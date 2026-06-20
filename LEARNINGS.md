@@ -56,14 +56,22 @@ xcrun simctl io booted screenshot out.png      # capture the live app
 Flutter has no kashida justification — it stretches glyph/space advances, which
 mangles Arabic. Use `TextAlign.start`/`center` with `textDirection: rtl`.
 
-### "Broken" Arabic is sometimes flowed-vs-page-faithful, not a bug
-`يَٰٓأَيُّهَا` renders with the superscript-alef+maddah as small marks over the yā
-in standard Unicode fonts — users may expect the elongated calligraphic "yā" of
-the printed Mushaf. That elongation comes from per-page QCF/page fonts, not any
-single Unicode font. Before "fixing", render the word with `hb-view` across
-several fonts (KFGQPC v2, v0.09, Scheherazade). If they ALL agree, ours is the
-correct standard rendering and the reference is page-faithful (backlog
-Exact-Mushaf mode) — nothing to fix in flowed mode.
+### Elongated madd (يَٰٓأَيُّهَا) needs the tatweel — it's a TEXT bug, not the font
+`يَٰٓأَيُّهَا` rendering with the superscript-alef+maddah as a detached mark
+(instead of the elongated "yā") looked like a font/page-fidelity issue — it
+wasn't. The QPC Uthmani edition quran.com uses inserts a **tatweel U+0640**
+before `superscript-alef(U+0670) + maddah(U+0653)`; our source (qpc-hafs
+word-by-word) omits it. Superscript alef is zero-width, so without a kashida
+carrier the font can't elongate. `hb-shape` proved it: add the tatweel and our
+SAME font emits the kashida glyph + connected init form.
+
+Fix (no migration): normalize on read — `text.replaceAll('ٰٓ',
+'ـٰٓ')`. Only ever applies to superscript-alef madds (1022 spots,
+all obligatory madds: يَٰٓأَيُّهَا, أُوْلَٰٓئِكَ, عَلَىٰٓ, مُوسَىٰٓ…); waw/ya madds
+already have a baseline and are untouched. **Diagnostic method that worked:** diff
+our stored text vs `api.quran.com/.../verses/uthmani` codepoints (use a real
+User-Agent — 403s urllib), then `hb-shape`/`hb-view` to confirm. Don't conclude
+"font limitation" before comparing the actual text encodings.
 
 ---
 

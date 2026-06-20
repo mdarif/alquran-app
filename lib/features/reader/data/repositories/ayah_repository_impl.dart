@@ -4,16 +4,12 @@ import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/repositories/ayah_repository.dart';
+import '../../domain/uthmani_text.dart';
 
 class AyahRepositoryImpl implements AyahRepository {
   const AyahRepositoryImpl(this._db);
 
   final AppDatabase _db;
-
-  // The QPC text carries an end-of-ayah marker (a trailing space + Arabic-Indic
-  // digits U+0660–U+0669, optionally the U+06DD ornament). We render our own
-  // ayah numbers, so strip the baked-in marker once on read.
-  static final RegExp _endOfAyahMarker = RegExp('[\\s۝٠-٩]+\$');
 
   @override
   Future<List<Ayah>> getAyahs(ReaderTarget target) async {
@@ -34,7 +30,7 @@ class AyahRepositoryImpl implements AyahRepository {
           id: r.id,
           surahId: r.surahId,
           ayahNumber: r.ayahNumber,
-          textArabic: r.textArabicUthmani.replaceAll(_endOfAyahMarker, ''),
+          textArabic: displayUthmani(r.textArabicUthmani),
           isSajda: r.sajda == 1,
           page: r.pageNumber,
           juz: r.juzNumber,
