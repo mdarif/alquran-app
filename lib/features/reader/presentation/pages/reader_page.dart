@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -7,6 +9,7 @@ import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/reader_navigation.dart';
+import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
@@ -43,15 +46,20 @@ class _ReaderViewState extends State<_ReaderView> {
   // Bounds target 20–48pt; tune on-device.
   static const double _minFont = 20;
   static const double _maxFont = 48;
-  double _arabicFont = 28;
+
+  // Reading preferences persist across launches (zoom + viewport).
+  final ReaderSettingsRepository _settings =
+      GetIt.I<ReaderSettingsRepository>();
+
+  late double _arabicFont = _settings.fontSize.clamp(_minFont, _maxFont);
 
   // The currently displayed section. Swiping moves it to an adjacent section
   // (next/previous) within the same dimension, keeping font/viewport state.
   late ReaderTarget _target = widget.initialTarget;
 
-  // Default to the lightweight Mushaf reading view (PRD lists Reading first);
-  // one touch on the app-bar toggle reveals the translations.
-  _Viewport _viewport = _Viewport.reading;
+  // Viewport preference (PRD lists Reading first), restored from settings.
+  late _Viewport _viewport =
+      _settings.detailed ? _Viewport.detailed : _Viewport.reading;
 
   // Pinch + swipe are both handled through a raw Listener (not GestureDetector)
   // so they do NOT enter the gesture arena. This matters because SelectionArea
@@ -86,12 +94,12 @@ class _ReaderViewState extends State<_ReaderView> {
           ),
           IconButton(
             tooltip: 'Smaller',
-            onPressed: () => _setFont(_arabicFont - 2),
+            onPressed: () => _nudgeFont(-2),
             icon: const Icon(Icons.text_decrease),
           ),
           IconButton(
             tooltip: 'Larger',
-            onPressed: () => _setFont(_arabicFont + 2),
+            onPressed: () => _nudgeFont(2),
             icon: const Icon(Icons.text_increase),
           ),
         ],
@@ -176,7 +184,12 @@ class _ReaderViewState extends State<_ReaderView> {
     if (_pointers.length < 2) _pinchBaseDistance = null;
     if (_pointers.isEmpty) {
       final start = _swipeStart;
-      if (!_multiTouch && start != null) _maybeSwipe(start, endPosition);
+      if (_multiTouch) {
+        // End of a pinch — persist the final zoom level.
+        unawaited(_settings.setFontSize(_arabicFont));
+      } else if (start != null) {
+        _maybeSwipe(start, endPosition);
+      }
       _swipeStart = null;
       _multiTouch = false;
     }
@@ -205,6 +218,13 @@ class _ReaderViewState extends State<_ReaderView> {
           ? _Viewport.detailed
           : _Viewport.reading;
     });
+    unawaited(_settings.setDetailed(_viewport == _Viewport.detailed));
+  }
+
+  /// +/- buttons: change the zoom and persist it.
+  void _nudgeFont(double delta) {
+    _setFont(_arabicFont + delta);
+    unawaited(_settings.setFontSize(_arabicFont));
   }
 
   void _setFont(double value) {

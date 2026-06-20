@@ -111,6 +111,12 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   (`if (ayahs.isEmpty) spinner; else content`) to avoid a spinner flash, and key
   the scroll view by the section's first ayah id so a *new* section starts at the
   top while a same-section rebuild keeps its scroll offset.
+- **Persisting reading prefs:** register `SharedPreferences` as a GetIt singleton
+  loaded once at startup, expose it behind a repo with **synchronous getters**
+  (so `State` can initialize `late` fields directly — no FutureBuilder flicker)
+  and async setters. Fire setters with `unawaited(...)` (satisfies the
+  `unawaited_futures` lint). For pinch-zoom, persist the **final** value on
+  pointer-up, not on every move, to avoid write spam.
 - **Centralize the Arabic style** once (`QuranTextStyle.madani`) and
   `.copyWith(fontSize: …)` at call sites — avoids drift across widgets.
 - **Urdu needs a Nastaliq font.** The platform default renders Urdu poorly. Bundle

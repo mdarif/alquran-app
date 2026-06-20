@@ -6,8 +6,10 @@ import '../../features/navigation/domain/repositories/index_repository.dart';
 import '../../features/navigation/presentation/cubit/index_list_cubit.dart';
 import '../../features/reader/data/repositories/ayah_repository_impl.dart';
 import '../../features/reader/data/repositories/last_read_repository_impl.dart';
+import '../../features/reader/data/repositories/reader_settings_repository_impl.dart';
 import '../../features/reader/domain/repositories/ayah_repository.dart';
 import '../../features/reader/domain/repositories/last_read_repository.dart';
+import '../../features/reader/domain/repositories/reader_settings_repository.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
 import '../../features/surahs/data/repositories/surah_repository_impl.dart';
 import '../../features/surahs/domain/repositories/surah_repository.dart';
@@ -36,6 +38,9 @@ Future<void> configureDependencies() async {
     )
     ..registerLazySingleton<LastReadRepository>(
       () => LastReadRepositoryImpl(getIt<SharedPreferences>()),
+    )
+    ..registerLazySingleton<ReaderSettingsRepository>(
+      () => ReaderSettingsRepositoryImpl(getIt<SharedPreferences>()),
     )
     // Cubits (new instance per screen)
     ..registerFactory<SurahListCubit>(

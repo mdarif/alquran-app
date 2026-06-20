@@ -4,6 +4,7 @@ import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
+import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
 import 'package:al_quran/features/reader/presentation/pages/reader_page.dart';
 import 'package:al_quran/features/reader/presentation/widgets/mushaf_view.dart';
@@ -45,6 +46,18 @@ class _FakeLastReadRepository implements LastReadRepository {
   Future<ReaderTarget?> load() async => saved;
 }
 
+class _FakeSettings implements ReaderSettingsRepository {
+  _FakeSettings({this.fontSize = 28, this.detailed = false});
+  @override
+  double fontSize;
+  @override
+  bool detailed;
+  @override
+  Future<void> setFontSize(double value) async => fontSize = value;
+  @override
+  Future<void> setDetailed(bool value) async => detailed = value;
+}
+
 Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
   await tester.pumpWidget(MaterialApp(home: ReaderPage(target: target)));
   await tester.pumpAndSettle();
@@ -52,9 +65,11 @@ Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
 
 void main() {
   setUp(() {
-    GetIt.I.registerFactory<ReaderCubit>(
-      () => ReaderCubit(_FakeAyahRepository(), _FakeLastReadRepository()),
-    );
+    GetIt.I
+      ..registerFactory<ReaderCubit>(
+        () => ReaderCubit(_FakeAyahRepository(), _FakeLastReadRepository()),
+      )
+      ..registerLazySingleton<ReaderSettingsRepository>(_FakeSettings.new);
   });
   tearDown(GetIt.I.reset);
 
@@ -111,6 +126,25 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 2'), findsOneWidget);
+    });
+  });
+
+  group('Reader persisted preferences', () {
+    testWidgets('opens in Mushaf when the saved viewport is reading',
+        (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      expect(find.byType(MushafView), findsOneWidget);
+    });
+
+    testWidgets('opens in Detailed when the saved viewport is detailed',
+        (tester) async {
+      GetIt.I.unregister<ReaderSettingsRepository>();
+      GetIt.I.registerLazySingleton<ReaderSettingsRepository>(
+        () => _FakeSettings(detailed: true),
+      );
+
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      expect(find.byType(MushafView), findsNothing); // Detailed list instead
     });
   });
 }
