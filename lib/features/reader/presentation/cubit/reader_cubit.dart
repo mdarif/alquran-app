@@ -6,13 +6,15 @@ import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/repositories/ayah_repository.dart';
+import '../../domain/repositories/last_read_repository.dart';
 
 part 'reader_state.dart';
 
 class ReaderCubit extends Cubit<ReaderState> {
-  ReaderCubit(this._repository) : super(const ReaderState());
+  ReaderCubit(this._repository, this._lastRead) : super(const ReaderState());
 
   final AyahRepository _repository;
+  final LastReadRepository _lastRead;
 
   Future<void> load(ReaderTarget target) async {
     emit(state.copyWith(status: ReaderStatus.loading));
@@ -28,6 +30,8 @@ class ReaderCubit extends Cubit<ReaderState> {
           headings: headings,
         ),
       );
+      // Remember where the user is, for "continue reading".
+      await _lastRead.save(target);
     } catch (e) {
       emit(state.copyWith(status: ReaderStatus.error, error: e.toString()));
     }

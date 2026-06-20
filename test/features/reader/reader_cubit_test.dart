@@ -3,8 +3,19 @@ import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
+import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _FakeLastReadRepository implements LastReadRepository {
+  ReaderTarget? saved;
+
+  @override
+  Future<void> save(ReaderTarget target) async => saved = target;
+
+  @override
+  Future<ReaderTarget?> load() async => saved;
+}
 
 class _FakeAyahRepository implements AyahRepository {
   _FakeAyahRepository({
@@ -49,7 +60,8 @@ const _ayah = Ayah(
 void main() {
   group('ReaderCubit', () {
     test('initial state is ReaderStatus.initial', () {
-      final cubit = ReaderCubit(_FakeAyahRepository());
+      final cubit =
+          ReaderCubit(_FakeAyahRepository(), _FakeLastReadRepository());
       expect(cubit.state.status, ReaderStatus.initial);
       expect(cubit.state.ayahs, isEmpty);
       expect(cubit.state.resources, isEmpty);
@@ -59,6 +71,7 @@ void main() {
     test('load() emits loading then loaded with ayahs and resources', () async {
       final cubit = ReaderCubit(
         _FakeAyahRepository(ayahs: const [_ayah], resources: const [_urdu]),
+        _FakeLastReadRepository(),
       );
 
       final expectation = expectLater(
@@ -79,6 +92,7 @@ void main() {
         () async {
       final cubit = ReaderCubit(
         _FakeAyahRepository(error: Exception('no surah 999')),
+        _FakeLastReadRepository(),
       );
 
       final expectation = expectLater(

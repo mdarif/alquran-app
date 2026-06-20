@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../reader/presentation/widgets/continue_reading_banner.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
 import '../widgets/index_list_view.dart';
@@ -26,13 +27,20 @@ class HomePage extends StatelessWidget {
             ],
           ),
         ),
-        body: const TabBarView(
+        body: const Column(
           children: [
-            SurahListView(),
-            IndexListView(kind: IndexKind.juz, label: 'Juz'),
-            IndexListView(kind: IndexKind.hizb, label: 'Hizb'),
-            IndexListView(kind: IndexKind.page, label: 'Page'),
-            IndexListView(kind: IndexKind.ruku, label: 'Ruku'),
+            ContinueReadingBanner(),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  SurahListView(),
+                  IndexListView(kind: IndexKind.juz, label: 'Juz'),
+                  IndexListView(kind: IndexKind.hizb, label: 'Hizb'),
+                  IndexListView(kind: IndexKind.page, label: 'Page'),
+                  IndexListView(kind: IndexKind.ruku, label: 'Ruku'),
+                ],
+              ),
+            ),
           ],
         ),
       ),
