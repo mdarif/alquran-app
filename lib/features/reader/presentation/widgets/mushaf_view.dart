@@ -116,15 +116,8 @@ class SurahHeaderCard extends StatelessWidget {
     final theme = Theme.of(context);
     final number = heading?.number ?? fallbackNumber;
     final name = heading?.nameEnglish ?? 'Surah $number';
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.18),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -173,7 +166,6 @@ class Bismillah extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      key: const Key('mushaf-bismillah'),
       child: Text(
         _bismillah,
         textAlign: TextAlign.center,

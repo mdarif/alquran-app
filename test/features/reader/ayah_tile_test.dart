@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _urdu = TranslationResource(id: 1, languageCode: 'ur', name: 'Junagarhi');
 const _hindi = TranslationResource(id: 2, languageCode: 'hi', name: 'al-Umari');
+const _english =
+    TranslationResource(id: 3, languageCode: 'en', name: 'Hilali & Khan');
 
 Widget _wrap(Widget child) =>
     MaterialApp(home: Scaffold(body: SingleChildScrollView(child: child)));
@@ -119,6 +121,71 @@ void main() {
 
       expect(find.text('اردو فقط'), findsOneWidget);
       expect(find.text('अल्लाह के नाम'), findsNothing);
+    });
+
+    testWidgets('shows a language + author attribution per translation',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+        translations: {1: 'اردو', 3: 'english'},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(
+            ayah: ayah,
+            resources: [_urdu, _english],
+            arabicFontSize: 24,
+          ),
+        ),
+      );
+
+      expect(find.text('Urdu · Junagarhi'), findsOneWidget);
+      expect(find.text('English · Hilali & Khan'), findsOneWidget);
+    });
+
+    testWidgets('does not show the page number', (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+        page: 2,
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(ayah: ayah, resources: [], arabicFontSize: 24),
+        ),
+      );
+
+      expect(find.textContaining('p. 2'), findsNothing);
+    });
+
+    testWidgets('renders Urdu translation right-to-left', (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+        translations: {1: 'اردو ترجمہ'},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(ayah: ayah, resources: [_urdu], arabicFontSize: 24),
+        ),
+      );
+
+      final urduText = tester.widget<Text>(find.text('اردو ترجمہ'));
+      expect(urduText.textDirection, TextDirection.rtl);
+      expect(urduText.textAlign, TextAlign.right);
     });
   });
 }

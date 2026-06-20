@@ -4,8 +4,6 @@ import 'package:al_quran/features/reader/presentation/widgets/mushaf_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _bismillahKey = Key('mushaf-bismillah');
-
 List<Ayah> _ayahs(int surahId, int count) => [
       for (var n = 1; n <= count; n++)
         Ayah(
@@ -74,7 +72,7 @@ void main() {
         ),
       );
 
-      expect(find.byKey(_bismillahKey), findsOneWidget);
+      expect(find.byType(Bismillah), findsOneWidget);
     });
 
     testWidgets('hides the Bismillah for Al-Fatihah (it is ayah 1)',
@@ -89,7 +87,7 @@ void main() {
         ),
       );
 
-      expect(find.byKey(_bismillahKey), findsNothing);
+      expect(find.byType(Bismillah), findsNothing);
     });
 
     testWidgets('hides the Bismillah for At-Tawbah (it has none)',
@@ -104,7 +102,7 @@ void main() {
         ),
       );
 
-      expect(find.byKey(_bismillahKey), findsNothing);
+      expect(find.byType(Bismillah), findsNothing);
     });
 
     testWidgets('renders a header per surah when a section spans surahs',

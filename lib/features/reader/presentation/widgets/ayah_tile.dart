@@ -24,7 +24,9 @@ class AyahTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // Stretch so the Arabic and each translation fill the row width and can
+        // be aligned by script (Arabic/Urdu → right, English → left).
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -41,44 +43,67 @@ class AyahTile extends StatelessWidget {
               ),
               const Spacer(),
               if (ayah.isSajda)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    Icons.star,
-                    size: 16,
-                    color: theme.colorScheme.tertiary,
-                  ),
-                ),
-              if (ayah.page != null)
-                Text('p. ${ayah.page}', style: theme.textTheme.labelSmall),
+                Icon(Icons.star, size: 16, color: theme.colorScheme.tertiary),
             ],
           ),
           const SizedBox(height: 10),
           // Arabic (RTL, scalable for low-vision accessibility — PRD 4.1)
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              ayah.textArabic,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              style: QuranTextStyle.madani.copyWith(fontSize: arabicFontSize),
-            ),
+          Text(
+            ayah.textArabic,
+            textAlign: TextAlign.right,
+            textDirection: TextDirection.rtl,
+            style: QuranTextStyle.madani.copyWith(fontSize: arabicFontSize),
           ),
           for (final r in resources)
-            if (ayah.translations[r.id] != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                ayah.translations[r.id]!,
-                textDirection: r.languageCode == 'ur'
-                    ? TextDirection.rtl
-                    : TextDirection.ltr,
-                style: r.languageCode.scriptStyle(
-                  theme.textTheme.bodyLarge!.copyWith(height: 1.5),
-                ),
-              ),
-            ],
+            if (ayah.translations[r.id] != null)
+              _Translation(resource: r, text: ayah.translations[r.id]!),
         ],
       ),
     );
   }
 }
+
+/// One translation: a small left-aligned attribution label over the text, which
+/// is aligned by its script (Urdu RTL → right, English LTR → left).
+class _Translation extends StatelessWidget {
+  const _Translation({required this.resource, required this.text});
+
+  final TranslationResource resource;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isRtl = resource.languageCode == 'ur';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 14),
+        Text(
+          '${_languageName(resource.languageCode)} · ${resource.name}',
+          textAlign: TextAlign.left,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          text,
+          textAlign: isRtl ? TextAlign.right : TextAlign.left,
+          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          style: resource.languageCode.scriptStyle(
+            theme.textTheme.bodyLarge!.copyWith(height: 1.5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _languageName(String code) => switch (code) {
+      'ur' => 'Urdu',
+      'en' => 'English',
+      'hi' => 'Hindi',
+      _ => code.toUpperCase(),
+    };

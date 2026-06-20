@@ -251,31 +251,45 @@ class _DetailedList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Flatten into header/ayah rows so the list stays lazy.
+    // Flatten into header/ayah rows so the list stays lazy. A header marks each
+    // surah boundary, and notes whether the Basmala should precede it (shown for
+    // every surah except Al-Fatihah — where it is ayah 1 — and At-Tawbah).
     final rows = <Object>[];
     int? lastSurah;
     for (final ayah in ayahs) {
       if (ayah.surahId != lastSurah) {
-        rows.add(_HeaderMarker(ayah.surahId));
+        rows.add(
+          _HeaderMarker(
+            surahId: ayah.surahId,
+            showBismillah:
+                ayah.ayahNumber == 1 && ayah.surahId != 1 && ayah.surahId != 9,
+          ),
+        );
         lastSurah = ayah.surahId;
       }
       rows.add(ayah);
     }
 
-    return ListView.separated(
+    return ListView.builder(
       itemCount: rows.length,
-      separatorBuilder: (_, __) {
-        return const SizedBox.shrink();
-      },
       itemBuilder: (context, i) {
         final row = rows[i];
         if (row is _HeaderMarker) {
-          return Padding(
-            padding: EdgeInsets.fromLTRB(16, i == 0 ? 12 : 20, 16, 4),
-            child: SurahHeaderCard(
-              heading: headings[row.surahId],
-              fallbackNumber: row.surahId,
-            ),
+          return Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(16, i == 0 ? 12 : 20, 16, 4),
+                child: SurahHeaderCard(
+                  heading: headings[row.surahId],
+                  fallbackNumber: row.surahId,
+                ),
+              ),
+              if (row.showBismillah)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Bismillah(fontSize: arabicFontSize),
+                ),
+            ],
           );
         }
         return AyahTile(
@@ -289,6 +303,7 @@ class _DetailedList extends StatelessWidget {
 }
 
 class _HeaderMarker {
-  const _HeaderMarker(this.surahId);
+  const _HeaderMarker({required this.surahId, required this.showBismillah});
   final int surahId;
+  final bool showBismillah;
 }

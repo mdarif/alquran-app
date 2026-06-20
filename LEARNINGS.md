@@ -119,6 +119,12 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   pointer-up, not on every move, to avoid write spam.
 - **Centralize the Arabic style** once (`QuranTextStyle.madani`) and
   `.copyWith(fontSize: …)` at call sites — avoids drift across widgets.
+- **RTL text still left-aligns inside a `Column`.** A `Text` with
+  `textDirection: rtl` in a `Column(crossAxisAlignment: start)` shrink-wraps and
+  sits at the *left* edge (short Urdu lines look left-aligned). Fix: stretch the
+  column (`crossAxisAlignment: stretch`) so each `Text` fills the width, then set
+  `textAlign` per script (Arabic/Urdu → `right`, English → `left`). Direction
+  alone is not alignment.
 - **Urdu needs a Nastaliq font.** The platform default renders Urdu poorly. Bundle
   **Noto Nastaliq Urdu** (Google, SIL OFL — license-clean) with extra line height
   (~2.0). Jameel Noori Nastaleeq looks great but its licence is murky.
