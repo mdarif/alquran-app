@@ -8,12 +8,21 @@ class SurahHeading extends Equatable {
     required this.number,
     required this.nameEnglish,
     required this.totalAyahs,
+    this.nameArabic,
+    this.revelationPlace,
   });
 
   final int number;
   final String nameEnglish;
   final int totalAyahs;
 
+  /// Arabic surah name (e.g. الفاتحة). Null only in synthetic test fixtures.
+  final String? nameArabic;
+
+  /// Revelation place as stored in the DB: "makkah" | "madinah" (nullable).
+  final String? revelationPlace;
+
   @override
-  List<Object?> get props => [number, nameEnglish, totalAyahs];
+  List<Object?> get props =>
+      [number, nameEnglish, totalAyahs, nameArabic, revelationPlace];
 }

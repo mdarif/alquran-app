@@ -193,7 +193,9 @@ List<List<Ayah>> groupAyahsBySurah(List<Ayah> ayahs) {
   return groups;
 }
 
-/// Chapter header: a small number medallion above the English name (centered).
+/// Chapter header (the "open a surah" moment): a refined number medallion, the
+/// Arabic surah name in the QPC face, the English name in a display serif, and a
+/// muted "<revelation> · <n> verses" meta line. Centered.
 class SurahHeaderCard extends StatelessWidget {
   const SurahHeaderCard({
     required this.heading,
@@ -207,36 +209,102 @@ class SurahHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final number = heading?.number ?? fallbackNumber;
-    final name = heading?.nameEnglish ?? 'Surah $number';
+    final nameEnglish = heading?.nameEnglish ?? 'Surah $number';
+    final nameArabic = heading?.nameArabic;
+    final meta = _metaLine(heading);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 15,
-            backgroundColor: theme.colorScheme.primary,
+          // Refined medallion: a soft-tinted ring rather than a flat green disc.
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.primary.withValues(alpha: 0.10),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.45)),
+            ),
             child: Text(
               '$number',
               style: TextStyle(
-                color: theme.colorScheme.onPrimary,
+                color: cs.primary,
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: 15,
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          if (nameArabic != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              nameArabic,
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.rtl,
+              style: QuranTextStyle.madani.copyWith(
+                fontSize: 26,
+                height: 1.4,
+                color: cs.primary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
           Text(
-            name,
+            nameEnglish,
             textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+            style: TextStyle(
+              fontFamily: AppTheme.displayFontFamily,
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurface,
             ),
           ),
+          if (meta != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              meta,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// "Meccan · 7 verses" — each part included only when known.
+  static String? _metaLine(SurahHeading? heading) {
+    if (heading == null) return null;
+    final parts = <String>[];
+    final revelation = _revelationLabel(heading.revelationPlace);
+    if (revelation != null) parts.add(revelation);
+    if (heading.totalAyahs > 0) {
+      parts.add(
+        heading.totalAyahs == 1 ? '1 verse' : '${heading.totalAyahs} verses',
+      );
+    }
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// Maps the DB's revelation_place ("makkah"/"madinah") to a reader label.
+  static String? _revelationLabel(String? place) {
+    switch (place?.toLowerCase()) {
+      case 'makkah':
+      case 'mecca':
+        return 'Meccan';
+      case 'madinah':
+      case 'medina':
+        return 'Medinan';
+      default:
+        return null;
+    }
   }
 }
 

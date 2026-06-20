@@ -8,12 +8,13 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
-import '../../../../core/theme/theme_toggle_button.dart';
+import '../../../../core/theme/theme_cubit.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
+import '../widgets/reader_settings_sheet.dart';
 
 class ReaderPage extends StatelessWidget {
   const ReaderPage({required this.target, super.key});
@@ -84,25 +85,10 @@ class _ReaderViewState extends State<_ReaderView> {
       appBar: AppBar(
         title: Text(_target.title),
         actions: [
-          const ThemeToggleButton(),
           IconButton(
-            tooltip: isReading
-                ? 'Detailed view (with translation)'
-                : 'Mushaf view (Arabic only)',
-            onPressed: _toggleViewport,
-            icon: Icon(
-              isReading ? Icons.subject_rounded : Icons.menu_book_rounded,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Smaller',
-            onPressed: () => _nudgeFont(-2),
-            icon: const Icon(Icons.text_decrease),
-          ),
-          IconButton(
-            tooltip: 'Larger',
-            onPressed: () => _nudgeFont(2),
-            icon: const Icon(Icons.text_increase),
+            tooltip: 'Display',
+            onPressed: _openSettings,
+            icon: const Icon(Icons.tune_rounded),
           ),
         ],
       ),
@@ -214,18 +200,37 @@ class _ReaderViewState extends State<_ReaderView> {
 
   // --------------------------------------------------------------------------
 
-  void _toggleViewport() {
-    setState(() {
-      _viewport = _viewport == _Viewport.reading
-          ? _Viewport.detailed
-          : _Viewport.reading;
-    });
-    unawaited(_settings.setDetailed(_viewport == _Viewport.detailed));
+  /// Opens the display settings sheet (theme / view / text size). The sheet
+  /// reaches the app-root [ThemeCubit] via `BlocProvider.value`, and drives the
+  /// page's font + viewport live through callbacks.
+  void _openSettings() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: false,
+      builder: (_) => BlocProvider<ThemeCubit>.value(
+        value: context.read<ThemeCubit>(),
+        child: ReaderSettingsSheet(
+          fontSize: _arabicFont,
+          minFont: _minFont,
+          maxFont: _maxFont,
+          detailed: _viewport == _Viewport.detailed,
+          onFontSize: _applyFont,
+          onDetailedChanged: _setDetailed,
+        ),
+      ),
+    );
   }
 
-  /// +/- buttons: change the zoom and persist it.
-  void _nudgeFont(double delta) {
-    _setFont(_arabicFont + delta);
+  void _setDetailed(bool detailed) {
+    setState(() {
+      _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
+    });
+    unawaited(_settings.setDetailed(detailed));
+  }
+
+  /// Slider: set the zoom to an absolute value and persist it.
+  void _applyFont(double value) {
+    _setFont(value);
     unawaited(_settings.setFontSize(_arabicFont));
   }
 

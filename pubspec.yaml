@@ -58,3 +58,8 @@ flutter:
     - family: NotoNastaliqUrdu
       fonts:
         - asset: assets/fonts/NotoNastaliqUrdu-Regular.ttf
+    # Display serif for Latin headings (surah English name) — Playfair Display by
+    # Claus Eggers Sørensen (Google Fonts, SIL OFL 1.1 — licence-clean).
+    - family: PlayfairDisplay
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay-SemiBold.ttf

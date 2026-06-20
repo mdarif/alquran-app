@@ -4,7 +4,6 @@ import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/repositories/ayah_repository.dart';
-import '../../domain/uthmani_text.dart';
 
 class AyahRepositoryImpl implements AyahRepository {
   const AyahRepositoryImpl(this._db);
@@ -30,7 +29,7 @@ class AyahRepositoryImpl implements AyahRepository {
           id: r.id,
           surahId: r.surahId,
           ayahNumber: r.ayahNumber,
-          textArabic: displayUthmani(r.textArabicUthmani),
+          textArabic: r.textArabicUthmani,
           isSajda: r.sajda == 1,
           page: r.pageNumber,
           juz: r.juzNumber,
@@ -51,6 +50,8 @@ class AyahRepositoryImpl implements AyahRepository {
           number: s.id,
           nameEnglish: s.nameEnglish,
           totalAyahs: s.totalAyahs,
+          nameArabic: s.nameArabic,
+          revelationPlace: s.revelationPlace,
         ),
     };
   }

@@ -22,6 +22,10 @@ class AppTheme {
   // Urdu translation face — Noto Nastaliq Urdu (proper nastaliq script).
   static const String urduFontFamily = 'NotoNastaliqUrdu';
 
+  // Display serif for Latin headings (the surah English name in the chapter
+  // header). Playfair Display (SIL OFL). Swap here to change the heading face.
+  static const String displayFontFamily = 'PlayfairDisplay';
+
   static ThemeData light() => _build(
         Brightness.light,
         const Color(0xFFFBF9F3), // warm off-white
@@ -40,7 +44,23 @@ class AppTheme {
       ),
       useMaterial3: true,
     );
-    return base.copyWith(scaffoldBackgroundColor: scaffold);
+    return base.copyWith(
+      scaffoldBackgroundColor: scaffold,
+      // Flat, centered bar that blends into the warm page — drops the Material
+      // "slab" look for a calmer, more premium reading frame.
+      appBarTheme: AppBarTheme(
+        backgroundColor: scaffold,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: base.colorScheme.onSurface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        titleTextStyle: base.textTheme.titleMedium?.copyWith(
+          color: base.colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }
 

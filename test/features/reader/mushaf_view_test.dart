@@ -15,11 +15,20 @@ List<Ayah> _ayahs(int surahId, int count) => [
         ),
     ];
 
-Map<int, SurahHeading> _headings(int surahId, String name, int count) => {
+Map<int, SurahHeading> _headings(
+  int surahId,
+  String name,
+  int count, {
+  String? arabic,
+  String? place,
+}) =>
+    {
       surahId: SurahHeading(
         number: surahId,
         nameEnglish: name,
         totalAyahs: count,
+        nameArabic: arabic,
+        revelationPlace: place,
       ),
     };
 
@@ -41,6 +50,44 @@ void main() {
 
       expect(find.text('Al-Baqarah'), findsOneWidget);
       expect(find.textContaining('ayahs'), findsNothing);
+    });
+
+    testWidgets('shows the Arabic surah name and a revelation/verses meta line',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahs(1, 7),
+            headings: _headings(
+              1,
+              'Al-Fatihah',
+              7,
+              arabic: 'الفاتحة',
+              place: 'makkah',
+            ),
+            arabicFontSize: 28,
+          ),
+        ),
+      );
+
+      expect(find.text('الفاتحة'), findsOneWidget);
+      expect(find.text('Meccan · 7 verses'), findsOneWidget);
+    });
+
+    testWidgets('omits the meta line when surah metadata is unavailable',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahs(2, 3),
+            headings: const {}, // no heading → fallback name, no meta
+            arabicFontSize: 28,
+          ),
+        ),
+      );
+
+      expect(find.textContaining('verses'), findsNothing);
+      expect(find.textContaining('·'), findsNothing);
     });
 
     testWidgets('the Arabic flow is centered and right-to-left',

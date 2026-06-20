@@ -15,4 +15,10 @@ Bundled faces (declared in `pubspec.yaml`):
 - **`NotoNastaliqUrdu-Regular.ttf`** — family `NotoNastaliqUrdu`, the Urdu
   translation face. Noto Nastaliq Urdu by Google, SIL Open Font License 1.1.
 
+- **`PlayfairDisplay-SemiBold.ttf`** — family `PlayfairDisplay`, the display
+  serif used for the surah English name in the chapter header. Playfair Display
+  by Claus Eggers Sørensen, SIL Open Font License 1.1 (licence-clean). This is
+  the variable-weight file from Google Fonts; we render it around weight 600.
+  Swap the face by changing `AppTheme.displayFontFamily`.
+
 `Kitab` is the planned alternate naskh face.
