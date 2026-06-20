@@ -13,9 +13,8 @@ class SurahTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final place = surah.revelationPlace;
-    final placeLabel = place == null
-        ? ''
-        : '${place[0].toUpperCase()}${place.substring(1)}';
+    final placeLabel =
+        place == null ? '' : '${place[0].toUpperCase()}${place.substring(1)}';
 
     return ListTile(
       onTap: onTap,

@@ -38,19 +38,22 @@ class AppDatabase extends _$AppDatabase {
   Future<List<SurahRow>> allSurahs() =>
       (select(surahs)..orderBy([(s) => OrderingTerm.asc(s.id)])).get();
 
-  Future<List<AyahRow>> ayahsForSurah(int surahId) =>
-      (select(ayahs)
-            ..where((a) => a.surahId.equals(surahId))
-            ..orderBy([(a) => OrderingTerm.asc(a.ayahNumber)]))
-          .get();
+  Future<List<AyahRow>> ayahsForSurah(int surahId) => (select(ayahs)
+        ..where((a) => a.surahId.equals(surahId))
+        ..orderBy([(a) => OrderingTerm.asc(a.ayahNumber)]))
+      .get();
 
   /// Ayahs of an index range (juz/hizb/page/ruku), in mushaf order. These
   /// indices are global and monotonic, so ordering by the running [Ayahs.id]
   /// yields the correct reading sequence even across surah boundaries.
-  Future<List<AyahRow>> ayahsForJuz(int n) => _ayahsByGlobalIndex(ayahs.juzNumber, n);
-  Future<List<AyahRow>> ayahsForHizb(int n) => _ayahsByGlobalIndex(ayahs.hizbNumber, n);
-  Future<List<AyahRow>> ayahsForPage(int n) => _ayahsByGlobalIndex(ayahs.pageNumber, n);
-  Future<List<AyahRow>> ayahsForRuku(int n) => _ayahsByGlobalIndex(ayahs.rukuNumber, n);
+  Future<List<AyahRow>> ayahsForJuz(int n) =>
+      _ayahsByGlobalIndex(ayahs.juzNumber, n);
+  Future<List<AyahRow>> ayahsForHizb(int n) =>
+      _ayahsByGlobalIndex(ayahs.hizbNumber, n);
+  Future<List<AyahRow>> ayahsForPage(int n) =>
+      _ayahsByGlobalIndex(ayahs.pageNumber, n);
+  Future<List<AyahRow>> ayahsForRuku(int n) =>
+      _ayahsByGlobalIndex(ayahs.rukuNumber, n);
 
   Future<List<AyahRow>> _ayahsByGlobalIndex(GeneratedColumn<int> col, int n) =>
       (select(ayahs)
@@ -145,7 +148,8 @@ LazyDatabase _openConnection() {
     if (!await file.exists()) {
       // First launch: unpack the bundled seed DB into writable storage.
       final blob = await rootBundle.load('assets/db/quran.db');
-      final bytes = blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);
+      final bytes =
+          blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);
       await file.writeAsBytes(bytes, flush: true);
     }
 

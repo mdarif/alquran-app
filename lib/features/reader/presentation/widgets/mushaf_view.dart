@@ -7,8 +7,7 @@ import '../../domain/entities/surah_heading.dart';
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
 /// quran.db). Shown before every surah except Al-Fatihah (where it is ayah 1)
 /// and At-Tawbah (which has none) — and only when a surah is shown from ayah 1.
-const String _bismillah =
-    'بِسۡمِ ٱللَّهِ'
+const String _bismillah = 'بِسۡمِ ٱللَّهِ'
     ' ٱلرَّحۡمَٰنِ'
     ' ٱلرَّحِيمِ';
 
@@ -188,7 +187,11 @@ class Bismillah extends StatelessWidget {
 /// Inline end-of-ayah marker: the verse number (Western numerals) inside a soft
 /// tinted medallion, sized to sit with the surrounding Arabic line.
 class AyahMedallion extends StatelessWidget {
-  const AyahMedallion({required this.number, required this.fontSize, super.key});
+  const AyahMedallion({
+    required this.number,
+    required this.fontSize,
+    super.key,
+  });
 
   final int number;
   final double fontSize;

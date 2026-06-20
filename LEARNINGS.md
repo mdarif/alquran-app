@@ -124,6 +124,17 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   a full disk fails builds with `errno 28`. DerivedData is regenerable; clearing
   it is safe.
 - Lint `require_trailing_commas` is on — multi-arg calls need trailing commas.
+- **`dart format` vs `require_trailing_commas` conflict:** when args fit on two
+  lines, the formatter wraps them WITHOUT a trailing comma, but the lint then
+  flags it — an endless tug-of-war. Fix by writing the call fully expanded with a
+  trailing comma (one arg per line); the formatter then leaves it alone. Decide
+  per project whether to keep both — they only clash on these borderline wraps.
+- **Cheap, high-leverage tooling** (ported from a sibling app): a `Makefile`
+  task runner (`make ci` = format-check + analyze + test), a `.githooks/pre-push`
+  mirroring CI (`git config core.hooksPath .githooks`), a GitHub Actions workflow
+  (remember: run `build_runner` before analyze since `*.g.dart` is gitignored),
+  stricter `analysis_options` (`strict-inference`, `unawaited_futures`), and
+  `cliff.toml` for changelog-from-conventional-commits. All architecture-agnostic.
 
 ---
 

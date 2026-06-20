@@ -43,7 +43,11 @@ class AyahTile extends StatelessWidget {
               if (ayah.isSajda)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: Icon(Icons.star, size: 16, color: theme.colorScheme.tertiary),
+                  child: Icon(
+                    Icons.star,
+                    size: 16,
+                    color: theme.colorScheme.tertiary,
+                  ),
                 ),
               if (ayah.page != null)
                 Text('p. ${ayah.page}', style: theme.textTheme.labelSmall),

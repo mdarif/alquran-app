@@ -38,39 +38,39 @@ class _SurahListBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<SurahListCubit, SurahListState>(
-        builder: (context, state) {
-          switch (state.status) {
-            case SurahListStatus.initial:
-            case SurahListStatus.loading:
-              return const Center(child: CircularProgressIndicator());
-            case SurahListStatus.error:
-              return _ErrorView(
-                message: state.error ?? 'Something went wrong',
-                onRetry: () => context.read<SurahListCubit>().load(),
-              );
-            case SurahListStatus.loaded:
-              return ListView.separated(
-                itemCount: state.surahs.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, i) {
-                  final Surah surah = state.surahs[i];
-                  return SurahTile(
-                    surah: surah,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => ReaderPage(
-                          target: ReaderTarget.surah(
-                            surah.id,
-                            surah.nameEnglish,
-                          ),
+      builder: (context, state) {
+        switch (state.status) {
+          case SurahListStatus.initial:
+          case SurahListStatus.loading:
+            return const Center(child: CircularProgressIndicator());
+          case SurahListStatus.error:
+            return _ErrorView(
+              message: state.error ?? 'Something went wrong',
+              onRetry: () => context.read<SurahListCubit>().load(),
+            );
+          case SurahListStatus.loaded:
+            return ListView.separated(
+              itemCount: state.surahs.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, i) {
+                final Surah surah = state.surahs[i];
+                return SurahTile(
+                  surah: surah,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ReaderPage(
+                        target: ReaderTarget.surah(
+                          surah.id,
+                          surah.nameEnglish,
                         ),
                       ),
                     ),
-                  );
-                },
-              );
-          }
-        },
+                  ),
+                );
+              },
+            );
+        }
+      },
     );
   }
 }

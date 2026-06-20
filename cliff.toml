@@ -1,0 +1,31 @@
+# git-cliff — generate CHANGELOG.md from Conventional Commits.
+# Usage: `git cliff -o CHANGELOG.md` (install: brew install git-cliff).
+[changelog]
+header = "# Changelog\n\nAll notable changes to Al Quran are documented here.\n"
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }}\
+{% endfor %}
+{% endfor %}\n
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactor" },
+  { message = "^docs", skip = true },
+  { message = "^test", skip = true },
+  { message = "^chore", skip = true },
+  { message = "^ci", skip = true },
+  { message = "^build", skip = true },
+  { message = "^style", skip = true },
+]
+filter_commits = false
+tag_pattern = "v[0-9]*"

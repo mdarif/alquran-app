@@ -1,0 +1,15 @@
+#!/bin/sh
+# Mirror the CI gate before pushing: formatting, static analysis, tests.
+# Install once with `make hooks` (sets core.hooksPath to .githooks).
+set -e
+
+echo "pre-push: dart format check…"
+dart format --output=none --set-exit-if-changed lib test
+
+echo "pre-push: flutter analyze…"
+flutter analyze --fatal-warnings
+
+echo "pre-push: flutter test…"
+flutter test --reporter=expanded
+
+echo "pre-push: all checks passed ✓"

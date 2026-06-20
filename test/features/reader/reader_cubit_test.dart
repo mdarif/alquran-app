@@ -56,8 +56,7 @@ void main() {
       cubit.close();
     });
 
-    test('load() emits loading then loaded with ayahs and resources',
-        () async {
+    test('load() emits loading then loaded with ayahs and resources', () async {
       final cubit = ReaderCubit(
         _FakeAyahRepository(ayahs: const [_ayah], resources: const [_urdu]),
       );
@@ -67,7 +66,7 @@ void main() {
         emitsInOrder([ReaderStatus.loading, ReaderStatus.loaded]),
       );
 
-      await cubit.load(const ReaderTarget.surah(1, "Al-Fatihah"));
+      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
       await expectation;
 
       expect(cubit.state.ayahs, const [_ayah]);

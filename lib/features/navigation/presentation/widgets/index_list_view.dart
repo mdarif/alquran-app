@@ -44,8 +44,9 @@ class IndexListView extends StatelessWidget {
                   label: label,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) =>
-                          ReaderPage(target: _targetFor(state.entries[i].number)),
+                      builder: (_) => ReaderPage(
+                        target: _targetFor(state.entries[i].number),
+                      ),
                     ),
                   ),
                 ),
