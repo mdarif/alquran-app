@@ -20,12 +20,14 @@ class SurahTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
+        radius: 16,
         backgroundColor: theme.colorScheme.primaryContainer,
         child: Text(
           '${surah.id}',
           style: TextStyle(
             color: theme.colorScheme.onPrimaryContainer,
             fontWeight: FontWeight.w600,
+            fontSize: 13,
           ),
         ),
       ),

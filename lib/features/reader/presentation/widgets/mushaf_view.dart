@@ -177,7 +177,7 @@ class _AyahMedallion extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final diameter = fontSize * 1.35;
+    final diameter = fontSize * 1.15;
     return Container(
       margin: EdgeInsets.symmetric(horizontal: fontSize * 0.18),
       width: diameter,
