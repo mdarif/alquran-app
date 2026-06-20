@@ -15,6 +15,7 @@ import '../../features/surahs/data/repositories/surah_repository_impl.dart';
 import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
 import '../database/app_database.dart';
+import '../database/db_seeder.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -22,9 +23,12 @@ final GetIt getIt = GetIt.instance;
 /// cubits, with the single AppDatabase as the shared data source.
 Future<void> configureDependencies() async {
   final prefs = await SharedPreferences.getInstance();
+  // Copy/refresh the bundled seed DB before opening it, so an updated quran.db
+  // (corrections, new translations) replaces the stale on-device copy.
+  final dbFile = await ensureSeedDatabase(prefs);
   getIt
     // Data sources
-    ..registerSingleton<AppDatabase>(AppDatabase())
+    ..registerSingleton<AppDatabase>(AppDatabase(dbFile))
     ..registerSingleton<SharedPreferences>(prefs)
     // Repositories
     ..registerLazySingleton<SurahRepository>(

@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -44,3 +44,8 @@ ci: format-check analyze test ## Mirror the CI pipeline locally
 hooks: ## Install the repo git hooks (pre-push runs the CI gate)
 	git config core.hooksPath .githooks
 	@echo "git hooks installed (core.hooksPath = .githooks)"
+
+seed-version: ## Refresh the DB version marker (run after replacing quran.db)
+	@sqlite3 assets/db/quran.db "SELECT value FROM db_meta WHERE key='built_at';" \
+		| tr -d '\n' > assets/db/quran.db.version
+	@echo "seed-version: $$(cat assets/db/quran.db.version)"

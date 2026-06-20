@@ -2,21 +2,18 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import 'tables.dart';
 
 part 'app_database.g.dart';
 
 /// The bundled, fully-offline seed database (compiled by the alquran-data
-/// pipeline and shipped as an asset). It is copied to a writable location on
-/// first launch; the tables already exist and are populated, so the Drift
-/// migration is a no-op (see [migration]).
+/// pipeline and shipped as an asset). The writable copy is created/refreshed by
+/// `ensureSeedDatabase` (see db_seeder.dart) and passed in here; the tables
+/// already exist and are populated, so the Drift migration is a no-op.
 @DriftDatabase(tables: [Surahs, Ayahs, Resources, Translations, DbMeta])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase(File file) : super(_openFile(file));
 
   AppDatabase.forTesting(super.executor);
 
@@ -140,19 +137,5 @@ class IndexStart {
   final int ayahNumber;
 }
 
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dir.path, 'quran.db'));
-
-    if (!await file.exists()) {
-      // First launch: unpack the bundled seed DB into writable storage.
-      final blob = await rootBundle.load('assets/db/quran.db');
-      final bytes =
-          blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes);
-      await file.writeAsBytes(bytes, flush: true);
-    }
-
-    return NativeDatabase.createInBackground(file);
-  });
-}
+LazyDatabase _openFile(File file) =>
+    LazyDatabase(() async => NativeDatabase.createInBackground(file));

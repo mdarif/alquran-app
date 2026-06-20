@@ -39,6 +39,9 @@ flutter:
 
   assets:
     - assets/db/quran.db
+    # Version marker (db_meta.built_at) used to re-seed the bundled DB on update.
+    # Regenerate after replacing quran.db: `make seed-version`.
+    - assets/db/quran.db.version
 
   # KFGQPC HAFS Uthmanic Script V2 (Ver 0.18) — the primary Arabic face (PRD
   # 4.1). This is the HarfBuzz-compatible release: the lam-alef ligature forms

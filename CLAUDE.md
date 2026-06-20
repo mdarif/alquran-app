@@ -83,9 +83,14 @@ Commands:
 - **Drift column mapping:** `build.yaml` sets `case_from_dart_to_sql: snake_case`
   so camelCase getters (e.g. `nameArabic`) map to the DB's snake_case columns
   (`name_arabic`). Keep that, or queries break against the prepopulated DB.
-- **Prepopulated DB:** `app_database.dart` copies the asset to app docs dir once,
-  then opens it; `migration.onCreate` is intentionally empty. Do NOT add
-  `m.createAll()` — the tables/data already exist.
+- **Prepopulated DB:** `db_seeder.dart` (`ensureSeedDatabase`, called from
+  `configureDependencies` before the DB opens) copies the bundled asset to the
+  app docs dir and **re-copies whenever the version marker changes**, so an
+  updated `quran.db` actually reaches users. `AppDatabase(File)` just opens that
+  file; `migration.onCreate` is intentionally empty — do NOT add `m.createAll()`,
+  the tables/data already exist. **After replacing `assets/db/quran.db`, run
+  `make seed-version`** to refresh `assets/db/quran.db.version` (= `db_meta.built_at`),
+  or the new data won't be detected on devices that already ran the app.
 - **Arabic font:** the `fonts:` block in `pubspec.yaml` is commented out so the
   build stays green. Add `assets/fonts/KFGQPC_Uthmanic_Hafs.ttf` and uncomment
   to use the Madani face. Until then it falls back to the platform Arabic font.
