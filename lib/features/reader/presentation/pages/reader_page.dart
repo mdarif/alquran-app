@@ -6,6 +6,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
+import '../../domain/reader_navigation.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
@@ -19,15 +20,15 @@ class ReaderPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => GetIt.I<ReaderCubit>()..load(target),
-      child: _ReaderView(title: target.title),
+      child: _ReaderView(initialTarget: target),
     );
   }
 }
 
 class _ReaderView extends StatefulWidget {
-  const _ReaderView({required this.title});
+  const _ReaderView({required this.initialTarget});
 
-  final String title;
+  final ReaderTarget initialTarget;
 
   @override
   State<_ReaderView> createState() => _ReaderViewState();
@@ -44,23 +45,35 @@ class _ReaderViewState extends State<_ReaderView> {
   static const double _maxFont = 48;
   double _arabicFont = 28;
 
+  // The currently displayed section. Swiping moves it to an adjacent section
+  // (next/previous) within the same dimension, keeping font/viewport state.
+  late ReaderTarget _target = widget.initialTarget;
+
   // Default to the lightweight Mushaf reading view (PRD lists Reading first);
   // one touch on the app-bar toggle reveals the translations.
   _Viewport _viewport = _Viewport.reading;
 
-  // Pinch tracking. We use a raw Listener (not GestureDetector.onScale) so the
-  // gesture does NOT enter the arena — single-finger scroll and text selection
-  // keep working, and only a genuine two-finger pinch rescales the font.
+  // Pinch + swipe are both handled through a raw Listener (not GestureDetector)
+  // so they do NOT enter the gesture arena. This matters because SelectionArea
+  // and the scroll view claim drags in the arena — a Listener still sees every
+  // pointer event, so pinch-zoom, vertical scroll, text selection, and the
+  // horizontal swipe all coexist.
   final Map<int, Offset> _pointers = {};
   double? _pinchBaseDistance;
   double _fontAtPinchStart = 28;
+
+  // Single-finger swipe tracking (distance-based; ignored once a 2nd finger
+  // joins, so a pinch is never mistaken for a swipe).
+  Offset? _swipeStart;
+  bool _multiTouch = false;
+  static const double _swipeDistance = 64;
 
   @override
   Widget build(BuildContext context) {
     final isReading = _viewport == _Viewport.reading;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text(_target.title),
         actions: [
           IconButton(
             tooltip: isReading
@@ -91,27 +104,32 @@ class _ReaderViewState extends State<_ReaderView> {
         child: SelectionArea(
           child: BlocBuilder<ReaderCubit, ReaderState>(
             builder: (context, state) {
-              switch (state.status) {
-                case ReaderStatus.initial:
-                case ReaderStatus.loading:
-                  return const Center(child: CircularProgressIndicator());
-                case ReaderStatus.error:
-                  return Center(child: Text(state.error ?? 'Failed to load'));
-                case ReaderStatus.loaded:
-                  if (isReading) {
-                    return MushafView(
-                      ayahs: state.ayahs,
-                      headings: state.headings,
-                      arabicFontSize: _arabicFont,
-                    );
-                  }
-                  return _DetailedList(
-                    ayahs: state.ayahs,
-                    resources: state.resources,
-                    headings: state.headings,
-                    arabicFontSize: _arabicFont,
-                  );
+              if (state.status == ReaderStatus.error) {
+                return Center(child: Text(state.error ?? 'Failed to load'));
               }
+              // Keep showing the previous section while the next one loads
+              // (no spinner flash on swipe); spinner only before first load.
+              if (state.ayahs.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              // Key by the section's first ayah so a new section starts at the
+              // top, while a same-section rebuild preserves scroll position.
+              final sectionKey = ValueKey(state.ayahs.first.id);
+              if (isReading) {
+                return MushafView(
+                  key: sectionKey,
+                  ayahs: state.ayahs,
+                  headings: state.headings,
+                  arabicFontSize: _arabicFont,
+                );
+              }
+              return _DetailedList(
+                key: sectionKey,
+                ayahs: state.ayahs,
+                resources: state.resources,
+                headings: state.headings,
+                arabicFontSize: _arabicFont,
+              );
             },
           ),
         ),
@@ -119,11 +137,25 @@ class _ReaderViewState extends State<_ReaderView> {
     );
   }
 
-  // --- Pinch-to-zoom (two-finger) -------------------------------------------
+  void _goToAdjacent(int delta) {
+    final cubit = context.read<ReaderCubit>();
+    final next = adjacentTarget(_target, delta, cubit.state.headings);
+    if (next == null) return; // at the first/last section — no wrap-around
+    setState(() => _target = next);
+    cubit.load(next);
+  }
+
+  // --- Pinch-to-zoom (two-finger) + swipe (one-finger) ----------------------
 
   void _onPointerDown(PointerDownEvent event) {
     _pointers[event.pointer] = event.position;
+    if (_pointers.length == 1) {
+      _swipeStart = event.position;
+      _multiTouch = false;
+    }
     if (_pointers.length == 2) {
+      // A pinch — disqualify this gesture from also being treated as a swipe.
+      _multiTouch = true;
       _pinchBaseDistance = _pointerDistance();
       _fontAtPinchStart = _arabicFont;
     }
@@ -139,8 +171,25 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _onPointerEnd(PointerEvent event) {
+    final endPosition = _pointers[event.pointer] ?? event.position;
     _pointers.remove(event.pointer);
     if (_pointers.length < 2) _pinchBaseDistance = null;
+    if (_pointers.isEmpty) {
+      final start = _swipeStart;
+      if (!_multiTouch && start != null) _maybeSwipe(start, endPosition);
+      _swipeStart = null;
+      _multiTouch = false;
+    }
+  }
+
+  /// A deliberate, mostly-horizontal one-finger drag moves to an adjacent
+  /// section: left → next, right → previous (no wrap at the bounds).
+  void _maybeSwipe(Offset start, Offset end) {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    if (dx.abs() >= _swipeDistance && dx.abs() > dy.abs()) {
+      _goToAdjacent(dx < 0 ? 1 : -1);
+    }
   }
 
   double _pointerDistance() {
@@ -172,6 +221,7 @@ class _DetailedList extends StatelessWidget {
     required this.resources,
     required this.headings,
     required this.arabicFontSize,
+    super.key,
   });
 
   final List<Ayah> ayahs;

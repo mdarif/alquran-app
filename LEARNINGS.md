@@ -98,6 +98,19 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
 - **Inline ayah-end markers:** `Text.rich` + `WidgetSpan(alignment:
   PlaceholderAlignment.middle, child: medallion)`. Each ayah is one `TextSpan`
   so intra-ayah shaping stays intact.
+- **`SelectionArea` eats horizontal drags.** A parent `GestureDetector.onHorizontalDragEnd`
+  (or a `PageView`) won't fire when wrapped around/under a `SelectionArea` —
+  selection claims the drag in the gesture arena. Fix: detect the swipe in a raw
+  `Listener` (pointer down/up positions, distance-based), which observes pointer
+  events outside the arena — the same trick used for pinch-zoom. One Listener can
+  do both: 2 pointers → pinch, 1 pointer with a mostly-horizontal displacement
+  past a threshold → swipe (guard with a `_multiTouch` flag so a pinch is never
+  read as a swipe).
+- **Swipe-between-sections without losing state:** keep one cubit, change its
+  target in `State`, and reload. Show the previous content while the next loads
+  (`if (ayahs.isEmpty) spinner; else content`) to avoid a spinner flash, and key
+  the scroll view by the section's first ayah id so a *new* section starts at the
+  top while a same-section rebuild keeps its scroll offset.
 - **Centralize the Arabic style** once (`QuranTextStyle.madani`) and
   `.copyWith(fontSize: …)` at call sites — avoids drift across widgets.
 - **Urdu needs a Nastaliq font.** The platform default renders Urdu poorly. Bundle
