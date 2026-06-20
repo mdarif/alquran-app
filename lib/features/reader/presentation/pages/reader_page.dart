@@ -41,11 +41,17 @@ class _ReaderViewState extends State<_ReaderView> {
   static const double _minFont = 20;
   static const double _maxFont = 48;
   double _arabicFont = 28;
-  double _fontAtGestureStart = 28;
 
   // Default to the lightweight Mushaf reading view (PRD lists Reading first);
   // one touch on the app-bar toggle reveals the translations.
   _Viewport _viewport = _Viewport.reading;
+
+  // Pinch tracking. We use a raw Listener (not GestureDetector.onScale) so the
+  // gesture does NOT enter the arena — single-finger scroll and text selection
+  // keep working, and only a genuine two-finger pinch rescales the font.
+  final Map<int, Offset> _pointers = {};
+  double? _pinchBaseDistance;
+  double _fontAtPinchStart = 28;
 
   @override
   Widget build(BuildContext context) {
@@ -55,11 +61,13 @@ class _ReaderViewState extends State<_ReaderView> {
         title: Text(widget.title),
         actions: [
           IconButton(
-            tooltip: isReading ? 'Show translation' : 'Mushaf (Arabic only)',
-            isSelected: isReading,
+            tooltip: isReading
+                ? 'Detailed view (with translation)'
+                : 'Mushaf view (Arabic only)',
             onPressed: _toggleViewport,
-            icon: const Icon(Icons.translate),
-            selectedIcon: const Icon(Icons.menu_book),
+            icon: Icon(
+              isReading ? Icons.subject_rounded : Icons.menu_book_rounded,
+            ),
           ),
           IconButton(
             tooltip: 'Smaller',
@@ -73,45 +81,76 @@ class _ReaderViewState extends State<_ReaderView> {
           ),
         ],
       ),
-      body: GestureDetector(
-        onScaleStart: (_) => _fontAtGestureStart = _arabicFont,
-        onScaleUpdate: (details) {
-          if (details.scale != 1.0) {
-            _setFont(_fontAtGestureStart * details.scale);
-          }
-        },
-        child: BlocBuilder<ReaderCubit, ReaderState>(
-          builder: (context, state) {
-            switch (state.status) {
-              case ReaderStatus.initial:
-              case ReaderStatus.loading:
-                return const Center(child: CircularProgressIndicator());
-              case ReaderStatus.error:
-                return Center(child: Text(state.error ?? 'Failed to load'));
-              case ReaderStatus.loaded:
-                if (isReading) {
-                  return MushafView(
-                    ayahs: state.ayahs,
-                    arabicFontSize: _arabicFont,
-                    surahNumber: widget.surahId,
-                    surahName: widget.title,
+      body: Listener(
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: _onPointerEnd,
+        onPointerCancel: _onPointerEnd,
+        child: SelectionArea(
+          child: BlocBuilder<ReaderCubit, ReaderState>(
+            builder: (context, state) {
+              switch (state.status) {
+                case ReaderStatus.initial:
+                case ReaderStatus.loading:
+                  return const Center(child: CircularProgressIndicator());
+                case ReaderStatus.error:
+                  return Center(child: Text(state.error ?? 'Failed to load'));
+                case ReaderStatus.loaded:
+                  if (isReading) {
+                    return MushafView(
+                      ayahs: state.ayahs,
+                      arabicFontSize: _arabicFont,
+                      surahNumber: widget.surahId,
+                      surahName: widget.title,
+                    );
+                  }
+                  return ListView.separated(
+                    itemCount: state.ayahs.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, i) => AyahTile(
+                      ayah: state.ayahs[i],
+                      resources: state.resources,
+                      arabicFontSize: _arabicFont,
+                    ),
                   );
-                }
-                return ListView.separated(
-                  itemCount: state.ayahs.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, i) => AyahTile(
-                    ayah: state.ayahs[i],
-                    resources: state.resources,
-                    arabicFontSize: _arabicFont,
-                  ),
-                );
-            }
-          },
+              }
+            },
+          ),
         ),
       ),
     );
   }
+
+  // --- Pinch-to-zoom (two-finger) -------------------------------------------
+
+  void _onPointerDown(PointerDownEvent event) {
+    _pointers[event.pointer] = event.position;
+    if (_pointers.length == 2) {
+      _pinchBaseDistance = _pointerDistance();
+      _fontAtPinchStart = _arabicFont;
+    }
+  }
+
+  void _onPointerMove(PointerMoveEvent event) {
+    if (!_pointers.containsKey(event.pointer)) return;
+    _pointers[event.pointer] = event.position;
+    final base = _pinchBaseDistance;
+    if (_pointers.length == 2 && base != null && base > 0) {
+      _setFont(_fontAtPinchStart * (_pointerDistance() / base));
+    }
+  }
+
+  void _onPointerEnd(PointerEvent event) {
+    _pointers.remove(event.pointer);
+    if (_pointers.length < 2) _pinchBaseDistance = null;
+  }
+
+  double _pointerDistance() {
+    final points = _pointers.values.toList(growable: false);
+    return (points[0] - points[1]).distance;
+  }
+
+  // --------------------------------------------------------------------------
 
   void _toggleViewport() {
     setState(() {
@@ -122,6 +161,7 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _setFont(double value) {
-    setState(() => _arabicFont = value.clamp(_minFont, _maxFont));
+    final clamped = value.clamp(_minFont, _maxFont);
+    if (clamped != _arabicFont) setState(() => _arabicFont = clamped);
   }
 }

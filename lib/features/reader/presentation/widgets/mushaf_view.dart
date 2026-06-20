@@ -3,6 +3,17 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/ayah.dart';
 
+/// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
+/// quran.db). Shown as a header before every surah except Al-Fatihah (where it
+/// is ayah 1) and At-Tawbah (which has none).
+const String _bismillah =
+    'بِسۡمِ ٱللَّهِ'
+    ' ٱلرَّحۡمَٰنِ'
+    ' ٱلرَّحِيمِ';
+
+const int _surahAlFatiha = 1;
+const int _surahAtTawbah = 9;
+
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow with
 /// no translations. Ayahs run together into one justified RTL block — each
 /// closed by an English verse number set in a light medallion — beneath a
@@ -34,6 +45,10 @@ class MushafView extends StatelessWidget {
             ayahCount: ayahs.length,
           ),
           const SizedBox(height: 20),
+          if (surahNumber != _surahAlFatiha && surahNumber != _surahAtTawbah) ...[
+            _Bismillah(fontSize: arabicFontSize),
+            const SizedBox(height: 18),
+          ],
           Text.rich(
             TextSpan(
               children: [
@@ -41,22 +56,27 @@ class MushafView extends StatelessWidget {
                   TextSpan(text: ayah.textArabic),
                   WidgetSpan(
                     alignment: PlaceholderAlignment.middle,
-                    child: _AyahMedallion(
-                      number: ayah.ayahNumber,
-                      fontSize: arabicFontSize,
+                    // Keep the verse number out of any text selection/copy so a
+                    // copied passage is pure Quran text.
+                    child: SelectionContainer.disabled(
+                      child: _AyahMedallion(
+                        number: ayah.ayahNumber,
+                        fontSize: arabicFontSize,
+                      ),
                     ),
                   ),
                   const TextSpan(text: ' '),
                 ],
               ],
             ),
-            textAlign: TextAlign.justify,
+            // NOT justify: Flutter has no kashida justification, so justifying
+            // Arabic stretches glyph advances. Natural RTL start alignment keeps
+            // shaping intact.
+            textAlign: TextAlign.start,
             textDirection: TextDirection.rtl,
-            style: TextStyle(
-              fontFamily: AppTheme.arabicFontFamily,
+            style: QuranTextStyle.madani.copyWith(
               fontSize: arabicFontSize,
               height: 2.1,
-              color: const Color(0xFF1A1A1A),
             ),
           ),
         ],
@@ -89,7 +109,8 @@ class _SurahHeader extends StatelessWidget {
           color: theme.colorScheme.primary.withValues(alpha: 0.18),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircleAvatar(
             radius: 18,
@@ -103,27 +124,43 @@ class _SurahHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  'Surah $number · $ayahCount ayahs',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 10),
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Surah $number · $ayahCount ayahs',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Centred Basmala header rendered in the QPC face, scaled to the reading size.
+class _Bismillah extends StatelessWidget {
+  const _Bismillah({required this.fontSize});
+
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      key: const Key('mushaf-bismillah'),
+      child: Text(
+        _bismillah,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        style: QuranTextStyle.madani.copyWith(fontSize: fontSize * 0.92),
       ),
     );
   }

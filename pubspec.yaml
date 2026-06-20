@@ -39,11 +39,17 @@ flutter:
   assets:
     - assets/db/quran.db
 
-  # KFGQPC Uthmanic Script HAFS — the primary Arabic face (PRD 4.1). This is the
-  # official QPC mushaf typeface that matches the text encoding in quran.db.
+  # KFGQPC HAFS Uthmanic Script V2 (Ver 0.18) — the primary Arabic face (PRD
+  # 4.1). This is the HarfBuzz-compatible release: the lam-alef ligature forms
+  # natively (via rlig/default features Flutter applies) even with vowels between
+  # the letters, unlike the old v0.09 whose ligature sat under `liga`.
   # NOTE: licence is UNVERIFIED — clear it before any public release (see
   # ../alquran-data/HANDOFF.md).
   fonts:
     - family: UthmanicHafs
       fonts:
-        - asset: assets/fonts/KFGQPC_Uthmanic_Hafs.otf
+        - asset: assets/fonts/UthmanicHafsV18.ttf
+    # Urdu translation face — Noto Nastaliq Urdu (Google, SIL OFL — licence-clean).
+    - family: NotoNastaliqUrdu
+      fonts:
+        - asset: assets/fonts/NotoNastaliqUrdu-Regular.ttf

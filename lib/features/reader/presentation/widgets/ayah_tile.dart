@@ -57,11 +57,7 @@ class AyahTile extends StatelessWidget {
               ayah.textArabic,
               textAlign: TextAlign.right,
               textDirection: TextDirection.rtl,
-              style: TextStyle(
-                fontFamily: AppTheme.arabicFontFamily,
-                fontSize: arabicFontSize,
-                height: 1.9,
-              ),
+              style: QuranTextStyle.madani.copyWith(fontSize: arabicFontSize),
             ),
           ),
           for (final r in resources)
@@ -72,7 +68,9 @@ class AyahTile extends StatelessWidget {
                 textDirection: r.languageCode == 'ur'
                     ? TextDirection.rtl
                     : TextDirection.ltr,
-                style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+                style: r.languageCode.scriptStyle(
+                  theme.textTheme.bodyLarge!.copyWith(height: 1.5),
+                ),
               ),
             ],
         ],
