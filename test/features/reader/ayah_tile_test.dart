@@ -235,6 +235,43 @@ void main() {
       expect(find.text('Ayah copied'), findsOneWidget);
     });
 
+    testWidgets('a failing Share is handled gracefully (no crash)',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+      );
+
+      // Simulate the share plugin being unavailable (MissingPluginException).
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        const MethodChannel('dev.fluttercommunity.plus/share'),
+        (call) async => throw MissingPluginException('no share'),
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          const MethodChannel('dev.fluttercommunity.plus/share'),
+          null,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(ayah: ayah, resources: [], arabicFontSize: 24),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_horiz));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Share'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull); // no unhandled exception
+      expect(find.text('Could not share'), findsOneWidget);
+    });
+
     testWidgets('renders Urdu translation right-to-left', (tester) async {
       const ayah = Ayah(
         id: 1,

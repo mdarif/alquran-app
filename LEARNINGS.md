@@ -160,6 +160,16 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   (reads a ~30-byte asset, not the whole DB). Do the seeding in DI startup
   *before* opening the DB, and pass the file into the DB class. Remember to
   regenerate the marker whenever the DB changes (a `make seed-version` target).
+- **Adding a native plugin needs a full rebuild, not hot reload.** After
+  `flutter pub add share_plus`, a hot reload/restart reuses the existing native
+  binary → `MissingPluginException(No implementation found for method … on
+  channel …)` at runtime. Fix: full `flutter run` (or `flutter clean && flutter
+  pub get && flutter run`) so `pod install` runs and `GeneratedPluginRegistrant`
+  picks up the plugin. Verify with `grep <plugin> ios/Runner/GeneratedPluginRegistrant.m`
+  and `ios/Podfile.lock`. Also wrap plugin calls (share/clipboard) in try/catch
+  so a missing/again-failing plugin shows a snackbar instead of an unhandled
+  exception. Diagnose runtime errors from a sim via
+  `xcrun simctl spawn booted log show --last 4m | grep -i exception`.
 - **GetIt "not registered" after a UI change = you hot-reloaded a DI change.**
   Adding a `getIt.register…` in `configureDependencies` and a `GetIt.I<X>()` use
   in the same change: hot reload (`r`) re-runs `build()` (which now needs `X`) but

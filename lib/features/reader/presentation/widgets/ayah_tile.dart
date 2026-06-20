@@ -97,24 +97,35 @@ class AyahTile extends StatelessWidget {
   }
 
   Future<void> _onAction(BuildContext context, _AyahAction action) async {
+    final messenger = ScaffoldMessenger.of(context);
     final text = buildAyahShareText(
       ayah: ayah,
       resources: resources,
       surahName: surahName,
     );
-    switch (action) {
-      case _AyahAction.copy:
-        await Clipboard.setData(ClipboardData(text: text));
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+    try {
+      switch (action) {
+        case _AyahAction.copy:
+          await Clipboard.setData(ClipboardData(text: text));
+          messenger.showSnackBar(
             const SnackBar(
               content: Text('Ayah copied'),
               duration: Duration(seconds: 1),
             ),
           );
-        }
-      case _AyahAction.share:
-        await SharePlus.instance.share(ShareParams(text: text));
+        case _AyahAction.share:
+          await SharePlus.instance.share(ShareParams(text: text));
+      }
+    } catch (_) {
+      // Never let a clipboard/share failure crash the reader.
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            action == _AyahAction.copy ? 'Could not copy' : 'Could not share',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 }
