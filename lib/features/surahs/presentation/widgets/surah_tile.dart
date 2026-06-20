@@ -34,17 +34,13 @@ class SurahTile extends StatelessWidget {
         surah.nameEnglish,
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
-      subtitle: Text(
-        [
-          if (placeLabel.isNotEmpty) placeLabel,
-          '${surah.totalAyahs} ayahs',
-        ].join(' • '),
-      ),
+      // Revelation place only (ayah count dropped to declutter the list).
+      subtitle: placeLabel.isEmpty ? null : Text(placeLabel),
       trailing: Text(
         surah.nameArabic,
         style: const TextStyle(
           fontFamily: AppTheme.arabicFontFamily,
-          fontSize: 22,
+          fontSize: 28,
         ),
       ),
     );

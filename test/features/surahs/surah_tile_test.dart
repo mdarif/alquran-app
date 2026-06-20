@@ -7,7 +7,7 @@ Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('SurahTile', () {
-    testWidgets('renders names, capitalised place, and ayah count',
+    testWidgets('renders names + capitalised place, without the ayah count',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -27,10 +27,30 @@ void main() {
       expect(find.text('Al-Fatihah'), findsOneWidget);
       expect(find.text('الفاتحة'), findsOneWidget);
       expect(find.text('1'), findsOneWidget); // leading badge
-      expect(find.text('Makkah • 7 ayahs'), findsOneWidget);
+      expect(find.text('Makkah'), findsOneWidget);
+      expect(find.textContaining('ayahs'), findsNothing); // count hidden
     });
 
-    testWidgets('omits the place segment when revelationPlace is null',
+    testWidgets('Arabic chapter name is rendered prominently', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          SurahTile(
+            surah: const Surah(
+              id: 1,
+              nameArabic: 'الفاتحة',
+              nameEnglish: 'Al-Fatihah',
+              totalAyahs: 7,
+              revelationPlace: 'makkah',
+            ),
+            onTap: () {},
+          ),
+        ),
+      );
+
+      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 28);
+    });
+
+    testWidgets('shows no subtitle when revelationPlace is null',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -46,7 +66,9 @@ void main() {
         ),
       );
 
-      expect(find.text('286 ayahs'), findsOneWidget);
+      expect(find.text('Al-Baqarah'), findsOneWidget);
+      expect(find.textContaining('ayahs'), findsNothing);
+      expect(find.text('Madinah'), findsNothing);
     });
 
     testWidgets('invokes onTap when tapped', (tester) async {

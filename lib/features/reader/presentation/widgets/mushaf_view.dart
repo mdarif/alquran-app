@@ -100,7 +100,7 @@ List<List<Ayah>> groupAyahsBySurah(List<Ayah> ayahs) {
   return groups;
 }
 
-/// Decorative chapter header: number, English name, ayah count (centered).
+/// Chapter header: a small number medallion above the English name (centered).
 class SurahHeaderCard extends StatelessWidget {
   const SurahHeaderCard({
     required this.heading,
@@ -122,14 +122,14 @@ class SurahHeaderCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           CircleAvatar(
-            radius: 18,
+            radius: 15,
             backgroundColor: theme.colorScheme.primary,
             child: Text(
               '$number',
               style: TextStyle(
                 color: theme.colorScheme.onPrimary,
                 fontWeight: FontWeight.w700,
-                fontSize: 14,
+                fontSize: 13,
               ),
             ),
           ),
@@ -141,16 +141,6 @@ class SurahHeaderCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          if (heading != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              'Surah $number · ${heading!.totalAyahs} ayahs',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
         ],
       ),
     );

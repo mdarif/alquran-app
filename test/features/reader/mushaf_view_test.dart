@@ -27,7 +27,7 @@ Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('MushafView', () {
-    testWidgets('renders chapter header with name and ayah count',
+    testWidgets('renders chapter header with the name (no ayah count)',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -40,7 +40,7 @@ void main() {
       );
 
       expect(find.text('Al-Baqarah'), findsOneWidget);
-      expect(find.text('Surah 2 · 286 ayahs'), findsOneWidget);
+      expect(find.textContaining('ayahs'), findsNothing);
     });
 
     testWidgets('renders an English medallion number for each ayah',

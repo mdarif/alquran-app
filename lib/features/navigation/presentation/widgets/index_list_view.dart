@@ -91,7 +91,7 @@ class _IndexTile extends StatelessWidget {
         style: const TextStyle(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
-        'Starts at ${entry.startSurahName} · ayah ${entry.startAyah}',
+        '${entry.startSurahName} ${entry.startSurahId}:${entry.startAyah}',
       ),
     );
   }

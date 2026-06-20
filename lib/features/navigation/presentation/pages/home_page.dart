@@ -20,9 +20,9 @@ class HomePage extends StatelessWidget {
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Surah'),
+              Tab(text: 'Page'),
               Tab(text: 'Juz'),
               Tab(text: 'Hizb'),
-              Tab(text: 'Page'),
               Tab(text: 'Ruku'),
             ],
           ),
@@ -34,9 +34,9 @@ class HomePage extends StatelessWidget {
               child: TabBarView(
                 children: [
                   SurahListView(),
+                  IndexListView(kind: IndexKind.page, label: 'Page'),
                   IndexListView(kind: IndexKind.juz, label: 'Juz'),
                   IndexListView(kind: IndexKind.hizb, label: 'Hizb'),
-                  IndexListView(kind: IndexKind.page, label: 'Page'),
                   IndexListView(kind: IndexKind.ruku, label: 'Ruku'),
                 ],
               ),
