@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../reader/presentation/widgets/continue_reading_banner.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
@@ -17,6 +18,7 @@ class HomePage extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Al Quran'),
+          actions: const [ThemeToggleButton()],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Surah'),

@@ -8,6 +8,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
+import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/reader_cubit.dart';
@@ -83,6 +84,7 @@ class _ReaderViewState extends State<_ReaderView> {
       appBar: AppBar(
         title: Text(_target.title),
         actions: [
+          const ThemeToggleButton(),
           IconButton(
             tooltip: isReading
                 ? 'Detailed view (with translation)'

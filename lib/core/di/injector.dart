@@ -16,6 +16,7 @@ import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
 import '../database/app_database.dart';
 import '../database/db_seeder.dart';
+import '../theme/theme_cubit.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -39,6 +40,10 @@ Future<void> configureDependencies() async {
     )
     ..registerLazySingleton<IndexRepository>(
       () => IndexRepositoryImpl(getIt<AppDatabase>()),
+    )
+    // App-wide theme (light default), persisted.
+    ..registerLazySingleton<ThemeCubit>(
+      () => ThemeCubit(getIt<SharedPreferences>()),
     )
     ..registerLazySingleton<LastReadRepository>(
       () => LastReadRepositoryImpl(getIt<SharedPreferences>()),

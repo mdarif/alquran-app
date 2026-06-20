@@ -117,6 +117,14 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   and async setters. Fire setters with `unawaited(...)` (satisfies the
   `unawaited_futures` lint). For pinch-zoom, persist the **final** value on
   pointer-up, not on every move, to avoid write spam.
+- **Runtime light/dark with Cubit:** hold `ThemeMode` in a `ThemeCubit`
+  (persisted, light default), provide it above `MaterialApp`, and a
+  `BlocBuilder` sets `theme`/`darkTheme`/`themeMode`. Put a one-tap toggle in the
+  app bars (read brightness via `Theme.of(context).brightness`, not the cubit, so
+  the icon reflects the actual theme). **Gotcha:** any *hardcoded* text colour
+  (we had `0xFF1A1A1A` on the Arabic style) is invisible in the other mode —
+  drop it so the text inherits the theme's `onSurface`; audit `grep "Color(0xFF"`
+  for stragglers outside the theme file.
 - **Centralize the Arabic style** once (`QuranTextStyle.madani`) and
   `.copyWith(fontSize: …)` at call sites — avoids drift across widgets.
 - **RTL text still left-aligns inside a `Column`.** A `Text` with

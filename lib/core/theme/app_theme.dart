@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// MVP theme. Dark/night mode is deferred (PRD 3.2 / backlog).
+/// App theme. Light is the default; dark is user-toggleable (see ThemeCubit).
 class AppTheme {
   AppTheme._();
+
+  static const Color _seed = Color(0xFF12705B); // Al Marfa green
 
   // Primary Arabic face (PRD 4.1). Falls back gracefully if the .ttf is not
   // yet bundled in assets/fonts/.
@@ -20,21 +22,30 @@ class AppTheme {
   // Urdu translation face — Noto Nastaliq Urdu (proper nastaliq script).
   static const String urduFontFamily = 'NotoNastaliqUrdu';
 
-  static ThemeData light() {
+  static ThemeData light() => _build(
+        Brightness.light,
+        const Color(0xFFFBF9F3), // warm off-white
+      );
+
+  static ThemeData dark() => _build(
+        Brightness.dark,
+        const Color(0xFF12100E), // warm near-black
+      );
+
+  static ThemeData _build(Brightness brightness, Color scaffold) {
     final base = ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF12705B), // Al Marfa green
-        brightness: Brightness.light,
+        seedColor: _seed,
+        brightness: brightness,
       ),
       useMaterial3: true,
     );
-    return base.copyWith(
-      scaffoldBackgroundColor: const Color(0xFFFBF9F3), // warm off-white
-    );
+    return base.copyWith(scaffoldBackgroundColor: scaffold);
   }
 }
 
-/// Canonical Arabic (Madani/Uthmani) text style. Callers layer on size/height
+/// Canonical Arabic (Madani/Uthmani) text style. No colour — the text inherits
+/// the theme's default (so it adapts to light/dark). Callers layer on size etc.
 /// via [TextStyle.copyWith], e.g. `QuranTextStyle.madani.copyWith(fontSize: 28)`.
 class QuranTextStyle {
   QuranTextStyle._();
@@ -42,7 +53,6 @@ class QuranTextStyle {
   static const TextStyle madani = TextStyle(
     fontFamily: AppTheme.arabicFontFamily,
     fontFeatures: AppTheme.arabicFontFeatures,
-    color: Color(0xFF1A1A1A),
     height: 1.9,
   );
 }
