@@ -1,0 +1,8 @@
+# Ensures Drift maps camelCase Dart getters to the DB's snake_case columns
+# (so the generated queries line up with the prepopulated quran.db).
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          case_from_dart_to_sql: snake_case

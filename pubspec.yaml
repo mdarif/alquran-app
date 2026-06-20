@@ -1,0 +1,49 @@
+name: al_quran
+description: "Al Quran — an ultra-lightweight, fully-offline Quran reader (Al Marfa Technologies)."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State (PRD 7.1: one-way state lifecycle via Cubit)
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.5
+
+  # Data (PRD 7.1: Drift over embedded SQLite)
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.24
+
+  # Dependency injection (PRD 7.1: GetIt)
+  get_it: ^7.7.0
+
+  # Bundled-asset DB handling
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.11
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/db/quran.db
+
+  # KFGQPC Uthmanic Script HAFS — the primary Arabic face (PRD 4.1). This is the
+  # official QPC mushaf typeface that matches the text encoding in quran.db.
+  # NOTE: licence is UNVERIFIED — clear it before any public release (see
+  # ../alquran-data/HANDOFF.md).
+  fonts:
+    - family: UthmanicHafs
+      fonts:
+        - asset: assets/fonts/KFGQPC_Uthmanic_Hafs.otf

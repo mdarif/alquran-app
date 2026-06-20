@@ -1,0 +1,51 @@
+import 'package:flutter/material.dart';
+
+import '../../../../core/theme/app_theme.dart';
+import '../../domain/entities/surah.dart';
+
+class SurahTile extends StatelessWidget {
+  const SurahTile({required this.surah, required this.onTap, super.key});
+
+  final Surah surah;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final place = surah.revelationPlace;
+    final placeLabel = place == null
+        ? ''
+        : '${place[0].toUpperCase()}${place.substring(1)}';
+
+    return ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          '${surah.id}',
+          style: TextStyle(
+            color: theme.colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      title: Text(
+        surah.nameEnglish,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        [
+          if (placeLabel.isNotEmpty) placeLabel,
+          '${surah.totalAyahs} ayahs',
+        ].join(' • '),
+      ),
+      trailing: Text(
+        surah.nameArabic,
+        style: const TextStyle(
+          fontFamily: AppTheme.arabicFontFamily,
+          fontSize: 22,
+        ),
+      ),
+    );
+  }
+}
