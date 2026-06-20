@@ -1,51 +1,124 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/feature_flags.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../reader/presentation/widgets/continue_reading_banner.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
-import '../widgets/index_list_view.dart';
+import 'index_list_page.dart';
 
-/// App home: the five-dimensional navigation shell (PRD 4.2) — Surah, Juz, Hizb,
-/// Page, Ruku — each a tab over the bundled offline index.
+/// App home: an immersive, full-width Surah list with the "continue reading"
+/// resume card. Page/Juz/Hizb/Ruku stay out of the way behind a single "Jump to"
+/// sheet (gated by [FeatureFlags.advancedNavigation]) so the reader keeps focus.
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  const HomePage({
+    super.key,
+    this.advancedNavigation = FeatureFlags.advancedNavigation,
+  });
+
+  /// Whether to surface Page/Juz/Hizb/Ruku navigation. Injectable for tests.
+  final bool advancedNavigation;
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Al Quran'),
-          actions: const [ThemeToggleButton()],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Surah'),
-              Tab(text: 'Page'),
-              Tab(text: 'Juz'),
-              Tab(text: 'Hizb'),
-              Tab(text: 'Ruku'),
-            ],
-          ),
-        ),
-        body: const Column(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Al Quran'),
+        actions: [
+          if (advancedNavigation)
+            IconButton(
+              tooltip: 'Jump to (Page · Juz · Hizb · Ruku)',
+              icon: const Icon(Icons.format_list_numbered_rounded),
+              onPressed: () => _openJumpSheet(context),
+            ),
+          const ThemeToggleButton(),
+        ],
+      ),
+      body: const Column(
+        children: [
+          ContinueReadingBanner(),
+          Expanded(child: SurahListView()),
+        ],
+      ),
+    );
+  }
+
+  void _openJumpSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            ContinueReadingBanner(),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  SurahListView(),
-                  IndexListView(kind: IndexKind.page, label: 'Page'),
-                  IndexListView(kind: IndexKind.juz, label: 'Juz'),
-                  IndexListView(kind: IndexKind.hizb, label: 'Hizb'),
-                  IndexListView(kind: IndexKind.ruku, label: 'Ruku'),
-                ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Jump to',
+                  style: Theme.of(sheetContext).textTheme.titleMedium,
+                ),
               ),
+            ),
+            _JumpTile(
+              parentContext: context,
+              kind: IndexKind.page,
+              label: 'Page',
+              icon: Icons.auto_stories_outlined,
+            ),
+            _JumpTile(
+              parentContext: context,
+              kind: IndexKind.juz,
+              label: 'Juz',
+              icon: Icons.view_agenda_outlined,
+            ),
+            _JumpTile(
+              parentContext: context,
+              kind: IndexKind.hizb,
+              label: 'Hizb',
+              icon: Icons.grid_view_outlined,
+            ),
+            _JumpTile(
+              parentContext: context,
+              kind: IndexKind.ruku,
+              label: 'Ruku',
+              icon: Icons.segment_outlined,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _JumpTile extends StatelessWidget {
+  const _JumpTile({
+    required this.parentContext,
+    required this.kind,
+    required this.label,
+    required this.icon,
+  });
+
+  /// The page context (not the sheet's) — used to push after the sheet closes.
+  final BuildContext parentContext;
+  final IndexKind kind;
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      onTap: () {
+        Navigator.of(context).pop(); // close the sheet
+        Navigator.of(parentContext).push(
+          MaterialPageRoute<void>(
+            builder: (_) => IndexListPage(kind: kind, label: label),
+          ),
+        );
+      },
     );
   }
 }
