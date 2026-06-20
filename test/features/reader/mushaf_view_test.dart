@@ -125,6 +125,31 @@ void main() {
       expect(find.byType(Bismillah), findsNothing);
     });
 
+    testWidgets('shows a current-page readout when ayahs carry page numbers',
+        (tester) async {
+      const ayahs = [
+        Ayah(
+          id: 1,
+          surahId: 2,
+          ayahNumber: 1,
+          textArabic: 'نص',
+          isSajda: false,
+          page: 5,
+        ),
+      ];
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: ayahs,
+            headings: _headings(2, 'Al-Baqarah', 286),
+            arabicFontSize: 28,
+          ),
+        ),
+      );
+
+      expect(find.text('Page 5'), findsOneWidget);
+    });
+
     testWidgets('renders a header per surah when a section spans surahs',
         (tester) async {
       await tester.pumpWidget(

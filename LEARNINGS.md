@@ -54,7 +54,16 @@ xcrun simctl io booted screenshot out.png      # capture the live app
 
 ### `TextAlign.justify` is wrong for Arabic in Flutter
 Flutter has no kashida justification — it stretches glyph/space advances, which
-mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
+mangles Arabic. Use `TextAlign.start`/`center` with `textDirection: rtl`.
+
+### "Broken" Arabic is sometimes flowed-vs-page-faithful, not a bug
+`يَٰٓأَيُّهَا` renders with the superscript-alef+maddah as small marks over the yā
+in standard Unicode fonts — users may expect the elongated calligraphic "yā" of
+the printed Mushaf. That elongation comes from per-page QCF/page fonts, not any
+single Unicode font. Before "fixing", render the word with `hb-view` across
+several fonts (KFGQPC v2, v0.09, Scheherazade). If they ALL agree, ours is the
+correct standard rendering and the reference is page-faithful (backlog
+Exact-Mushaf mode) — nothing to fix in flowed mode.
 
 ---
 

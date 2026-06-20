@@ -1,7 +1,20 @@
+import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/reader_navigation.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+List<Ayah> _pagedAyahs(List<int> pages) => [
+      for (var i = 0; i < pages.length; i++)
+        Ayah(
+          id: i + 1,
+          surahId: 2,
+          ayahNumber: i + 1,
+          textArabic: '0123456789', // equal length so fractions are even
+          isSajda: false,
+          page: pages[i],
+        ),
+    ];
 
 const _headings = {
   1: SurahHeading(number: 1, nameEnglish: 'Al-Fatihah', totalAyahs: 7),
@@ -111,6 +124,30 @@ void main() {
         adjacentTarget(const ReaderTarget.ruku(558), 1, _headings),
         isNull,
       );
+    });
+  });
+
+  group('pageAtFraction', () {
+    test('returns null for an empty section', () {
+      expect(pageAtFraction(const [], 0.5), isNull);
+    });
+
+    test('maps the top of the scroll to the first page', () {
+      expect(pageAtFraction(_pagedAyahs([1, 2, 3]), 0), 1);
+    });
+
+    test('maps the bottom of the scroll to the last page', () {
+      expect(pageAtFraction(_pagedAyahs([1, 2, 3]), 1), 3);
+    });
+
+    test('maps the middle to a middle page', () {
+      expect(pageAtFraction(_pagedAyahs([1, 2, 3]), 0.5), 2);
+    });
+
+    test('clamps out-of-range fractions', () {
+      final ayahs = _pagedAyahs([4, 5, 6]);
+      expect(pageAtFraction(ayahs, -1), 4);
+      expect(pageAtFraction(ayahs, 2), 6);
     });
   });
 

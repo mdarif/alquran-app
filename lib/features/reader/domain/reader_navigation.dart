@@ -1,3 +1,4 @@
+import 'entities/ayah.dart';
 import 'entities/reader_target.dart';
 import 'entities/surah_heading.dart';
 
@@ -36,4 +37,23 @@ ReaderTarget? adjacentTarget(
     ReaderDimension.page => ReaderTarget.page(value),
     ReaderDimension.ruku => ReaderTarget.ruku(value),
   };
+}
+
+/// Estimates the printed-Mushaf page for a vertical scroll [fraction] (0..1)
+/// through a flowed section. The flow is one uniform font, so vertical position
+/// tracks character count well enough for a subtle "current page" readout —
+/// it's an estimate, not a page-faithful boundary. Returns null if unknown.
+int? pageAtFraction(List<Ayah> ayahs, double fraction) {
+  if (ayahs.isEmpty) return null;
+  final lengths = [for (final a in ayahs) a.textArabic.length];
+  final total = lengths.fold<int>(0, (sum, l) => sum + l);
+  if (total == 0) return ayahs.first.page;
+
+  final target = fraction.clamp(0.0, 1.0) * total;
+  var acc = 0;
+  for (var i = 0; i < ayahs.length; i++) {
+    acc += lengths[i];
+    if (acc >= target) return ayahs[i].page;
+  }
+  return ayahs.last.page;
 }

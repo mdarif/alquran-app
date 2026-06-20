@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
+import '../../domain/reader_navigation.dart';
 
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
 /// quran.db). Shown before every surah except Al-Fatihah (where it is ayah 1)
@@ -17,7 +20,7 @@ const int _surahAtTawbah = 9;
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
 /// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
 /// and each group gets a chapter header (and Basmala where appropriate).
-class MushafView extends StatelessWidget {
+class MushafView extends StatefulWidget {
   const MushafView({
     required this.ayahs,
     required this.headings,
@@ -30,54 +33,112 @@ class MushafView extends StatelessWidget {
   final double arabicFontSize;
 
   @override
+  State<MushafView> createState() => _MushafViewState();
+}
+
+class _MushafViewState extends State<MushafView> {
+  final ScrollController _controller = ScrollController();
+  Timer? _hideTimer;
+
+  int? _currentPage;
+  bool _showPage = false; // pill is shown briefly while scrolling
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
+    _controller.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_controller.hasClients) return;
+    final max = _controller.position.maxScrollExtent;
+    final fraction = max <= 0 ? 0.0 : _controller.offset / max;
+    final page = pageAtFraction(widget.ayahs, fraction);
+    if (page != null && page != _currentPage) {
+      setState(() => _currentPage = page);
+    }
+    // Reveal the pill, then fade it out after the scroll settles.
+    if (!_showPage) setState(() => _showPage = true);
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _showPage = false);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final group in groupAyahsBySurah(ayahs)) ...[
-            SurahHeaderCard(
-              heading: headings[group.first.surahId],
-              fallbackNumber: group.first.surahId,
-            ),
-            const SizedBox(height: 20),
-            if (_showBismillah(group)) ...[
-              Bismillah(fontSize: arabicFontSize),
-              const SizedBox(height: 18),
-            ],
-            Text.rich(
-              TextSpan(
-                children: [
-                  for (final ayah in group) ...[
-                    TextSpan(text: ayah.textArabic),
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.middle,
-                      child: SelectionContainer.disabled(
-                        child: AyahMedallion(
-                          number: ayah.ayahNumber,
-                          fontSize: arabicFontSize,
-                        ),
-                      ),
-                    ),
-                    const TextSpan(text: ' '),
-                  ],
+    final fontSize = widget.arabicFontSize;
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          controller: _controller,
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final group in groupAyahsBySurah(widget.ayahs)) ...[
+                SurahHeaderCard(
+                  heading: widget.headings[group.first.surahId],
+                  fallbackNumber: group.first.surahId,
+                ),
+                const SizedBox(height: 20),
+                if (_showBismillah(group)) ...[
+                  Bismillah(fontSize: fontSize),
+                  const SizedBox(height: 18),
                 ],
-              ),
-              // Centered (not justify): Flutter has no kashida justification, so
-              // justifying Arabic stretches glyph advances and breaks ligatures.
-              // Centering keeps shaping intact and balances the short last line.
-              textAlign: TextAlign.center,
-              textDirection: TextDirection.rtl,
-              style: QuranTextStyle.madani.copyWith(
-                fontSize: arabicFontSize,
-                height: 2.1,
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      for (final ayah in group) ...[
+                        TextSpan(text: ayah.textArabic),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: SelectionContainer.disabled(
+                            child: AyahMedallion(
+                              number: ayah.ayahNumber,
+                              fontSize: fontSize,
+                            ),
+                          ),
+                        ),
+                        const TextSpan(text: ' '),
+                      ],
+                    ],
+                  ),
+                  // Centered (not justify): Flutter has no kashida
+                  // justification, so justifying Arabic stretches glyph advances
+                  // and breaks ligatures. Centering keeps shaping intact.
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  style: QuranTextStyle.madani.copyWith(
+                    fontSize: fontSize,
+                    height: 2.1,
+                  ),
+                ),
+                const SizedBox(height: 28),
+              ],
+            ],
+          ),
+        ),
+        if (_currentPage != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 16,
+            child: IgnorePointer(
+              child: Center(
+                child: _PagePill(page: _currentPage!, visible: _showPage),
               ),
             ),
-            const SizedBox(height: 28),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -85,6 +146,38 @@ class MushafView extends StatelessWidget {
       group.first.surahId != _surahAlFatiha &&
       group.first.surahId != _surahAtTawbah &&
       group.first.ayahNumber == 1;
+}
+
+/// A subtle "Page N" readout that fades in while scrolling and out when idle.
+/// It's an estimate over flowed text, not a page-faithful boundary.
+class _PagePill extends StatelessWidget {
+  const _PagePill({required this.page, required this.visible});
+
+  final int page;
+  final bool visible;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AnimatedOpacity(
+      opacity: visible ? 0.85 : 0.0,
+      duration: const Duration(milliseconds: 250),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          'Page $page',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: theme.colorScheme.onSecondaryContainer,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Groups a mushaf-ordered ayah list into consecutive runs of the same surah.
