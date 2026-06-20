@@ -2,29 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../domain/entities/ayah.dart';
+import '../../domain/entities/reader_target.dart';
+import '../../domain/entities/surah_heading.dart';
+import '../../domain/entities/translation_resource.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
 
 class ReaderPage extends StatelessWidget {
-  const ReaderPage({required this.surahId, required this.title, super.key});
+  const ReaderPage({required this.target, super.key});
 
-  final int surahId;
-  final String title;
+  final ReaderTarget target;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => GetIt.I<ReaderCubit>()..load(surahId),
-      child: _ReaderView(surahId: surahId, title: title),
+      create: (_) => GetIt.I<ReaderCubit>()..load(target),
+      child: _ReaderView(title: target.title),
     );
   }
 }
 
 class _ReaderView extends StatefulWidget {
-  const _ReaderView({required this.surahId, required this.title});
+  const _ReaderView({required this.title});
 
-  final int surahId;
   final String title;
 
   @override
@@ -99,19 +101,15 @@ class _ReaderViewState extends State<_ReaderView> {
                   if (isReading) {
                     return MushafView(
                       ayahs: state.ayahs,
+                      headings: state.headings,
                       arabicFontSize: _arabicFont,
-                      surahNumber: widget.surahId,
-                      surahName: widget.title,
                     );
                   }
-                  return ListView.separated(
-                    itemCount: state.ayahs.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, i) => AyahTile(
-                      ayah: state.ayahs[i],
-                      resources: state.resources,
-                      arabicFontSize: _arabicFont,
-                    ),
+                  return _DetailedList(
+                    ayahs: state.ayahs,
+                    resources: state.resources,
+                    headings: state.headings,
+                    arabicFontSize: _arabicFont,
                   );
               }
             },
@@ -164,4 +162,63 @@ class _ReaderViewState extends State<_ReaderView> {
     final clamped = value.clamp(_minFont, _maxFont);
     if (clamped != _arabicFont) setState(() => _arabicFont = clamped);
   }
+}
+
+/// Detailed viewport: a lazy list of ayah tiles, with a surah header inserted
+/// wherever the section crosses into a new surah.
+class _DetailedList extends StatelessWidget {
+  const _DetailedList({
+    required this.ayahs,
+    required this.resources,
+    required this.headings,
+    required this.arabicFontSize,
+  });
+
+  final List<Ayah> ayahs;
+  final List<TranslationResource> resources;
+  final Map<int, SurahHeading> headings;
+  final double arabicFontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    // Flatten into header/ayah rows so the list stays lazy.
+    final rows = <Object>[];
+    int? lastSurah;
+    for (final ayah in ayahs) {
+      if (ayah.surahId != lastSurah) {
+        rows.add(_HeaderMarker(ayah.surahId));
+        lastSurah = ayah.surahId;
+      }
+      rows.add(ayah);
+    }
+
+    return ListView.separated(
+      itemCount: rows.length,
+      separatorBuilder: (_, __) {
+        return const SizedBox.shrink();
+      },
+      itemBuilder: (context, i) {
+        final row = rows[i];
+        if (row is _HeaderMarker) {
+          return Padding(
+            padding: EdgeInsets.fromLTRB(16, i == 0 ? 12 : 20, 16, 4),
+            child: SurahHeaderCard(
+              heading: headings[row.surahId],
+              fallbackNumber: row.surahId,
+            ),
+          );
+        }
+        return AyahTile(
+          ayah: row as Ayah,
+          resources: resources,
+          arabicFontSize: arabicFontSize,
+        );
+      },
+    );
+  }
+}
+
+class _HeaderMarker {
+  const _HeaderMarker(this.surahId);
+  final int surahId;
 }

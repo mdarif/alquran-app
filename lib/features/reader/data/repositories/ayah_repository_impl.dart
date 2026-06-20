@@ -1,5 +1,7 @@
 import '../../../../core/database/app_database.dart';
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/reader_target.dart';
+import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/repositories/ayah_repository.dart';
 
@@ -14,40 +16,59 @@ class AyahRepositoryImpl implements AyahRepository {
   static final RegExp _endOfAyahMarker = RegExp('[\\s۝٠-٩]+\$');
 
   @override
-  Future<List<Ayah>> getAyahs(int surahId) async {
-    final rows = await _db.ayahsForSurah(surahId);
-    final translations = await _db.translationsForSurah(surahId);
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async {
+    final rows = await switch (target.dimension) {
+      ReaderDimension.surah => _db.ayahsForSurah(target.value),
+      ReaderDimension.juz => _db.ayahsForJuz(target.value),
+      ReaderDimension.hizb => _db.ayahsForHizb(target.value),
+      ReaderDimension.page => _db.ayahsForPage(target.value),
+      ReaderDimension.ruku => _db.ayahsForRuku(target.value),
+    };
 
-    return rows
-        .map(
-          (r) => Ayah(
-            id: r.id,
-            surahId: r.surahId,
-            ayahNumber: r.ayahNumber,
-            textArabic: r.textArabicUthmani.replaceAll(_endOfAyahMarker, ''),
-            isSajda: r.sajda == 1,
-            page: r.pageNumber,
-            juz: r.juzNumber,
-            hizb: r.hizbNumber,
-            rubElHizb: r.rubElHizb,
-            ruku: r.rukuNumber,
-            translations: translations[r.id] ?? const {},
-          ),
-        )
-        .toList();
+    final translations =
+        await _db.translationsForAyahIds([for (final r in rows) r.id]);
+
+    return [
+      for (final r in rows)
+        Ayah(
+          id: r.id,
+          surahId: r.surahId,
+          ayahNumber: r.ayahNumber,
+          textArabic: r.textArabicUthmani.replaceAll(_endOfAyahMarker, ''),
+          isSajda: r.sajda == 1,
+          page: r.pageNumber,
+          juz: r.juzNumber,
+          hizb: r.hizbNumber,
+          rubElHizb: r.rubElHizb,
+          ruku: r.rukuNumber,
+          translations: translations[r.id] ?? const {},
+        ),
+    ];
+  }
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async {
+    final rows = await _db.allSurahs();
+    return {
+      for (final s in rows)
+        s.id: SurahHeading(
+          number: s.id,
+          nameEnglish: s.nameEnglish,
+          totalAyahs: s.totalAyahs,
+        ),
+    };
   }
 
   @override
   Future<List<TranslationResource>> getTranslationResources() async {
     final rows = await _db.translationResources();
-    return rows
-        .map(
-          (r) => TranslationResource(
-            id: r.id,
-            languageCode: r.languageCode,
-            name: r.name,
-          ),
-        )
-        .toList();
+    return [
+      for (final r in rows)
+        TranslationResource(
+          id: r.id,
+          languageCode: r.languageCode,
+          name: r.name,
+        ),
+    ];
   }
 }

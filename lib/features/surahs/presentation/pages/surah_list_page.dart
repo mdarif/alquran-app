@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../../reader/domain/entities/reader_target.dart';
 import '../../../reader/presentation/pages/reader_page.dart';
 import '../../domain/entities/surah.dart';
 import '../cubit/surah_list_cubit.dart';
@@ -48,8 +49,10 @@ class _SurahListView extends StatelessWidget {
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => ReaderPage(
-                          surahId: surah.id,
-                          title: surah.nameEnglish,
+                          target: ReaderTarget.surah(
+                            surah.id,
+                            surah.nameEnglish,
+                          ),
                         ),
                       ),
                     ),

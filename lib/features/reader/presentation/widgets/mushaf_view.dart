@@ -2,35 +2,33 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/surah_heading.dart';
 
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
-/// quran.db). Shown as a header before every surah except Al-Fatihah (where it
-/// is ayah 1) and At-Tawbah (which has none).
+/// quran.db). Shown before every surah except Al-Fatihah (where it is ayah 1)
+/// and At-Tawbah (which has none) — and only when a surah is shown from ayah 1.
 const String _bismillah =
-    'بِسۡمِ ٱللَّهِ'
-    ' ٱلرَّحۡمَٰنِ'
-    ' ٱلرَّحِيمِ';
+    'بِسۡمِ ٱللَّهِ'
+    ' ٱلرَّحۡمَٰنِ'
+    ' ٱلرَّحِيمِ';
 
 const int _surahAlFatiha = 1;
 const int _surahAtTawbah = 9;
 
-/// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow with
-/// no translations. Ayahs run together into one justified RTL block — each
-/// closed by an English verse number set in a light medallion — beneath a
-/// surah header carrying the chapter number and English name.
+/// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
+/// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
+/// and each group gets a chapter header (and Basmala where appropriate).
 class MushafView extends StatelessWidget {
   const MushafView({
     required this.ayahs,
+    required this.headings,
     required this.arabicFontSize,
-    required this.surahNumber,
-    required this.surahName,
     super.key,
   });
 
   final List<Ayah> ayahs;
+  final Map<int, SurahHeading> headings;
   final double arabicFontSize;
-  final int surahNumber;
-  final String surahName;
 
   @override
   Widget build(BuildContext context) {
@@ -39,67 +37,86 @@ class MushafView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SurahHeader(
-            number: surahNumber,
-            name: surahName,
-            ayahCount: ayahs.length,
-          ),
-          const SizedBox(height: 20),
-          if (surahNumber != _surahAlFatiha && surahNumber != _surahAtTawbah) ...[
-            _Bismillah(fontSize: arabicFontSize),
-            const SizedBox(height: 18),
-          ],
-          Text.rich(
-            TextSpan(
-              children: [
-                for (final ayah in ayahs) ...[
-                  TextSpan(text: ayah.textArabic),
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    // Keep the verse number out of any text selection/copy so a
-                    // copied passage is pure Quran text.
-                    child: SelectionContainer.disabled(
-                      child: _AyahMedallion(
-                        number: ayah.ayahNumber,
-                        fontSize: arabicFontSize,
+          for (final group in groupAyahsBySurah(ayahs)) ...[
+            SurahHeaderCard(
+              heading: headings[group.first.surahId],
+              fallbackNumber: group.first.surahId,
+            ),
+            const SizedBox(height: 20),
+            if (_showBismillah(group)) ...[
+              Bismillah(fontSize: arabicFontSize),
+              const SizedBox(height: 18),
+            ],
+            Text.rich(
+              TextSpan(
+                children: [
+                  for (final ayah in group) ...[
+                    TextSpan(text: ayah.textArabic),
+                    WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: SelectionContainer.disabled(
+                        child: AyahMedallion(
+                          number: ayah.ayahNumber,
+                          fontSize: arabicFontSize,
+                        ),
                       ),
                     ),
-                  ),
-                  const TextSpan(text: ' '),
+                    const TextSpan(text: ' '),
+                  ],
                 ],
-              ],
+              ),
+              // NOT justify: Flutter has no kashida justification, so justifying
+              // Arabic stretches glyph advances. Natural RTL start alignment
+              // keeps shaping intact.
+              textAlign: TextAlign.start,
+              textDirection: TextDirection.rtl,
+              style: QuranTextStyle.madani.copyWith(
+                fontSize: arabicFontSize,
+                height: 2.1,
+              ),
             ),
-            // NOT justify: Flutter has no kashida justification, so justifying
-            // Arabic stretches glyph advances. Natural RTL start alignment keeps
-            // shaping intact.
-            textAlign: TextAlign.start,
-            textDirection: TextDirection.rtl,
-            style: QuranTextStyle.madani.copyWith(
-              fontSize: arabicFontSize,
-              height: 2.1,
-            ),
-          ),
+            const SizedBox(height: 28),
+          ],
         ],
       ),
     );
   }
+
+  bool _showBismillah(List<Ayah> group) =>
+      group.first.surahId != _surahAlFatiha &&
+      group.first.surahId != _surahAtTawbah &&
+      group.first.ayahNumber == 1;
 }
 
-/// Decorative chapter header: number, English name, ayah count.
-class _SurahHeader extends StatelessWidget {
-  const _SurahHeader({
-    required this.number,
-    required this.name,
-    required this.ayahCount,
+/// Groups a mushaf-ordered ayah list into consecutive runs of the same surah.
+List<List<Ayah>> groupAyahsBySurah(List<Ayah> ayahs) {
+  final groups = <List<Ayah>>[];
+  for (final ayah in ayahs) {
+    if (groups.isEmpty || groups.last.first.surahId != ayah.surahId) {
+      groups.add([ayah]);
+    } else {
+      groups.last.add(ayah);
+    }
+  }
+  return groups;
+}
+
+/// Decorative chapter header: number, English name, ayah count (centered).
+class SurahHeaderCard extends StatelessWidget {
+  const SurahHeaderCard({
+    required this.heading,
+    required this.fallbackNumber,
+    super.key,
   });
 
-  final int number;
-  final String name;
-  final int ayahCount;
+  final SurahHeading? heading;
+  final int fallbackNumber;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final number = heading?.number ?? fallbackNumber;
+    final name = heading?.nameEnglish ?? 'Surah $number';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -132,14 +149,16 @@ class _SurahHeader extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Surah $number · $ayahCount ayahs',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          if (heading != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Surah $number · ${heading!.totalAyahs} ayahs',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -147,8 +166,8 @@ class _SurahHeader extends StatelessWidget {
 }
 
 /// Centred Basmala header rendered in the QPC face, scaled to the reading size.
-class _Bismillah extends StatelessWidget {
-  const _Bismillah({required this.fontSize});
+class Bismillah extends StatelessWidget {
+  const Bismillah({required this.fontSize, super.key});
 
   final double fontSize;
 
@@ -166,10 +185,10 @@ class _Bismillah extends StatelessWidget {
   }
 }
 
-/// Inline end-of-ayah marker: the verse number (Western numerals) inside a
-/// soft tinted medallion, sized to sit with the surrounding Arabic line.
-class _AyahMedallion extends StatelessWidget {
-  const _AyahMedallion({required this.number, required this.fontSize});
+/// Inline end-of-ayah marker: the verse number (Western numerals) inside a soft
+/// tinted medallion, sized to sit with the surrounding Arabic line.
+class AyahMedallion extends StatelessWidget {
+  const AyahMedallion({required this.number, required this.fontSize, super.key});
 
   final int number;
   final double fontSize;
@@ -194,7 +213,6 @@ class _AyahMedallion extends StatelessWidget {
         '$number',
         textDirection: TextDirection.ltr,
         style: TextStyle(
-          fontFamily: null, // platform sans — Western numerals, not the QPC face
           fontSize: fontSize * 0.42,
           height: 1.0,
           fontWeight: FontWeight.w600,

@@ -2,6 +2,8 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/ayah.dart';
+import '../../domain/entities/reader_target.dart';
+import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/repositories/ayah_repository.dart';
 
@@ -12,16 +14,18 @@ class ReaderCubit extends Cubit<ReaderState> {
 
   final AyahRepository _repository;
 
-  Future<void> load(int surahId) async {
+  Future<void> load(ReaderTarget target) async {
     emit(state.copyWith(status: ReaderStatus.loading));
     try {
       final resources = await _repository.getTranslationResources();
-      final ayahs = await _repository.getAyahs(surahId);
+      final headings = await _repository.getSurahHeadings();
+      final ayahs = await _repository.getAyahs(target);
       emit(
         state.copyWith(
           status: ReaderStatus.loaded,
           ayahs: ayahs,
           resources: resources,
+          headings: headings,
         ),
       );
     } catch (e) {

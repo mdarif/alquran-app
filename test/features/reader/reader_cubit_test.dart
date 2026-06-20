@@ -1,4 +1,6 @@
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
+import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
+import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
@@ -16,9 +18,15 @@ class _FakeAyahRepository implements AyahRepository {
   final Object? error;
 
   @override
-  Future<List<Ayah>> getAyahs(int surahId) async {
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async {
     if (error != null) throw error!;
     return ayahs;
+  }
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async {
+    if (error != null) throw error!;
+    return const {};
   }
 
   @override
@@ -59,7 +67,7 @@ void main() {
         emitsInOrder([ReaderStatus.loading, ReaderStatus.loaded]),
       );
 
-      await cubit.load(1);
+      await cubit.load(const ReaderTarget.surah(1, "Al-Fatihah"));
       await expectation;
 
       expect(cubit.state.ayahs, const [_ayah]);
@@ -79,7 +87,7 @@ void main() {
         emitsInOrder([ReaderStatus.loading, ReaderStatus.error]),
       );
 
-      await cubit.load(999);
+      await cubit.load(const ReaderTarget.juz(99));
       await expectation;
 
       expect(cubit.state.error, contains('no surah 999'));

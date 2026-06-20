@@ -44,6 +44,57 @@ class AppDatabase extends _$AppDatabase {
             ..orderBy([(a) => OrderingTerm.asc(a.ayahNumber)]))
           .get();
 
+  /// Ayahs of an index range (juz/hizb/page/ruku), in mushaf order. These
+  /// indices are global and monotonic, so ordering by the running [Ayahs.id]
+  /// yields the correct reading sequence even across surah boundaries.
+  Future<List<AyahRow>> ayahsForJuz(int n) => _ayahsByGlobalIndex(ayahs.juzNumber, n);
+  Future<List<AyahRow>> ayahsForHizb(int n) => _ayahsByGlobalIndex(ayahs.hizbNumber, n);
+  Future<List<AyahRow>> ayahsForPage(int n) => _ayahsByGlobalIndex(ayahs.pageNumber, n);
+  Future<List<AyahRow>> ayahsForRuku(int n) => _ayahsByGlobalIndex(ayahs.rukuNumber, n);
+
+  Future<List<AyahRow>> _ayahsByGlobalIndex(GeneratedColumn<int> col, int n) =>
+      (select(ayahs)
+            ..where((a) => col.equals(n))
+            ..orderBy([(a) => OrderingTerm.asc(a.id)]))
+          .get();
+
+  /// Translations for an arbitrary set of ayahs, keyed by ayahId -> (resourceId
+  /// -> text). Used when a reader section spans surahs (juz/hizb/page/ruku).
+  Future<Map<int, Map<int, String>>> translationsForAyahIds(
+    List<int> ayahIds,
+  ) async {
+    if (ayahIds.isEmpty) return {};
+    final rows = await (select(translations)
+          ..where((t) => t.ayahId.isIn(ayahIds)))
+        .get();
+    final out = <int, Map<int, String>>{};
+    for (final t in rows) {
+      out.putIfAbsent(t.ayahId, () => {})[t.resourceId] = t.textContent;
+    }
+    return out;
+  }
+
+  /// For an index dimension (`juz_number`, `hizb_number`, `page_number`,
+  /// `ruku_number`), the first ayah of each value — used to label navigation
+  /// entries with where they begin. [column] is a fixed, code-supplied name.
+  Future<List<IndexStart>> indexStarts(String column) async {
+    final rows = await customSelect(
+      'SELECT a.$column AS idx, a.surah_id AS surah_id, a.ayah_number AS ayah '
+      'FROM ayahs a '
+      'WHERE a.id = (SELECT MIN(b.id) FROM ayahs b WHERE b.$column = a.$column) '
+      'AND a.$column IS NOT NULL '
+      'ORDER BY a.$column',
+    ).get();
+    return [
+      for (final r in rows)
+        IndexStart(
+          index: r.read<int>('idx'),
+          surahId: r.read<int>('surah_id'),
+          ayahNumber: r.read<int>('ayah'),
+        ),
+    ];
+  }
+
   /// All active translation resources (MVP: Urdu + Hindi), ordered by id.
   Future<List<ResourceRow>> translationResources() =>
       (select(resources)..where((r) => r.type.equals('translation'))).get();
@@ -71,6 +122,19 @@ class AppDatabase extends _$AppDatabase {
     }
     return out;
   }
+}
+
+/// Where an index value (juz/hizb/page/ruku) first begins.
+class IndexStart {
+  const IndexStart({
+    required this.index,
+    required this.surahId,
+    required this.ayahNumber,
+  });
+
+  final int index;
+  final int surahId;
+  final int ayahNumber;
 }
 
 LazyDatabase _openConnection() {
