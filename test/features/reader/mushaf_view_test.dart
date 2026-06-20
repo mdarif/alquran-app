@@ -43,6 +43,26 @@ void main() {
       expect(find.textContaining('ayahs'), findsNothing);
     });
 
+    testWidgets('the Arabic flow is centered and right-to-left',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahs(2, 3),
+            headings: _headings(2, 'Al-Baqarah', 286),
+            arabicFontSize: 28,
+          ),
+        ),
+      );
+
+      // The continuous flow is the only Text built from a TextSpan tree.
+      final flow = tester
+          .widgetList<Text>(find.byType(Text))
+          .firstWhere((t) => t.textSpan != null);
+      expect(flow.textAlign, TextAlign.center);
+      expect(flow.textDirection, TextDirection.rtl);
+    });
+
     testWidgets('renders an English medallion number for each ayah',
         (tester) async {
       await tester.pumpWidget(

@@ -64,10 +64,10 @@ class MushafView extends StatelessWidget {
                   ],
                 ],
               ),
-              // NOT justify: Flutter has no kashida justification, so justifying
-              // Arabic stretches glyph advances. Natural RTL start alignment
-              // keeps shaping intact.
-              textAlign: TextAlign.start,
+              // Centered (not justify): Flutter has no kashida justification, so
+              // justifying Arabic stretches glyph advances and breaks ligatures.
+              // Centering keeps shaping intact and balances the short last line.
+              textAlign: TextAlign.center,
               textDirection: TextDirection.rtl,
               style: QuranTextStyle.madani.copyWith(
                 fontSize: arabicFontSize,
