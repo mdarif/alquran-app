@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
-import 'features/surahs/presentation/pages/surah_list_page.dart';
+import 'features/navigation/presentation/pages/home_page.dart';
 
 class AlQuranApp extends StatelessWidget {
   const AlQuranApp({super.key});
@@ -12,7 +12,7 @@ class AlQuranApp extends StatelessWidget {
       title: 'Al Quran',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const SurahListPage(),
+      home: const HomePage(),
     );
   }
 }

@@ -1,5 +1,8 @@
 import 'package:get_it/get_it.dart';
 
+import '../../features/navigation/data/repositories/index_repository_impl.dart';
+import '../../features/navigation/domain/repositories/index_repository.dart';
+import '../../features/navigation/presentation/cubit/index_list_cubit.dart';
 import '../../features/reader/data/repositories/ayah_repository_impl.dart';
 import '../../features/reader/domain/repositories/ayah_repository.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
@@ -23,11 +26,17 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton<AyahRepository>(
       () => AyahRepositoryImpl(getIt<AppDatabase>()),
     )
+    ..registerLazySingleton<IndexRepository>(
+      () => IndexRepositoryImpl(getIt<AppDatabase>()),
+    )
     // Cubits (new instance per screen)
     ..registerFactory<SurahListCubit>(
       () => SurahListCubit(getIt<SurahRepository>()),
     )
     ..registerFactory<ReaderCubit>(
       () => ReaderCubit(getIt<AyahRepository>()),
+    )
+    ..registerFactory<IndexListCubit>(
+      () => IndexListCubit(getIt<IndexRepository>()),
     );
 }

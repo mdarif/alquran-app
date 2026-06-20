@@ -13,21 +13,31 @@ class SurahListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => GetIt.I<SurahListCubit>()..load(),
-      child: const _SurahListView(),
+    return const Scaffold(
+      body: SurahListView(),
     );
   }
 }
 
-class _SurahListView extends StatelessWidget {
-  const _SurahListView();
+/// The surah list body (no Scaffold), embeddable as a navigation tab.
+class SurahListView extends StatelessWidget {
+  const SurahListView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Al Quran')),
-      body: BlocBuilder<SurahListCubit, SurahListState>(
+    return BlocProvider(
+      create: (_) => GetIt.I<SurahListCubit>()..load(),
+      child: const _SurahListBody(),
+    );
+  }
+}
+
+class _SurahListBody extends StatelessWidget {
+  const _SurahListBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<SurahListCubit, SurahListState>(
         builder: (context, state) {
           switch (state.status) {
             case SurahListStatus.initial:
@@ -61,7 +71,6 @@ class _SurahListView extends StatelessWidget {
               );
           }
         },
-      ),
     );
   }
 }

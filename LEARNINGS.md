@@ -73,6 +73,15 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   exact glyphs from Al-Fatihah 1:1 (stripped) so encoding matches the font.
 - Western ("English") numerals come free from rendering an `int` (`'$n'`); keep
   ayah-number medallions in a plain sans face, not the Quran font.
+- **All QPC index columns are global and monotonic** — juz 1–30, hizb 1–60,
+  rub-el-hizb 1–240, page 1–604, ruku 1–558 (ruku does NOT reset per surah). So
+  "ayahs of juz N" is just `WHERE juz_number = N ORDER BY id` and a section can
+  span surahs cleanly. For navigation lists, the first ayah of each index value
+  is one grouped query:
+  `SELECT col, surah_id, ayah_number FROM ayahs a WHERE a.id = (SELECT MIN(b.id) FROM ayahs b WHERE b.col = a.col) ORDER BY col`.
+- When a reader section spans surahs, group consecutive ayahs by `surah_id` and
+  draw a chapter header per group; show the Basmala only when a group starts at
+  `ayah_number == 1` (so a juz that begins mid-surah correctly omits it).
 
 ---
 
