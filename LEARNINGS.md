@@ -160,6 +160,13 @@ mangles Arabic. Use `TextAlign.start` with `textDirection: TextDirection.rtl`.
   (reads a ~30-byte asset, not the whole DB). Do the seeding in DI startup
   *before* opening the DB, and pass the file into the DB class. Remember to
   regenerate the marker whenever the DB changes (a `make seed-version` target).
+- **GetIt "not registered" after a UI change = you hot-reloaded a DI change.**
+  Adding a `getIt.register…` in `configureDependencies` and a `GetIt.I<X>()` use
+  in the same change: hot reload (`r`) re-runs `build()` (which now needs `X`) but
+  NOT `main()`/`configureDependencies()` (which registers it) → red-screen "X is
+  not registered." Fix: hot **restart** (`R`) or rerun. No production impact (no
+  hot reload there); it only bites during dev. Rule: DI graph changes need a
+  restart, not a reload.
 - **`native_assets … references objective_c` build error** after clearing caches
   → fix with `flutter clean && flutter pub get`.
 - **Disk:** iOS builds + `~/Library/Developer/Xcode/DerivedData` balloon fast and
