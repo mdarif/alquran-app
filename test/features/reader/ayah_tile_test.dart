@@ -2,6 +2,7 @@ import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/presentation/widgets/ayah_tile.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _urdu = TranslationResource(id: 1, languageCode: 'ur', name: 'Junagarhi');
@@ -165,6 +166,73 @@ void main() {
       );
 
       expect(find.textContaining('p. 2'), findsNothing);
+    });
+
+    testWidgets('offers a Copy / Share menu', (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(ayah: ayah, resources: [], arabicFontSize: 24),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_horiz));
+      await tester.pumpAndSettle();
+      expect(find.text('Copy'), findsOneWidget);
+      expect(find.text('Share'), findsOneWidget);
+    });
+
+    testWidgets('Copy puts the ayah text on the clipboard and confirms',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+        translations: {1: 'اردو'},
+      );
+
+      String? copied;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String;
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(
+            ayah: ayah,
+            resources: [_urdu],
+            arabicFontSize: 24,
+            surahName: 'Al-Baqarah',
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_horiz));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy'));
+      await tester.pumpAndSettle();
+
+      expect(copied, 'الٓمٓ\n\nاردو\n\n— Al-Baqarah 2:1');
+      expect(find.text('Ayah copied'), findsOneWidget);
     });
 
     testWidgets('renders Urdu translation right-to-left', (tester) async {

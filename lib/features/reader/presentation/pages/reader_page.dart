@@ -294,10 +294,12 @@ class _DetailedList extends StatelessWidget {
             ],
           );
         }
+        final ayah = row as Ayah;
         return AyahTile(
-          ayah: row as Ayah,
+          ayah: ayah,
           resources: resources,
           arabicFontSize: arabicFontSize,
+          surahName: headings[ayah.surahId]?.nameEnglish,
         );
       },
     );

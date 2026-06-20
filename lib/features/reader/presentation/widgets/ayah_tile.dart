@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../domain/ayah_share.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/translation_resource.dart';
 
@@ -10,12 +13,14 @@ class AyahTile extends StatelessWidget {
     required this.ayah,
     required this.resources,
     required this.arabicFontSize,
+    this.surahName,
     super.key,
   });
 
   final Ayah ayah;
   final List<TranslationResource> resources;
   final double arabicFontSize;
+  final String? surahName;
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +46,38 @@ class AyahTile extends StatelessWidget {
                   ),
                 ),
               ),
-              const Spacer(),
-              if (ayah.isSajda)
+              if (ayah.isSajda) ...[
+                const SizedBox(width: 8),
                 Icon(Icons.star, size: 16, color: theme.colorScheme.tertiary),
+              ],
+              const Spacer(),
+              PopupMenuButton<_AyahAction>(
+                tooltip: 'Copy or share',
+                icon: Icon(
+                  Icons.more_horiz,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                onSelected: (action) => _onAction(context, action),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: _AyahAction.copy,
+                    child: ListTile(
+                      leading: Icon(Icons.copy_rounded),
+                      title: Text('Copy'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _AyahAction.share,
+                    child: ListTile(
+                      leading: Icon(Icons.share_rounded),
+                      title: Text('Share'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -61,7 +95,31 @@ class AyahTile extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _onAction(BuildContext context, _AyahAction action) async {
+    final text = buildAyahShareText(
+      ayah: ayah,
+      resources: resources,
+      surahName: surahName,
+    );
+    switch (action) {
+      case _AyahAction.copy:
+        await Clipboard.setData(ClipboardData(text: text));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Ayah copied'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
+      case _AyahAction.share:
+        await SharePlus.instance.share(ShareParams(text: text));
+    }
+  }
 }
+
+enum _AyahAction { copy, share }
 
 /// One translation: a small left-aligned attribution label over the text, which
 /// is aligned by its script (Urdu RTL → right, English LTR → left).
@@ -80,7 +138,7 @@ class _Translation extends StatelessWidget {
       children: [
         const SizedBox(height: 14),
         Text(
-          '${_languageName(resource.languageCode)} · ${resource.name}',
+          '${languageName(resource.languageCode)} · ${resource.name}',
           textAlign: TextAlign.left,
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.primary,
@@ -100,10 +158,3 @@ class _Translation extends StatelessWidget {
     );
   }
 }
-
-String _languageName(String code) => switch (code) {
-      'ur' => 'Urdu',
-      'en' => 'English',
-      'hi' => 'Hindi',
-      _ => code.toUpperCase(),
-    };
