@@ -114,9 +114,10 @@ class _MushafViewState extends State<MushafView> {
       int offset = 0;
       for (final ayah in group) {
         _verseStart[ayah.id] = offset;
-        offset += ayah.textArabic.length
-            + 2 // leading + trailing space around the number
-            + _toArabicIndic(ayah.ayahNumber).length;
+        offset += ayah.textArabic.length +
+            2 // leading + trailing space around the number
+            +
+            _toArabicIndic(ayah.ayahNumber).length;
       }
     }
   }
@@ -141,7 +142,10 @@ class _MushafViewState extends State<MushafView> {
   void _scrollToFocus(int ayahId) {
     if (!mounted) return;
     final surahId = widget.ayahs
-        .firstWhere((a) => a.id == ayahId, orElse: () => widget.ayahs.first,)
+        .firstWhere(
+          (a) => a.id == ayahId,
+          orElse: () => widget.ayahs.first,
+        )
         .surahId;
     final key = _groupKeys[surahId];
     if (key?.currentContext == null) return;
@@ -156,11 +160,13 @@ class _MushafViewState extends State<MushafView> {
     );
     if (boxes.isEmpty) return;
     final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
-    final viewportGlobalY =
-        (context.findRenderObject()! as RenderBox).localToGlobal(Offset.zero).dy;
-    final target = (_controller.offset
-            + (groupGlobalY - viewportGlobalY)
-            + boxes.first.top - 48)
+    final viewportGlobalY = (context.findRenderObject()! as RenderBox)
+        .localToGlobal(Offset.zero)
+        .dy;
+    final target = (_controller.offset +
+            (groupGlobalY - viewportGlobalY) +
+            boxes.first.top -
+            48)
         .clamp(0.0, _controller.position.maxScrollExtent);
     _controller.animateTo(
       target,

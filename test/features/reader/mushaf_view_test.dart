@@ -110,7 +110,8 @@ void main() {
       expect(flow.textDirection, TextDirection.rtl);
     });
 
-    testWidgets('appends each ayah number as Arabic-Indic digits (font draws '
+    testWidgets(
+        'appends each ayah number as Arabic-Indic digits (font draws '
         'the rosette around them)', (tester) async {
       await tester.pumpWidget(
         _wrap(

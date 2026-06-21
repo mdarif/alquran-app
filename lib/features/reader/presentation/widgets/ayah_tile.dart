@@ -201,7 +201,8 @@ class _Translation extends StatelessWidget {
           // Tag the translation's language for correct screen-reader pronunciation.
           locale: Locale(resource.languageCode),
           style: resource.languageCode.scriptStyle(
-            theme.textTheme.bodyLarge!.copyWith(height: 1.5, fontSize: fontSize),
+            theme.textTheme.bodyLarge!
+                .copyWith(height: 1.5, fontSize: fontSize),
           ),
         ),
       ],
