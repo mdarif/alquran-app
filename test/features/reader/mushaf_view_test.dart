@@ -71,7 +71,7 @@ void main() {
       );
 
       expect(find.text('الفاتحة'), findsOneWidget);
-      expect(find.text('Meccan · 7 verses'), findsOneWidget);
+      expect(find.text('Meccan · 7 Verses'), findsOneWidget);
     });
 
     testWidgets('omits the meta line when surah metadata is unavailable',

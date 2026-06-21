@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -17,23 +18,27 @@ import '../widgets/mushaf_view.dart';
 import '../widgets/reader_settings_sheet.dart';
 
 class ReaderPage extends StatelessWidget {
-  const ReaderPage({required this.target, super.key});
+  const ReaderPage({required this.target, this.focusAyahId, super.key});
 
   final ReaderTarget target;
+
+  /// Global ayah id to scroll to on open (from "Last Read"); null starts at top.
+  final int? focusAyahId;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => GetIt.I<ReaderCubit>()..load(target),
-      child: _ReaderView(initialTarget: target),
+      child: _ReaderView(initialTarget: target, focusAyahId: focusAyahId),
     );
   }
 }
 
 class _ReaderView extends StatefulWidget {
-  const _ReaderView({required this.initialTarget});
+  const _ReaderView({required this.initialTarget, this.focusAyahId});
 
   final ReaderTarget initialTarget;
+  final int? focusAyahId;
 
   @override
   State<_ReaderView> createState() => _ReaderViewState();
@@ -58,6 +63,11 @@ class _ReaderViewState extends State<_ReaderView> {
   // The currently displayed section. Swiping moves it to an adjacent section
   // (next/previous) within the same dimension, keeping font/viewport state.
   late ReaderTarget _target = widget.initialTarget;
+
+  // The verse to scroll to on open ("Last Read" resume). Consumed by the first
+  // section's viewport; cleared once we navigate away so swiped sections start
+  // at the top.
+  late int? _focusAyahId = widget.focusAyahId;
 
   // Viewport preference (PRD lists Reading first), restored from settings.
   late _Viewport _viewport =
@@ -117,6 +127,8 @@ class _ReaderViewState extends State<_ReaderView> {
                   ayahs: state.ayahs,
                   headings: state.headings,
                   arabicFontSize: _arabicFont,
+                  focusAyahId: _focusAyahId,
+                  onVisibleAyah: _onVisibleAyah,
                 );
               }
               return _DetailedList(
@@ -125,6 +137,8 @@ class _ReaderViewState extends State<_ReaderView> {
                 resources: state.resources,
                 headings: state.headings,
                 arabicFontSize: _arabicFont,
+                focusAyahId: _focusAyahId,
+                onVisibleAyah: _onVisibleAyah,
               );
             },
           ),
@@ -137,9 +151,17 @@ class _ReaderViewState extends State<_ReaderView> {
     final cubit = context.read<ReaderCubit>();
     final next = adjacentTarget(_target, delta, cubit.state.headings);
     if (next == null) return; // at the first/last section — no wrap-around
-    setState(() => _target = next);
+    setState(() {
+      _target = next;
+      _focusAyahId = null; // a swiped section opens at its top, not a resume
+    });
     cubit.load(next);
   }
+
+  /// The viewport reports its topmost-visible verse (on scroll-idle); record it
+  /// so "Last Read" resumes exactly here.
+  void _onVisibleAyah(Ayah ayah) =>
+      context.read<ReaderCubit>().saveProgress(ayah);
 
   // --- Pinch-to-zoom (two-finger) + swipe (one-finger) ----------------------
 
@@ -241,13 +263,17 @@ class _ReaderViewState extends State<_ReaderView> {
 }
 
 /// Detailed viewport: a lazy list of ayah tiles, with a surah header inserted
-/// wherever the section crosses into a new surah.
-class _DetailedList extends StatelessWidget {
+/// wherever the section crosses into a new surah. Uses a positioned list so it
+/// can scroll to the exact last-read verse (even when its tile isn't built yet)
+/// and report the topmost-visible verse as the user scrolls.
+class _DetailedList extends StatefulWidget {
   const _DetailedList({
     required this.ayahs,
     required this.resources,
     required this.headings,
     required this.arabicFontSize,
+    this.focusAyahId,
+    this.onVisibleAyah,
     super.key,
   });
 
@@ -255,17 +281,52 @@ class _DetailedList extends StatelessWidget {
   final List<TranslationResource> resources;
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
+  final int? focusAyahId;
+  final ValueChanged<Ayah>? onVisibleAyah;
 
   @override
-  Widget build(BuildContext context) {
+  State<_DetailedList> createState() => _DetailedListState();
+}
+
+class _DetailedListState extends State<_DetailedList> {
+  final ItemScrollController _scrollController = ItemScrollController();
+  final ItemPositionsListener _positions = ItemPositionsListener.create();
+
+  late final List<Object> _rows;
+  final Map<int, int> _ayahRowIndex = {}; // ayah id -> row index
+
+  Timer? _reportTimer;
+  Timer? _highlightTimer;
+  int? _highlightAyahId;
+
+  @override
+  void initState() {
+    super.initState();
+    _buildRows();
+    _positions.itemPositions.addListener(_onPositions);
+    final id = widget.focusAyahId;
+    if (id != null && _ayahRowIndex.containsKey(id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
+    }
+  }
+
+  @override
+  void dispose() {
+    _reportTimer?.cancel();
+    _highlightTimer?.cancel();
+    _positions.itemPositions.removeListener(_onPositions);
+    super.dispose();
+  }
+
+  void _buildRows() {
     // Flatten into header/ayah rows so the list stays lazy. A header marks each
     // surah boundary, and notes whether the Basmala should precede it (shown for
     // every surah except Al-Fatihah — where it is ayah 1 — and At-Tawbah).
-    final rows = <Object>[];
+    _rows = <Object>[];
     int? lastSurah;
-    for (final ayah in ayahs) {
+    for (final ayah in widget.ayahs) {
       if (ayah.surahId != lastSurah) {
-        rows.add(
+        _rows.add(
           _HeaderMarker(
             surahId: ayah.surahId,
             showBismillah:
@@ -274,37 +335,109 @@ class _DetailedList extends StatelessWidget {
         );
         lastSurah = ayah.surahId;
       }
-      rows.add(ayah);
+      _ayahRowIndex[ayah.id] = _rows.length;
+      _rows.add(ayah);
     }
+  }
 
-    return ListView.builder(
-      itemCount: rows.length,
+  void _scrollToFocus(int ayahId) {
+    if (!mounted || !_scrollController.isAttached) return;
+    final idx = _ayahRowIndex[ayahId];
+    if (idx == null) return;
+    _scrollController.scrollTo(
+      index: idx,
+      alignment: 0.06,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
+    _flash(ayahId);
+  }
+
+  void _flash(int ayahId) {
+    setState(() => _highlightAyahId = ayahId);
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (mounted) setState(() => _highlightAyahId = null);
+    });
+  }
+
+  void _onPositions() {
+    // Debounce: report only once scrolling settles.
+    _reportTimer?.cancel();
+    _reportTimer = Timer(const Duration(milliseconds: 400), _reportTopmost);
+  }
+
+  void _reportTopmost() {
+    final onVisible = widget.onVisibleAyah;
+    if (onVisible == null) return;
+    final visible = _positions.itemPositions.value
+        .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1);
+    if (visible.isEmpty) return;
+    final top = visible
+        .reduce((a, b) => a.itemLeadingEdge <= b.itemLeadingEdge ? a : b);
+    // The verse being read at the top is this row, or the next ayah row if the
+    // topmost item is a surah header.
+    for (var i = top.index; i < _rows.length; i++) {
+      final row = _rows[i];
+      if (row is Ayah) {
+        onVisible(row);
+        return;
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollablePositionedList.builder(
+      itemScrollController: _scrollController,
+      itemPositionsListener: _positions,
+      itemCount: _rows.length,
       itemBuilder: (context, i) {
-        final row = rows[i];
+        final row = _rows[i];
         if (row is _HeaderMarker) {
           return Column(
             children: [
               Padding(
                 padding: EdgeInsets.fromLTRB(16, i == 0 ? 12 : 20, 16, 4),
                 child: SurahHeaderCard(
-                  heading: headings[row.surahId],
+                  heading: widget.headings[row.surahId],
                   fallbackNumber: row.surahId,
+                  fontSize: widget.arabicFontSize,
                 ),
               ),
               if (row.showBismillah)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Bismillah(fontSize: arabicFontSize),
+                  child: Bismillah(fontSize: widget.arabicFontSize),
                 ),
             ],
           );
         }
         final ayah = row as Ayah;
-        return AyahTile(
+        final tile = AyahTile(
           ayah: ayah,
-          resources: resources,
-          arabicFontSize: arabicFontSize,
-          surahName: headings[ayah.surahId]?.nameEnglish,
+          resources: widget.resources,
+          arabicFontSize: widget.arabicFontSize,
+          surahName: widget.headings[ayah.surahId]?.nameEnglish,
+          highlight: _highlightAyahId == ayah.id,
+        );
+        // A light hairline separates consecutive verses. It's omitted after the
+        // last verse (nothing follows) and before a surah header (the chapter
+        // header is its own separator).
+        final nextIsAyah = i + 1 < _rows.length && _rows[i + 1] is Ayah;
+        if (!nextIsAyah) return tile;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            tile,
+            Divider(
+              height: 1,
+              thickness: 1,
+              indent: 16,
+              endIndent: 16,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ],
         );
       },
     );

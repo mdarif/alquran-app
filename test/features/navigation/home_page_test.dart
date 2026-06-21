@@ -4,7 +4,7 @@ import 'package:al_quran/features/navigation/domain/entities/index_kind.dart';
 import 'package:al_quran/features/navigation/domain/repositories/index_repository.dart';
 import 'package:al_quran/features/navigation/presentation/cubit/index_list_cubit.dart';
 import 'package:al_quran/features/navigation/presentation/pages/home_page.dart';
-import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
+import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
@@ -31,9 +31,9 @@ class _FakeSurahRepository implements SurahRepository {
 
 class _FakeLastReadRepository implements LastReadRepository {
   @override
-  Future<void> save(ReaderTarget target) async {}
+  Future<void> save(LastRead value) async {}
   @override
-  Future<ReaderTarget?> load() async => null; // banner stays hidden
+  Future<LastRead?> load() async => null; // banner stays hidden
 }
 
 class _FakeIndexRepository implements IndexRepository {

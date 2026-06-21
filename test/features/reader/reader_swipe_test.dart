@@ -1,4 +1,5 @@
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
+import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
@@ -39,11 +40,11 @@ class _FakeAyahRepository implements AyahRepository {
 }
 
 class _FakeLastReadRepository implements LastReadRepository {
-  ReaderTarget? saved;
+  LastRead? saved;
   @override
-  Future<void> save(ReaderTarget target) async => saved = target;
+  Future<void> save(LastRead value) async => saved = value;
   @override
-  Future<ReaderTarget?> load() async => saved;
+  Future<LastRead?> load() async => saved;
 }
 
 class _FakeSettings implements ReaderSettingsRepository {

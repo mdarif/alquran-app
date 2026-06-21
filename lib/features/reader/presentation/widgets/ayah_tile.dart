@@ -14,6 +14,7 @@ class AyahTile extends StatelessWidget {
     required this.resources,
     required this.arabicFontSize,
     this.surahName,
+    this.highlight = false,
     super.key,
   });
 
@@ -22,11 +23,18 @@ class AyahTile extends StatelessWidget {
   final double arabicFontSize;
   final String? surahName;
 
+  /// Briefly tints the tile when the reader resumes on this verse (Last Read).
+  final bool highlight;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Padding(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 600),
+      color: highlight
+          ? theme.colorScheme.primary.withValues(alpha: 0.10)
+          : Colors.transparent,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         // Stretch so the Arabic and each translation fill the row width and can

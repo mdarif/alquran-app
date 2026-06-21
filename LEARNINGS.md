@@ -178,6 +178,27 @@ encodes the right answer (here, where kashidas go).
   (`if (ayahs.isEmpty) spinner; else content`) to avoid a spinner flash, and key
   the scroll view by the section's first ayah id so a *new* section starts at the
   top while a same-section rebuild keeps its scroll offset.
+- **Last-read resume to the *exact verse* — two viewports, two mechanisms.** The
+  flowed Mushaf (one `Text.rich`) and the Detailed `ListView` need different
+  scroll-to-verse tools:
+  - *Flowed Mushaf:* there are no per-ayah widgets, so add a **zero-size keyed
+    `WidgetSpan` anchor at each verse's start** (`SizedBox.shrink(key: …)`, wrapped
+    in `SelectionContainer.disabled` so copy/selection ignores it). Scroll to a
+    verse with `Scrollable.ensureVisible(anchorKey.currentContext, alignment: …)`.
+    Detect the top verse by scanning anchors' `localToGlobal` dy vs. the viewport
+    top (the State's `context` RenderBox top) — the last anchor at/above the fold;
+    `break` once one is below since anchors are in document order. The whole
+    paragraph is laid out, so even off-screen anchors have render boxes.
+  - *Detailed list:* a lazy `ListView.builder` can't `ensureVisible` an unbuilt
+    tile, so use **`scrollable_positioned_list`** — `ItemScrollController.scrollTo(
+    index:)` handles unbuilt items, and `ItemPositionsListener` gives the topmost
+    visible index for free (map header rows → the next ayah row).
+  - *Capture* the top verse on **scroll-idle** (debounce ~400ms; reuse the page
+    pill's idle timer in Mushaf), persist it via the cubit. *Restore* in a
+    post-frame callback in `initState`, and only for the **initial** section —
+    clear the focus id on swipe so adjacent sections open at their top. A brief
+    tint (TextSpan `backgroundColor` in Mushaf, `AnimatedContainer` color in
+    Detailed) confirms "you are here".
 - **Persisting reading prefs:** register `SharedPreferences` as a GetIt singleton
   loaded once at startup, expose it behind a repo with **synchronous getters**
   (so `State` can initialize `late` fields directly — no FutureBuilder flicker)

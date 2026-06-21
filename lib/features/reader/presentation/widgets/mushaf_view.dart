@@ -25,12 +25,20 @@ class MushafView extends StatefulWidget {
     required this.ayahs,
     required this.headings,
     required this.arabicFontSize,
+    this.focusAyahId,
+    this.onVisibleAyah,
     super.key,
   });
 
   final List<Ayah> ayahs;
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
+
+  /// Global ayah id to scroll to on open (Last Read resume); null starts at top.
+  final int? focusAyahId;
+
+  /// Reports the topmost-visible verse as the user scrolls (debounced).
+  final ValueChanged<Ayah>? onVisibleAyah;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -40,19 +48,34 @@ class _MushafViewState extends State<MushafView> {
   final ScrollController _controller = ScrollController();
   Timer? _hideTimer;
 
+  // One zero-size anchor per ayah, so we can scroll to a verse and detect which
+  // verse sits at the top of the viewport (the flowed text has no per-ayah
+  // widgets otherwise).
+  final Map<int, GlobalKey> _anchors = {};
+  Timer? _highlightTimer;
+  int? _highlightAyahId;
+
   int? _currentPage;
   bool _showPage = false; // pill is shown briefly while scrolling
+
+  GlobalKey _anchorFor(int ayahId) =>
+      _anchors.putIfAbsent(ayahId, GlobalKey.new);
 
   @override
   void initState() {
     super.initState();
     _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
     _controller.addListener(_onScroll);
+    final id = widget.focusAyahId;
+    if (id != null && widget.ayahs.any((a) => a.id == id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
+    }
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _highlightTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -65,12 +88,54 @@ class _MushafViewState extends State<MushafView> {
     if (page != null && page != _currentPage) {
       setState(() => _currentPage = page);
     }
-    // Reveal the pill, then fade it out after the scroll settles.
+    // Reveal the pill, then fade it out — and record the resume point — after
+    // the scroll settles.
     if (!_showPage) setState(() => _showPage = true);
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(milliseconds: 1200), () {
-      if (mounted) setState(() => _showPage = false);
+      if (!mounted) return;
+      setState(() => _showPage = false);
+      _reportTopmost();
     });
+  }
+
+  void _scrollToFocus(int ayahId) {
+    if (!mounted) return;
+    final ctx = _anchorFor(ayahId).currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.08,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
+    setState(() => _highlightAyahId = ayahId);
+    _highlightTimer?.cancel();
+    _highlightTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (mounted) setState(() => _highlightAyahId = null);
+    });
+  }
+
+  /// Finds the verse whose start sits at/above the viewport top and reports it.
+  void _reportTopmost() {
+    final onVisible = widget.onVisibleAyah;
+    if (onVisible == null) return;
+    final viewport = context.findRenderObject();
+    if (viewport is! RenderBox || !viewport.attached) return;
+    final viewportTop = viewport.localToGlobal(Offset.zero).dy;
+    Ayah? current;
+    for (final ayah in widget.ayahs) {
+      final ctx = _anchors[ayah.id]?.currentContext;
+      final box = ctx?.findRenderObject();
+      if (box is! RenderBox || !box.attached) continue;
+      final top = box.localToGlobal(Offset.zero).dy;
+      if (top <= viewportTop + 12) {
+        current = ayah; // still above the fold
+      } else {
+        break; // anchors are in document order
+      }
+    }
+    onVisible(current ?? widget.ayahs.first);
   }
 
   @override
@@ -88,8 +153,9 @@ class _MushafViewState extends State<MushafView> {
                 SurahHeaderCard(
                   heading: widget.headings[group.first.surahId],
                   fallbackNumber: group.first.surahId,
+                  fontSize: fontSize,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 if (_showBismillah(group)) ...[
                   Bismillah(fontSize: fontSize),
                   const SizedBox(height: 18),
@@ -98,7 +164,25 @@ class _MushafViewState extends State<MushafView> {
                   TextSpan(
                     children: [
                       for (final ayah in group) ...[
-                        TextSpan(text: ayah.textArabic),
+                        // Zero-size anchor at the verse start: lets us scroll to
+                        // this verse and detect when it's at the viewport top.
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.top,
+                          child: SelectionContainer.disabled(
+                            child: SizedBox.shrink(key: _anchorFor(ayah.id)),
+                          ),
+                        ),
+                        TextSpan(
+                          text: ayah.textArabic,
+                          style: _highlightAyahId == ayah.id
+                              ? TextStyle(
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.16),
+                                )
+                              : null,
+                        ),
                         WidgetSpan(
                           alignment: PlaceholderAlignment.middle,
                           child: SelectionContainer.disabled(
@@ -200,11 +284,19 @@ class SurahHeaderCard extends StatelessWidget {
   const SurahHeaderCard({
     required this.heading,
     required this.fallbackNumber,
+    required this.fontSize,
     super.key,
   });
 
   final SurahHeading? heading;
   final int fallbackNumber;
+
+  /// Current Arabic reading size (driven by pinch-zoom / ±). The header scales
+  /// off this so the chapter name and meta grow and shrink with the verses.
+  final double fontSize;
+
+  /// Neutral reading size: at this value the header keeps its designed sizes.
+  static const double _baseFontSize = 28;
 
   @override
   Widget build(BuildContext context) {
@@ -214,16 +306,22 @@ class SurahHeaderCard extends StatelessWidget {
     final nameEnglish = heading?.nameEnglish ?? 'Surah $number';
     final nameArabic = heading?.nameArabic;
     final meta = _metaLine(heading);
+    final scale = fontSize / _baseFontSize;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.only(
+        top: 4,
+        bottom: 8,
+        left: 20,
+        right: 20,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Refined medallion: a soft-tinted ring rather than a flat green disc.
           Container(
-            width: 40,
-            height: 40,
+            width: 40 * scale,
+            height: 40 * scale,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -235,40 +333,41 @@ class SurahHeaderCard extends StatelessWidget {
               style: TextStyle(
                 color: cs.primary,
                 fontWeight: FontWeight.w700,
-                fontSize: 15,
+                fontSize: 15 * scale,
               ),
             ),
           ),
           if (nameArabic != null) ...[
-            const SizedBox(height: 14),
+            SizedBox(height: 14 * scale),
             Text(
               nameArabic,
               textAlign: TextAlign.center,
               textDirection: TextDirection.rtl,
               style: QuranTextStyle.madani.copyWith(
-                fontSize: 26,
+                fontSize: 34 * scale,
                 height: 1.4,
                 color: cs.primary,
               ),
             ),
           ],
-          const SizedBox(height: 6),
+          SizedBox(height: 6 * scale),
           Text(
             nameEnglish,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: AppTheme.displayFontFamily,
-              fontSize: 24,
+              fontSize: 24 * scale,
               fontWeight: FontWeight.w600,
               color: cs.onSurface,
             ),
           ),
           if (meta != null) ...[
-            const SizedBox(height: 6),
+            SizedBox(height: 6 * scale),
             Text(
               meta,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * scale,
                 color: cs.onSurfaceVariant,
                 letterSpacing: 0.5,
               ),
@@ -287,7 +386,7 @@ class SurahHeaderCard extends StatelessWidget {
     if (revelation != null) parts.add(revelation);
     if (heading.totalAyahs > 0) {
       parts.add(
-        heading.totalAyahs == 1 ? '1 verse' : '${heading.totalAyahs} verses',
+        heading.totalAyahs == 1 ? '1 Verse' : '${heading.totalAyahs} Verses',
       );
     }
     return parts.isEmpty ? null : parts.join(' · ');

@@ -1,10 +1,10 @@
-import '../entities/reader_target.dart';
+import '../entities/last_read.dart';
 
-/// Persists the most recently opened reader target so the user can resume
+/// Persists where the user left off so they can resume at the exact verse
 /// (PRD §12 backlog: last-read resume).
 abstract interface class LastReadRepository {
-  Future<void> save(ReaderTarget target);
+  Future<void> save(LastRead value);
 
-  /// The last opened target, or null if nothing has been read yet.
-  Future<ReaderTarget?> load();
+  /// The last read position, or null if nothing has been read yet.
+  Future<LastRead?> load();
 }

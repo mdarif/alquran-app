@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
-import '../../../reader/presentation/widgets/continue_reading_banner.dart';
+import '../../../reader/presentation/widgets/last_read_banner.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
 import 'index_list_page.dart';
@@ -36,7 +36,7 @@ class HomePage extends StatelessWidget {
       ),
       body: const Column(
         children: [
-          ContinueReadingBanner(),
+          LastReadBanner(),
           Expanded(child: SurahListView()),
         ],
       ),

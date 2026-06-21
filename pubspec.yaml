@@ -28,6 +28,10 @@ dependencies:
   shared_preferences: ^2.5.5
   share_plus: ^13.1.0
 
+  # Scroll-to-verse in the Detailed (lazy) list — resumes at the exact last-read
+  # ayah even when its tile isn't built yet (Last Read resume).
+  scrollable_positioned_list: ^0.3.8
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
