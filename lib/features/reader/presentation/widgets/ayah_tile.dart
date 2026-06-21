@@ -26,9 +26,18 @@ class AyahTile extends StatelessWidget {
   /// Briefly tints the tile when the reader resumes on this verse (Last Read).
   final bool highlight;
 
+  /// Neutral Arabic size: at this value translations keep their designed size.
+  static const double _baseArabicFontSize = 28;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Translations scale with the same font control as the Arabic (accessibility
+    // — PRD 4.1), proportionally so the in-app +/- and pinch enlarge the whole
+    // verse, not just the Arabic line.
+    final baseTranslationSize = theme.textTheme.bodyLarge?.fontSize ?? 16;
+    final translationFontSize =
+        baseTranslationSize * (arabicFontSize / _baseArabicFontSize);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
@@ -56,7 +65,14 @@ class AyahTile extends StatelessWidget {
               ),
               if (ayah.isSajda) ...[
                 const SizedBox(width: 8),
-                Icon(Icons.star, size: 16, color: theme.colorScheme.tertiary),
+                Icon(
+                  Icons.star,
+                  size: 16,
+                  color: theme.colorScheme.tertiary,
+                  // The star is the only signal that this is a prostration
+                  // verse — give screen readers the meaning, not just a shape.
+                  semanticLabel: 'Sajda — prostration verse',
+                ),
               ],
               const Spacer(),
               PopupMenuButton<_AyahAction>(
@@ -94,11 +110,17 @@ class AyahTile extends StatelessWidget {
             ayah.textArabic,
             textAlign: TextAlign.right,
             textDirection: TextDirection.rtl,
+            // Tag the script so TalkBack/VoiceOver pick the Arabic speech engine.
+            locale: const Locale('ar'),
             style: QuranTextStyle.madani.copyWith(fontSize: arabicFontSize),
           ),
           for (final r in resources)
             if (ayah.translations[r.id] != null)
-              _Translation(resource: r, text: ayah.translations[r.id]!),
+              _Translation(
+                resource: r,
+                text: ayah.translations[r.id]!,
+                fontSize: translationFontSize,
+              ),
         ],
       ),
     );
@@ -143,10 +165,17 @@ enum _AyahAction { copy, share }
 /// One translation: a small left-aligned attribution label over the text, which
 /// is aligned by its script (Urdu RTL → right, English LTR → left).
 class _Translation extends StatelessWidget {
-  const _Translation({required this.resource, required this.text});
+  const _Translation({
+    required this.resource,
+    required this.text,
+    required this.fontSize,
+  });
 
   final TranslationResource resource;
   final String text;
+
+  /// Translation body size, scaled by the reader's font control.
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +186,7 @@ class _Translation extends StatelessWidget {
       children: [
         const SizedBox(height: 14),
         Text(
-          '${languageName(resource.languageCode)} · ${resource.name}',
+          '${languageName(resource.languageCode)} · ${resource.attribution}',
           textAlign: TextAlign.left,
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.primary,
@@ -169,8 +198,10 @@ class _Translation extends StatelessWidget {
           text,
           textAlign: isRtl ? TextAlign.right : TextAlign.left,
           textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          // Tag the translation's language for correct screen-reader pronunciation.
+          locale: Locale(resource.languageCode),
           style: resource.languageCode.scriptStyle(
-            theme.textTheme.bodyLarge!.copyWith(height: 1.5),
+            theme.textTheme.bodyLarge!.copyWith(height: 1.5, fontSize: fontSize),
           ),
         ),
       ],

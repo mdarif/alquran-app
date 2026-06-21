@@ -91,7 +91,10 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
                 Text(
                   'Last Read',
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: onColor.withValues(alpha: 0.75),
+                    // Full token colour (not a reduced alpha): keeps the AA
+                    // contrast the M3 pair guarantees. Hierarchy vs the bold
+                    // reference comes from weight, not lower opacity.
+                    color: onColor,
                   ),
                 ),
                 const SizedBox(width: 8),

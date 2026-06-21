@@ -6,12 +6,17 @@ class TranslationResource extends Equatable {
     required this.id,
     required this.languageCode,
     required this.name,
+    this.author,
   });
 
   final int id;
   final String languageCode; // ur | hi
-  final String name;
+  final String name; // language label, e.g. "Urdu"
+  final String? author; // translator, e.g. "Muhammad Junagarhi"
+
+  /// Attribution shown in the reader: the translator when known, else the name.
+  String get attribution => author?.trim().isNotEmpty == true ? author! : name;
 
   @override
-  List<Object?> get props => [id, languageCode, name];
+  List<Object?> get props => [id, languageCode, name, author];
 }

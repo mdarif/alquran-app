@@ -5,10 +5,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _urdu = TranslationResource(id: 1, languageCode: 'ur', name: 'Junagarhi');
-const _hindi = TranslationResource(id: 2, languageCode: 'hi', name: 'al-Umari');
-const _english =
-    TranslationResource(id: 3, languageCode: 'en', name: 'Hilali & Khan');
+// Mirror the real DB shape: `name` is the language label, `author` the
+// translator. The attribution line must show the translator, not the language.
+const _urdu = TranslationResource(
+  id: 1,
+  languageCode: 'ur',
+  name: 'Urdu',
+  author: 'Junagarhi',
+);
+const _hindi = TranslationResource(
+  id: 2,
+  languageCode: 'hi',
+  name: 'Hindi',
+  author: 'al-Umari',
+);
+const _english = TranslationResource(
+  id: 3,
+  languageCode: 'en',
+  name: 'English',
+  author: 'Hilali & Khan',
+);
 
 Widget _wrap(Widget child) =>
     MaterialApp(home: Scaffold(body: SingleChildScrollView(child: child)));

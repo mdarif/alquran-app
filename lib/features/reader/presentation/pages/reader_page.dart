@@ -435,7 +435,10 @@ class _DetailedListState extends State<_DetailedList> {
               thickness: 1,
               indent: 16,
               endIndent: 16,
-              color: Theme.of(context).colorScheme.outlineVariant,
+              // `outline`, not `outlineVariant`: the latter is ~1.6:1 on the warm
+              // background (barely visible). `outline` reads as a dependable light
+              // hairline (~4.3:1 light / ~6:1 dark) without becoming a hard rule.
+              color: Theme.of(context).colorScheme.outline,
             ),
           ],
         );

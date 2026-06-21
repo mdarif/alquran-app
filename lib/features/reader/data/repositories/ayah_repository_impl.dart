@@ -65,6 +65,7 @@ class AyahRepositoryImpl implements AyahRepository {
           id: r.id,
           languageCode: r.languageCode,
           name: r.name,
+          author: r.author,
         ),
     ];
   }
