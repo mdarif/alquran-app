@@ -2,15 +2,23 @@
 
 Bundled faces (declared in `pubspec.yaml`):
 
-- **`UthmanicHafsV18.ttf`** — family `UthmanicHafs`, the primary Arabic face
-  (PRD 4.1). KFGQPC HAFS Uthmanic Script **V2 (Ver 0.18)** — the
-  HarfBuzz-compatible release from the King Fahd Quran Printing Complex. Its
-  lam-alef ligature forms natively via `rlig`/default OpenType features (which
-  Flutter applies), even with vowels between the letters. This replaced the old
-  v0.09, whose ligature sat under `liga` — a feature Flutter does not apply for
-  Arabic, so the lam and alef rendered detached.
-  Source: https://qul.tarteel.ai (mirror: github.com/thetruetruth/quran-data-kfgqpc,
-  `hafs/font/hafs.18.ttf`). **Licence UNVERIFIED — confirm before shipping.**
+- **`UthmanicHafs1-Ver18.ttf`** — family `UthmanicHafs`, the primary Arabic face
+  (PRD 4.1). KFGQPC HAFS Uthmanic Script — **UthmanicHafs1 Ver18, Regular (weight
+  400)**. This is the regular-weight KFGQPC face the **quran.com web reader** ships
+  (`verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2`,
+  converted woff2→ttf for Flutter — glyphs unchanged). It pairs with the
+  `quran.ar.uthmani.v2.db` text we ship: madd, tanween and sukun render from the
+  **bare QPC encoding** (no tatweel-grafting / mark-stripping in the pipeline), and
+  the ayah-number Arabic-Indic digits compose — via the font's GSUB — into the
+  ornate end-of-ayah rosette **with the number inside**. We enable `calt`/`rlig`/
+  `liga` (`AppTheme.arabicFontFeatures`) for lam-alef etc.
+  **Why this and not the others:** the older thetruetruth `UthmanicHafsV18.ttf`
+  forced per-glyph tatweel-grafting; the quran-ios `UthmanicHafs1B Ver13` works but
+  is the **Bold** cut (weight 700, macStyle bold) — it rendered heavy and, declared
+  without a weight, made iOS fall back to a system Naskh face. This Regular/400 cut
+  is light, elegant, and matches cleanly with no weight workaround.
+  Source: quran.com / Quran Foundation CDN (the `.ttf` itself is KFGQPC).
+  **Font licence UNVERIFIED (KFGQPC terms) — confirm before shipping.**
 
 - **`NotoNastaliqUrdu-Regular.ttf`** — family `NotoNastaliqUrdu`, the Urdu
   translation face. Noto Nastaliq Urdu by Google, SIL Open Font License 1.1.

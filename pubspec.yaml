@@ -48,16 +48,19 @@ flutter:
     # Regenerate after replacing quran.db: `make seed-version`.
     - assets/db/quran.db.version
 
-  # KFGQPC HAFS Uthmanic Script V2 (Ver 0.18) — the primary Arabic face (PRD
-  # 4.1). This is the HarfBuzz-compatible release: the lam-alef ligature forms
-  # natively (via rlig/default features Flutter applies) even with vowels between
-  # the letters, unlike the old v0.09 whose ligature sat under `liga`.
-  # NOTE: licence is UNVERIFIED — clear it before any public release (see
-  # ../alquran-data/HANDOFF.md).
+  # KFGQPC HAFS Uthmanic Script — UthmanicHafs1 Ver18 (Regular, weight 400), the
+  # primary Arabic face (PRD 4.1). This is the regular-weight KFGQPC face the
+  # quran.com web reader uses; it pairs with the `quran.ar.uthmani.v2.db` text we
+  # ship — madd/tanween/sukun render from the bare QPC encoding (no grafting) and
+  # the ayah-number digits compose into the ornate rosette. Regular weight (no
+  # bold flag) so iOS matches it cleanly — unlike the Bold "1B Ver13" cut, which
+  # rendered heavy and fell back to a system Naskh face when not declared as 700.
+  # NOTE: licence is UNVERIFIED (KFGQPC terms) — clear before any public release
+  # (see ../alquran-data/ATTRIBUTION.md).
   fonts:
     - family: UthmanicHafs
       fonts:
-        - asset: assets/fonts/UthmanicHafsV18.ttf
+        - asset: assets/fonts/UthmanicHafs1-Ver18.ttf
     # Urdu translation face — Noto Nastaliq Urdu (Google, SIL OFL — licence-clean).
     - family: NotoNastaliqUrdu
       fonts:

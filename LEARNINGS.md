@@ -56,6 +56,50 @@ xcrun simctl io booted screenshot out.png      # capture the live app
 Flutter has no kashida justification — it stretches glyph/space advances, which
 mangles Arabic. Use `TextAlign.start`/`center` with `textDirection: rtl`.
 
+### Adopt the matched text+font PAIR — stop hand-fixing Arabic data (2026-06-21)
+
+> **This is the current approach. Bug 2 below (tatweel-grafting) and the
+> mark-stripping in §2 are SUPERSEDED — kept only as the record of why.**
+
+The madd/tanween/mark hacks all came from the same mistake: **pairing a text source
+with a font it wasn't authored for.** github.com/quran (quran.com / quran-ios) has no
+secret dataset — it ships the QPC Hafs text **`quran.ar.uthmani.v2.db`**
+(`quran/quran-ios` → `Domain/QuranResources/Databases`) rendered with a matched KFGQPC
+HAFS font (quran-ios uses the Bold `UthmanicHafs1B Ver13`; **we ship the Regular cut
+`UthmanicHafs1 Ver18`** from quran.com web — lighter and no iOS weight-fallback, see
+the font-weight gotcha below). Because text and font are co-designed, the bare QPC
+encoding renders correctly: madd `يَٰٓأَيُّهَا` is bare
+`U+0670 U+0653` (NO grafted tatweel — golden has only ~494 tatweels vs our 1327), and
+U+06ED tanween marks are kept (98×), not stripped. We now **ingest that text verbatim**
+(`config/sources.yaml` → `arabic_uthmani` points at `quran.ar.uthmani.v2.db`, table
+`arabic_text`); `prepare_sources.py` only builds `structure.sqlite` metadata;
+`convert_ghanem.py` is deleted. **Rule: don't transform Quran text to suit a font —
+use the font the text was made for.** Bismillah is already a separate header in the
+golden text (not bundled in each surah's ayah 1) and ayahs carry no trailing
+number glyph, so even the strips are unnecessary. The golden text uses the QPC
+**shadda-before-vowel** combining order (`U+0651 U+064E`, NOT NFC-canonical) — do not
+NFC-normalize it, and the app's `_bismillah` constant was made byte-exact to it.
+(Impeller still must stay off — Bug 1 below — that's renderer-level, not data.)
+
+> **Font-weight gotcha (cost two debug cycles) → use the Regular cut.**
+> `UthmanicHafs1B Ver13` (quran-ios's face) is a **Bold** cut: OS/2
+> `usWeightClass=700`, `head.macStyle` bold bit set, subfamily "Bold". Declared in
+> `pubspec.yaml` with no `weight:` (Flutter assumes 400), **iOS silently falls back
+> to a system Naskh font** — the whole page is the wrong typeface even though the
+> cmap is complete (easy to miss: it still looks "fully diacriticised"). Declaring
+> `weight: 700` + `fontWeight: FontWeight.w700` makes it match, but then it just
+> renders heavy/clunky. **The real fix: ship the Regular/400 cut —
+> `UthmanicHafs1 Ver18`, the face quran.com's *web* reader uses** (Quran Foundation
+> CDN, woff2→ttf, glyphs unchanged). It renders the same bare golden text correctly
+> (madd/tanween) AND composes the digit→rosette, is lighter/elegant, and matches
+> with no weight workaround. Don't edit a font's metadata to force a weight (KFGQPC
+> must not be modified) — pick the cut you actually want. **After any font change,
+> `flutter clean` + delete the app before re-running** — hot reload/restart does NOT
+> re-read `pubspec` font declarations or re-bundle assets, and iOS caches font
+> registration aggressively (a DB asset can update at runtime while the font does
+> not, which masks the problem). Always verify a font's weight (`OS/2.usWeightClass`,
+> `head.macStyle`) and shaping (`hb-shape`/`hb-view`) before shipping it.
+
 ### Elongated madd (يَٰٓأَيُّهَا) — TWO independent bugs, both had to be fixed
 
 This one took a long, winding investigation with several wrong turns. The final, verified
@@ -132,9 +176,33 @@ encodes the right answer (here, where kashidas go).
   tatweel runs (see `prepare_sources.py` `_transfer_tatweel`; full story in §1). This is
   one half of the fix — the other half is disabling Impeller so the marks anchor (§1).
 - The text is dense with QPC annotation marks the font must cover: U+0670 (dagger
-  alef), U+0671 (alef wasla), U+06D6/D7/D8/DA/DB/DC (small high waqf signs),
-  U+06DD (end of ayah), U+06DE (start of rub el hizb), U+06E1 (rounded sukun,
-  ~37k occurrences), U+06E5/E6 (small waw/yeh), U+06E9 (place of sajdah), etc.
+  alef), U+0671 (alef wasla), U+06D6/D7/D8/DA/DB/DC (small high waqf signs — all
+  zero advance in KFGQPC, safe), U+06DD (end of ayah), U+06DE (rub el hizb star,
+  advance 1273 — intentional inline marker), U+06E1 (rounded sukun, ~37k), U+06E2
+  (small high meem — zero advance, safe), U+06E5/E6 (small waw/yeh — letter
+  substitutes with smaller but non-zero advance, intentional), U+06E9 (sajda,
+  advance 923 — intentional inline marker).
+- **U+06ED and similar marks have +1442 advance in KFGQPC — strip them.**
+  U+06ED (ARABIC SMALL LOW MEEM, 4 807×) and U+06E3/06EA/06EB (1× each) have
+  `+1442` advance (≈ full letter width) in KFGQPC — they're Mn-class combining
+  marks that *should* have zero advance but the font gives them full advance,
+  causing visible gaps after tanween words and other positions where they appear.
+  The AbdullahGhanem DB includes them (not present in the old QUL pipeline data).
+  Strip all four in `normalize_uthmani()` in `convert_ghanem.py`. U+06DF (+large
+  dashed circle) and U+06E0 (rectangular) are similarly problematic and already
+  stripped. Diagnose with: `printf 'char' | hb-shape font.otf` — look for
+  advance > 0 on any mark you suspect.
+- **Better Arabic text source: `github.com/quran` — `quran.ar.uthmani.v2.db`.**
+  The quran org (Apache 2.0) has two directly usable databases:
+  `quran.ar.uthmani.v2.db` (authoritative Uthmani Arabic, 6236 ayahs, Bismillah
+  pre-separated) and `quran.en.khanhilali.db` (Khan-Hilali English). Both use the
+  QPC-native encoding: **U+06E1** for sukun (instead of U+0652), which our KFGQPC
+  Hafs V18 supports and which triggers extra calligraphic ligatures (`Bism`, `Allah`).
+  Much cleaner mark set: only 99× U+06ED vs 4807× in ghanem. Limitation: no Urdu
+  translation and no page/juz/hizb metadata — still need ghanem for those. Also
+  still requires tatweel normalization (V18 needs `ـٰٓ` carriers; the v2 text omits
+  them, requiring `text.replace('ٰٓ', 'ـٰٓ')` at conversion time).
+  Download: `gh api repos/quran/quran-ios/contents/Domain/QuranResources/Databases/quran.ar.uthmani.v2.db -H "Accept: application/vnd.github.raw"`.
 - **Bismillah header rules:** it *is* ayah 1 of Al-Fatihah (surah 1); At-Tawbah
   (surah 9) has **none**; show it as a header for the other 112 surahs. Pull the
   exact glyphs from Al-Fatihah 1:1 (stripped) so encoding matches the font.
@@ -162,9 +230,61 @@ encodes the right answer (here, where kashidas go).
 - **Selectable text / copy:** wrap the reader body in `SelectionArea`. Exclude
   inline non-text widgets (e.g. verse-number medallions) with
   `SelectionContainer.disabled(child: …)` so a copied passage is pure Quran text.
-- **Inline ayah-end markers:** `Text.rich` + `WidgetSpan(alignment:
-  PlaceholderAlignment.middle, child: medallion)`. Each ayah is one `TextSpan`
-  so intra-ayah shaping stays intact.
+- **Verse number INSIDE the ornament — SOLVED: just write the number as
+  Arabic-Indic digits; the KFGQPC font draws the rosette around them.** In the
+  KFGQPC HAFS face (both `UthmanicHafs1 Ver18` Regular and `1B Ver13` Bold) the
+  ayah-number digits compose, via the font's own GSUB,
+  into the ornate end-of-ayah medallion *with the number inside* — verified with
+  `hb-shape` and `hb-view`: `١`→`_770`, `٢٣`→`a002_a003`, `٢٨٦`→`a002_a008_a006`,
+  each a single full-em (advance 1700) rosette glyph. So the per-verse marker is
+  simply `' ${_toArabicIndic(n)} '` appended in the surah paragraph (same font as
+  the text, only the colour differs — the substitution won't fire across a
+  *different-font* span). **Do NOT add U+06DD** — that draws a second, empty circle
+  next to the numbered one (the long-misdiagnosed "two circles"). It's pure text:
+  correct RTL order, continuous reflow, pinch-zoom, and copyable — none of the
+  overlay/WidgetSpan machinery below is needed.
+  > Two earlier "facts" were WRONG and sent us in circles: (a) "KFGQPC has no
+  > single Arabic-Indic digit glyph (`٣`→`.notdef`)" — false for Ver13; the digits
+  > map to numbered-rosette glyphs. (b) "the font renders `U+06DD`+digit as two
+  > circles so the number can't go in the text" — the two circles were `U+06DD`
+  > (circle 1) + the digit's own rosette glyph (circle 2); drop `U+06DD` and you get
+  > exactly one. **Always confirm font shaping with `hb-shape`/`hb-view` before
+  > concluding a glyph/ligature is impossible.**
+
+  **Superseded approach (kept as the record of the dead-ends).** Before finding the
+  native composition we proved an inline *widget* can't work and built a fragile
+  overlay (which went invisible on-device twice). Three probe tests pinned the
+  widget limits down:
+  1. `WidgetSpan` medallions in a single RTL `Text.rich` are placed in *logical*
+     (left-to-right) order, not bidi-reordered — verse 1's medallion lands leftmost.
+     A *single self-contained* WidgetSpan still reverses (it's not the two-span split).
+  2. Raw `dart:ui` `ParagraphBuilder.addPlaceholder` + `getBoxesForPlaceholders()`
+     reverses **identically** — so this is an *engine*-level placeholder behaviour,
+     not a framework/widget-layer bug. `CustomPaint`-from-placeholders is dead too.
+  3. Only **real text** reorders correctly in RTL. So U+06DD (ARABIC END OF AYAH)
+     stays in the text run as the anchor, giving correct order **and** continuous
+     inline flow (one `Text.rich` per surah group → verse N+1 begins where N ended).
+  **The number is then overlaid, centred, on the rosette:** U+06DD is purpose-built
+  as a *number container* (that's why the font's GSUB tries — and fails — to compose
+  `U+06DD + digit` into one glyph, producing the two-broken-circles bug). In a
+  `Stack`, child[0] is the `Text.rich` (sits at the origin, so its `RenderParagraph`
+  local space == Stack space); for each ayah, `getBoxesForSelection(offset, offset+1,
+  boxHeightStyle: BoxHeightStyle.tight)` gives the rosette's box, and a
+  `Positioned.fromRect` → `Center` → `FittedBox(scaleDown)` → `Text` paints the
+  Arabic-Indic number inside it. **Use `BoxHeightStyle.tight`**: its box centre
+  coincides with the *glyph* centre regardless of the paragraph's `height:` multiplier
+  (a `max`/default box is the full line height, so a centred number floats in the
+  leading). Re-measure in a `addPostFrameCallback` scheduled from `build()` with a
+  *guarded* `setState` (only when a rect changes) so zoom/reflow/rotation re-anchor
+  without an infinite loop. Graceful degradation: the rosette is always drawn (it's
+  text), so even if a number nudges, nothing disappears — unlike a fully-drawn
+  medallion overlay, which vanished entirely the one time its offset math drifted.
+  **KFGQPC Arabic-Indic digits caveat:** KFGQPC has NO individual Arabic-Indic digit
+  glyphs (U+0660–U+0669) — only 5 multi-char GSUB ligatures (`٠`, `١٢٣`, `٤٥`, `٦٧`,
+  `٨٩`); a lone `٣` → `.notdef`. This is *fine for the overlay number* because it's a
+  separate `Text` in the **platform font**, not KFGQPC — so Arabic-Indic numerals
+  (the traditional Mushaf numeral, what Urdu/Hindi readers expect) render correctly.
+  Earlier the digit had to be ASCII only because it lived in the KFGQPC paragraph.
 - **`SelectionArea` eats horizontal drags.** A parent `GestureDetector.onHorizontalDragEnd`
   (or a `PageView`) won't fire when wrapped around/under a `SelectionArea` —
   selection claims the drag in the gesture arena. Fix: detect the swipe in a raw
@@ -181,14 +301,19 @@ encodes the right answer (here, where kashidas go).
 - **Last-read resume to the *exact verse* — two viewports, two mechanisms.** The
   flowed Mushaf (one `Text.rich`) and the Detailed `ListView` need different
   scroll-to-verse tools:
-  - *Flowed Mushaf:* there are no per-ayah widgets, so add a **zero-size keyed
-    `WidgetSpan` anchor at each verse's start** (`SizedBox.shrink(key: …)`, wrapped
-    in `SelectionContainer.disabled` so copy/selection ignores it). Scroll to a
-    verse with `Scrollable.ensureVisible(anchorKey.currentContext, alignment: …)`.
-    Detect the top verse by scanning anchors' `localToGlobal` dy vs. the viewport
-    top (the State's `context` RenderBox top) — the last anchor at/above the fold;
-    `break` once one is below since anchors are in document order. The whole
-    paragraph is laid out, so even off-screen anchors have render boxes.
+  - *Flowed Mushaf (one `Text.rich` per surah group):* verses share a paragraph,
+    so there are no per-verse anchor widgets. Place a `GlobalKey` on each group's
+    `Text` widget and pre-compute each verse's **character offset** within its group
+    (`_buildOffsets()`: iterate ayahs, accumulate `textArabic.length + marker.length`
+    per verse). To scroll to a verse: `key.currentContext.findRenderObject()` gives
+    the `RenderParagraph`; call `getBoxesForSelection(TextSelection(baseOffset: offset,
+    extentOffset: offset + 1))` to get the bounding box of the verse's first character
+    (local Y); convert to scroll coordinates via `obj.localToGlobal(Offset.zero).dy -
+    viewportBox.localToGlobal(Offset.zero).dy` and animate. Detect the topmost verse
+    the same way: loop groups/verses, compare `groupGlobalY + boxes.first.top` to the
+    viewport top, take the last one at/above the fold. Rebuild offsets in both
+    `initState` and `didUpdateWidget` (when `ayahs` changes). Note: `context.findRenderObject()`
+    returns `RenderObject`, not `RenderBox` — cast explicitly before calling `localToGlobal`.
   - *Detailed list:* a lazy `ListView.builder` can't `ensureVisible` an unbuilt
     tile, so use **`scrollable_positioned_list`** — `ItemScrollController.scrollTo(
     index:)` handles unbuilt items, and `ItemPositionsListener` gives the topmost

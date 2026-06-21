@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/ayah.dart';
@@ -10,12 +11,24 @@ import '../../domain/reader_navigation.dart';
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
 /// quran.db). Shown before every surah except Al-Fatihah (where it is ayah 1)
 /// and At-Tawbah (which has none) — and only when a surah is shown from ayah 1.
-const String _bismillah = 'بِسۡمِ ٱللَّهِ'
-    ' ٱلرَّحۡمَٰنِ'
-    ' ٱلرَّحِيمِ';
+const String _bismillah = 'بِسۡمِ ٱللَّهِ'
+    ' ٱلرَّحۡمَٰنِ'
+    ' ٱلرَّحِيمِ';
 
 const int _surahAlFatiha = 1;
 const int _surahAtTawbah = 9;
+
+/// The verse number as Arabic-Indic digits (٠١٢…). In KFGQPC UthmanicHafs1B the
+/// digits of an ayah number compose — via the font's GSUB — into the ornate
+/// end-of-ayah rosette *with the number inside it* (e.g. ٢٨٦ → one medallion
+/// glyph). So we DON'T add U+06DD (that would draw a second, empty circle) and
+/// we keep the digits in one text run with the surrounding Arabic style, which
+/// is what lets the substitution fire (it won't across separate TextSpans).
+String _toArabicIndic(int n) => n
+    .toString()
+    .split('')
+    .map((d) => String.fromCharCode(0x0660 + (d.codeUnitAt(0) - 0x30)))
+    .join();
 
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
 /// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
@@ -47,28 +60,39 @@ class MushafView extends StatefulWidget {
 class _MushafViewState extends State<MushafView> {
   final ScrollController _controller = ScrollController();
   Timer? _hideTimer;
-
-  // One zero-size anchor per ayah, so we can scroll to a verse and detect which
-  // verse sits at the top of the viewport (the flowed text has no per-ayah
-  // widgets otherwise).
-  final Map<int, GlobalKey> _anchors = {};
   Timer? _highlightTimer;
   int? _highlightAyahId;
 
   int? _currentPage;
-  bool _showPage = false; // pill is shown briefly while scrolling
+  bool _showPage = false;
 
-  GlobalKey _anchorFor(int ayahId) =>
-      _anchors.putIfAbsent(ayahId, GlobalKey.new);
+  // One key per surah group (on the Text widget); character offset per ayah in
+  // its group paragraph — used for RenderParagraph-based scroll anchoring and
+  // for anchoring the overlaid verse-number on its U+06DD rosette.
+  final Map<int, GlobalKey> _groupKeys = {};
+  final Map<int, int> _verseStart = {};
+
+  GlobalKey _groupKeyFor(int surahId) =>
+      _groupKeys.putIfAbsent(surahId, GlobalKey.new);
 
   @override
   void initState() {
     super.initState();
+    _buildOffsets();
     _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
     _controller.addListener(_onScroll);
     final id = widget.focusAyahId;
     if (id != null && widget.ayahs.any((a) => a.id == id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
+    }
+  }
+
+  @override
+  void didUpdateWidget(MushafView old) {
+    super.didUpdateWidget(old);
+    if (widget.ayahs != old.ayahs) {
+      _groupKeys.clear();
+      _buildOffsets();
     }
   }
 
@@ -80,6 +104,23 @@ class _MushafViewState extends State<MushafView> {
     super.dispose();
   }
 
+  /// Pre-computes each ayah's character offset within its surah group paragraph
+  /// (for scroll anchoring). Mirrors the span layout in [build] exactly: each
+  /// verse is `textArabic` + ' <arabic-indic digits> ' (a leading space, the
+  /// digits, a trailing space). Must be called whenever [widget.ayahs] changes.
+  void _buildOffsets() {
+    _verseStart.clear();
+    for (final group in groupAyahsBySurah(widget.ayahs)) {
+      int offset = 0;
+      for (final ayah in group) {
+        _verseStart[ayah.id] = offset;
+        offset += ayah.textArabic.length
+            + 2 // leading + trailing space around the number
+            + _toArabicIndic(ayah.ayahNumber).length;
+      }
+    }
+  }
+
   void _onScroll() {
     if (!_controller.hasClients) return;
     final max = _controller.position.maxScrollExtent;
@@ -88,8 +129,6 @@ class _MushafViewState extends State<MushafView> {
     if (page != null && page != _currentPage) {
       setState(() => _currentPage = page);
     }
-    // Reveal the pill, then fade it out — and record the resume point — after
-    // the scroll settles.
     if (!_showPage) setState(() => _showPage = true);
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(milliseconds: 1200), () {
@@ -101,11 +140,30 @@ class _MushafViewState extends State<MushafView> {
 
   void _scrollToFocus(int ayahId) {
     if (!mounted) return;
-    final ctx = _anchorFor(ayahId).currentContext;
-    if (ctx == null) return;
-    Scrollable.ensureVisible(
-      ctx,
-      alignment: 0.08,
+    final surahId = widget.ayahs
+        .firstWhere((a) => a.id == ayahId, orElse: () => widget.ayahs.first,)
+        .surahId;
+    final key = _groupKeys[surahId];
+    if (key?.currentContext == null) return;
+    final obj = key!.currentContext!.findRenderObject();
+    if (obj is! RenderParagraph || !obj.attached) return;
+    final offset = _verseStart[ayahId] ?? 0;
+    final boxes = obj.getBoxesForSelection(
+      TextSelection(
+        baseOffset: offset,
+        extentOffset: offset + 1,
+      ),
+    );
+    if (boxes.isEmpty) return;
+    final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
+    final viewportGlobalY =
+        (context.findRenderObject()! as RenderBox).localToGlobal(Offset.zero).dy;
+    final target = (_controller.offset
+            + (groupGlobalY - viewportGlobalY)
+            + boxes.first.top - 48)
+        .clamp(0.0, _controller.position.maxScrollExtent);
+    _controller.animateTo(
+      target,
       duration: const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
     );
@@ -124,15 +182,27 @@ class _MushafViewState extends State<MushafView> {
     if (viewport is! RenderBox || !viewport.attached) return;
     final viewportTop = viewport.localToGlobal(Offset.zero).dy;
     Ayah? current;
-    for (final ayah in widget.ayahs) {
-      final ctx = _anchors[ayah.id]?.currentContext;
-      final box = ctx?.findRenderObject();
-      if (box is! RenderBox || !box.attached) continue;
-      final top = box.localToGlobal(Offset.zero).dy;
-      if (top <= viewportTop + 12) {
-        current = ayah; // still above the fold
-      } else {
-        break; // anchors are in document order
+    outer:
+    for (final group in groupAyahsBySurah(widget.ayahs)) {
+      final key = _groupKeys[group.first.surahId];
+      if (key?.currentContext == null) continue;
+      final obj = key!.currentContext!.findRenderObject();
+      if (obj is! RenderParagraph || !obj.attached) continue;
+      final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
+      for (final ayah in group) {
+        final offset = _verseStart[ayah.id] ?? 0;
+        final boxes = obj.getBoxesForSelection(
+          TextSelection(
+            baseOffset: offset,
+            extentOffset: offset + 1,
+          ),
+        );
+        if (boxes.isEmpty) continue;
+        if (groupGlobalY + boxes.first.top <= viewportTop + 12) {
+          current = ayah;
+        } else {
+          break outer;
+        }
       }
     }
     onVisible(current ?? widget.ayahs.first);
@@ -160,18 +230,20 @@ class _MushafViewState extends State<MushafView> {
                   Bismillah(fontSize: fontSize),
                   const SizedBox(height: 18),
                 ],
+                // One Text.rich per surah group → continuous inline flow. After
+                // each verse we append its number as Arabic-Indic digits: in
+                // KFGQPC UthmanicHafs1B the font's GSUB composes those digits into
+                // the ornate end-of-ayah rosette with the NUMBER INSIDE it. It is
+                // all real text, so it orders correctly in RTL and reflows/zooms
+                // natively — no U+06DD (that adds a second empty circle), no
+                // WidgetSpan/placeholder (those bidi-reverse) and no overlay
+                // (invisible on-device). The number span keeps the surah text's
+                // font (only the colour differs) so the substitution still fires.
                 Text.rich(
+                  key: _groupKeyFor(group.first.surahId),
                   TextSpan(
                     children: [
                       for (final ayah in group) ...[
-                        // Zero-size anchor at the verse start: lets us scroll to
-                        // this verse and detect when it's at the viewport top.
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.top,
-                          child: SelectionContainer.disabled(
-                            child: SizedBox.shrink(key: _anchorFor(ayah.id)),
-                          ),
-                        ),
                         TextSpan(
                           text: ayah.textArabic,
                           style: _highlightAyahId == ayah.id
@@ -183,24 +255,18 @@ class _MushafViewState extends State<MushafView> {
                                 )
                               : null,
                         ),
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: SelectionContainer.disabled(
-                            child: AyahMedallion(
-                              number: ayah.ayahNumber,
-                              fontSize: fontSize,
-                            ),
+                        TextSpan(
+                          text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
-                        const TextSpan(text: ' '),
                       ],
                     ],
                   ),
-                  // Centered (not justify): Flutter has no kashida
-                  // justification, so justifying Arabic stretches glyph advances
-                  // and breaks ligatures. Centering keeps shaping intact.
                   textAlign: TextAlign.center,
                   textDirection: TextDirection.rtl,
+                  locale: const Locale('ar'),
                   style: QuranTextStyle.madani.copyWith(
                     fontSize: fontSize,
                     height: 2.1,
@@ -343,6 +409,7 @@ class SurahHeaderCard extends StatelessWidget {
               nameArabic,
               textAlign: TextAlign.center,
               textDirection: TextDirection.rtl,
+              locale: const Locale('ar'),
               style: QuranTextStyle.madani.copyWith(
                 fontSize: 34 * scale,
                 height: 1.4,
@@ -420,49 +487,8 @@ class Bismillah extends StatelessWidget {
         _bismillah,
         textAlign: TextAlign.center,
         textDirection: TextDirection.rtl,
+        locale: const Locale('ar'),
         style: QuranTextStyle.madani.copyWith(fontSize: fontSize * 0.92),
-      ),
-    );
-  }
-}
-
-/// Inline end-of-ayah marker: the verse number (Western numerals) inside a soft
-/// tinted medallion, sized to sit with the surrounding Arabic line.
-class AyahMedallion extends StatelessWidget {
-  const AyahMedallion({
-    required this.number,
-    required this.fontSize,
-    super.key,
-  });
-
-  final int number;
-  final double fontSize;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final diameter = fontSize * 1.15;
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: fontSize * 0.18),
-      width: diameter,
-      height: diameter,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.55),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.30),
-        ),
-      ),
-      child: Text(
-        '$number',
-        textDirection: TextDirection.ltr,
-        style: TextStyle(
-          fontSize: fontSize * 0.42,
-          height: 1.0,
-          fontWeight: FontWeight.w600,
-          color: theme.colorScheme.onPrimaryContainer,
-        ),
       ),
     );
   }

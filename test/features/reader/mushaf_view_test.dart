@@ -102,7 +102,7 @@ void main() {
         ),
       );
 
-      // The continuous flow is the only Text built from a TextSpan tree.
+      // Each surah group is one Text.rich; pick the first one.
       final flow = tester
           .widgetList<Text>(find.byType(Text))
           .firstWhere((t) => t.textSpan != null);
@@ -110,8 +110,8 @@ void main() {
       expect(flow.textDirection, TextDirection.rtl);
     });
 
-    testWidgets('renders an English medallion number for each ayah',
-        (tester) async {
+    testWidgets('appends each ayah number as Arabic-Indic digits (font draws '
+        'the rosette around them)', (tester) async {
       await tester.pumpWidget(
         _wrap(
           MushafView(
@@ -122,8 +122,16 @@ void main() {
         ),
       );
 
-      for (final n in ['1', '2', '3', '4']) {
-        expect(find.text(n), findsOneWidget);
+      // The number is plain text in the surah paragraph (the KFGQPC font composes
+      // the digits into the ayah rosette at render time). No U+06DD is added.
+      final allText = tester
+          .widgetList<Text>(find.byType(Text))
+          .where((t) => t.textSpan != null)
+          .map((t) => t.textSpan!.toPlainText())
+          .join();
+      expect(allText.contains('۝'), isFalse);
+      for (final n in ['١', '٢', '٣', '٤']) {
+        expect(allText, contains(n));
       }
     });
 
