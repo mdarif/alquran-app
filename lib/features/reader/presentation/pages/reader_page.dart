@@ -16,6 +16,7 @@ import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
 import '../widgets/reader_settings_sheet.dart';
+import '../widgets/scroll_to_top_button.dart';
 
 class ReaderPage extends StatelessWidget {
   const ReaderPage({required this.target, this.focusAyahId, super.key});
@@ -299,6 +300,9 @@ class _DetailedListState extends State<_DetailedList> {
   Timer? _highlightTimer;
   int? _highlightAyahId;
 
+  // "Back to top" appears once the list is roughly a screen deep.
+  bool _showTop = false;
+
   @override
   void initState() {
     super.initState();
@@ -362,9 +366,41 @@ class _DetailedListState extends State<_DetailedList> {
   }
 
   void _onPositions() {
-    // Debounce: report only once scrolling settles.
+    // "Back to top" visibility tracks live (cheap), but the resume-point report
+    // is debounced until scrolling settles.
+    _updateShowTop();
     _reportTimer?.cancel();
     _reportTimer = Timer(const Duration(milliseconds: 400), _reportTopmost);
+  }
+
+  void _updateShowTop() {
+    final positions = _positions.itemPositions.value;
+    bool showTop;
+    if (positions.isEmpty) {
+      showTop = false;
+    } else {
+      // Find the first row (index 0). Show the button once it has scrolled
+      // roughly one viewport above the top, or is gone from view entirely.
+      ItemPosition? first;
+      for (final p in positions) {
+        if (p.index == 0) {
+          first = p;
+          break;
+        }
+      }
+      showTop = first == null || first.itemLeadingEdge < -1.0;
+    }
+    if (showTop != _showTop) setState(() => _showTop = showTop);
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.isAttached) return;
+    _scrollController.scrollTo(
+      index: 0,
+      alignment: 0,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _reportTopmost() {
@@ -388,61 +424,72 @@ class _DetailedListState extends State<_DetailedList> {
 
   @override
   Widget build(BuildContext context) {
-    return ScrollablePositionedList.builder(
-      itemScrollController: _scrollController,
-      itemPositionsListener: _positions,
-      itemCount: _rows.length,
-      itemBuilder: (context, i) {
-        final row = _rows[i];
-        if (row is _HeaderMarker) {
-          return Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(16, i == 0 ? 12 : 20, 16, 4),
-                child: SurahHeaderCard(
-                  heading: widget.headings[row.surahId],
-                  fallbackNumber: row.surahId,
-                  fontSize: widget.arabicFontSize,
-                ),
-              ),
-              if (row.showBismillah)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Bismillah(fontSize: widget.arabicFontSize),
-                ),
-            ],
-          );
-        }
-        final ayah = row as Ayah;
-        final tile = AyahTile(
-          ayah: ayah,
-          resources: widget.resources,
-          arabicFontSize: widget.arabicFontSize,
-          surahName: widget.headings[ayah.surahId]?.nameEnglish,
-          highlight: _highlightAyahId == ayah.id,
-        );
-        // A light hairline separates consecutive verses. It's omitted after the
-        // last verse (nothing follows) and before a surah header (the chapter
-        // header is its own separator).
-        final nextIsAyah = i + 1 < _rows.length && _rows[i + 1] is Ayah;
-        if (!nextIsAyah) return tile;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            tile,
-            Divider(
-              height: 1,
-              thickness: 1,
-              indent: 16,
-              endIndent: 16,
-              // `outline`, not `outlineVariant`: the latter is ~1.6:1 on the warm
-              // background (barely visible). `outline` reads as a dependable light
-              // hairline (~4.3:1 light / ~6:1 dark) without becoming a hard rule.
-              color: Theme.of(context).colorScheme.outline,
+    return Stack(
+      children: [
+        ScrollablePositionedList.builder(
+          itemScrollController: _scrollController,
+          itemPositionsListener: _positions,
+          itemCount: _rows.length,
+          itemBuilder: _buildRow,
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: ScrollToTopButton(visible: _showTop, onPressed: _scrollToTop),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRow(BuildContext context, int i) {
+    final row = _rows[i];
+    if (row is _HeaderMarker) {
+      return Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, i == 0 ? 12 : 20, 16, 4),
+            child: SurahHeaderCard(
+              heading: widget.headings[row.surahId],
+              fallbackNumber: row.surahId,
+              fontSize: widget.arabicFontSize,
             ),
-          ],
-        );
-      },
+          ),
+          if (row.showBismillah)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Bismillah(fontSize: widget.arabicFontSize),
+            ),
+        ],
+      );
+    }
+    final ayah = row as Ayah;
+    final tile = AyahTile(
+      ayah: ayah,
+      resources: widget.resources,
+      arabicFontSize: widget.arabicFontSize,
+      surahName: widget.headings[ayah.surahId]?.nameEnglish,
+      highlight: _highlightAyahId == ayah.id,
+    );
+    // A light hairline separates consecutive verses. It's omitted after the
+    // last verse (nothing follows) and before a surah header (the chapter
+    // header is its own separator).
+    final nextIsAyah = i + 1 < _rows.length && _rows[i + 1] is Ayah;
+    if (!nextIsAyah) return tile;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        tile,
+        Divider(
+          height: 1,
+          thickness: 1,
+          indent: 16,
+          endIndent: 16,
+          // `outline`, not `outlineVariant`: the latter is ~1.6:1 on the warm
+          // background (barely visible). `outline` reads as a dependable light
+          // hairline (~4.3:1 light / ~6:1 dark) without becoming a hard rule.
+          color: Theme.of(context).colorScheme.outline,
+        ),
+      ],
     );
   }
 }

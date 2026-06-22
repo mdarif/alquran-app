@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import 'core/navigation/route_observer.dart';
+import 'core/scroll/quran_scroll_behavior.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
@@ -22,6 +23,7 @@ class AlQuranApp extends StatelessWidget {
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),
             themeMode: mode,
+            scrollBehavior: const QuranScrollBehavior(),
             navigatorObservers: [routeObserver],
             home: const HomePage(),
           );

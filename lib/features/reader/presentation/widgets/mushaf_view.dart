@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/reader_navigation.dart';
+import 'scroll_to_top_button.dart';
 
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
 /// quran.db). Shown before every surah except Al-Fatihah (where it is ayah 1)
@@ -65,6 +66,10 @@ class _MushafViewState extends State<MushafView> {
 
   int? _currentPage;
   bool _showPage = false;
+
+  // "Back to top" appears once the reader is roughly a screen deep into a surah.
+  bool _showTop = false;
+  static const double _topButtonThreshold = 800;
 
   // One key per surah group (on the Text widget); character offset per ayah in
   // its group paragraph — used for RenderParagraph-based scroll anchoring and
@@ -130,6 +135,8 @@ class _MushafViewState extends State<MushafView> {
     if (page != null && page != _currentPage) {
       setState(() => _currentPage = page);
     }
+    final showTop = _controller.offset > _topButtonThreshold;
+    if (showTop != _showTop) setState(() => _showTop = showTop);
     if (!_showPage) setState(() => _showPage = true);
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(milliseconds: 1200), () {
@@ -137,6 +144,15 @@ class _MushafViewState extends State<MushafView> {
       setState(() => _showPage = false);
       _reportTopmost();
     });
+  }
+
+  void _scrollToTop() {
+    if (!_controller.hasClients) return;
+    _controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _scrollToFocus(int ayahId) {
@@ -294,6 +310,14 @@ class _MushafViewState extends State<MushafView> {
               ),
             ),
           ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: ScrollToTopButton(
+            visible: _showTop,
+            onPressed: _scrollToTop,
+          ),
+        ),
       ],
     );
   }
