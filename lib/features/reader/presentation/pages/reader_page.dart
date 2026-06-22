@@ -9,13 +9,12 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
-import '../../../../core/theme/theme_cubit.dart';
+import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
-import '../widgets/reader_settings_sheet.dart';
 import '../widgets/scroll_to_top_button.dart';
 
 class ReaderPage extends StatelessWidget {
@@ -74,6 +73,9 @@ class _ReaderViewState extends State<_ReaderView> {
   late _Viewport _viewport =
       _settings.detailed ? _Viewport.detailed : _Viewport.reading;
 
+  // Whether the inline text-size slider is revealed (toggled by the "Aa" button).
+  bool _showFontSlider = false;
+
   // Pinch + swipe are both handled through a raw Listener (not GestureDetector)
   // so they do NOT enter the gesture arena. This matters because SelectionArea
   // and the scroll view claim drags in the arena — a Listener still sees every
@@ -96,54 +98,89 @@ class _ReaderViewState extends State<_ReaderView> {
       appBar: AppBar(
         title: Text(_target.title),
         actions: [
+          // Reading ⇄ Detailed in one tap (icon shows the view you'll switch to).
           IconButton(
-            tooltip: 'Display',
-            onPressed: _openSettings,
-            icon: const Icon(Icons.tune_rounded),
+            tooltip: isReading ? 'Detailed view' : 'Reading view',
+            icon: Icon(
+              isReading ? Icons.subject_rounded : Icons.menu_book_rounded,
+            ),
+            onPressed: () => _setDetailed(isReading),
           ),
+          // Text size: reveals the inline slider below the bar.
+          IconButton(
+            tooltip: 'Text size',
+            icon: const Icon(Icons.format_size_rounded),
+            onPressed: _toggleFontSlider,
+          ),
+          const ThemeToggleButton(),
         ],
       ),
-      body: Listener(
-        onPointerDown: _onPointerDown,
-        onPointerMove: _onPointerMove,
-        onPointerUp: _onPointerEnd,
-        onPointerCancel: _onPointerEnd,
-        child: SelectionArea(
-          child: BlocBuilder<ReaderCubit, ReaderState>(
-            builder: (context, state) {
-              if (state.status == ReaderStatus.error) {
-                return Center(child: Text(state.error ?? 'Failed to load'));
-              }
-              // Keep showing the previous section while the next one loads
-              // (no spinner flash on swipe); spinner only before first load.
-              if (state.ayahs.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              // Key by the section's first ayah so a new section starts at the
-              // top, while a same-section rebuild preserves scroll position.
-              final sectionKey = ValueKey(state.ayahs.first.id);
-              if (isReading) {
-                return MushafView(
-                  key: sectionKey,
-                  ayahs: state.ayahs,
-                  headings: state.headings,
-                  arabicFontSize: _arabicFont,
-                  focusAyahId: _focusAyahId,
-                  onVisibleAyah: _onVisibleAyah,
-                );
-              }
-              return _DetailedList(
-                key: sectionKey,
-                ayahs: state.ayahs,
-                resources: state.resources,
-                headings: state.headings,
-                arabicFontSize: _arabicFont,
-                focusAyahId: _focusAyahId,
-                onVisibleAyah: _onVisibleAyah,
-              );
-            },
+      body: Stack(
+        children: [
+          Listener(
+            onPointerDown: _onPointerDown,
+            onPointerMove: _onPointerMove,
+            onPointerUp: _onPointerEnd,
+            onPointerCancel: _onPointerEnd,
+            child: SelectionArea(
+              child: BlocBuilder<ReaderCubit, ReaderState>(
+                builder: (context, state) {
+                  if (state.status == ReaderStatus.error) {
+                    return Center(child: Text(state.error ?? 'Failed to load'));
+                  }
+                  // Keep showing the previous section while the next one loads
+                  // (no spinner flash on swipe); spinner only before first load.
+                  if (state.ayahs.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  // Key by the section's first ayah so a new section starts at the
+                  // top, while a same-section rebuild preserves scroll position.
+                  final sectionKey = ValueKey(state.ayahs.first.id);
+                  if (isReading) {
+                    return MushafView(
+                      key: sectionKey,
+                      ayahs: state.ayahs,
+                      headings: state.headings,
+                      arabicFontSize: _arabicFont,
+                      focusAyahId: _focusAyahId,
+                      onVisibleAyah: _onVisibleAyah,
+                    );
+                  }
+                  return _DetailedList(
+                    key: sectionKey,
+                    ayahs: state.ayahs,
+                    resources: state.resources,
+                    headings: state.headings,
+                    arabicFontSize: _arabicFont,
+                    focusAyahId: _focusAyahId,
+                    onVisibleAyah: _onVisibleAyah,
+                  );
+                },
+              ),
+            ),
           ),
-        ),
+          // Tap-away barrier: dismiss the size slider by tapping the page.
+          if (_showFontSlider)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _hideFontSlider,
+              ),
+            ),
+          // The inline text-size slider, anchored under the app bar.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: _FontSizeBar(
+              visible: _showFontSlider,
+              fontSize: _arabicFont,
+              minFont: _minFont,
+              maxFont: _maxFont,
+              onChanged: _applyFont,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -223,25 +260,11 @@ class _ReaderViewState extends State<_ReaderView> {
 
   // --------------------------------------------------------------------------
 
-  /// Opens the display settings sheet (theme / view / text size). The sheet
-  /// reaches the app-root [ThemeCubit] via `BlocProvider.value`, and drives the
-  /// page's font + viewport live through callbacks.
-  void _openSettings() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: false,
-      builder: (_) => BlocProvider<ThemeCubit>.value(
-        value: context.read<ThemeCubit>(),
-        child: ReaderSettingsSheet(
-          fontSize: _arabicFont,
-          minFont: _minFont,
-          maxFont: _maxFont,
-          detailed: _viewport == _Viewport.detailed,
-          onFontSize: _applyFont,
-          onDetailedChanged: _setDetailed,
-        ),
-      ),
-    );
+  void _toggleFontSlider() =>
+      setState(() => _showFontSlider = !_showFontSlider);
+
+  void _hideFontSlider() {
+    if (_showFontSlider) setState(() => _showFontSlider = false);
   }
 
   void _setDetailed(bool detailed) {
@@ -484,10 +507,10 @@ class _DetailedListState extends State<_DetailedList> {
           thickness: 1,
           indent: 16,
           endIndent: 16,
-          // `outline`, not `outlineVariant`: the latter is ~1.6:1 on the warm
-          // background (barely visible). `outline` reads as a dependable light
-          // hairline (~4.3:1 light / ~6:1 dark) without becoming a hard rule.
-          color: Theme.of(context).colorScheme.outline,
+          // A soft hairline: solid `outline` read too dark; a 40%-alpha `outline`
+          // lands between it and the near-invisible `outlineVariant` — visible
+          // separation without a heavy rule. Tune the alpha to taste.
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
         ),
       ],
     );
@@ -498,4 +521,65 @@ class _HeaderMarker {
   const _HeaderMarker({required this.surahId, required this.showBismillah});
   final int surahId;
   final bool showBismillah;
+}
+
+/// Inline text-size control: a slim bar that slides down from under the app bar
+/// with a small "A" → slider → large "A". Hidden (slid up + faded) when not
+/// [visible]. Pinch-to-zoom stays the primary gesture; this is the discoverable,
+/// precise one. The parent anchors it at the top of the reader Stack.
+class _FontSizeBar extends StatelessWidget {
+  const _FontSizeBar({
+    required this.visible,
+    required this.fontSize,
+    required this.minFont,
+    required this.maxFont,
+    required this.onChanged,
+  });
+
+  final bool visible;
+  final double fontSize;
+  final double minFont;
+  final double maxFont;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedSlide(
+        offset: visible ? Offset.zero : const Offset(0, -1),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 160),
+          child: Material(
+            color: theme.colorScheme.surface,
+            elevation: 3,
+            shadowColor: Colors.black.withValues(alpha: 0.2),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              child: Row(
+                children: [
+                  const Text('A', style: TextStyle(fontSize: 13)),
+                  Expanded(
+                    child: Slider(
+                      value: fontSize.clamp(minFont, maxFont),
+                      min: minFont,
+                      max: maxFont,
+                      divisions: ((maxFont - minFont) / 2).round(),
+                      label: '${fontSize.round()}',
+                      onChanged: onChanged,
+                    ),
+                  ),
+                  const Text('A', style: TextStyle(fontSize: 22)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
