@@ -19,27 +19,46 @@ import '../widgets/mushaf_view.dart';
 import '../widgets/scroll_to_top_button.dart';
 
 class ReaderPage extends StatelessWidget {
-  const ReaderPage({required this.target, this.focusAyahId, super.key});
+  const ReaderPage({
+    required this.target,
+    this.focusAyahId,
+    this.initialDetailed = false,
+    super.key,
+  });
 
   final ReaderTarget target;
 
   /// Global ayah id to scroll to on open (from "Last Read"); null starts at top.
   final int? focusAyahId;
 
+  /// Open in Detailed view rather than Reading. Used by "Last Read" to resume in
+  /// the same viewport the reader left off in; a fresh open from the index leaves
+  /// this false (always Reading).
+  final bool initialDetailed;
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => GetIt.I<ReaderCubit>()..load(target),
-      child: _ReaderView(initialTarget: target, focusAyahId: focusAyahId),
+      child: _ReaderView(
+        initialTarget: target,
+        focusAyahId: focusAyahId,
+        initialDetailed: initialDetailed,
+      ),
     );
   }
 }
 
 class _ReaderView extends StatefulWidget {
-  const _ReaderView({required this.initialTarget, this.focusAyahId});
+  const _ReaderView({
+    required this.initialTarget,
+    this.focusAyahId,
+    this.initialDetailed = false,
+  });
 
   final ReaderTarget initialTarget;
   final int? focusAyahId;
+  final bool initialDetailed;
 
   @override
   State<_ReaderView> createState() => _ReaderViewState();
@@ -70,11 +89,12 @@ class _ReaderViewState extends State<_ReaderView> {
   // at the top.
   late int? _focusAyahId = widget.focusAyahId;
 
-  // Opening a surah always starts in Reading (Mushaf) view — the calm,
-  // Arabic-only default. The Detailed (translations) view is one tap away and
-  // stays selected while you read/swipe, but it is not remembered across a fresh
-  // open: every time you come in from the index you land in Reading.
-  _Viewport _viewport = _Viewport.reading;
+  // A fresh open (from the index) always starts in Reading (Mushaf) — the calm,
+  // Arabic-only default. "Last Read" instead resumes in the viewport the reader
+  // left off in (widget.initialDetailed), so Reading stays Reading and Detailed
+  // stays Detailed.
+  late _Viewport _viewport =
+      widget.initialDetailed ? _Viewport.detailed : _Viewport.reading;
 
   // Whether the inline text-size slider is revealed (toggled by the "Aa" button).
   bool _showFontSlider = false;
@@ -102,6 +122,16 @@ class _ReaderViewState extends State<_ReaderView> {
   Offset? _swipeStart;
   bool _multiTouch = false;
   static const double _swipeDistance = 64;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tell the cubit which viewport we opened in, so Last Read records it (this
+    // runs before the cubit's first progress save, which is async).
+    context
+        .read<ReaderCubit>()
+        .setViewportDetailed(_viewport == _Viewport.detailed);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -297,11 +327,13 @@ class _ReaderViewState extends State<_ReaderView> {
 
   void _setDetailed(bool detailed) {
     // Session-only toggle: the choice holds while this reader is open (including
-    // across swipes) but is intentionally NOT persisted — a fresh open always
-    // starts in Reading view.
+    // across swipes) but is intentionally NOT persisted as the open default — a
+    // fresh open always starts in Reading. It IS recorded on the Last Read point
+    // though, so resuming returns to the view you were last in.
     setState(() {
       _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
     });
+    context.read<ReaderCubit>().setViewportDetailed(detailed);
   }
 
   /// The reader's active translation editions — shared by the Reading peek and

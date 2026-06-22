@@ -362,4 +362,37 @@ void main() {
       expect(find.text('हिंदी अनुवाद'), findsNothing);
     });
   });
+
+  group('Last Read viewport resume', () {
+    testWidgets('resumes in Detailed when that was the saved viewport',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ReaderPage(
+            target: ReaderTarget.surah(2, 'Al-Baqarah'),
+            focusAyahId: 201,
+            initialDetailed: true, // came from Detailed view
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // Detailed view → no Mushaf flow.
+      expect(find.byType(MushafView), findsNothing);
+    });
+
+    testWidgets('resumes in Reading when that was the saved viewport',
+        (tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ReaderPage(
+            target: ReaderTarget.surah(2, 'Al-Baqarah'),
+            focusAyahId: 201,
+            initialDetailed: false, // came from Reading view
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(MushafView), findsOneWidget);
+    });
+  });
 }

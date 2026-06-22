@@ -22,6 +22,12 @@ class ReaderCubit extends Cubit<ReaderState> {
   /// The section currently shown — needed to record last-read progress.
   ReaderTarget? _target;
 
+  /// The viewport the reader is in (true = Detailed) and the last verse reported,
+  /// so Last Read records which view to resume in — and so a viewport switch
+  /// re-stamps the existing resume point with the new view.
+  bool _detailed = false;
+  Ayah? _lastAyah;
+
   Future<void> load(ReaderTarget target) async {
     _target = target;
     emit(state.copyWith(status: ReaderStatus.loading));
@@ -45,9 +51,20 @@ class ReaderCubit extends Cubit<ReaderState> {
     }
   }
 
+  /// Records the active viewport (true = Detailed) so Last Read resumes in the
+  /// same view. Re-stamps the existing resume point when it changes, so leaving
+  /// right after switching views still records the new view.
+  void setViewportDetailed(bool detailed) {
+    if (_detailed == detailed) return;
+    _detailed = detailed;
+    final ayah = _lastAyah;
+    if (ayah != null) saveProgress(ayah);
+  }
+
   /// Records [ayah] as the last-read verse within the current section, so the
-  /// home "Last Read" card resumes exactly here.
+  /// home "Last Read" card resumes exactly here (in the current viewport).
   void saveProgress(Ayah ayah) {
+    _lastAyah = ayah;
     final target = _target;
     if (target == null) return;
     unawaited(
@@ -57,6 +74,7 @@ class ReaderCubit extends Cubit<ReaderState> {
           ayahId: ayah.id,
           surahId: ayah.surahId,
           ayahNumber: ayah.ayahNumber,
+          detailed: _detailed,
         ),
       ),
     );

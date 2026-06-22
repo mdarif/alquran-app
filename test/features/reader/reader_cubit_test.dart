@@ -122,6 +122,55 @@ void main() {
       expect(lastRead.saved?.ayahId, 262);
       expect(lastRead.saved?.surahId, 2);
       expect(lastRead.saved?.ayahNumber, 255);
+      expect(lastRead.saved?.detailed, isFalse); // Reading by default
+      await cubit.close();
+    });
+
+    test('saveProgress records the active viewport (Detailed)', () async {
+      final lastRead = _FakeLastReadRepository();
+      final cubit = ReaderCubit(
+        _FakeAyahRepository(ayahs: const [_ayah]),
+        lastRead,
+      );
+      await cubit.load(const ReaderTarget.surah(2, 'Al-Baqarah'));
+      cubit.setViewportDetailed(true);
+      cubit.saveProgress(
+        const Ayah(
+          id: 262,
+          surahId: 2,
+          ayahNumber: 255,
+          textArabic: 'x',
+          isSajda: false,
+        ),
+      );
+
+      expect(lastRead.saved?.detailed, isTrue);
+      await cubit.close();
+    });
+
+    test('switching viewport re-stamps the existing resume point', () async {
+      final lastRead = _FakeLastReadRepository();
+      final cubit = ReaderCubit(
+        _FakeAyahRepository(ayahs: const [_ayah]),
+        lastRead,
+      );
+      await cubit.load(const ReaderTarget.surah(2, 'Al-Baqarah'));
+      cubit.saveProgress(
+        const Ayah(
+          id: 262,
+          surahId: 2,
+          ayahNumber: 255,
+          textArabic: 'x',
+          isSajda: false,
+        ),
+      );
+      expect(lastRead.saved?.detailed, isFalse);
+
+      // Switching to Detailed re-saves the same verse with the new viewport,
+      // so leaving immediately still records Detailed.
+      cubit.setViewportDetailed(true);
+      expect(lastRead.saved?.ayahId, 262);
+      expect(lastRead.saved?.detailed, isTrue);
       await cubit.close();
     });
 

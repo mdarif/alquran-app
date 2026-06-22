@@ -14,6 +14,7 @@ class LastRead extends Equatable {
     required this.ayahId,
     required this.surahId,
     required this.ayahNumber,
+    this.detailed = false,
   });
 
   final ReaderTarget target;
@@ -21,6 +22,10 @@ class LastRead extends Equatable {
   final int surahId;
   final int ayahNumber;
 
+  /// Which viewport the reader was in when they left off — true = Detailed
+  /// (translations), false = Reading (Mushaf). Resuming reopens that same view.
+  final bool detailed;
+
   @override
-  List<Object?> get props => [target, ayahId, surahId, ayahNumber];
+  List<Object?> get props => [target, ayahId, surahId, ayahNumber, detailed];
 }

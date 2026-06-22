@@ -15,6 +15,7 @@ class LastReadRepositoryImpl implements LastReadRepository {
   static const String _kAyahId = 'last_read_ayah_id';
   static const String _kSurahId = 'last_read_surah_id';
   static const String _kAyahNumber = 'last_read_ayah_number';
+  static const String _kDetailed = 'last_read_detailed';
 
   @override
   Future<void> save(LastRead value) async {
@@ -24,6 +25,7 @@ class LastReadRepositoryImpl implements LastReadRepository {
     await _prefs.setInt(_kAyahId, value.ayahId);
     await _prefs.setInt(_kSurahId, value.surahId);
     await _prefs.setInt(_kAyahNumber, value.ayahNumber);
+    await _prefs.setBool(_kDetailed, value.detailed);
   }
 
   @override
@@ -57,6 +59,8 @@ class LastReadRepositoryImpl implements LastReadRepository {
       ayahId: ayahId,
       surahId: surahId,
       ayahNumber: ayahNumber,
+      // Older records have no viewport flag → default to Reading.
+      detailed: _prefs.getBool(_kDetailed) ?? false,
     );
   }
 }

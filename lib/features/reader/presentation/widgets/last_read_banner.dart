@@ -79,6 +79,7 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
               builder: (_) => ReaderPage(
                 target: lastRead.target,
                 focusAyahId: lastRead.ayahId,
+                initialDetailed: lastRead.detailed,
               ),
             ),
           ),
