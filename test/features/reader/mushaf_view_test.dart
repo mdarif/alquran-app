@@ -217,91 +217,58 @@ void main() {
   // -------------------------------------------------------------------------
 
   group('MushafView — tap-to-peek translation card', () {
+    // The peek card is the only Material with elevation 12 — a robust "is the
+    // card visible" probe independent of its text content.
+    bool cardVisible(WidgetTester tester) => tester
+        .widgetList<Material>(find.byType(Material))
+        .any((m) => m.elevation == 12);
+
+    // Build the Reading view, defaulting the peek language to Urdu so content
+    // assertions are deterministic regardless of the test host's locale.
+    Widget reader(
+      List<Ayah> ayahs, {
+      List<TranslationResource> resources = _kResources,
+      String? peek = 'ur',
+    }) =>
+        _wrap(
+          MushafView(
+            ayahs: ayahs,
+            headings: _headings(1, 'Al-Fatihah', 7),
+            arabicFontSize: 28,
+            resources: resources,
+            peekTranslation: peek,
+          ),
+        );
+
     testWidgets('card is absent before any verse is tapped', (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahs(1, 7),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
-      // No 'Ayah N' label in the tree — the card returns SizedBox.shrink().
-      expect(find.textContaining('Ayah '), findsNothing);
-    });
-
-    testWidgets('card is absent before any verse is tapped even for a short surah',
-        (tester) async {
-      // Al-Fatihah (7 ayahs) fits on screen without scrolling — this was the
-      // failing case before the SizedBox.expand() fix (the Stack sized to content
-      // height, so Positioned(bottom:0) was above the real screen bottom).
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahs(1, 7),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
+      await tester.pumpWidget(reader(_ayahs(1, 7)));
       await tester.pump();
-      // The grab handle must not be visible at any point before a verse is tapped.
-      // We confirm by asserting no peek-card content is in the widget tree.
-      expect(find.textContaining('Ayah '), findsNothing);
-      // The card widget itself should be SizedBox.shrink() — zero height.
-      // We verify this by checking that no Material with elevation 12 exists.
-      final materials = tester
-          .widgetList<Material>(find.byType(Material))
-          .where((m) => m.elevation == 12);
-      expect(materials, isEmpty);
+      expect(cardVisible(tester), isFalse);
     });
 
-    testWidgets('tapping the text opens the card and shows an Ayah label',
+    testWidgets('card is absent before any tap even for a short surah',
         (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 3),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
+      // Al-Fatihah (7 ayahs) fits on screen without scrolling — the case that
+      // exposed the old Positioned(bottom:0) / Stack-sizing bug.
+      await tester.pumpWidget(reader(_ayahs(1, 7)));
+      await tester.pump();
+      expect(cardVisible(tester), isFalse);
+    });
+
+    testWidgets('tapping a verse opens the card with the verse reference',
+        (tester) async {
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 3)));
       await tester.pump();
       await _tapText(tester);
 
-      expect(find.textContaining('Ayah '), findsOneWidget);
+      expect(cardVisible(tester), isTrue);
+      // Reference like "Al-Fatihah · 1:2" — unique to the card (the header meta
+      // line reads "Meccan · 7 Verses").
+      expect(find.textContaining('Al-Fatihah · 1:'), findsOneWidget);
     });
 
-    testWidgets('card shows translations matching the tapped verse',
+    testWidgets('card does NOT repeat the Arabic of the tapped verse',
         (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
-      await tester.pump();
-      await _tapText(tester);
-
-      // The card must render both translation strings.
-      expect(find.text('اردو ترجمہ'), findsOneWidget);
-      expect(find.text('هिंदी अनुवाद'), findsNothing); // not the right text
-      // Use a contained-in check robust to the specific translation strings.
-      // Label is just the author name — no language prefix.
-      expect(find.text('Junagarhi'), findsOneWidget);
-      expect(find.text('al-Umari'), findsOneWidget);
-    });
-
-    testWidgets('card shows the Arabic text of the tapped verse', (tester) async {
       final singleAyah = [
         const Ayah(
           id: 1001,
@@ -312,109 +279,80 @@ void main() {
           translations: {1: 'ترجمہ', 2: 'अनुवाद'},
         ),
       ];
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: singleAyah,
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
+      await tester.pumpWidget(reader(singleAyah));
       await tester.pump();
       await _tapText(tester);
 
-      // The Arabic text appears in the card (once in the flow, once in the card).
-      expect(find.text('بِسْمِ اللَّهِ'), findsWidgets);
+      // The flow renders Arabic via Text.rich (which find.text ignores); the card
+      // no longer adds a plain Arabic Text, so this exact string is nowhere.
+      expect(find.text('بِسْمِ اللَّهِ'), findsNothing);
+    });
+
+    testWidgets('card shows ONE translation (the selected language) at a time',
+        (tester) async {
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 1)));
+      await tester.pump();
+      await _tapText(tester);
+
+      // Urdu is selected → its text + author show; Hindi's do not (until switched).
+      expect(find.text('اردو ترجمہ'), findsOneWidget);
+      expect(find.text('हिंदी अनुवाद'), findsNothing);
+      expect(find.text('Junagarhi'), findsOneWidget);
+      expect(find.text('al-Umari'), findsNothing);
+      // Both languages are offered as switcher chips.
+      expect(find.text('اردو'), findsOneWidget); // chip (exact, not the body text)
+      expect(find.text('हिन्दी'), findsOneWidget);
+    });
+
+    testWidgets('tapping a language chip switches the shown translation',
+        (tester) async {
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 1)));
+      await tester.pump();
+      await _tapText(tester);
+      expect(find.text('اردو ترجمہ'), findsOneWidget);
+
+      // Switch to Hindi via its chip.
+      await tester.tap(find.text('हिन्दी'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('हिंदी अनुवाद'), findsOneWidget);
+      expect(find.text('اردو ترجمہ'), findsNothing);
+      expect(find.text('al-Umari'), findsOneWidget);
     });
 
     testWidgets('tapping the handle dismisses the card', (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 1)));
       await tester.pump();
 
-      // Open.
       await _tapText(tester);
-      expect(find.textContaining('Ayah '), findsOneWidget);
+      expect(cardVisible(tester), isTrue);
 
-      // Dismiss via the handle.
       await _tapHandle(tester);
-
-      // The label is gone — AnimationStatus.dismissed listener cleared _shownAyah.
-      expect(find.textContaining('Ayah '), findsNothing);
-    });
-
-    testWidgets('card disappears completely after dismiss (no handle visible)',
-        (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
-      await tester.pump();
-      await _tapText(tester);
-      await _tapHandle(tester);
-
-      // No peek-card Material at all in the tree after full dismissal.
-      final materials = tester
-          .widgetList<Material>(find.byType(Material))
-          .where((m) => m.elevation == 12);
-      expect(materials, isEmpty);
+      // _shownAyah cleared once the slide-out completes → card is gone entirely.
+      expect(cardVisible(tester), isFalse);
     });
 
     testWidgets('tapping the same verse again closes the card', (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-          ),
-        ),
-      );
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 1)));
       await tester.pump();
 
-      // Open.
       await _tapText(tester);
-      expect(find.textContaining('Ayah '), findsOneWidget);
+      expect(cardVisible(tester), isTrue);
 
-      // Tap same spot again — _selectedAyah.id == tapped.id → _dismissPeek().
-      await _tapText(tester);
-      expect(find.textContaining('Ayah '), findsNothing);
+      await _tapText(tester); // same verse → _dismissPeek()
+      expect(cardVisible(tester), isFalse);
     });
 
-    testWidgets('no resources — card opens with Arabic only, no crash',
+    testWidgets('no resources — card opens without chips/translation, no crash',
         (tester) async {
       await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: const [], // empty list
-          ),
-        ),
+        reader(_ayahsWithTranslations(1, 1), resources: const []),
       );
       await tester.pump();
       await _tapText(tester);
 
-      expect(find.textContaining('Ayah '), findsOneWidget);
-      // No author labels when there are no resources.
+      expect(cardVisible(tester), isTrue);
+      expect(find.text('No translation available'), findsOneWidget);
       expect(find.textContaining('Junagarhi'), findsNothing);
     });
   });

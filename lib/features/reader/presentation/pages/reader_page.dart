@@ -148,6 +148,9 @@ class _ReaderViewState extends State<_ReaderView> {
                     resources: state.resources,
                     focusAyahId: _focusAyahId,
                     onVisibleAyah: _onVisibleAyah,
+                    peekTranslation: _settings.peekTranslation,
+                    onPeekTranslationChanged: (code) =>
+                        unawaited(_settings.setPeekTranslation(code)),
                   );
                 }
                 // SelectionArea only in Detailed mode where copy/share is useful.

@@ -43,6 +43,8 @@ class MushafView extends StatefulWidget {
     required this.resources,
     this.focusAyahId,
     this.onVisibleAyah,
+    this.peekTranslation,
+    this.onPeekTranslationChanged,
     super.key,
   });
 
@@ -56,6 +58,14 @@ class MushafView extends StatefulWidget {
 
   /// Reports the topmost-visible verse as the user scrolls (debounced).
   final ValueChanged<Ayah>? onVisibleAyah;
+
+  /// Remembered language for the tap-to-peek card (e.g. 'ur'); null → seed from
+  /// device locale, else the first available translation.
+  final String? peekTranslation;
+
+  /// Called when the reader switches the peek card's language, so the choice can
+  /// be persisted.
+  final ValueChanged<String>? onPeekTranslationChanged;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -71,6 +81,7 @@ class _MushafViewState extends State<MushafView>
   // Tap-to-peek translation card.
   Ayah? _selectedAyah; // highlighted verse (null = none)
   Ayah? _shownAyah; // kept during slide-out so card doesn't blink
+  String? _peekLang; // session override for the shown translation language
   late final AnimationController _peekCtrl;
   late final Animation<Offset> _peekSlide;
 
@@ -161,6 +172,28 @@ class _MushafViewState extends State<MushafView>
   void _dismissPeek() {
     setState(() => _selectedAyah = null);
     _peekCtrl.reverse();
+  }
+
+  /// The language code whose translation the peek card shows: a tapped-this-session
+  /// choice, else the remembered one, else the device locale, else the first
+  /// available translation. Always returns a code present in [resources] (or ''
+  /// when there are no translations).
+  String _resolvePeekLang() {
+    final available = [for (final r in widget.resources) r.languageCode];
+    if (available.isEmpty) return '';
+    if (_peekLang != null && available.contains(_peekLang)) return _peekLang!;
+    final remembered = widget.peekTranslation;
+    if (remembered != null && available.contains(remembered)) return remembered;
+    final locale =
+        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+    if (available.contains(locale)) return locale;
+    return available.first;
+  }
+
+  void _selectPeekLang(String code) {
+    if (code == _peekLang) return;
+    setState(() => _peekLang = code);
+    widget.onPeekTranslationChanged?.call(code);
   }
 
   /// Pre-computes each ayah's character offset within its surah group paragraph
@@ -397,7 +430,12 @@ class _MushafViewState extends State<MushafView>
               child: _MushafPeekCard(
                 ayah: _shownAyah,
                 resources: widget.resources,
+                surahName: _shownAyah == null
+                    ? null
+                    : widget.headings[_shownAyah!.surahId]?.nameEnglish,
                 fontSize: fontSize,
+                selectedLanguage: _resolvePeekLang(),
+                onSelectLanguage: _selectPeekLang,
                 onDismiss: _dismissPeek,
               ),
             ),
@@ -631,19 +669,42 @@ class Bismillah extends StatelessWidget {
   }
 }
 
-/// Bottom peek card shown when the reader taps a verse in Reading mode.
-/// Slides up from the bottom; swipe down or tap the handle to dismiss.
+/// Native display label for a translation language's switcher chip.
+String _peekChipLabel(String code) {
+  switch (code) {
+    case 'ur':
+      return 'اردو';
+    case 'hi':
+      return 'हिन्दी';
+    case 'en':
+      return 'English';
+    default:
+      return code.toUpperCase();
+  }
+}
+
+/// Bottom peek card shown when the reader taps a verse in Reading mode. It is
+/// translation-FIRST: the Arabic is not repeated (the tapped verse is already
+/// on the page and highlighted) — the card shows one translation at a time, with
+/// a language switcher so the others are a tap away. Slides up from the bottom;
+/// swipe down or tap the handle to dismiss.
 class _MushafPeekCard extends StatelessWidget {
   const _MushafPeekCard({
     required this.ayah,
     required this.resources,
+    required this.surahName,
     required this.fontSize,
+    required this.selectedLanguage,
+    required this.onSelectLanguage,
     required this.onDismiss,
   });
 
   final Ayah? ayah;
   final List<TranslationResource> resources;
+  final String? surahName;
   final double fontSize;
+  final String selectedLanguage;
+  final ValueChanged<String> onSelectLanguage;
   final VoidCallback onDismiss;
 
   @override
@@ -655,6 +716,23 @@ class _MushafPeekCard extends StatelessWidget {
     final maxH = MediaQuery.of(context).size.height * 0.6;
     final translationSize =
         (theme.textTheme.bodyLarge?.fontSize ?? 16) * (fontSize / 28.0);
+
+    // Editions that actually have a translation for this verse, in resource order.
+    final available = [
+      for (final r in resources)
+        if (current.translations[r.id] != null) r,
+    ];
+    // The edition to show: the selected language if present, else the first.
+    final shown = available.isEmpty
+        ? null
+        : available.firstWhere(
+            (r) => r.languageCode == selectedLanguage,
+            orElse: () => available.first,
+          );
+
+    final reference = surahName == null
+        ? '${current.surahId}:${current.ayahNumber}'
+        : '$surahName · ${current.surahId}:${current.ayahNumber}';
 
     return Material(
       color: cs.surface,
@@ -690,7 +768,7 @@ class _MushafPeekCard extends StatelessWidget {
             ),
             // Content — ListView(shrinkWrap) hugs its own content height so
             // there's no blank gap at small font sizes, while still scrolling
-            // when translations are long. Swallow taps to prevent bleed-through.
+            // when a translation is long. Swallow taps to prevent bleed-through.
             GestureDetector(
               onTap: () {},
               child: ConstrainedBox(
@@ -699,53 +777,117 @@ class _MushafPeekCard extends StatelessWidget {
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
                   children: [
-                    Text(
-                      'Ayah ${current.ayahNumber}',
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: cs.primary),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      current.textArabic,
-                      textAlign: TextAlign.right,
-                      textDirection: TextDirection.rtl,
-                      locale: const Locale('ar'),
-                      style: QuranTextStyle.madani
-                          .copyWith(fontSize: fontSize * 0.77),
-                    ),
-                    for (final r in resources)
-                      if (current.translations[r.id] != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          r.attribution,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          current.translations[r.id]!,
-                          textAlign: r.languageCode == 'ur'
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          textDirection: r.languageCode == 'ur'
-                              ? TextDirection.rtl
-                              : TextDirection.ltr,
-                          locale: Locale(r.languageCode),
-                          style: r.languageCode.scriptStyle(
-                            theme.textTheme.bodyLarge!.copyWith(
-                              height: 1.5,
-                              fontSize: translationSize,
+                    // Reference + language switcher on one line (chips wrap below
+                    // the reference on narrow screens).
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              reference,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
                             ),
                           ),
                         ),
+                        if (available.length > 1)
+                          Wrap(
+                            spacing: 6,
+                            children: [
+                              for (final r in available)
+                                _PeekLangChip(
+                                  label: _peekChipLabel(r.languageCode),
+                                  selected:
+                                      shown?.languageCode == r.languageCode,
+                                  onTap: () => onSelectLanguage(r.languageCode),
+                                ),
+                            ],
+                          ),
                       ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (shown == null)
+                      Text(
+                        'No translation available',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      )
+                    else ...[
+                      Text(
+                        current.translations[shown.id]!,
+                        textAlign: shown.languageCode == 'ur'
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        textDirection: shown.languageCode == 'ur'
+                            ? TextDirection.rtl
+                            : TextDirection.ltr,
+                        locale: Locale(shown.languageCode),
+                        style: shown.languageCode.scriptStyle(
+                          theme.textTheme.bodyLarge!.copyWith(
+                            height: 1.5,
+                            fontSize: translationSize,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        shown.attribution,
+                        textAlign: shown.languageCode == 'ur'
+                            ? TextAlign.right
+                            : TextAlign.left,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A small selectable language pill in the peek card's switcher.
+class _PeekLangChip extends StatelessWidget {
+  const _PeekLangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? cs.primary : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+            ),
+          ),
         ),
       ),
     );

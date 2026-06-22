@@ -48,15 +48,19 @@ class _FakeLastReadRepository implements LastReadRepository {
 }
 
 class _FakeSettings implements ReaderSettingsRepository {
-  _FakeSettings({this.fontSize = 28, this.detailed = false});
+  _FakeSettings({this.fontSize = 28, this.detailed = false, this.peekTranslation});
   @override
   double fontSize;
   @override
   bool detailed;
   @override
+  String? peekTranslation;
+  @override
   Future<void> setFontSize(double value) async => fontSize = value;
   @override
   Future<void> setDetailed(bool value) async => detailed = value;
+  @override
+  Future<void> setPeekTranslation(String value) async => peekTranslation = value;
 }
 
 Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
