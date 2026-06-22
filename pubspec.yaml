@@ -66,6 +66,12 @@ flutter:
     - family: NotoNastaliqUrdu
       fonts:
         - asset: assets/fonts/NotoNastaliqUrdu-Regular.ttf
+    # Hindi translation face — Noto Sans Devanagari (Google, SIL OFL — licence-
+    # clean). Static Regular instanced from the variable font so Hindi renders
+    # crisply and consistently across devices instead of via the platform font.
+    - family: NotoSansDevanagari
+      fonts:
+        - asset: assets/fonts/NotoSansDevanagari-Regular.ttf
     # Display serif for Latin headings (surah English name) — Playfair Display by
     # Claus Eggers Sørensen (Google Fonts, SIL OFL 1.1 — licence-clean).
     - family: PlayfairDisplay
