@@ -40,10 +40,18 @@ this is **re-applied after any platform regen**. IDs: Android applicationId
 `com.almarfa.al_quran`, iOS bundle `com.almarfa.alQuran` (both already in the
 `patrol:` block).
 
-**Android — already wired** (Kotlin DSL). `android/app/build.gradle.kts` has the
-`PatrolJUnitRunner` test runner + `ANDROIDX_TEST_ORCHESTRATOR` + the orchestrator
-`androidTestUtil`, and `android/app/src/androidTest/java/com/almarfa/al_quran/MainActivityTest.java`
-is in place. After a platform regen, re-apply those two (they're git-ignored).
+**Android — already wired** (Kotlin DSL). `android/app/build.gradle.kts` has:
+- `testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"` + `clearPackageData`
+- `testOptions { execution = "ANDROIDX_TEST_ORCHESTRATOR" }`
+- `coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")` +
+  `isCoreLibraryDesugaringEnabled = true` — **required** by Patrol's bundled
+  uiautomator; without it the app can crash on launch under instrumentation and
+  the run reports `Total: 0` tests.
+- `androidTestUtil("androidx.test:orchestrator:1.5.1")`
+
+…and `android/app/src/androidTest/java/com/almarfa/al_quran/MainActivityTest.java`
+(the canonical `PatrolJUnitRunner` parameterized test). After a platform regen,
+re-apply all of the above — they're git-ignored.
 
 **iOS — needs an Xcode step** (can't be scripted). Open `ios/Runner.xcworkspace`,
 add a **UI Testing Bundle** target named `RunnerUITests`, drop in
@@ -72,6 +80,22 @@ patrol develop -t integration_test/reader_flow_test.dart
   Page/Juz/Hizb/Ruku.
 - **P2** — persistence across relaunch; copy/share; offline; system back;
   Bismillah edge cases (Al-Fatihah / At-Tawbah).
+
+## Troubleshooting
+
+- **`Total: 0` tests** — the native side discovered no Dart tests. The build is
+  fine (`./gradlew :app:assembleDebugAndroidTest` produces the instrumentation
+  APK); this is a runtime app-service handshake. Most common cause is missing
+  core-library desugaring (now added). If it persists, re-run with `--verbose`
+  and capture the device log in another terminal:
+  ```bash
+  adb logcat -c && adb logcat | grep -iE "Patrol|AppService|FATAL|AndroidRuntime|al_quran"
+  ```
+  Look for the app launching, `PatrolAppService` coming up, and `listDartTests`.
+- **Bundle import errors** — ensure `test_directory: integration_test` is in the
+  `patrol:` block (patrol_cli defaults to `patrol_test/`).
+- **`patrol test` uninstalls the app/test APKs after a run**, so you can't
+  `adb shell am instrument` manually afterwards — re-run `patrol test`.
 
 ## Notes
 
