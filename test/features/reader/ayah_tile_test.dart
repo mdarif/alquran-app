@@ -141,7 +141,8 @@ void main() {
       expect(find.text('अल्लाह के नाम'), findsNothing);
     });
 
-    testWidgets('shows the author attribution per translation (no language prefix)',
+    testWidgets(
+        'shows the author attribution per translation (no language prefix)',
         (tester) async {
       const ayah = Ayah(
         id: 1,

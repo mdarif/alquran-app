@@ -53,8 +53,18 @@ Map<int, SurahHeading> _headings(
     };
 
 const _kResources = <TranslationResource>[
-  TranslationResource(id: 1, languageCode: 'ur', name: 'Urdu', author: 'Junagarhi'),
-  TranslationResource(id: 2, languageCode: 'hi', name: 'Hindi', author: 'al-Umari'),
+  TranslationResource(
+    id: 1,
+    languageCode: 'ur',
+    name: 'Urdu',
+    author: 'Junagarhi',
+  ),
+  TranslationResource(
+    id: 2,
+    languageCode: 'hi',
+    name: 'Hindi',
+    author: 'al-Umari',
+  ),
 ];
 
 Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
@@ -86,7 +96,8 @@ Future<void> _tapText(WidgetTester tester) async {
 // Tap the handle bar of the open peek card.
 Future<void> _tapHandle(WidgetTester tester) async {
   final handle = find.byWidgetPredicate(
-    (w) => w is GestureDetector && w.onTap != null && w.onVerticalDragEnd != null,
+    (w) =>
+        w is GestureDetector && w.onTap != null && w.onVerticalDragEnd != null,
   );
   await tester.tap(handle.first);
   await tester.pumpAndSettle();
@@ -109,7 +120,13 @@ void main() {
         _wrap(
           _view(
             ayahs: _ayahs(1, 7),
-            headings: _headings(1, 'Al-Fatihah', 7, arabic: 'الفاتحة', place: 'makkah'),
+            headings: _headings(
+              1,
+              'Al-Fatihah',
+              7,
+              arabic: 'الفاتحة',
+              place: 'makkah',
+            ),
           ),
         ),
       );
@@ -126,7 +143,8 @@ void main() {
       expect(find.textContaining('·'), findsNothing);
     });
 
-    testWidgets('the Arabic flow is centered and right-to-left', (tester) async {
+    testWidgets('the Arabic flow is centered and right-to-left',
+        (tester) async {
       await tester.pumpWidget(_wrap(_view()));
       final flow = tester
           .widgetList<Text>(find.byType(Text))
@@ -188,7 +206,14 @@ void main() {
         _wrap(
           _view(
             ayahs: const [
-              Ayah(id: 1, surahId: 2, ayahNumber: 1, textArabic: 'نص', isSajda: false, page: 5),
+              Ayah(
+                id: 1,
+                surahId: 2,
+                ayahNumber: 1,
+                textArabic: 'نص',
+                isSajda: false,
+                page: 5,
+              ),
             ],
           ),
         ),
@@ -299,8 +324,8 @@ void main() {
       expect(find.text('हिंदी अनुवाद'), findsNothing);
       expect(find.text('Junagarhi'), findsOneWidget);
       expect(find.text('al-Umari'), findsNothing);
-      // Both languages are offered as switcher chips.
-      expect(find.text('اردو'), findsOneWidget); // chip (exact, not the body text)
+      // Both languages are offered as switcher chips (exact, not the body text).
+      expect(find.text('اردو'), findsOneWidget);
       expect(find.text('हिन्दी'), findsOneWidget);
     });
 
