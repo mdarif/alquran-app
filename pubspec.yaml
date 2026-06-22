@@ -50,9 +50,9 @@ dev_dependencies:
 patrol:
   app_name: Al Quran
   android:
-    package_name: com.almarfa.alquran
+    package_name: com.almarfa.al_quran
   ios:
-    bundle_id: com.almarfa.alquran
+    bundle_id: com.almarfa.alQuran
 
 # App launcher icon — اقرأ ("Read", the first revealed word) in the bundled
 # KFGQPC Uthmanic Hafs face, gold on deep green. Master art lives in
