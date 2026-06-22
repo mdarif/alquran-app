@@ -69,9 +69,11 @@ class _ReaderViewState extends State<_ReaderView> {
   // at the top.
   late int? _focusAyahId = widget.focusAyahId;
 
-  // Viewport preference (PRD lists Reading first), restored from settings.
-  late _Viewport _viewport =
-      _settings.detailed ? _Viewport.detailed : _Viewport.reading;
+  // Opening a surah always starts in Reading (Mushaf) view — the calm,
+  // Arabic-only default. The Detailed (translations) view is one tap away and
+  // stays selected while you read/swipe, but it is not remembered across a fresh
+  // open: every time you come in from the index you land in Reading.
+  _Viewport _viewport = _Viewport.reading;
 
   // Whether the inline text-size slider is revealed (toggled by the "Aa" button).
   bool _showFontSlider = false;
@@ -272,10 +274,12 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _setDetailed(bool detailed) {
+    // Session-only toggle: the choice holds while this reader is open (including
+    // across swipes) but is intentionally NOT persisted — a fresh open always
+    // starts in Reading view.
     setState(() {
       _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
     });
-    unawaited(_settings.setDetailed(detailed));
   }
 
   /// Slider: set the zoom to an absolute value and persist it.

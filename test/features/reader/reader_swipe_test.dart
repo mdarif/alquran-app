@@ -130,22 +130,23 @@ void main() {
     });
   });
 
-  group('Reader persisted preferences', () {
-    testWidgets('opens in Mushaf when the saved viewport is reading',
-        (tester) async {
+  group('Reader default viewport', () {
+    testWidgets('opens in Reading (Mushaf) view by default', (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
       expect(find.byType(MushafView), findsOneWidget);
     });
 
-    testWidgets('opens in Detailed when the saved viewport is detailed',
+    testWidgets('always opens in Reading view, even if detailed was last used',
         (tester) async {
+      // The viewport is no longer restored from settings — every fresh open
+      // (e.g. tapping a surah from the index) lands in Reading view.
       GetIt.I.unregister<ReaderSettingsRepository>();
       GetIt.I.registerLazySingleton<ReaderSettingsRepository>(
         () => _FakeSettings(detailed: true),
       );
 
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
-      expect(find.byType(MushafView), findsNothing); // Detailed list instead
+      expect(find.byType(MushafView), findsOneWidget);
     });
   });
 }
