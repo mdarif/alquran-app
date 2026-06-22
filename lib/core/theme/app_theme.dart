@@ -26,6 +26,15 @@ class AppTheme {
   // header). Playfair Display (SIL OFL). Swap here to change the heading face.
   static const String displayFontFamily = 'PlayfairDisplay';
 
+  /// Gold accent reserved for sacred ornamentation (the Bismillah, and any
+  /// future illuminated markers). Tuned per brightness for legibility: a deep
+  /// antique gold on the light cream (≈4.3:1), a bright gold on the dark ground
+  /// (≈11.5:1). Keep its use intentional — don't spread it across the UI.
+  static Color ornamentGold(Brightness brightness) =>
+      brightness == Brightness.dark
+          ? const Color(0xFFE6C76A)
+          : const Color(0xFF9C6F02);
+
   static ThemeData light() => _build(
         Brightness.light,
         const Color(0xFFFBF9F3), // warm off-white

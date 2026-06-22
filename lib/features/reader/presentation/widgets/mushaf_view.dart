@@ -504,7 +504,9 @@ class SurahHeaderCard extends StatelessWidget {
   }
 }
 
-/// Centred Basmala header rendered in the QPC face, scaled to the reading size.
+/// Centred Basmala header in the QPC face — the special recurring line, set
+/// apart from the verses: rendered in the reserved ornament gold and flanked by
+/// a small QPC star ornament (۞) on each side. Scales with the reading size.
 class Bismillah extends StatelessWidget {
   const Bismillah({required this.fontSize, super.key});
 
@@ -512,14 +514,34 @@ class Bismillah extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        _bismillah,
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.rtl,
-        locale: const Locale('ar'),
-        style: QuranTextStyle.madani.copyWith(fontSize: fontSize * 0.92),
+    final gold = AppTheme.ornamentGold(Theme.of(context).brightness);
+    final star = Text(
+      '۞',
+      style: QuranTextStyle.madani.copyWith(
+        fontSize: fontSize * 0.7,
+        color: gold,
       ),
+    );
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        star,
+        SizedBox(width: fontSize * 0.45),
+        Flexible(
+          child: Text(
+            _bismillah,
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            locale: const Locale('ar'),
+            style: QuranTextStyle.madani.copyWith(
+              fontSize: fontSize,
+              color: gold,
+            ),
+          ),
+        ),
+        SizedBox(width: fontSize * 0.45),
+        star,
+      ],
     );
   }
 }
