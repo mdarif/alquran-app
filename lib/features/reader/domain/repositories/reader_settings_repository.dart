@@ -11,9 +11,14 @@ abstract interface class ReaderSettingsRepository {
   /// card (e.g. 'ur'); null until the reader picks one (then seeded from locale).
   String? get peekTranslation;
 
+  /// Language codes the reader has chosen to show in Detailed view (e.g.
+  /// ['ur','en']); null means "show all available editions" (the default).
+  List<String>? get detailedTranslations;
+
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setPeekTranslation(String languageCode);
+  Future<void> setDetailedTranslations(List<String> languageCodes);
 
   static const double defaultFontSize = 28;
 }

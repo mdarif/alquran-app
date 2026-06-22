@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
@@ -669,20 +670,6 @@ class Bismillah extends StatelessWidget {
   }
 }
 
-/// Native display label for a translation language's switcher chip.
-String _peekChipLabel(String code) {
-  switch (code) {
-    case 'ur':
-      return 'اردو';
-    case 'hi':
-      return 'हिन्दी';
-    case 'en':
-      return 'English';
-    default:
-      return code.toUpperCase();
-  }
-}
-
 /// Bottom peek card shown when the reader taps a verse in Reading mode. It is
 /// translation-FIRST: the Arabic is not repeated (the tapped verse is already
 /// on the page and highlighted) — the card shows one translation at a time, with
@@ -801,7 +788,7 @@ class _MushafPeekCard extends StatelessWidget {
                             children: [
                               for (final r in available)
                                 _PeekLangChip(
-                                  label: _peekChipLabel(r.languageCode),
+                                  label: nativeLanguageName(r.languageCode),
                                   selected:
                                       shown?.languageCode == r.languageCode,
                                   onTap: () => onSelectLanguage(r.languageCode),

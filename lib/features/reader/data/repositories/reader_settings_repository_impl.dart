@@ -10,6 +10,7 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   static const String _kFontSize = 'reader_font_size';
   static const String _kDetailed = 'reader_detailed';
   static const String _kPeekLang = 'reader_peek_translation';
+  static const String _kDetailedLangs = 'reader_detailed_translations';
 
   @override
   double get fontSize =>
@@ -22,6 +23,10 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   String? get peekTranslation => _prefs.getString(_kPeekLang);
 
   @override
+  List<String>? get detailedTranslations =>
+      _prefs.getStringList(_kDetailedLangs);
+
+  @override
   Future<void> setFontSize(double value) => _prefs.setDouble(_kFontSize, value);
 
   @override
@@ -30,4 +35,8 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   @override
   Future<void> setPeekTranslation(String languageCode) =>
       _prefs.setString(_kPeekLang, languageCode);
+
+  @override
+  Future<void> setDetailedTranslations(List<String> languageCodes) =>
+      _prefs.setStringList(_kDetailedLangs, languageCodes);
 }

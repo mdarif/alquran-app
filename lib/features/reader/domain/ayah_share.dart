@@ -9,6 +9,15 @@ String languageName(String code) => switch (code) {
       _ => code.toUpperCase(),
     };
 
+/// Native-script label for a language code, for compact UI chips (the language
+/// switcher in the peek card and the Detailed-view translation filter).
+String nativeLanguageName(String code) => switch (code) {
+      'ur' => 'اردو',
+      'hi' => 'हिन्दी',
+      'en' => 'English',
+      _ => code.toUpperCase(),
+    };
+
 /// Builds clean, shareable/copyable text for a single ayah: the Arabic, each
 /// available translation, and a reference like "Al-Baqarah 2:1".
 String buildAyahShareText({

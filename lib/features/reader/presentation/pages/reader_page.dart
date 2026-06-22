@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
@@ -78,6 +79,13 @@ class _ReaderViewState extends State<_ReaderView> {
   // Whether the inline text-size slider is revealed (toggled by the "Aa" button).
   bool _showFontSlider = false;
 
+  // Whether the Detailed-view translation filter bar is revealed.
+  bool _showLangBar = false;
+
+  // Language codes shown in Detailed view; null = show all available editions.
+  // Restored from settings so the reader's focus choice survives restarts.
+  late Set<String>? _detailedLangs = _settings.detailedTranslations?.toSet();
+
   // Pinch + swipe are both handled through a raw Listener (not GestureDetector)
   // so they do NOT enter the gesture arena. This matters because SelectionArea
   // and the scroll view claim drags in the arena — a Listener still sees every
@@ -108,6 +116,14 @@ class _ReaderViewState extends State<_ReaderView> {
             ),
             onPressed: () => _setDetailed(isReading),
           ),
+          // Translations filter — only meaningful in Detailed view (Reading has
+          // no translations to filter). Reveals the language chip bar.
+          if (!isReading)
+            IconButton(
+              tooltip: 'Translations',
+              icon: const Icon(Icons.tune_rounded),
+              onPressed: _toggleLangBar,
+            ),
           // Text size: reveals the inline slider below the bar.
           IconButton(
             tooltip: 'Text size',
@@ -158,7 +174,7 @@ class _ReaderViewState extends State<_ReaderView> {
                   child: _DetailedList(
                     key: sectionKey,
                     ayahs: state.ayahs,
-                    resources: state.resources,
+                    resources: _detailedResources(state.resources),
                     headings: state.headings,
                     arabicFontSize: _arabicFont,
                     focusAyahId: _focusAyahId,
@@ -168,12 +184,15 @@ class _ReaderViewState extends State<_ReaderView> {
               },
             ),
           ),
-          // Tap-away barrier: dismiss the size slider by tapping the page.
-          if (_showFontSlider)
+          // Tap-away barrier: dismiss whichever bar is open by tapping the page.
+          if (_showFontSlider || _showLangBar)
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onTap: _hideFontSlider,
+                onTap: () {
+                  _hideFontSlider();
+                  _hideLangBar();
+                },
               ),
             ),
           // The inline text-size slider, anchored under the app bar.
@@ -189,6 +208,23 @@ class _ReaderViewState extends State<_ReaderView> {
               onChanged: _applyFont,
             ),
           ),
+          // The Detailed-view translation filter bar, anchored under the app bar.
+          if (!isReading)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: BlocBuilder<ReaderCubit, ReaderState>(
+                buildWhen: (a, b) => a.resources != b.resources,
+                builder: (context, state) => _LangFilterBar(
+                  visible: _showLangBar,
+                  resources: state.resources,
+                  enabled: _enabledDetailedLangs(state.resources),
+                  onToggle: (code) =>
+                      _toggleDetailedLang(code, state.resources),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -269,11 +305,22 @@ class _ReaderViewState extends State<_ReaderView> {
 
   // --------------------------------------------------------------------------
 
-  void _toggleFontSlider() =>
-      setState(() => _showFontSlider = !_showFontSlider);
+  void _toggleFontSlider() => setState(() {
+        _showFontSlider = !_showFontSlider;
+        if (_showFontSlider) _showLangBar = false; // one bar at a time
+      });
 
   void _hideFontSlider() {
     if (_showFontSlider) setState(() => _showFontSlider = false);
+  }
+
+  void _toggleLangBar() => setState(() {
+        _showLangBar = !_showLangBar;
+        if (_showLangBar) _showFontSlider = false; // one bar at a time
+      });
+
+  void _hideLangBar() {
+    if (_showLangBar) setState(() => _showLangBar = false);
   }
 
   void _setDetailed(bool detailed) {
@@ -282,7 +329,41 @@ class _ReaderViewState extends State<_ReaderView> {
     // starts in Reading view.
     setState(() {
       _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
+      if (!detailed) _showLangBar = false; // the filter is Detailed-only
     });
+  }
+
+  /// The set of translation languages currently shown in Detailed view — the
+  /// saved selection, or all available editions when nothing is saved.
+  Set<String> _enabledDetailedLangs(List<TranslationResource> all) =>
+      _detailedLangs ?? {for (final r in all) r.languageCode};
+
+  /// Detailed-view resources after applying the language filter. Never empty:
+  /// if a stale saved selection matches nothing available, fall back to all.
+  List<TranslationResource> _detailedResources(
+    List<TranslationResource> all,
+  ) {
+    final enabled = _detailedLangs;
+    if (enabled == null) return all;
+    final filtered = [
+      for (final r in all)
+        if (enabled.contains(r.languageCode)) r,
+    ];
+    return filtered.isEmpty ? all : filtered;
+  }
+
+  /// Toggle a language in the Detailed-view filter, keeping at least one on, and
+  /// persist the choice.
+  void _toggleDetailedLang(String code, List<TranslationResource> all) {
+    final current = {..._enabledDetailedLangs(all)};
+    if (current.contains(code)) {
+      if (current.length <= 1) return; // never hide the last translation
+      current.remove(code);
+    } else {
+      current.add(code);
+    }
+    setState(() => _detailedLangs = current);
+    unawaited(_settings.setDetailedTranslations(current.toList()));
   }
 
   /// Slider: set the zoom to an absolute value and persist it.
@@ -591,6 +672,111 @@ class _FontSizeBar extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Detailed-view translation filter: a slim bar of language chips that slides
+/// down under the app bar. Tap a chip to show/hide that edition; at least one
+/// always stays on. Mirrors [_FontSizeBar]'s slide/fade so the two bars feel
+/// like one control surface. The parent anchors it at the top of the Stack.
+class _LangFilterBar extends StatelessWidget {
+  const _LangFilterBar({
+    required this.visible,
+    required this.resources,
+    required this.enabled,
+    required this.onToggle,
+  });
+
+  final bool visible;
+  final List<TranslationResource> resources;
+  final Set<String> enabled;
+  final ValueChanged<String> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedSlide(
+        offset: visible ? Offset.zero : const Offset(0, -1),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 160),
+          child: Material(
+            color: theme.colorScheme.surface,
+            elevation: 3,
+            shadowColor: Colors.black.withValues(alpha: 0.2),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final r in resources)
+                    _LangChip(
+                      label: nativeLanguageName(r.languageCode),
+                      selected: enabled.contains(r.languageCode),
+                      onTap: () => onToggle(r.languageCode),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A toggleable language pill in the Detailed-view filter bar.
+class _LangChip extends StatelessWidget {
+  const _LangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = selected ? cs.onPrimary : cs.onSurfaceVariant;
+    return Material(
+      color: selected ? cs.primary : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? Icons.check_rounded : Icons.add_rounded,
+                size: 15,
+                color: fg,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+            ],
           ),
         ),
       ),
