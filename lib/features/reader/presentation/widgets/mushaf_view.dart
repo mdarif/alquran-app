@@ -134,7 +134,28 @@ class _MushafViewState extends State<MushafView>
     if (widget.ayahs != old.ayahs) {
       _groupKeys.clear();
       _buildOffsets();
+    } else if (widget.arabicFontSize != old.arabicFontSize) {
+      // A font-size change reflows the text but the ScrollController keeps the
+      // same pixel offset, so the reading position would drift to an earlier
+      // verse (and corrupt "Last Read"). Capture the verse at the top NOW (the
+      // render objects still hold the pre-change layout) and re-anchor to it
+      // once the new layout is in.
+      final anchor = _topmostAyah();
+      if (anchor != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _anchorTo(anchor);
+        });
+      }
     }
+  }
+
+  /// Keep [ayah] at the top of the viewport after a relayout (font-size change),
+  /// and refresh "Last Read" to it so the resume point doesn't drift.
+  void _anchorTo(Ayah ayah) {
+    final target = _offsetForAyahTop(ayah.id);
+    if (target == null) return;
+    _controller.jumpTo(target);
+    widget.onVisibleAyah?.call(ayah);
   }
 
   @override
@@ -260,12 +281,12 @@ class _MushafViewState extends State<MushafView>
     });
   }
 
-  /// Finds the verse whose start sits at/above the viewport top and reports it.
-  void _reportTopmost() {
-    final onVisible = widget.onVisibleAyah;
-    if (onVisible == null) return;
+  /// The verse currently at the top of the viewport (the one being read), or
+  /// null if it can't be determined yet. Walks the laid-out paragraphs and
+  /// returns the last verse whose top has scrolled to/above the viewport top.
+  Ayah? _topmostAyah() {
     final viewport = context.findRenderObject();
-    if (viewport is! RenderBox || !viewport.attached) return;
+    if (viewport is! RenderBox || !viewport.attached) return null;
     final viewportTop = viewport.localToGlobal(Offset.zero).dy;
     Ayah? current;
     outer:
@@ -278,10 +299,7 @@ class _MushafViewState extends State<MushafView>
       for (final ayah in group) {
         final offset = _verseStart[ayah.id] ?? 0;
         final boxes = obj.getBoxesForSelection(
-          TextSelection(
-            baseOffset: offset,
-            extentOffset: offset + 1,
-          ),
+          TextSelection(baseOffset: offset, extentOffset: offset + 1),
         );
         if (boxes.isEmpty) continue;
         if (groupGlobalY + boxes.first.top <= viewportTop + 12) {
@@ -291,7 +309,39 @@ class _MushafViewState extends State<MushafView>
         }
       }
     }
-    onVisible(current ?? widget.ayahs.first);
+    return current;
+  }
+
+  /// Reports the topmost verse (drives "Last Read") on scroll-idle.
+  void _reportTopmost() {
+    final onVisible = widget.onVisibleAyah;
+    if (onVisible == null) return;
+    onVisible(_topmostAyah() ?? widget.ayahs.first);
+  }
+
+  /// Scroll offset that puts [ayahId]'s top just under the viewport top, using
+  /// the CURRENT layout. Null if it can't be located.
+  double? _offsetForAyahTop(int ayahId) {
+    if (!_controller.hasClients) return null;
+    final surahId = widget.ayahs
+        .firstWhere((a) => a.id == ayahId, orElse: () => widget.ayahs.first)
+        .surahId;
+    final obj = _groupKeys[surahId]?.currentContext?.findRenderObject();
+    if (obj is! RenderParagraph || !obj.attached) return null;
+    final offset = _verseStart[ayahId] ?? 0;
+    final boxes = obj.getBoxesForSelection(
+      TextSelection(baseOffset: offset, extentOffset: offset + 1),
+    );
+    if (boxes.isEmpty) return null;
+    final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
+    final viewportGlobalY = (context.findRenderObject()! as RenderBox)
+        .localToGlobal(Offset.zero)
+        .dy;
+    return (_controller.offset +
+            (groupGlobalY - viewportGlobalY) +
+            boxes.first.top -
+            16)
+        .clamp(0.0, _controller.position.maxScrollExtent);
   }
 
   @override

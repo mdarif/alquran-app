@@ -414,6 +414,64 @@ void main() {
 
   // -------------------------------------------------------------------------
 
+  group('MushafView — font-size re-anchor (Last Read)', () {
+    testWidgets('changing font size does not drift the reading position back',
+        (tester) async {
+      final reported = <int>[];
+      var fontSize = 24.0;
+      late StateSetter setOuter;
+      // One list instance reused across rebuilds — mirrors the app (the cubit
+      // hands back the same ayahs on a font change, so only the size differs).
+      final ayahs = _ayahs(2, 60);
+
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: ayahs,
+                headings: _headings(2, 'Al-Baqarah', 286),
+                arabicFontSize: fontSize,
+                resources: const [],
+                onVisibleAyah: (a) => reported.add(a.ayahNumber),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Scroll well into the surah and let the resume-point report fire.
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -1500),
+      );
+      await tester.pump(const Duration(seconds: 2));
+      expect(reported, isNotEmpty);
+      final before = reported.last;
+      expect(before, greaterThan(1)); // genuinely scrolled past verse 1
+
+      // Enlarge the font — without re-anchoring, the same pixel offset would now
+      // sit at an earlier verse, so a subsequent report would drift backwards.
+      setOuter(() => fontSize = 44);
+      await tester.pump(); // didUpdateWidget + relayout
+      await tester.pump(); // post-frame re-anchor
+
+      // Re-trigger a report from the (re-anchored) position: it must not have
+      // drifted to an earlier verse than before the font change.
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -40),
+      );
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(reported.last, greaterThanOrEqualTo(before));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
   group('groupAyahsBySurah', () {
     test('single surah → one group', () {
       final groups = groupAyahsBySurah(_ayahs(2, 5));
