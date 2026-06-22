@@ -79,6 +79,12 @@ class _ReaderViewState extends State<_ReaderView> {
   final ReaderSettingsRepository _settings =
       GetIt.I<ReaderSettingsRepository>();
 
+  // Cached so it can be used without a context lookup — notably from
+  // _onVisibleAyah, which the Detailed list invokes from its dispose() (a
+  // resume-point flush). An ancestor lookup there is illegal ("deactivated
+  // widget's ancestor is unsafe"), so we hold the reference instead.
+  late final ReaderCubit _cubit;
+
   late double _arabicFont = _settings.fontSize.clamp(_minFont, _maxFont);
 
   // The currently displayed section. Swiping moves it to an adjacent section
@@ -127,11 +133,10 @@ class _ReaderViewState extends State<_ReaderView> {
   @override
   void initState() {
     super.initState();
+    _cubit = context.read<ReaderCubit>();
     // Tell the cubit which viewport we opened in, so Last Read records it (this
     // runs before the cubit's first progress save, which is async).
-    context
-        .read<ReaderCubit>()
-        .setViewportDetailed(_viewport == _Viewport.detailed);
+    _cubit.setViewportDetailed(_viewport == _Viewport.detailed);
   }
 
   @override
@@ -247,7 +252,7 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _goToAdjacent(int delta) {
-    final cubit = context.read<ReaderCubit>();
+    final cubit = _cubit;
     final next = adjacentTarget(_target, delta, cubit.state.headings);
     if (next == null) return; // at the first/last section — no wrap-around
     setState(() {
@@ -259,8 +264,16 @@ class _ReaderViewState extends State<_ReaderView> {
 
   /// The viewport reports its topmost-visible verse (on scroll-idle); record it
   /// so "Last Read" resumes exactly here.
-  void _onVisibleAyah(Ayah ayah) =>
-      context.read<ReaderCubit>().saveProgress(ayah);
+  void _onVisibleAyah(Ayah ayah) {
+    // Advance the resume target to the live position. This is what the *next*
+    // viewport built (on a Reading⇄Detailed toggle) homes to — so a toggle keeps
+    // your place instead of snapping back to the original open/resume verse.
+    // Deliberately no setState: the value is only read when a build next runs,
+    // and re-passing it to the current viewport is inert (focus-scroll runs only
+    // in initState), so this never re-homes the view you're already reading.
+    _focusAyahId = ayah.id;
+    _cubit.saveProgress(ayah);
+  }
 
   // --- Pinch-to-zoom (two-finger) + swipe (one-finger) ----------------------
 
@@ -336,7 +349,7 @@ class _ReaderViewState extends State<_ReaderView> {
     setState(() {
       _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
     });
-    context.read<ReaderCubit>().setViewportDetailed(detailed);
+    _cubit.setViewportDetailed(detailed);
   }
 
   /// The reader's active translation editions — shared by the Reading peek and
@@ -467,6 +480,11 @@ class _DetailedListState extends State<_DetailedList> {
 
   @override
   void dispose() {
+    // Flush the resume point before tearing down: a pending debounce timer is
+    // about to be cancelled, so without this a quick pop (back-button mid-scroll,
+    // within the 400ms window) would lose the final position and Last Read would
+    // resume at a stale earlier verse.
+    _reportTopmost();
     _reportTimer?.cancel();
     _highlightTimer?.cancel();
     _positions.itemPositions.removeListener(_onPositions);
