@@ -414,6 +414,40 @@ void main() {
 
   // -------------------------------------------------------------------------
 
+  group('MushafView — resume-point reporting (Last Read)', () {
+    testWidgets('reports the topmost verse as soon as scrolling settles',
+        (tester) async {
+      // Guards the bug where the resume point only updated on a 1200ms idle
+      // timer, so leaving right after scrolling saved a much earlier verse.
+      final reported = <int>[];
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahs(2, 60),
+            headings: _headings(2, 'Al-Baqarah', 286),
+            arabicFontSize: 24,
+            resources: const [],
+            onVisibleAyah: (a) => reported.add(a.ayahNumber),
+          ),
+        ),
+      );
+      await tester.pump();
+      reported.clear();
+
+      // Drag to scroll, then pump just one frame (NO 1200ms wait): the report
+      // must already have fired on the scroll-end notification.
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -1500),
+      );
+      await tester.pump();
+
+      expect(reported, isNotEmpty);
+      // Tracked the scroll, not stuck at verse 1.
+      expect(reported.last, greaterThan(1));
+    });
+  });
+
   group('MushafView — font-size re-anchor (Last Read)', () {
     testWidgets('changing font size does not drift the reading position back',
         (tester) async {

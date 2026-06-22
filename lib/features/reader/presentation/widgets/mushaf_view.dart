@@ -57,7 +57,8 @@ class MushafView extends StatefulWidget {
   /// Global ayah id to scroll to on open (Last Read resume); null starts at top.
   final int? focusAyahId;
 
-  /// Reports the topmost-visible verse as the user scrolls (debounced).
+  /// Reports the topmost-visible verse when scrolling settles (drives "Last
+  /// Read"), so the resume point reflects where the reader actually stopped.
   final ValueChanged<Ayah>? onVisibleAyah;
 
   /// The reader's selected translation editions (shared with Detailed view).
@@ -349,83 +350,94 @@ class _MushafViewState extends State<MushafView>
     final fontSize = widget.arabicFontSize;
     return Stack(
       children: [
-        // SizedBox.expand forces the inner Stack to fill the full Scaffold body
-        // even when the surah content is shorter than the screen (e.g. Al-Fatihah).
-        // Without it the Stack sizes to the ScrollView's content height, so
-        // Positioned(bottom:0) would anchor to that short height instead of the
-        // real screen bottom — causing the peek card to appear partially on-screen
-        // after dismissal on short surahs.
-        SizedBox.expand(
-          child: SingleChildScrollView(
-            controller: _controller,
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final group in groupAyahsBySurah(widget.ayahs)) ...[
-                  SurahHeaderCard(
-                    heading: widget.headings[group.first.surahId],
-                    fallbackNumber: group.first.surahId,
-                    fontSize: fontSize,
-                  ),
-                  const SizedBox(height: 12),
-                  if (_showBismillah(group)) ...[
-                    Bismillah(fontSize: fontSize),
-                    const SizedBox(height: 18),
-                  ],
-                  // One Text.rich per surah group → continuous inline flow. After
-                  // each verse we append its number as Arabic-Indic digits: in
-                  // KFGQPC UthmanicHafs1B the font's GSUB composes those digits into
-                  // the ornate end-of-ayah rosette with the NUMBER INSIDE it. It is
-                  // all real text, so it orders correctly in RTL and reflows/zooms
-                  // natively — no U+06DD (that adds a second empty circle), no
-                  // WidgetSpan/placeholder (those bidi-reverse) and no overlay
-                  // (invisible on-device). The number span keeps the surah text's
-                  // font (only the colour differs) so the substitution still fires.
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: (d) => _onGroupTap(d, group),
-                    child: Text.rich(
-                      key: _groupKeyFor(group.first.surahId),
-                      TextSpan(
-                        children: [
-                          for (final ayah in group) ...[
-                            TextSpan(
-                              text: ayah.textArabic,
-                              style: (_highlightAyahId == ayah.id ||
-                                      _selectedAyah?.id == ayah.id)
-                                  ? TextStyle(
-                                      backgroundColor: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withValues(alpha: 0.16),
-                                    )
-                                  : null,
-                            ),
-                            TextSpan(
-                              text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
+        // Record the resume point the moment scrolling settles (finger release /
+        // fling end) — reliable and immediate, so leaving right after scrolling
+        // still saves where you actually are. (The 1200ms timer below only drives
+        // the page pill; on its own it loses the final position when you pop the
+        // route before it fires.)
+        NotificationListener<ScrollEndNotification>(
+          onNotification: (_) {
+            _reportTopmost();
+            return false;
+          },
+          // SizedBox.expand forces the inner Stack to fill the full Scaffold body
+          // even when the surah content is shorter than the screen (e.g. Al-Fatihah).
+          // Without it the Stack sizes to the ScrollView's content height, so
+          // Positioned(bottom:0) would anchor to that short height instead of the
+          // real screen bottom — causing the peek card to appear partially on-screen
+          // after dismissal on short surahs.
+          child: SizedBox.expand(
+            child: SingleChildScrollView(
+              controller: _controller,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final group in groupAyahsBySurah(widget.ayahs)) ...[
+                    SurahHeaderCard(
+                      heading: widget.headings[group.first.surahId],
+                      fallbackNumber: group.first.surahId,
+                      fontSize: fontSize,
+                    ),
+                    const SizedBox(height: 12),
+                    if (_showBismillah(group)) ...[
+                      Bismillah(fontSize: fontSize),
+                      const SizedBox(height: 18),
+                    ],
+                    // One Text.rich per surah group → continuous inline flow. After
+                    // each verse we append its number as Arabic-Indic digits: in
+                    // KFGQPC UthmanicHafs1B the font's GSUB composes those digits into
+                    // the ornate end-of-ayah rosette with the NUMBER INSIDE it. It is
+                    // all real text, so it orders correctly in RTL and reflows/zooms
+                    // natively — no U+06DD (that adds a second empty circle), no
+                    // WidgetSpan/placeholder (those bidi-reverse) and no overlay
+                    // (invisible on-device). The number span keeps the surah text's
+                    // font (only the colour differs) so the substitution still fires.
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (d) => _onGroupTap(d, group),
+                      child: Text.rich(
+                        key: _groupKeyFor(group.first.surahId),
+                        TextSpan(
+                          children: [
+                            for (final ayah in group) ...[
+                              TextSpan(
+                                text: ayah.textArabic,
+                                style: (_highlightAyahId == ayah.id ||
+                                        _selectedAyah?.id == ayah.id)
+                                    ? TextStyle(
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.16),
+                                      )
+                                    : null,
                               ),
-                            ),
+                              TextSpan(
+                                text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.rtl,
-                      locale: const Locale('ar'),
-                      style: QuranTextStyle.madani.copyWith(
-                        fontSize: fontSize,
-                        height: 1.9,
+                        ),
+                        textAlign: TextAlign.center,
+                        textDirection: TextDirection.rtl,
+                        locale: const Locale('ar'),
+                        style: QuranTextStyle.madani.copyWith(
+                          fontSize: fontSize,
+                          height: 1.9,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 28),
+                    const SizedBox(height: 28),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ), // SizedBox.expand
+          ), // SizedBox.expand
+        ), // NotificationListener
         if (_currentPage != null)
           Positioned(
             left: 0,
