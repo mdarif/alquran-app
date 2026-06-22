@@ -58,8 +58,20 @@ mangles Arabic. Use `TextAlign.start`/`center` with `textDirection: rtl`.
 
 ### Adopt the matched text+font PAIR — stop hand-fixing Arabic data (2026-06-21)
 
-> **This is the current approach. Bug 2 below (tatweel-grafting) and the
-> mark-stripping in §2 are SUPERSEDED — kept only as the record of why.**
+> **CORRECTION (2026-06-22): the "drop grafting" decision below was WRONG.**
+> Adopting the matched text+font pair was right, but the claim that the *bare*
+> golden text renders madd correctly held only in HarfBuzz/freetype (and the
+> quran.com web reader) — **NOT in Flutter on-device**, where the zero-width
+> superscript-alef+maddah loses its GPOS anchor and detaches/floats (in BOTH
+> Impeller and Skia; confirmed `flutter clean` + `--no-enable-impeller` still
+> broken). **Tatweel-carrier grafting (Bug 2) is REQUIRED and has been
+> re-instated** in `alquran-data/pipeline/build_db.py` (`graft_tatweel_carriers`,
+> driven by the `tatweel_reference` key in `sources.yaml`): it grafts the
+> canonical kashidas onto the golden text at build time (535 → 1652, letters
+> unchanged), and `verify_db.py` guards the 1652 count + an Al-Maidah 5:1 canary.
+> Mark-stripping (§2) stays superseded. The mark-anchoring `mark`/`mkmk`/`ccmp`
+> font features did NOT help (they're HarfBuzz defaults already applied) — only
+> the carriers fix it.
 
 The madd/tanween/mark hacks all came from the same mistake: **pairing a text source
 with a font it wasn't authored for.** github.com/quran (quran.com / quran-ios) has no
@@ -67,14 +79,16 @@ secret dataset — it ships the QPC Hafs text **`quran.ar.uthmani.v2.db`**
 (`quran/quran-ios` → `Domain/QuranResources/Databases`) rendered with a matched KFGQPC
 HAFS font (quran-ios uses the Bold `UthmanicHafs1B Ver13`; **we ship the Regular cut
 `UthmanicHafs1 Ver18`** from quran.com web — lighter and no iOS weight-fallback, see
-the font-weight gotcha below). Because text and font are co-designed, the bare QPC
-encoding renders correctly: madd `يَٰٓأَيُّهَا` is bare
-`U+0670 U+0653` (NO grafted tatweel — golden has only ~494 tatweels vs our 1327), and
-U+06ED tanween marks are kept (98×), not stripped. We now **ingest that text verbatim**
-(`config/sources.yaml` → `arabic_uthmani` points at `quran.ar.uthmani.v2.db`, table
-`arabic_text`); `prepare_sources.py` only builds `structure.sqlite` metadata;
-`convert_ghanem.py` is deleted. **Rule: don't transform Quran text to suit a font —
-use the font the text was made for.** Bismillah is already a separate header in the
+the font-weight gotcha below). Text and font are co-designed for letters/shaping —
+BUT (see the 2026-06-22 correction above) the golden text ships madd `يَٰٓأَيُّهَا`
+**bare** (`U+0670 U+0653`, only 535 tatweels) and Flutter does NOT anchor those
+bare marks on-device. So we graft the canonical tatweel carriers back on at build
+time: `config/sources.yaml` → `arabic_uthmani` reads `quran.ar.uthmani.v2.db` and
+adds a `tatweel_reference: sources/quran-uthmani-tanzil.json`; `build_db.py`'s
+`graft_tatweel_carriers` diffs the two and copies ONLY the pure-tatweel runs
+(535 → 1652, letters/spacing untouched). U+06ED tanween marks are kept (98×), not stripped.
+`convert_ghanem.py` is deleted. **Rule: use the font the text was made for — and on
+Flutter, give zero-width superscript marks a tatweel carrier or they detach.** Bismillah is already a separate header in the
 golden text (not bundled in each surah's ayah 1) and ayahs carry no trailing
 number glyph, so even the strips are unnecessary. The golden text uses the QPC
 **shadda-before-vowel** combining order (`U+0651 U+064E`, NOT NFC-canonical) — do not
