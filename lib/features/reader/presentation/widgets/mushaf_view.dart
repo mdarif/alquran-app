@@ -291,7 +291,7 @@ class _MushafViewState extends State<MushafView> {
                   locale: const Locale('ar'),
                   style: QuranTextStyle.madani.copyWith(
                     fontSize: fontSize,
-                    height: 2.1,
+                    height: 1.9,
                   ),
                 ),
                 const SizedBox(height: 28),
