@@ -122,31 +122,35 @@ class _ReaderViewState extends State<_ReaderView> {
             onPointerMove: _onPointerMove,
             onPointerUp: _onPointerEnd,
             onPointerCancel: _onPointerEnd,
-            child: SelectionArea(
-              child: BlocBuilder<ReaderCubit, ReaderState>(
-                builder: (context, state) {
-                  if (state.status == ReaderStatus.error) {
-                    return Center(child: Text(state.error ?? 'Failed to load'));
-                  }
-                  // Keep showing the previous section while the next one loads
-                  // (no spinner flash on swipe); spinner only before first load.
-                  if (state.ayahs.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  // Key by the section's first ayah so a new section starts at the
-                  // top, while a same-section rebuild preserves scroll position.
-                  final sectionKey = ValueKey(state.ayahs.first.id);
-                  if (isReading) {
-                    return MushafView(
-                      key: sectionKey,
-                      ayahs: state.ayahs,
-                      headings: state.headings,
-                      arabicFontSize: _arabicFont,
-                      focusAyahId: _focusAyahId,
-                      onVisibleAyah: _onVisibleAyah,
-                    );
-                  }
-                  return _DetailedList(
+            child: BlocBuilder<ReaderCubit, ReaderState>(
+              builder: (context, state) {
+                if (state.status == ReaderStatus.error) {
+                  return Center(child: Text(state.error ?? 'Failed to load'));
+                }
+                // Keep showing the previous section while the next one loads
+                // (no spinner flash on swipe); spinner only before first load.
+                if (state.ayahs.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                // Key by the section's first ayah so a new section starts at the
+                // top, while a same-section rebuild preserves scroll position.
+                final sectionKey = ValueKey(state.ayahs.first.id);
+                if (isReading) {
+                  // No SelectionArea in Reading mode — it competes in the gesture
+                  // arena and swallows the taps needed for tap-to-peek translation.
+                  return MushafView(
+                    key: sectionKey,
+                    ayahs: state.ayahs,
+                    headings: state.headings,
+                    arabicFontSize: _arabicFont,
+                    resources: state.resources,
+                    focusAyahId: _focusAyahId,
+                    onVisibleAyah: _onVisibleAyah,
+                  );
+                }
+                // SelectionArea only in Detailed mode where copy/share is useful.
+                return SelectionArea(
+                  child: _DetailedList(
                     key: sectionKey,
                     ayahs: state.ayahs,
                     resources: state.resources,
@@ -154,9 +158,9 @@ class _ReaderViewState extends State<_ReaderView> {
                     arabicFontSize: _arabicFont,
                     focusAyahId: _focusAyahId,
                     onVisibleAyah: _onVisibleAyah,
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
           // Tap-away barrier: dismiss the size slider by tapping the page.

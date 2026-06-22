@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
+import '../../domain/entities/translation_resource.dart';
 import '../../domain/reader_navigation.dart';
 import 'scroll_to_top_button.dart';
 
@@ -39,6 +40,7 @@ class MushafView extends StatefulWidget {
     required this.ayahs,
     required this.headings,
     required this.arabicFontSize,
+    required this.resources,
     this.focusAyahId,
     this.onVisibleAyah,
     super.key,
@@ -47,6 +49,7 @@ class MushafView extends StatefulWidget {
   final List<Ayah> ayahs;
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
+  final List<TranslationResource> resources;
 
   /// Global ayah id to scroll to on open (Last Read resume); null starts at top.
   final int? focusAyahId;
@@ -58,11 +61,18 @@ class MushafView extends StatefulWidget {
   State<MushafView> createState() => _MushafViewState();
 }
 
-class _MushafViewState extends State<MushafView> {
+class _MushafViewState extends State<MushafView>
+    with SingleTickerProviderStateMixin {
   final ScrollController _controller = ScrollController();
   Timer? _hideTimer;
   Timer? _highlightTimer;
   int? _highlightAyahId;
+
+  // Tap-to-peek translation card.
+  Ayah? _selectedAyah; // highlighted verse (null = none)
+  Ayah? _shownAyah; // kept during slide-out so card doesn't blink
+  late final AnimationController _peekCtrl;
+  late final Animation<Offset> _peekSlide;
 
   int? _currentPage;
   bool _showPage = false;
@@ -83,6 +93,22 @@ class _MushafViewState extends State<MushafView> {
   @override
   void initState() {
     super.initState();
+    _peekCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    _peekSlide =
+        Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(
+      CurvedAnimation(parent: _peekCtrl, curve: Curves.easeOutCubic),
+    );
+    // Once the slide-out animation fully completes, drop the displayed ayah
+    // so the card returns SizedBox.shrink() — guaranteeing it's truly
+    // invisible rather than relying solely on translation + clipping.
+    _peekCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && mounted) {
+        setState(() => _shownAyah = null);
+      }
+    });
     _buildOffsets();
     _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
     _controller.addListener(_onScroll);
@@ -106,7 +132,35 @@ class _MushafViewState extends State<MushafView> {
     _hideTimer?.cancel();
     _highlightTimer?.cancel();
     _controller.dispose();
+    _peekCtrl.dispose();
     super.dispose();
+  }
+
+  void _onGroupTap(TapUpDetails details, List<Ayah> group) {
+    final key = _groupKeys[group.first.surahId];
+    final ro = key?.currentContext?.findRenderObject();
+    if (ro is! RenderParagraph) return;
+    final localPos = ro.globalToLocal(details.globalPosition);
+    final charOffset = ro.getPositionForOffset(localPos).offset;
+    Ayah? tapped;
+    for (final ayah in group) {
+      if (charOffset >= (_verseStart[ayah.id] ?? 0)) tapped = ayah;
+    }
+    if (tapped == null) return;
+    if (_selectedAyah?.id == tapped.id) {
+      _dismissPeek();
+      return;
+    }
+    setState(() {
+      _selectedAyah = tapped;
+      _shownAyah = tapped;
+    });
+    _peekCtrl.forward();
+  }
+
+  void _dismissPeek() {
+    setState(() => _selectedAyah = null);
+    _peekCtrl.reverse();
   }
 
   /// Pre-computes each ayah's character offset within its surah group paragraph
@@ -235,10 +289,17 @@ class _MushafViewState extends State<MushafView> {
     final fontSize = widget.arabicFontSize;
     return Stack(
       children: [
-        SingleChildScrollView(
-          controller: _controller,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
-          child: Column(
+        // SizedBox.expand forces the inner Stack to fill the full Scaffold body
+        // even when the surah content is shorter than the screen (e.g. Al-Fatihah).
+        // Without it the Stack sizes to the ScrollView's content height, so
+        // Positioned(bottom:0) would anchor to that short height instead of the
+        // real screen bottom — causing the peek card to appear partially on-screen
+        // after dismissal on short surahs.
+        SizedBox.expand(
+          child: SingleChildScrollView(
+            controller: _controller,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final group in groupAyahsBySurah(widget.ayahs)) ...[
@@ -261,37 +322,42 @@ class _MushafViewState extends State<MushafView> {
                 // WidgetSpan/placeholder (those bidi-reverse) and no overlay
                 // (invisible on-device). The number span keeps the surah text's
                 // font (only the colour differs) so the substitution still fires.
-                Text.rich(
-                  key: _groupKeyFor(group.first.surahId),
-                  TextSpan(
-                    children: [
-                      for (final ayah in group) ...[
-                        TextSpan(
-                          text: ayah.textArabic,
-                          style: _highlightAyahId == ayah.id
-                              ? TextStyle(
-                                  backgroundColor: Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.16),
-                                )
-                              : null,
-                        ),
-                        TextSpan(
-                          text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (d) => _onGroupTap(d, group),
+                  child: Text.rich(
+                    key: _groupKeyFor(group.first.surahId),
+                    TextSpan(
+                      children: [
+                        for (final ayah in group) ...[
+                          TextSpan(
+                            text: ayah.textArabic,
+                            style: (_highlightAyahId == ayah.id ||
+                                    _selectedAyah?.id == ayah.id)
+                                ? TextStyle(
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withValues(alpha: 0.16),
+                                  )
+                                : null,
                           ),
-                        ),
+                          TextSpan(
+                            text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                  textDirection: TextDirection.rtl,
-                  locale: const Locale('ar'),
-                  style: QuranTextStyle.madani.copyWith(
-                    fontSize: fontSize,
-                    height: 1.9,
+                    ),
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.rtl,
+                    locale: const Locale('ar'),
+                    style: QuranTextStyle.madani.copyWith(
+                      fontSize: fontSize,
+                      height: 1.9,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -299,6 +365,7 @@ class _MushafViewState extends State<MushafView> {
             ],
           ),
         ),
+        ), // SizedBox.expand
         if (_currentPage != null)
           Positioned(
             left: 0,
@@ -316,6 +383,24 @@ class _MushafViewState extends State<MushafView> {
           child: ScrollToTopButton(
             visible: _showTop,
             onPressed: _scrollToTop,
+          ),
+        ),
+        // Tap-to-peek translation card — always in the tree so it can animate.
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SlideTransition(
+            position: _peekSlide,
+            child: IgnorePointer(
+              ignoring: _selectedAyah == null,
+              child: _MushafPeekCard(
+                ayah: _shownAyah,
+                resources: widget.resources,
+                fontSize: fontSize,
+                onDismiss: _dismissPeek,
+              ),
+            ),
           ),
         ),
       ],
@@ -542,6 +627,140 @@ class Bismillah extends StatelessWidget {
         SizedBox(width: fontSize * 0.45),
         star,
       ],
+    );
+  }
+}
+
+String _languageLabel(String code) {
+  switch (code) {
+    case 'ur':
+      return 'Urdu';
+    case 'hi':
+      return 'Hindi';
+    case 'en':
+      return 'English';
+    default:
+      return code.toUpperCase();
+  }
+}
+
+/// Bottom peek card shown when the reader taps a verse in Reading mode.
+/// Slides up from the bottom; swipe down or tap the handle to dismiss.
+class _MushafPeekCard extends StatelessWidget {
+  const _MushafPeekCard({
+    required this.ayah,
+    required this.resources,
+    required this.fontSize,
+    required this.onDismiss,
+  });
+
+  final Ayah? ayah;
+  final List<TranslationResource> resources;
+  final double fontSize;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final current = ayah;
+    if (current == null) return const SizedBox.shrink();
+    final maxH = MediaQuery.of(context).size.height * 0.6;
+    final translationSize =
+        (theme.textTheme.bodyLarge?.fontSize ?? 16) * (fontSize / 28.0);
+
+    return Material(
+      color: cs.surface,
+      elevation: 12,
+      shadowColor: Colors.black.withValues(alpha: 0.3),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle — tap or swipe-down to dismiss. Separate from the
+            // content area so its GestureDetector wins the arena cleanly.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onDismiss,
+              onVerticalDragEnd: (d) {
+                if ((d.primaryVelocity ?? 0) > 300) onDismiss();
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Content — ListView(shrinkWrap) hugs its own content height so
+            // there's no blank gap at small font sizes, while still scrolling
+            // when translations are long. Swallow taps to prevent bleed-through.
+            GestureDetector(
+              onTap: () {},
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxH),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
+                  children: [
+                    Text(
+                      'Ayah ${current.ayahNumber}',
+                      style:
+                          theme.textTheme.labelLarge?.copyWith(color: cs.primary),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      current.textArabic,
+                      textAlign: TextAlign.right,
+                      textDirection: TextDirection.rtl,
+                      locale: const Locale('ar'),
+                      style:
+                          QuranTextStyle.madani.copyWith(fontSize: fontSize * 0.77),
+                    ),
+                    for (final r in resources)
+                      if (current.translations[r.id] != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          '${_languageLabel(r.languageCode)} · ${r.attribution}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          current.translations[r.id]!,
+                          textAlign: r.languageCode == 'ur'
+                              ? TextAlign.right
+                              : TextAlign.left,
+                          textDirection: r.languageCode == 'ur'
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          locale: Locale(r.languageCode),
+                          style: r.languageCode.scriptStyle(
+                            theme.textTheme.bodyLarge!.copyWith(
+                              height: 1.5,
+                              fontSize: translationSize,
+                            ),
+                          ),
+                        ),
+                      ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
