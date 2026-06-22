@@ -49,6 +49,9 @@ dev_dependencies:
 # `e2e-setup` and LEARNINGS.md). app_name/ids match the package id.
 patrol:
   app_name: Al Quran
+  # Our E2E tests live in integration_test/ (the Flutter convention); patrol_cli
+  # otherwise defaults to patrol_test/ and would mis-bundle the imports.
+  test_directory: integration_test
   android:
     package_name: com.almarfa.al_quran
   ios:
