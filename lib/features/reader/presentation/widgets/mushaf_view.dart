@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
@@ -761,6 +762,7 @@ class _MushafPeekCard extends StatelessWidget {
         : '$surahName · ${current.surahId}:${current.ayahNumber}';
 
     return Material(
+      key: WidgetKeys.peekCard,
       color: cs.surface,
       elevation: 12,
       shadowColor: Colors.black.withValues(alpha: 0.3),

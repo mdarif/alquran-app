@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../../core/navigation/route_observer.dart';
+import '../../../../core/testing/widget_keys.dart';
 import '../../domain/entities/last_read.dart';
 import '../../domain/repositories/ayah_repository.dart';
 import '../../domain/repositories/last_read_repository.dart';
@@ -73,6 +74,7 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
         color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
+          key: WidgetKeys.lastReadCard,
           borderRadius: BorderRadius.circular(12),
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(

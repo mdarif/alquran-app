@@ -29,6 +29,12 @@ format-check: ## Verify formatting without writing (CI gate)
 test: ## Run unit + widget tests
 	flutter test
 
+e2e: ## Run Patrol end-to-end tests on a device/emulator (see docs/E2E.md)
+	patrol test
+
+e2e-setup: ## Reminder: re-apply Patrol native config after a platform regen
+	@echo "Patrol native setup is one-time per android/ios regen — see docs/E2E.md"
+
 coverage: ## Run tests with coverage and print the lcov path
 	flutter test --coverage
 	@echo "coverage written to coverage/lcov.info"

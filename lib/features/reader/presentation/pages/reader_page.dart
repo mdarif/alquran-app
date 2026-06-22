@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../../core/testing/widget_keys.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -145,6 +146,7 @@ class _ReaderViewState extends State<_ReaderView> {
           // never shift; the translation filter lives inside the Detailed view
           // itself (a self-labeling chip strip), not here.
           IconButton(
+            key: WidgetKeys.viewportToggle,
             tooltip: isReading ? 'Detailed view' : 'Reading view',
             icon: Icon(
               isReading ? Icons.subject_rounded : Icons.menu_book_rounded,
@@ -153,6 +155,7 @@ class _ReaderViewState extends State<_ReaderView> {
           ),
           // Text size: reveals the inline slider below the bar.
           IconButton(
+            key: WidgetKeys.fontSizeButton,
             tooltip: 'Text size',
             icon: const Icon(Icons.format_size_rounded),
             onPressed: _toggleFontSlider,

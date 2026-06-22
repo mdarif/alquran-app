@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/feature_flags.dart';
+import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
@@ -27,6 +28,7 @@ class HomePage extends StatelessWidget {
         actions: [
           if (advancedNavigation)
             IconButton(
+              key: WidgetKeys.jumpButton,
               tooltip: 'Jump to (Page · Juz · Hizb · Ruku)',
               icon: const Icon(Icons.format_list_numbered_rounded),
               onPressed: () => _openJumpSheet(context),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../../../core/testing/widget_keys.dart';
 import '../../../reader/domain/entities/reader_target.dart';
 import '../../../reader/presentation/pages/reader_page.dart';
 import '../../domain/entities/surah.dart';
@@ -55,6 +56,7 @@ class _SurahListBody extends StatelessWidget {
               itemBuilder: (context, i) {
                 final Surah surah = state.surahs[i];
                 return SurahTile(
+                  key: WidgetKeys.surahTile(surah.id),
                   surah: surah,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
