@@ -15,8 +15,10 @@ toolchain).
 
 ```
 integration_test/
-  helpers/app_harness.dart   bootstrapApp($): real DI + bundled DB, clean prefs
-  reader_flow_test.dart      P0: launch → surah list → reader → peek → detailed
+  helpers/app_harness.dart       bootstrapApp($): real DI + bundled DB, clean prefs
+  reader_flow_test.dart          launch → surah list → reader → peek → detailed
+  reader_resume_test.dart        Last Read: record progress; resume in the same viewport
+  reader_interactions_test.dart  peek dismiss; swipe to the next surah
 lib/core/testing/widget_keys.dart   stable WidgetKeys for finders
 ```
 
@@ -71,10 +73,10 @@ patrol develop -t integration_test/reader_flow_test.dart
 
 ## Coverage roadmap
 
-- **P0 (this phase)** — launch → 114-surah list; open a surah in Reading;
-  tap a verse → peek card; toggle Reading⇄Detailed. Plus the Last-Read flows we
-  just fixed (resume at the exact verse, viewport preserved, font-change keeps
-  position) — to be added once the pipeline is green.
+- **P0 (done, pending on-device validation)** — launch → 114-surah list; open a
+  surah in Reading; tap a verse → peek card; toggle Reading⇄Detailed; peek
+  dismiss; swipe to the next surah; **Last Read** records progress and resumes
+  in the same viewport (Reading vs Detailed) — locking the resume fixes.
 - **P1** — swipe next/prev surah; font slider + pinch (bounds 20–48); language
   filter toggle + collapse-to-pill + carry-over; theme persist; Jump-to
   Page/Juz/Hizb/Ruku.
