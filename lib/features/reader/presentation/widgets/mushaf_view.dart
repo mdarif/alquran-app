@@ -300,71 +300,71 @@ class _MushafViewState extends State<MushafView>
             controller: _controller,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final group in groupAyahsBySurah(widget.ayahs)) ...[
-                SurahHeaderCard(
-                  heading: widget.headings[group.first.surahId],
-                  fallbackNumber: group.first.surahId,
-                  fontSize: fontSize,
-                ),
-                const SizedBox(height: 12),
-                if (_showBismillah(group)) ...[
-                  Bismillah(fontSize: fontSize),
-                  const SizedBox(height: 18),
-                ],
-                // One Text.rich per surah group → continuous inline flow. After
-                // each verse we append its number as Arabic-Indic digits: in
-                // KFGQPC UthmanicHafs1B the font's GSUB composes those digits into
-                // the ornate end-of-ayah rosette with the NUMBER INSIDE it. It is
-                // all real text, so it orders correctly in RTL and reflows/zooms
-                // natively — no U+06DD (that adds a second empty circle), no
-                // WidgetSpan/placeholder (those bidi-reverse) and no overlay
-                // (invisible on-device). The number span keeps the surah text's
-                // font (only the colour differs) so the substitution still fires.
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapUp: (d) => _onGroupTap(d, group),
-                  child: Text.rich(
-                    key: _groupKeyFor(group.first.surahId),
-                    TextSpan(
-                      children: [
-                        for (final ayah in group) ...[
-                          TextSpan(
-                            text: ayah.textArabic,
-                            style: (_highlightAyahId == ayah.id ||
-                                    _selectedAyah?.id == ayah.id)
-                                ? TextStyle(
-                                    backgroundColor: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.16),
-                                  )
-                                : null,
-                          ),
-                          TextSpan(
-                            text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final group in groupAyahsBySurah(widget.ayahs)) ...[
+                  SurahHeaderCard(
+                    heading: widget.headings[group.first.surahId],
+                    fallbackNumber: group.first.surahId,
+                    fontSize: fontSize,
+                  ),
+                  const SizedBox(height: 12),
+                  if (_showBismillah(group)) ...[
+                    Bismillah(fontSize: fontSize),
+                    const SizedBox(height: 18),
+                  ],
+                  // One Text.rich per surah group → continuous inline flow. After
+                  // each verse we append its number as Arabic-Indic digits: in
+                  // KFGQPC UthmanicHafs1B the font's GSUB composes those digits into
+                  // the ornate end-of-ayah rosette with the NUMBER INSIDE it. It is
+                  // all real text, so it orders correctly in RTL and reflows/zooms
+                  // natively — no U+06DD (that adds a second empty circle), no
+                  // WidgetSpan/placeholder (those bidi-reverse) and no overlay
+                  // (invisible on-device). The number span keeps the surah text's
+                  // font (only the colour differs) so the substitution still fires.
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (d) => _onGroupTap(d, group),
+                    child: Text.rich(
+                      key: _groupKeyFor(group.first.surahId),
+                      TextSpan(
+                        children: [
+                          for (final ayah in group) ...[
+                            TextSpan(
+                              text: ayah.textArabic,
+                              style: (_highlightAyahId == ayah.id ||
+                                      _selectedAyah?.id == ayah.id)
+                                  ? TextStyle(
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withValues(alpha: 0.16),
+                                    )
+                                  : null,
                             ),
-                          ),
+                            TextSpan(
+                              text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.rtl,
-                    locale: const Locale('ar'),
-                    style: QuranTextStyle.madani.copyWith(
-                      fontSize: fontSize,
-                      height: 1.9,
+                      ),
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                      locale: const Locale('ar'),
+                      style: QuranTextStyle.madani.copyWith(
+                        fontSize: fontSize,
+                        height: 1.9,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 28),
+                  const SizedBox(height: 28),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
         ), // SizedBox.expand
         if (_currentPage != null)
           Positioned(
@@ -631,19 +631,6 @@ class Bismillah extends StatelessWidget {
   }
 }
 
-String _languageLabel(String code) {
-  switch (code) {
-    case 'ur':
-      return 'Urdu';
-    case 'hi':
-      return 'Hindi';
-    case 'en':
-      return 'English';
-    default:
-      return code.toUpperCase();
-  }
-}
-
 /// Bottom peek card shown when the reader taps a verse in Reading mode.
 /// Slides up from the bottom; swipe down or tap the handle to dismiss.
 class _MushafPeekCard extends StatelessWidget {
@@ -714,8 +701,8 @@ class _MushafPeekCard extends StatelessWidget {
                   children: [
                     Text(
                       'Ayah ${current.ayahNumber}',
-                      style:
-                          theme.textTheme.labelLarge?.copyWith(color: cs.primary),
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(color: cs.primary),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -723,14 +710,14 @@ class _MushafPeekCard extends StatelessWidget {
                       textAlign: TextAlign.right,
                       textDirection: TextDirection.rtl,
                       locale: const Locale('ar'),
-                      style:
-                          QuranTextStyle.madani.copyWith(fontSize: fontSize * 0.77),
+                      style: QuranTextStyle.madani
+                          .copyWith(fontSize: fontSize * 0.77),
                     ),
                     for (final r in resources)
                       if (current.translations[r.id] != null) ...[
                         const SizedBox(height: 16),
                         Text(
-                          '${_languageLabel(r.languageCode)} · ${r.attribution}',
+                          r.attribution,
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: cs.primary,
                             fontWeight: FontWeight.w600,

@@ -95,9 +95,13 @@ class AppDatabase extends _$AppDatabase {
     ];
   }
 
-  /// All active translation resources (MVP: Urdu + Hindi), ordered by id.
-  Future<List<ResourceRow>> translationResources() =>
-      (select(resources)..where((r) => r.type.equals('translation'))).get();
+  /// All active translation resources (Urdu, Hindi, English), ordered by id so
+  /// the reader shows them in a stable, intentional order (matches the build
+  /// order in the data pipeline's sources.yaml).
+  Future<List<ResourceRow>> translationResources() => (select(resources)
+        ..where((r) => r.type.equals('translation'))
+        ..orderBy([(r) => OrderingTerm.asc(r.id)]))
+      .get();
 
   /// Translations for one ayah keyed by resource id.
   Future<Map<int, String>> translationsForAyah(int ayahId) async {

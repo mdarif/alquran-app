@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Mirror the real DB shape: `name` is the language label, `author` the
-// translator. The attribution line must show the translator, not the language.
+// translator. The attribution line shows just the translator — the script
+// already makes the language obvious.
 const _urdu = TranslationResource(
   id: 1,
   languageCode: 'ur',
@@ -140,7 +141,7 @@ void main() {
       expect(find.text('अल्लाह के नाम'), findsNothing);
     });
 
-    testWidgets('shows a language + author attribution per translation',
+    testWidgets('shows the author attribution per translation (no language prefix)',
         (tester) async {
       const ayah = Ayah(
         id: 1,
@@ -161,8 +162,8 @@ void main() {
         ),
       );
 
-      expect(find.text('Urdu · Junagarhi'), findsOneWidget);
-      expect(find.text('English · Hilali & Khan'), findsOneWidget);
+      expect(find.text('Junagarhi'), findsOneWidget);
+      expect(find.text('Hilali & Khan'), findsOneWidget);
     });
 
     testWidgets('does not show the page number', (tester) async {

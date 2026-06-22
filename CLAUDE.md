@@ -97,8 +97,11 @@ Commands:
 - **Arabic text** includes QPC's end-of-ayah number glyph (e.g. `١`). Decide in
   the data repo (`prepare_sources.py`) whether to strip it; the app just renders
   what's in the DB.
-- **Hindi translation** is Maulana Azizul Haque al-Umari (substituted for the
-  PRD's unavailable Farooq Khan/Ahmed). Urdu is Junagarhi.
+- **Hindi translation** is Suhel Farooq Khan & Saifur Rahman Nadwi (Tanzil
+  edition `hi.hindi`, not on QUL — sourced via the AlQuran Cloud API which
+  mirrors Tanzil; see `../alquran-data/config/sources.yaml`). Earlier builds
+  used Maulana Azizul Haque al-Umari. Urdu is Junagarhi. Reader order:
+  Urdu → Hindi → English.
 - **Licensing** of translations/fonts is UNVERIFIED — clear before any release
   (see `../alquran-data/HANDOFF.md`).
 

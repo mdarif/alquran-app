@@ -296,8 +296,9 @@ void main() {
       expect(find.text('اردو ترجمہ'), findsOneWidget);
       expect(find.text('هिंदी अनुवाद'), findsNothing); // not the right text
       // Use a contained-in check robust to the specific translation strings.
-      expect(find.textContaining('Urdu · Junagarhi'), findsOneWidget);
-      expect(find.textContaining('Hindi · al-Umari'), findsOneWidget);
+      // Label is just the author name — no language prefix.
+      expect(find.text('Junagarhi'), findsOneWidget);
+      expect(find.text('al-Umari'), findsOneWidget);
     });
 
     testWidgets('card shows the Arabic text of the tapped verse', (tester) async {
@@ -413,8 +414,8 @@ void main() {
       await _tapText(tester);
 
       expect(find.textContaining('Ayah '), findsOneWidget);
-      // No translation labels when there are no resources.
-      expect(find.textContaining('Urdu'), findsNothing);
+      // No author labels when there are no resources.
+      expect(find.textContaining('Junagarhi'), findsNothing);
     });
   });
 

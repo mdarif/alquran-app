@@ -186,7 +186,8 @@ class _Translation extends StatelessWidget {
       children: [
         const SizedBox(height: 14),
         Text(
-          '${languageName(resource.languageCode)} · ${resource.attribution}',
+          // Just the author — the script already makes the language obvious.
+          resource.attribution,
           textAlign: TextAlign.left,
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.primary,
