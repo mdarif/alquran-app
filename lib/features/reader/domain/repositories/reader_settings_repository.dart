@@ -7,18 +7,14 @@ abstract interface class ReaderSettingsRepository {
   /// Whether the Detailed (translation) viewport is preferred over Mushaf.
   bool get detailed;
 
-  /// Language code of the translation last shown in the Reading-view tap-to-peek
-  /// card (e.g. 'ur'); null until the reader picks one (then seeded from locale).
-  String? get peekTranslation;
-
-  /// Language codes the reader has chosen to show in Detailed view (e.g.
-  /// ['ur','en']); null means "show all available editions" (the default).
-  List<String>? get detailedTranslations;
+  /// The reader's chosen translation editions, shared by BOTH the Reading-view
+  /// peek card and the Detailed view (e.g. ['ur'] or ['ur','en']) — set once,
+  /// honoured everywhere. null until the reader picks (then seeded from locale).
+  List<String>? get selectedTranslations;
 
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
-  Future<void> setPeekTranslation(String languageCode);
-  Future<void> setDetailedTranslations(List<String> languageCodes);
+  Future<void> setSelectedTranslations(List<String> languageCodes);
 
   static const double defaultFontSize = 28;
 }

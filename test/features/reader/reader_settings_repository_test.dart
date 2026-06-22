@@ -12,11 +12,14 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ReaderSettingsRepository', () {
-    test('defaults: 28pt font, Mushaf (not detailed)', () async {
+    test('defaults: 28pt font, Mushaf (not detailed), no translation choice',
+        () async {
       final repo = await _repo();
       expect(repo.fontSize, ReaderSettingsRepository.defaultFontSize);
       expect(repo.fontSize, 28);
       expect(repo.detailed, isFalse);
+      // null → the caller (reader page) resolves a default.
+      expect(repo.selectedTranslations, isNull);
     });
 
     test('persists the font size', () async {
@@ -31,6 +34,14 @@ void main() {
       expect(repo.detailed, isTrue);
       await repo.setDetailed(false);
       expect(repo.detailed, isFalse);
+    });
+
+    test('persists the shared translation selection', () async {
+      final repo = await _repo();
+      await repo.setSelectedTranslations(['ur', 'en']);
+      expect(repo.selectedTranslations, ['ur', 'en']);
+      await repo.setSelectedTranslations(['ur']);
+      expect(repo.selectedTranslations, ['ur']);
     });
   });
 }

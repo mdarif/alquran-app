@@ -87,31 +87,66 @@ class _FakeAyahRepoWithTranslations implements AyahRepository {
       ];
 }
 
+/// Repo with Urdu + Hindi (no English) — exercises the "device language not
+/// available → fall back to Urdu" default, given the en test-host locale.
+class _FakeAyahRepoUrHi implements AyahRepository {
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async => const [
+        Ayah(
+          id: 201,
+          surahId: 2,
+          ayahNumber: 1,
+          textArabic: 'نص',
+          isSajda: false,
+          translations: {1: 'اردو متن', 2: 'हिंदी अनुवाद'},
+        ),
+      ];
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => {
+        2: const SurahHeading(
+          number: 2,
+          nameEnglish: 'Al-Baqarah',
+          totalAyahs: 3,
+        ),
+      };
+
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async => const [
+        TranslationResource(
+          id: 1,
+          languageCode: 'ur',
+          name: 'Urdu',
+          author: 'Junagarhi',
+        ),
+        TranslationResource(
+          id: 2,
+          languageCode: 'hi',
+          name: 'Hindi',
+          author: 'al-Umari',
+        ),
+      ];
+}
+
 class _FakeSettings implements ReaderSettingsRepository {
   _FakeSettings({
     this.fontSize = 28,
     this.detailed = false,
-    this.peekTranslation,
-    this.detailedTranslations,
+    this.selectedTranslations,
   });
   @override
   double fontSize;
   @override
   bool detailed;
   @override
-  String? peekTranslation;
-  @override
-  List<String>? detailedTranslations;
+  List<String>? selectedTranslations;
   @override
   Future<void> setFontSize(double value) async => fontSize = value;
   @override
   Future<void> setDetailed(bool value) async => detailed = value;
   @override
-  Future<void> setPeekTranslation(String value) async =>
-      peekTranslation = value;
-  @override
-  Future<void> setDetailedTranslations(List<String> codes) async =>
-      detailedTranslations = codes;
+  Future<void> setSelectedTranslations(List<String> codes) async =>
+      selectedTranslations = codes;
 }
 
 Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
@@ -206,27 +241,37 @@ void main() {
   });
 
   group('Detailed-view translation filter', () {
-    testWidgets('toggling a language chip hides that translation',
-        (tester) async {
-      GetIt.I.unregister<ReaderCubit>();
-      GetIt.I.registerFactory<ReaderCubit>(
-        () => ReaderCubit(
-          _FakeAyahRepoWithTranslations(),
-          _FakeLastReadRepository(),
-        ),
-      );
-
+    // Register the translations repo + a settings fake with both editions
+    // selected (the default is a single language), then open Detailed view.
+    Future<void> openDetailed(
+      WidgetTester tester, {
+      List<String> selected = const ['ur', 'en'],
+    }) async {
+      GetIt.I
+        ..unregister<ReaderCubit>()
+        ..registerFactory<ReaderCubit>(
+          () => ReaderCubit(
+            _FakeAyahRepoWithTranslations(),
+            _FakeLastReadRepository(),
+          ),
+        )
+        ..unregister<ReaderSettingsRepository>()
+        ..registerLazySingleton<ReaderSettingsRepository>(
+          () => _FakeSettings(selectedTranslations: selected),
+        );
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
-
-      // Switch to Detailed view — both translations show.
       await tester.tap(find.byTooltip('Detailed view'));
       await tester.pumpAndSettle();
+    }
+
+    testWidgets('toggling a language chip hides that translation',
+        (tester) async {
+      await openDetailed(tester);
+      // Both selected → both show, with the chip strip in the view.
       expect(find.text('اردو متن'), findsOneWidget);
       expect(find.text('english body'), findsOneWidget);
 
-      // Open the translations filter and turn English off via its chip.
-      await tester.tap(find.byTooltip('Translations'));
-      await tester.pumpAndSettle();
+      // Turn English off via its chip in the strip.
       await tester.tap(find.text('English'));
       await tester.pumpAndSettle();
 
@@ -236,19 +281,7 @@ void main() {
 
     testWidgets('the last remaining language cannot be turned off',
         (tester) async {
-      GetIt.I.unregister<ReaderCubit>();
-      GetIt.I.registerFactory<ReaderCubit>(
-        () => ReaderCubit(
-          _FakeAyahRepoWithTranslations(),
-          _FakeLastReadRepository(),
-        ),
-      );
-
-      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
-      await tester.tap(find.byTooltip('Detailed view'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Translations'));
-      await tester.pumpAndSettle();
+      await openDetailed(tester);
 
       // Turn English off, then try to turn Urdu off too — it must stay.
       await tester.tap(find.text('English'));
@@ -257,6 +290,76 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('اردو متن'), findsOneWidget);
+    });
+
+    testWidgets('× collapses the strip to a pill, tapping it expands again',
+        (tester) async {
+      await openDetailed(tester);
+      expect(find.text('English'), findsOneWidget); // chip visible
+
+      // Collapse via the × — chips hide, a summary pill appears.
+      await tester.tap(find.byTooltip('Hide languages'));
+      await tester.pumpAndSettle();
+      expect(find.text('English'), findsNothing);
+      expect(find.text('اردو · English'), findsOneWidget); // pill summary
+
+      // Tap the pill to expand again.
+      await tester.tap(find.text('اردو · English'));
+      await tester.pumpAndSettle();
+      expect(find.text('English'), findsOneWidget);
+    });
+
+    testWidgets('the selection carries over to the Reading peek card',
+        (tester) async {
+      await openDetailed(tester);
+
+      // Narrow to Urdu only in Detailed.
+      await tester.tap(find.text('English'));
+      await tester.pumpAndSettle();
+      expect(find.text('english body'), findsNothing);
+
+      // Back to Reading, tap the verse — the peek shows Urdu only (carried).
+      await tester.tap(find.byTooltip('Reading view'));
+      await tester.pumpAndSettle();
+      final flow = find.byWidgetPredicate(
+        (w) => w is GestureDetector && w.onTapUp != null && w.onTap == null,
+      );
+      await tester.tap(flow.first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('اردو متن'), findsOneWidget);
+      expect(find.text('english body'), findsNothing);
+    });
+  });
+
+  group('Default translation selection', () {
+    // No saved selection (the default _FakeSettings) → the reader resolves a
+    // single default: the device language if we have that edition, else Urdu.
+    Future<void> openDetailed(WidgetTester tester, AyahRepository repo) async {
+      GetIt.I
+        ..unregister<ReaderCubit>()
+        ..registerFactory<ReaderCubit>(
+          () => ReaderCubit(repo, _FakeLastReadRepository()),
+        );
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      await tester.tap(find.byTooltip('Detailed view'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('defaults to the device language when that edition exists',
+        (tester) async {
+      // Test host locale is en, and English is available → default to English.
+      await openDetailed(tester, _FakeAyahRepoWithTranslations());
+      expect(find.text('english body'), findsOneWidget);
+      expect(find.text('اردو متن'), findsNothing);
+    });
+
+    testWidgets('falls back to Urdu when the device language has no edition',
+        (tester) async {
+      // en host locale, but only Urdu + Hindi exist → fall back to Urdu.
+      await openDetailed(tester, _FakeAyahRepoUrHi());
+      expect(find.text('اردو متن'), findsOneWidget);
+      expect(find.text('हिंदी अनुवाद'), findsNothing);
     });
   });
 }

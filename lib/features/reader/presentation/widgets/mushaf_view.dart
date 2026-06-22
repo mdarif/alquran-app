@@ -44,8 +44,8 @@ class MushafView extends StatefulWidget {
     required this.resources,
     this.focusAyahId,
     this.onVisibleAyah,
-    this.peekTranslation,
-    this.onPeekTranslationChanged,
+    this.selectedLanguages = const {},
+    this.onToggleLanguage,
     super.key,
   });
 
@@ -60,13 +60,12 @@ class MushafView extends StatefulWidget {
   /// Reports the topmost-visible verse as the user scrolls (debounced).
   final ValueChanged<Ayah>? onVisibleAyah;
 
-  /// Remembered language for the tap-to-peek card (e.g. 'ur'); null → seed from
-  /// device locale, else the first available translation.
-  final String? peekTranslation;
+  /// The reader's selected translation editions (shared with Detailed view).
+  /// The peek card shows these and offers them as multi-select chips.
+  final Set<String> selectedLanguages;
 
-  /// Called when the reader switches the peek card's language, so the choice can
-  /// be persisted.
-  final ValueChanged<String>? onPeekTranslationChanged;
+  /// Toggle a language in the shared selection (from the peek card's chips).
+  final ValueChanged<String>? onToggleLanguage;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -82,7 +81,6 @@ class _MushafViewState extends State<MushafView>
   // Tap-to-peek translation card.
   Ayah? _selectedAyah; // highlighted verse (null = none)
   Ayah? _shownAyah; // kept during slide-out so card doesn't blink
-  String? _peekLang; // session override for the shown translation language
   late final AnimationController _peekCtrl;
   late final Animation<Offset> _peekSlide;
 
@@ -173,28 +171,6 @@ class _MushafViewState extends State<MushafView>
   void _dismissPeek() {
     setState(() => _selectedAyah = null);
     _peekCtrl.reverse();
-  }
-
-  /// The language code whose translation the peek card shows: a tapped-this-session
-  /// choice, else the remembered one, else the device locale, else the first
-  /// available translation. Always returns a code present in [resources] (or ''
-  /// when there are no translations).
-  String _resolvePeekLang() {
-    final available = [for (final r in widget.resources) r.languageCode];
-    if (available.isEmpty) return '';
-    if (_peekLang != null && available.contains(_peekLang)) return _peekLang!;
-    final remembered = widget.peekTranslation;
-    if (remembered != null && available.contains(remembered)) return remembered;
-    final locale =
-        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
-    if (available.contains(locale)) return locale;
-    return available.first;
-  }
-
-  void _selectPeekLang(String code) {
-    if (code == _peekLang) return;
-    setState(() => _peekLang = code);
-    widget.onPeekTranslationChanged?.call(code);
   }
 
   /// Pre-computes each ayah's character offset within its surah group paragraph
@@ -435,8 +411,8 @@ class _MushafViewState extends State<MushafView>
                     ? null
                     : widget.headings[_shownAyah!.surahId]?.nameEnglish,
                 fontSize: fontSize,
-                selectedLanguage: _resolvePeekLang(),
-                onSelectLanguage: _selectPeekLang,
+                selected: widget.selectedLanguages,
+                onToggleLanguage: widget.onToggleLanguage,
                 onDismiss: _dismissPeek,
               ),
             ),
@@ -671,9 +647,10 @@ class Bismillah extends StatelessWidget {
 }
 
 /// Bottom peek card shown when the reader taps a verse in Reading mode. It is
-/// translation-FIRST: the Arabic is not repeated (the tapped verse is already
-/// on the page and highlighted) — the card shows one translation at a time, with
-/// a language switcher so the others are a tap away. Slides up from the bottom;
+/// translation-FIRST: the Arabic is not repeated (the tapped verse is already on
+/// the page and highlighted). It shows the reader's selected translation(s) —
+/// the same set used by Detailed view — and offers all editions as multi-select
+/// chips, so toggling here also changes Detailed. Slides up from the bottom;
 /// swipe down or tap the handle to dismiss.
 class _MushafPeekCard extends StatelessWidget {
   const _MushafPeekCard({
@@ -681,8 +658,8 @@ class _MushafPeekCard extends StatelessWidget {
     required this.resources,
     required this.surahName,
     required this.fontSize,
-    required this.selectedLanguage,
-    required this.onSelectLanguage,
+    required this.selected,
+    required this.onToggleLanguage,
     required this.onDismiss,
   });
 
@@ -690,8 +667,8 @@ class _MushafPeekCard extends StatelessWidget {
   final List<TranslationResource> resources;
   final String? surahName;
   final double fontSize;
-  final String selectedLanguage;
-  final ValueChanged<String> onSelectLanguage;
+  final Set<String> selected;
+  final ValueChanged<String>? onToggleLanguage;
   final VoidCallback onDismiss;
 
   @override
@@ -709,13 +686,13 @@ class _MushafPeekCard extends StatelessWidget {
       for (final r in resources)
         if (current.translations[r.id] != null) r,
     ];
-    // The edition to show: the selected language if present, else the first.
-    final shown = available.isEmpty
-        ? null
-        : available.firstWhere(
-            (r) => r.languageCode == selectedLanguage,
-            orElse: () => available.first,
-          );
+    // Show the selected editions; if none of the selected ones apply here, fall
+    // back to the first available so the card is never empty.
+    var shown = [
+      for (final r in available)
+        if (selected.contains(r.languageCode)) r,
+    ];
+    if (shown.isEmpty && available.isNotEmpty) shown = [available.first];
 
     final reference = surahName == null
         ? '${current.surahId}:${current.ayahNumber}'
@@ -755,7 +732,7 @@ class _MushafPeekCard extends StatelessWidget {
             ),
             // Content — ListView(shrinkWrap) hugs its own content height so
             // there's no blank gap at small font sizes, while still scrolling
-            // when a translation is long. Swallow taps to prevent bleed-through.
+            // when translations are long. Swallow taps to prevent bleed-through.
             GestureDetector(
               onTap: () {},
               child: ConstrainedBox(
@@ -764,8 +741,8 @@ class _MushafPeekCard extends StatelessWidget {
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
                   children: [
-                    // Reference + language switcher on one line (chips wrap below
-                    // the reference on narrow screens).
+                    // Reference + multi-select language chips (the shared
+                    // selection, also reflected in Detailed view).
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -789,50 +766,52 @@ class _MushafPeekCard extends StatelessWidget {
                               for (final r in available)
                                 _PeekLangChip(
                                   label: nativeLanguageName(r.languageCode),
-                                  selected:
-                                      shown?.languageCode == r.languageCode,
-                                  onTap: () => onSelectLanguage(r.languageCode),
+                                  selected: selected.contains(r.languageCode),
+                                  onTap: () =>
+                                      onToggleLanguage?.call(r.languageCode),
                                 ),
                             ],
                           ),
                       ],
                     ),
                     const SizedBox(height: 14),
-                    if (shown == null)
+                    if (shown.isEmpty)
                       Text(
                         'No translation available',
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(color: cs.onSurfaceVariant),
                       )
-                    else ...[
-                      Text(
-                        current.translations[shown.id]!,
-                        textAlign: shown.languageCode == 'ur'
-                            ? TextAlign.right
-                            : TextAlign.left,
-                        textDirection: shown.languageCode == 'ur'
-                            ? TextDirection.rtl
-                            : TextDirection.ltr,
-                        locale: Locale(shown.languageCode),
-                        style: shown.languageCode.scriptStyle(
-                          theme.textTheme.bodyLarge!.copyWith(
-                            height: 1.5,
-                            fontSize: translationSize,
+                    else
+                      for (var i = 0; i < shown.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 18),
+                        Text(
+                          current.translations[shown[i].id]!,
+                          textAlign: shown[i].languageCode == 'ur'
+                              ? TextAlign.right
+                              : TextAlign.left,
+                          textDirection: shown[i].languageCode == 'ur'
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          locale: Locale(shown[i].languageCode),
+                          style: shown[i].languageCode.scriptStyle(
+                                theme.textTheme.bodyLarge!.copyWith(
+                                  height: 1.5,
+                                  fontSize: translationSize,
+                                ),
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          shown[i].attribution,
+                          textAlign: shown[i].languageCode == 'ur'
+                              ? TextAlign.right
+                              : TextAlign.left,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        shown.attribution,
-                        textAlign: shown.languageCode == 'ur'
-                            ? TextAlign.right
-                            : TextAlign.left,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                      ],
                   ],
                 ),
               ),
@@ -844,7 +823,7 @@ class _MushafPeekCard extends StatelessWidget {
   }
 }
 
-/// A small selectable language pill in the peek card's switcher.
+/// A small selectable language pill in the peek card's chip row.
 class _PeekLangChip extends StatelessWidget {
   const _PeekLangChip({
     required this.label,
