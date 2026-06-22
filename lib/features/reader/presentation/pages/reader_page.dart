@@ -511,10 +511,13 @@ class _DetailedListState extends State<_DetailedList> {
           thickness: 1,
           indent: 16,
           endIndent: 16,
-          // A soft hairline: solid `outline` read too dark; a 40%-alpha `outline`
-          // lands between it and the near-invisible `outlineVariant` — visible
-          // separation without a heavy rule. Tune the alpha to taste.
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+          // A whisper-soft hairline: just enough to separate verses without
+          // drawing the eye. `outlineVariant` (already a muted hairline tone) at
+          // low alpha keeps it barely-there on the warm page.
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.5),
         ),
       ],
     );
