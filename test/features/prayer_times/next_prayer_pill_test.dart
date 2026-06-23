@@ -40,10 +40,10 @@ class _FakeRepo implements PrayerTimesRepository {
   }
 }
 
-PrayerTimesCubit _cubit({GeoLocation? saved, int hour = 17}) {
+PrayerTimesCubit _cubit({GeoLocation? saved, int hour = 17, int minute = 0}) {
   final cubit = PrayerTimesCubit(
     _FakeRepo(saved: saved),
-    clock: () => DateTime(2026, 6, 23, hour),
+    clock: () => DateTime(2026, 6, 23, hour, minute),
   );
   addTearDown(cubit.close);
   return cubit;
@@ -85,6 +85,19 @@ void main() {
       expect(find.text(name), findsOneWidget);
     }
     expect(find.text('6:30'), findsOneWidget); // sunrise time shown
+    expect(find.textContaining('No prayer'), findsWidgets); // forbidden marks
+  });
+
+  testWidgets('inside a forbidden window the pill warns + tap opens sheet',
+      (tester) async {
+    // 18:30 is within the before-sunset window (18:27–18:42, lifts at Maghrib).
+    await _pump(tester, _cubit(saved: _loc, hour: 18, minute: 30));
+    expect(find.textContaining('Forbidden'), findsOneWidget);
+    expect(find.textContaining('6:42'), findsOneWidget); // lifts at Maghrib
+
+    await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
+    await tester.pumpAndSettle();
+    expect(find.byKey(WidgetKeys.prayerTimesSheet), findsOneWidget);
   });
 
   testWidgets('no location → a discreet enable affordance', (tester) async {

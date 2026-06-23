@@ -1,4 +1,5 @@
 import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/forbidden_window.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/prayer.dart';
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
@@ -71,6 +72,21 @@ void main() {
     addTearDown(cubit.close);
     expect(cubit.state.next!.prayer, Prayer.sunrise);
     expect(cubit.state.next!.at, DateTime(2026, 6, 23, 6));
+  });
+
+  test('flags the active forbidden window (after sunrise)', () {
+    // sunrise 6:00 → 6:15 is forbidden; 06:05 falls inside it.
+    final cubit =
+        PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(6, 5));
+    addTearDown(cubit.close);
+    expect(cubit.state.forbidden?.reason, ForbiddenReason.afterSunrise);
+    expect(cubit.state.next!.prayer, Prayer.dhuhr); // sunrise already passed
+  });
+
+  test('no forbidden window when prayer is permitted', () {
+    final cubit = PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(10));
+    addTearDown(cubit.close);
+    expect(cubit.state.forbidden, isNull);
   });
 
   test('after Isha, next rolls over to tomorrow Fajr', () {

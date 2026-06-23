@@ -1,4 +1,5 @@
 import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/forbidden_window.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/prayer.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,12 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 final _base = DateTime(2026, 6, 23);
 DateTime _t(int h, [int m = 0]) => _base.add(Duration(hours: h, minutes: m));
 
+// Sunrise/Maghrib symmetric about Dhuhr so solar noon == Dhuhr (as in real
+// data), keeping the zenith forbidden window valid.
 final _day = DailyPrayerTimes(
   fajr: _t(4, 30),
   sunrise: _t(6),
   dhuhr: _t(12, 15),
   asr: _t(15, 30),
-  maghrib: _t(18, 45),
+  maghrib: _t(18, 30),
   isha: _t(20, 15),
   location: const GeoLocation(latitude: 24.45, longitude: 54.38),
   date: _base,
@@ -46,6 +49,34 @@ void main() {
 
     test('nextAfter is null once all of the day has passed', () {
       expect(_day.nextAfter(_t(23)), isNull);
+    });
+
+    test('forbiddenWindows are the three periods in clock order', () {
+      expect(
+        _day.forbiddenWindows.map((w) => w.reason).toList(),
+        [
+          ForbiddenReason.afterSunrise,
+          ForbiddenReason.zenith,
+          ForbiddenReason.beforeSunset,
+        ],
+      );
+      // After sunrise: 6:00 → 6:15 (the ~spear's-length span).
+      expect(_day.forbiddenWindows.first.start, _day.sunrise);
+      expect(_day.forbiddenWindows.first.end, _t(6, 15));
+      // Zenith ends at Dhuhr (zawāl); before-sunset ends at Maghrib.
+      expect(_day.forbiddenWindows[1].end, _day.dhuhr);
+      expect(_day.forbiddenWindows.last.end, _day.maghrib);
+    });
+
+    test('forbiddenAt reports the active window, else null', () {
+      expect(_day.forbiddenAt(_t(6, 5))?.reason, ForbiddenReason.afterSunrise);
+      expect(_day.forbiddenAt(_t(12, 13))?.reason, ForbiddenReason.zenith);
+      expect(
+        _day.forbiddenAt(_t(18, 20))?.reason,
+        ForbiddenReason.beforeSunset,
+      );
+      expect(_day.forbiddenAt(_t(10)), isNull); // mid-morning — permitted
+      expect(_day.forbiddenAt(_day.dhuhr), isNull); // zawāl ends it
     });
   });
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/mushaf_palette.dart';
+import '../../domain/entities/forbidden_window.dart';
 import '../../domain/location/location_provider.dart';
 import '../cubit/prayer_times_cubit.dart';
 import '../cubit/prayer_times_state.dart';
@@ -38,6 +40,16 @@ class NextPrayerPill extends StatelessWidget {
             tooltip: 'Prayer times — set location',
             icon: const Icon(Icons.location_searching_rounded),
             onPressed: () => _enable(context, bloc),
+          );
+        }
+
+        // Inside one of the three windows where prayer is prohibited → a gold
+        // caution pill telling you when it lifts, instead of the next-prayer one.
+        final forbidden = state.forbidden;
+        if (forbidden != null) {
+          return _ForbiddenPill(
+            window: forbidden,
+            onTap: () => _openSheet(context, bloc),
           );
         }
 
@@ -106,4 +118,63 @@ class NextPrayerPill extends StatelessWidget {
           'Enable location for Al Quran in Settings to see prayer times.',
         _ => 'Location is needed to show prayer times.',
       };
+}
+
+/// The caution pill shown while prayer is prohibited — gold-toned (the same
+/// phase-tuned [MushafColors.gold] used for ornamentation, thematically apt for
+/// the sun at the horizon), with the time the window lifts. Tap opens the sheet.
+class _ForbiddenPill extends StatelessWidget {
+  const _ForbiddenPill({required this.window, required this.onTap});
+
+  final ForbiddenWindow window;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Defensive: bare test themes won't carry the MushafColors extension.
+    final gold = Theme.of(context).extension<MushafColors>()?.gold ??
+        const Color(0xFF9C6F02);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Tooltip(
+          message: 'Prayer is not offered now (${window.reason.label})',
+          child: Material(
+            key: WidgetKeys.nextPrayerPill,
+            color: gold.withValues(alpha: 0.18),
+            shape: RoundedRectangleBorder(
+              side: BorderSide(color: gold.withValues(alpha: 0.45)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: onTap,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.do_not_disturb_on_outlined,
+                      size: 15,
+                      color: gold,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Forbidden until ${formatPrayerTime(window.end)}',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: gold,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
