@@ -71,11 +71,33 @@ void main() {
         utcOffset: _date.timeZoneOffset,
       ).asr;
 
+      // Compare time-of-day (both on the same UTC clock for this UTC date), not
+      // the instant — `ours` is now a normalized local DateTime (see below).
+      int tod(DateTime t) => t.hour * 60 + t.minute;
       expect(
-        ours.isBefore(hanafi),
+        tod(ours) < tod(hanafi),
         isTrue,
         reason: 'Asr must be Shafi (earlier), got ours=$ours hanafi=$hanafi',
       );
+    });
+
+    test('returns plain LOCAL times so isAfter(now) ranks the day correctly',
+        () async {
+      // Regression: adhan's utcOffset path returns isUtc-flagged times whose
+      // instant is shifted by the offset, so late at night a long-passed prayer
+      // (e.g. Asr) still read as "after now". timesFor must hand back local
+      // DateTimes whose instant matches their wall clock.
+      final repo = await _repo(provider);
+      final t = repo.timesFor(_abuDhabi, _date);
+
+      expect(t.asr.isUtc, isFalse);
+      expect(t.isha.isUtc, isFalse);
+
+      // One minute past Isha, every prayer has passed → nextAfter is null and
+      // the cubit rolls over to tomorrow's Fajr (instead of resurfacing Asr).
+      final afterIsha = t.isha.add(const Duration(minutes: 1));
+      expect(t.asr.isAfter(afterIsha), isFalse);
+      expect(t.nextAfter(afterIsha), isNull);
     });
   });
 

@@ -52,9 +52,9 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
   @override
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
     final params = _method.getParameters()..madhab = _madhab;
-    // utcOffset from the date itself: in production `date` is the device-local
-    // now (user is physically at the location), so this yields local times; in
-    // tests a `DateTime.utc(...)` yields deterministic UTC times.
+    // utcOffset from the date itself makes adhan's wall-clock fields the local
+    // time at the location (device is physically there). In tests a
+    // `DateTime.utc(...)` → offset 0 → deterministic UTC-clock fields.
     final times = adhan.PrayerTimes(
       adhan.Coordinates(location.latitude, location.longitude),
       adhan.DateComponents.from(date),
@@ -62,14 +62,23 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
       utcOffset: date.timeZoneOffset,
     );
     return DailyPrayerTimes(
-      fajr: times.fajr,
-      sunrise: times.sunrise,
-      dhuhr: times.dhuhr,
-      asr: times.asr,
-      maghrib: times.maghrib,
-      isha: times.isha,
+      fajr: _local(times.fajr),
+      sunrise: _local(times.sunrise),
+      dhuhr: _local(times.dhuhr),
+      asr: _local(times.asr),
+      maghrib: _local(times.maghrib),
+      isha: _local(times.isha),
       location: location,
       date: date,
     );
   }
+
+  /// adhan with `utcOffset` returns each time as `t.toUtc().add(offset)` — a
+  /// DateTime flagged `isUtc` whose wall-clock fields are the correct LOCAL time
+  /// but whose *instant* is shifted by the offset. Comparing those against a
+  /// real `DateTime.now()` via `isAfter` is therefore off by the offset (it once
+  /// kept a long-passed Asr as "next" late at night). Rebuild a plain local
+  /// DateTime from the wall-clock fields: same display, correct instant.
+  static DateTime _local(DateTime t) =>
+      DateTime(t.year, t.month, t.day, t.hour, t.minute);
 }
