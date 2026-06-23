@@ -250,24 +250,27 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
 **Numeral convention — FINAL (owner-decided):** every verse/surah number is a **Western digit**.
 - **Plain UI chrome badges** (TOC surah circle, chapter-header medallion, Detailed-view ayah
   badge, nav-index circle) are `'$n'`. (An Urdu-digit experiment on these was tried and reverted.)
-- **Reading-view ayah marker = empty medallion + overlaid Western digit** (`_MarkedParagraph`).
-  Render the font's **empty ayah ornament U+06DD (`۝`)** inline as the marker — it's real text
-  (correct RTL order, reflow, zoom) and *always drawn* (graceful degradation: worst case is a
-  medallion with no number, never an empty gap). Then **overlay** the number centred on each
-  medallion, positioned via `RenderParagraph.getBoxesForSelection(offset, offset+1,
-  BoxHeightStyle.tight)` in a post-frame callback with a *guarded* setState (re-measures on
-  zoom/reflow; guard stops a rebuild loop). Wrap the digit in a `FittedBox(scaleDown)` sized to
-  the medallion's inner field (`rect.width*0.46 × rect.height*0.40`) so a 3-digit ayah (286)
-  scales to fit instead of overflowing, and it tracks pinch-zoom via the measured box. Offset
-  bookkeeping: the marker is ALWAYS the single char `۝`, so `_verseStart` advances `textLen + 3`
-  (` ۝ `), NOT the digit length.
-- **Why overlay, not the native rosette:** KFGQPC's GSUB composes Arabic-Indic U+0660–U+0669 into
-  the ornate rosette (`٢`→`_771`) — but `٢` reads like Urdu `۴` to the audience (3+ rounds of "it
-  still shows 4"; prove `٢≠4` with `hb-view ... "١ ٢ ٣ ٤"`). The rosette can ONLY hold the
-  canonical `٢` (feeding it U+06F2 → bare `uni06F2`; KFGQPC has no enclosing-circle U+20DD →
-  `.notdef`), so a circle around a *readable* digit MUST be an overlay. Evolution across rounds:
-  native rosette `٢` → plain Urdu `۲` (owner wanted readable, dropped circle) → owner wanted the
-  circle back AND English like the badges → **medallion + overlaid Western digit**.
+- **Reading-view ayah marker = INVISIBLE U+06DD anchor + overlaid circle badge** (`_MarkedParagraph`).
+  The font's ornate rosette read as "not real" inline, so the owner asked for the clean
+  CircleAvatar-style badge from the Detailed view. Render the **empty ayah ornament U+06DD (`۝`)
+  inline but TRANSPARENT** (`Color(0x00000000)`) — it reserves the inline slot and is the
+  *measurable anchor* (U+06DD boxes cleanly; see the getBoxes caveat in §3), but draws nothing.
+  Then **overlay** a real circle widget (`Container`, `BoxShape.circle`, `cs.primaryContainer`
+  fill + `onPrimaryContainer` Western digit in a `FittedBox(scaleDown)`) centred on each anchor's
+  box, sized to `rect.shortestSide`. An overlay (not a `WidgetSpan`, which bidi-reverses) keeps
+  RTL order + reflow + pinch-zoom. Measure the box with `getBoxesForSelection(offset, offset+1,
+  BoxHeightStyle.tight)` (works for the isolated U+06DD) in a post-frame callback with a *guarded*
+  setState. Graceful degradation: if a box mis-measures you get no badge (a gap), not a crash.
+  Offset bookkeeping: the marker is ALWAYS the single char `۝`, so `_verseStart` advances
+  `textLen + 3` (` ۝ `), NOT the digit length.
+- **Why an overlay at all (not the native rosette, not inline text):** KFGQPC's GSUB composes
+  Arabic-Indic U+0660–U+0669 into the rosette (`٢`→`_771`) — but `٢` reads like Urdu `۴` to the
+  audience (3+ rounds of "it still shows 4"; prove `٢≠4` with `hb-view ... "١ ٢ ٣ ٤"`). The rosette
+  can ONLY hold the canonical `٢` (feeding it U+06F2 → bare `uni06F2`; KFGQPC has no enclosing-circle
+  U+20DD → `.notdef`). So a clean circle around a *readable* digit MUST be a Flutter-drawn overlay
+  on an invisible text anchor. Evolution across rounds: native rosette `٢` → plain Urdu `۲` (dropped
+  circle) → ornate U+06DD medallion + Western digit overlay → **invisible U+06DD anchor + Flutter
+  circle badge matching the Detailed view**.
 
 ---
 
