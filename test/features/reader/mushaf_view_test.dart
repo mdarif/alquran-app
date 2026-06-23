@@ -153,7 +153,7 @@ void main() {
       expect(flow.textDirection, TextDirection.rtl);
     });
 
-    testWidgets('appends ayah numbers as Arabic-Indic digits (no U+06DD added)',
+    testWidgets('appends ayah numbers as Urdu/Persian digits (no U+06DD added)',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -169,9 +169,13 @@ void main() {
           .map((t) => t.textSpan!.toPlainText())
           .join();
       expect(allText.contains('۝'), isFalse);
-      for (final n in ['١', '٢', '٣', '٤']) {
+      // Reading view marks verses with Eastern Arabic-Indic (Urdu) digits ۱۲۳۴,
+      // not the canonical ٢ rosette (which reads as "4" to Urdu readers).
+      for (final n in ['۱', '۲', '۳', '۴']) {
         expect(allText, contains(n));
       }
+      // And NOT the Arabic-Indic forms.
+      expect(allText.contains('١'), isFalse);
     });
 
     testWidgets('shows the Bismillah for an ordinary surah starting at ayah 1',

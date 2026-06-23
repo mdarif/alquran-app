@@ -23,12 +23,12 @@ const String _bismillah = 'بِسۡمِ ٱللَّهِ'
 const int _surahAlFatiha = 1;
 const int _surahAtTawbah = 9;
 
-// The ayah-end ROSETTE uses Arabic-Indic digits (toArabicIndicDigits): KFGQPC's
-// GSUB composes those code points into the ornate medallion glyph (e.g.
-// ٢٨٦ → one rosette). They stay in one run with the Arabic style so the
-// substitution fires, and we DON'T add U+06DD (that draws a second circle).
-// Plain UI number badges (TOC, chapter medallion, ayah badge) stay Western —
-// the owner wants English numerals in chrome.
+// Verse numbers (see core/util/arabic_digits.dart):
+//  • Reading view marks each ayah with a plain Urdu/Persian numeral (toUrduDigits,
+//    ۲) in the Urdu face — readable to the Urdu/Hindi audience. We deliberately
+//    dropped the font's Arabic-Indic rosette: its ٢ reads like "4" to them.
+//  • Plain UI number badges (TOC, chapter medallion, ayah badge) stay Western —
+//    the owner wants English numerals in chrome.
 
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
 /// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
@@ -214,7 +214,7 @@ class _MushafViewState extends State<MushafView>
         offset += ayah.textArabic.length +
             2 // leading + trailing space around the number
             +
-            toArabicIndicDigits(ayah.ayahNumber).length;
+            toUrduDigits(ayah.ayahNumber).length;
       }
     }
   }
@@ -391,14 +391,14 @@ class _MushafViewState extends State<MushafView>
                       const SizedBox(height: 18),
                     ],
                     // One Text.rich per surah group → continuous inline flow. After
-                    // each verse we append its number as Arabic-Indic digits: in
-                    // KFGQPC UthmanicHafs1B the font's GSUB composes those digits into
-                    // the ornate end-of-ayah rosette with the NUMBER INSIDE it. It is
-                    // all real text, so it orders correctly in RTL and reflows/zooms
-                    // natively — no U+06DD (that adds a second empty circle), no
-                    // WidgetSpan/placeholder (those bidi-reverse) and no overlay
-                    // (invisible on-device). The number span keeps the surah text's
-                    // font (only the colour differs) so the substitution still fires.
+                    // each verse we append its number as a plain Urdu/Persian
+                    // numeral (۲), in the accent colour, in the Urdu face — Urdu
+                    // readers read ۲ as "2" (the canonical Arabic-Indic ٢ that the
+                    // KFGQPC font composes into a rosette reads like "4" to them).
+                    // It's real text, so it orders correctly in RTL and reflows/
+                    // zooms natively — no WidgetSpan/placeholder (those bidi-reverse)
+                    // and no overlay (invisible on-device). The marker overrides the
+                    // font because KFGQPC maps U+06F0+ to placeholder dotted-circles.
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapUp: (d) => _onGroupTap(d, group),
@@ -420,9 +420,10 @@ class _MushafViewState extends State<MushafView>
                                     : null,
                               ),
                               TextSpan(
-                                text: ' ${toArabicIndicDigits(ayah.ayahNumber)} ',
+                                text: ' ${toUrduDigits(ayah.ayahNumber)} ',
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
+                                  fontFamily: AppTheme.urduFontFamily,
                                 ),
                               ),
                             ],

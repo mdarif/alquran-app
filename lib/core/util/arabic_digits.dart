@@ -1,26 +1,13 @@
-/// Numeral helpers for verse/surah numbers.
+/// Eastern Arabic-Indic ("Urdu/Persian") digits, U+06F0–U+06F9.
 ///
-/// Two distinct scripts, used in two distinct places — do not conflate them:
-///
-/// * [toArabicIndicDigits] (U+0660–U+0669) is for the **Mushaf ayah-end rosette**.
-///   The KFGQPC font composes *these* code points (and only these) into the ornate
-///   medallion glyph via GSUB. Swap in Persian/Urdu digits and the rosette GSUB
-///   won't fire — you'd get a bare digit instead of the medallion.
-/// * [toUrduDigits] (U+06F0–U+06F9, "Extended Arabic-Indic") is for the **plain UI
-///   number badges** (the Detailed-view ayah badge and the chapter-header
-///   medallion), rendered in the system font. Urdu/Hindi readers read ۲ as "2";
-///   the Arabic-Indic ٢ looks like a "4" to them, hence we use the Eastern forms
-///   in chrome while the sacred rosette keeps the canonical Mushaf glyphs.
-library;
-
-/// Canonical Arabic-Indic digits (U+0660+) — for the Mushaf rosette only.
-String toArabicIndicDigits(int n) => _map(n, 0x0660);
-
-/// Eastern Arabic-Indic (Persian/Urdu) digits (U+06F0+) — for UI number badges.
-String toUrduDigits(int n) => _map(n, 0x06F0);
-
-String _map(int n, int base) => n
+/// Used for the **Reading-view verse marker**: Urdu/Hindi readers read ۲ as "2",
+/// whereas the canonical Arabic-Indic ٢ (U+0662) reads like a "4" to them. The
+/// glyph must be drawn in a font that actually has these code points — the
+/// KFGQPC Quran face maps U+06F0+ to placeholder dotted-circles, so the marker
+/// is rendered in [AppTheme.urduFontFamily] (Noto Nastaliq Urdu), not the Quran
+/// face. (Plain Western digits remain inline `'$n'` in the UI chrome badges.)
+String toUrduDigits(int n) => n
     .toString()
     .split('')
-    .map((d) => String.fromCharCode(base + (d.codeUnitAt(0) - 0x30)))
+    .map((d) => String.fromCharCode(0x06F0 + (d.codeUnitAt(0) - 0x30)))
     .join();
