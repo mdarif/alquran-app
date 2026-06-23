@@ -573,11 +573,24 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   params, utcOffset: …)` where `params = CalculationMethod.muslim_world_league
   .getParameters()..madhab = Madhab.shafi`. The six getters
   (`fajr/sunrise/dhuhr/asr/maghrib/isha`) are non-null `late DateTime`.
-- **`utcOffset` does double duty.** In production pass `date.timeZoneOffset`
-  (the user is physically at the GPS location, so the device offset is right,
-  DST included). In tests, build the date with `DateTime.utc(...)` → offset 0 →
-  the returned times are deterministic UTC you can assert to the minute, no
-  ambient-timezone flakiness.
+- **`utcOffset` makes the wall-clock fields right — but its DateTimes lie about
+  the instant.** Pass `date.timeZoneOffset` (the user is physically at the GPS
+  location, so the device offset is right, DST included); in tests a
+  `DateTime.utc(...)` → offset 0 → deterministic UTC-clock fields you can assert
+  to the minute. **The trap:** with `utcOffset` set, adhan returns each time as
+  `t.toUtc().add(offset)` — a DateTime flagged `isUtc` whose *fields* show the
+  correct local time but whose *instant* is shifted by the offset. So
+  `time.isAfter(DateTime.now())` is off by the offset: in IST (+5:30) an
+  afternoon Asr still read as "after" a 9pm `now`, so the pill showed a
+  long-passed prayer as next instead of rolling to tomorrow's Fajr. **Fix:**
+  normalize at the data boundary — rebuild a plain local DateTime from the
+  wall-clock fields (`DateTime(t.year, t.month, t.day, t.hour, t.minute)`):
+  identical display, correct instant, `isUtc == false`. Display worked all
+  along, which is why it slipped past the first tests — the regression test now
+  asserts the times are non-UTC and that one minute past Isha `nextAfter()` is
+  null. (Comparisons over these times — the creed guard, ordering checks — must
+  be representation-agnostic too: compare time-of-day, not instants, or both
+  operands must be normalized the same way.)
 - **Encode a creed constraint as code, never as a setting.** The owner follows
   Salafi/Ahle-Hadith: MWL method + Standard (Shafi) Asr, Hanafi never offered.
   So `_method` and `_madhab` are the *only* two calc constants, hard-wired in
