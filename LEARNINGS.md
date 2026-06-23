@@ -186,6 +186,22 @@ a booted iPhone sim (`flutter run -t lib/diag_main.dart -d <sim>`) and screensho
   the old Impeller Arabic-GPOS bug is gone; toggling Impeller changes nothing here.
 - The hb-view reference render of the same word is also correct. Font + data are fine.
 
+**Final word on the `ـىٰٓ` "tight madd" (e.g. `ٱلۡيَتَٰمَىٰٓ`, An-Nisa 4:2): it is the CANONICAL
+KFGQPC rendering — not a bug, and not cleanly fixable. Owner accepted it.** The madd hugs the
+alef-maqsura because `calt` substitutes word-final alef-maqsura to the Tajweed glyph `TJ065`,
+whose superscript/madd anchor sits at **y≈75** vs **≈480** on the normal final form
+(`afii57450.zz04`). Confirm: `hb-shape font.ttf "ٱلۡيَتَٰمَىٰٓ"` (mark at 75 on TJ065) vs
+`--features="-calt"` (mark at 480). This is identical to what quran.com ships (same font +
+text) and to the printed Madani Mushaf — verify An-Nisa 4:2 on quran.com. The contrast with
+`يَـٰٓأَيُّهَا` (which floats high) is that the latter has a **tatweel carrier**; `ـىٰٓ` words
+carry the madd on the letter itself, and Tanzil/canonical add no carrier there.
+**Why we did NOT "fix" it:** disabling `calt` lifts the madd but (a) deforms the alef-maqsura
+swash, (b) widens the text so Bismillah wraps, and (c) **shatters the Allah ligature**
+(`Allah`→5 glyphs) and Bismillah — `calt` drives those too. Per-span `-calt` for just the
+affected ~14 words is possible but the visual gain is marginal and not worth the complexity.
+**Flutter gotcha:** `calt` is default-ON; `FontFeature.enable('rlig')` alone does NOT disable
+it — you must pass `FontFeature.disable('calt')` explicitly (omitting ≠ off).
+
 (Impeller-off is still set in the native manifests — Android:
 `io.flutter.embedding.android.EnableImpeller=false`; iOS: `FLTEnableImpeller=<false/>` —
 and a manifest change needs `flutter clean` to take. But on 3.41 it is no longer the cause
@@ -204,19 +220,24 @@ medallion); patching one and declaring victory is whack-a-mole. **Lesson: when a
 before concluding it's a build/cache problem.** A screenshot localises which widget — the
 green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text glyph.
 
-**Numeral convention — two scripts, two places (`core/util/arabic_digits.dart`):**
-- **Plain UI badges** (ayah badge, surah/nav circles, chapter medallion) use **Urdu/Persian
-  "Extended Arabic-Indic" digits, U+06F0–U+06F9** (`toUrduDigits`) in the **system font**, so
-  Urdu/Hindi readers see the digit they read as "2" (`۲`).
-- **The Mushaf ayah-end ROSETTE** keeps **canonical Arabic-Indic, U+0660–U+0669**
-  (`toArabicIndicDigits`). KFGQPC's GSUB only composes *those* code points into the ornate
-  medallion (`٢`→`_771`); feed it `۲` (U+06F2) and you get a bare digit (`uni06F2`, no rosette).
-  Verify with `hb-shape font.ttf "٢"` vs `"۲"`.
-- **Gotcha that caused 3 rounds of "still showing 4":** the Arabic-Indic **`٢` (2) looks like
-  the Urdu/Persian `۴` (4)** to an Urdu reader. The rosette `٢` is correct (every printed
-  Mushaf, incl. Urdu ones, uses it) but *reads* as 4. Proof for the user: render `١ ٢ ٣ ٤`
-  as rosettes (`hb-view ... "١ ٢ ٣ ٤"`, RTL) so they see the 2 and the 4 are different glyphs.
-  This is why the badges (not the font-locked rosette) were switched to Urdu numerals.
+**Numeral convention — FINAL (owner-decided), `core/util/arabic_digits.dart`:**
+- **Plain UI chrome badges** (TOC surah circle, chapter-header medallion, Detailed-view
+  ayah badge, nav-index circle) stay **Western digits** (`'$n'`). The owner wants English
+  numerals in chrome. (An Urdu-digit experiment on these was tried and reverted.)
+- **Reading-view ayah marker** uses a **plain Eastern Arabic-Indic (Urdu/Persian) numeral,
+  U+06F0–U+06F9** (`toUrduDigits`, ۲), in the accent colour, **rendered in the Urdu face**
+  (`AppTheme.urduFontFamily`). The font override is REQUIRED: KFGQPC maps U+06F0+ to
+  placeholder dotted-circles (render `hb-view UthmanicHafs1-Ver18.ttf "۲"` → a dashed circle,
+  not a digit); Noto Nastaliq Urdu has proper `TwoFarsi`/etc. glyphs. Still real inline text
+  (orders correctly in RTL, reflows, zooms) — NOT a WidgetSpan/overlay.
+- **We DROPPED the font's ornate ayah rosette.** KFGQPC's GSUB composes Arabic-Indic
+  U+0660–U+0669 into the ornate medallion (`٢`→`_771`), but the **Arabic-Indic `٢` (2) reads
+  like the Urdu/Persian `۴` (4)** to an Urdu reader — the source of 3+ rounds of "it still
+  shows 4". The rosette `٢` was *correct* (every printed Mushaf uses it) but unreadable to the
+  target audience, so the owner chose a plain Urdu numeral over the medallion. To show a user
+  ٢≠4: render `١ ٢ ٣ ٤` (`hb-view ... "١ ٢ ٣ ٤"`, RTL) — the 2 (hook) and 4 (hook+loop) are
+  clearly different glyphs. Feeding U+06F2 to the rosette span would NOT compose (bare
+  `uni06F2`), which is why dropping the rosette (not recolouring it) was the only path.
 
 ---
 
