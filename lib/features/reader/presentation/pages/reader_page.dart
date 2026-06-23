@@ -171,7 +171,9 @@ class _ReaderViewState extends State<_ReaderView> {
             icon: const Icon(Icons.format_size_rounded),
             onPressed: _toggleFontSlider,
           ),
-          const NextPrayerPill(),
+          // Icon-only here — the reader bar is already busy (viewport, font,
+          // theme). The full text pill lives on the roomier Home bar.
+          const NextPrayerPill(compact: true),
           const ThemeToggleButton(),
         ],
       ),

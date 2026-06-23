@@ -13,10 +13,17 @@ import 'prayer_times_sheet.dart';
 /// reader's `_PagePill` tone) that opens the all-five sheet on tap. When no
 /// location is set yet, a discreet location icon offers one tap to enable.
 ///
+/// [compact] collapses it to a single icon (no text) for the already-busy reader
+/// app bar — a mosque glyph, or a gold no-prayer glyph while prayer is forbidden;
+/// the full text pill is for roomier bars (Home). Both open the same sheet.
+///
 /// Reads the cubit DEFENSIVELY (like [ThemeToggleButton]) so a screen pumped in
 /// isolation doesn't crash.
 class NextPrayerPill extends StatelessWidget {
-  const NextPrayerPill({super.key});
+  const NextPrayerPill({super.key, this.compact = false});
+
+  /// Icon-only (vs the full text pill) — for crowded app bars.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +51,21 @@ class NextPrayerPill extends StatelessWidget {
         }
 
         // Inside one of the three windows where prayer is prohibited → a gold
-        // caution pill telling you when it lifts, instead of the next-prayer one.
+        // caution telling you when it lifts, instead of the next-prayer one.
         final forbidden = state.forbidden;
         if (forbidden != null) {
+          if (compact) {
+            return IconButton(
+              key: WidgetKeys.nextPrayerPill,
+              tooltip: 'No prayer now (${forbidden.reason.label}) — '
+                  'until ${formatPrayerTime(forbidden.end)}',
+              icon: Icon(
+                Icons.do_not_disturb_on_outlined,
+                color: forbiddenGold(context),
+              ),
+              onPressed: () => _openSheet(context, bloc),
+            );
+          }
           return _ForbiddenPill(
             window: forbidden,
             onTap: () => _openSheet(context, bloc),
@@ -54,6 +73,15 @@ class NextPrayerPill extends StatelessWidget {
         }
 
         final next = state.next!;
+        if (compact) {
+          return IconButton(
+            key: WidgetKeys.nextPrayerPill,
+            tooltip: '${next.prayer.label} ${formatPrayerTime(next.at)} '
+                '— prayer times',
+            icon: const Icon(Icons.mosque),
+            onPressed: () => _openSheet(context, bloc),
+          );
+        }
         return Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -120,9 +148,15 @@ class NextPrayerPill extends StatelessWidget {
       };
 }
 
-/// The caution pill shown while prayer is prohibited — gold-toned (the same
-/// phase-tuned [MushafColors.gold] used for ornamentation, thematically apt for
-/// the sun at the horizon), with the time the window lifts. Tap opens the sheet.
+/// The phase-tuned caution gold (also the ornamentation gold), read DEFENSIVELY:
+/// bare test themes don't carry the [MushafColors] extension.
+Color forbiddenGold(BuildContext context) =>
+    Theme.of(context).extension<MushafColors>()?.gold ??
+    const Color(0xFF9C6F02);
+
+/// The caution pill shown while prayer is prohibited — gold-toned (thematically
+/// apt for the sun at the horizon), with the time the window lifts. Tap opens
+/// the sheet.
 class _ForbiddenPill extends StatelessWidget {
   const _ForbiddenPill({required this.window, required this.onTap});
 
@@ -131,9 +165,7 @@ class _ForbiddenPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Defensive: bare test themes won't carry the MushafColors extension.
-    final gold = Theme.of(context).extension<MushafColors>()?.gold ??
-        const Color(0xFF9C6F02);
+    final gold = forbiddenGold(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),

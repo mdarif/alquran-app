@@ -49,8 +49,15 @@ PrayerTimesCubit _cubit({GeoLocation? saved, int hour = 17, int minute = 0}) {
   return cubit;
 }
 
-Future<void> _pump(WidgetTester tester, PrayerTimesCubit? cubit) {
-  const bar = Scaffold(appBar: null, body: Center(child: NextPrayerPill()));
+Future<void> _pump(
+  WidgetTester tester,
+  PrayerTimesCubit? cubit, {
+  bool compact = false,
+}) {
+  final bar = Scaffold(
+    appBar: null,
+    body: Center(child: NextPrayerPill(compact: compact)),
+  );
   return tester.pumpWidget(
     MaterialApp(
       home: cubit == null
@@ -94,6 +101,28 @@ void main() {
     await _pump(tester, _cubit(saved: _loc, hour: 18, minute: 30));
     expect(find.textContaining('Forbidden'), findsOneWidget);
     expect(find.textContaining('6:42'), findsOneWidget); // lifts at Maghrib
+
+    await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
+    await tester.pumpAndSettle();
+    expect(find.byKey(WidgetKeys.prayerTimesSheet), findsOneWidget);
+  });
+
+  testWidgets('compact mode is an icon only — no text pill (reader bar)',
+      (tester) async {
+    await _pump(tester, _cubit(saved: _loc, hour: 14), compact: true);
+    expect(find.byIcon(Icons.mosque), findsOneWidget);
+    expect(find.textContaining('Asr'), findsNothing); // collapsed, no text
+  });
+
+  testWidgets('compact mode shows a gold no-prayer icon when forbidden',
+      (tester) async {
+    await _pump(
+      tester,
+      _cubit(saved: _loc, hour: 18, minute: 30),
+      compact: true,
+    );
+    expect(find.byIcon(Icons.do_not_disturb_on_outlined), findsOneWidget);
+    expect(find.textContaining('Forbidden'), findsNothing);
 
     await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
     await tester.pumpAndSettle();

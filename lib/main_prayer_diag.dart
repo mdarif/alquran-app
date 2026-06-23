@@ -112,19 +112,28 @@ class _DiagPageState extends State<_DiagPage> {
     );
     return Scaffold(
       appBar: AppBar(title: const Text('Prayer-times diag')),
-      body: ListView(
-        children: [
-          const _SectionLabel('App-bar pill — every state'),
-          for (final (label, cubit) in _states)
-            _PillRow(label: label, cubit: cubit),
-          const Divider(height: 32),
-          const _SectionLabel('Sheet — light (Duha)'),
-          _SheetDemo(phase: DayPhase.duha, day: sampleDay),
-          const Divider(height: 32),
-          const _SectionLabel('Sheet — night (Isha)'),
-          _SheetDemo(phase: DayPhase.isha, day: sampleDay),
-          const SizedBox(height: 24),
-        ],
+      // SingleChildScrollView (not ListView) so every section builds eagerly —
+      // screenshot-friendly, and the smoke test sees off-screen rows too.
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _SectionLabel('Home app-bar pill — every state'),
+            for (final (label, cubit) in _states)
+              _PillRow(label: label, cubit: cubit),
+            const Divider(height: 32),
+            const _SectionLabel('Reader app-bar — compact (icon only)'),
+            for (final (label, cubit) in _states.take(5))
+              _PillRow(label: label, cubit: cubit, compact: true),
+            const Divider(height: 32),
+            const _SectionLabel('Sheet — light (Duha)'),
+            _SheetDemo(phase: DayPhase.duha, day: sampleDay),
+            const Divider(height: 32),
+            const _SectionLabel('Sheet — night (Isha)'),
+            _SheetDemo(phase: DayPhase.isha, day: sampleDay),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
@@ -148,10 +157,15 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _PillRow extends StatelessWidget {
-  const _PillRow({required this.label, required this.cubit});
+  const _PillRow({
+    required this.label,
+    required this.cubit,
+    this.compact = false,
+  });
 
   final String label;
   final PrayerTimesCubit cubit;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -161,7 +175,7 @@ class _PillRow extends StatelessWidget {
             Expanded(child: Text(label)),
             BlocProvider<PrayerTimesCubit>.value(
               value: cubit,
-              child: const NextPrayerPill(),
+              child: NextPrayerPill(compact: compact),
             ),
           ],
         ),
