@@ -19,6 +19,18 @@ class AppTheme {
     FontFeature.enable('liga'),
   ];
 
+  // For words ending in a superscript-alef'd alef-maqsura (ـىٰٓ, e.g. ٱلۡيَتَٰمَىٰٓ),
+  // `calt` swaps the alef-maqsura for KFGQPC's Tajweed glyph (TJ065) whose madd
+  // anchor sits very low, dropping the mark onto the letter. Shaping JUST those
+  // words without `calt` lifts the madd to the normal anchor. `calt` is default-
+  // ON, so it must be explicitly DISABLED (omitting it ≠ off). Kept off only for
+  // those words so the Allah/Bismillah ligatures (also `calt`-driven) survive.
+  static const List<FontFeature> arabicFontFeaturesNoCalt = [
+    FontFeature.disable('calt'),
+    FontFeature.enable('rlig'),
+    FontFeature.enable('liga'),
+  ];
+
   // Urdu translation face — Noto Nastaliq Urdu (proper nastaliq script).
   static const String urduFontFamily = 'NotoNastaliqUrdu';
 

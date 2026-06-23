@@ -153,7 +153,7 @@ void main() {
       expect(flow.textDirection, TextDirection.rtl);
     });
 
-    testWidgets('appends ayah numbers as Urdu/Persian digits (no U+06DD added)',
+    testWidgets('marks each ayah with the U+06DD medallion + overlaid Urdu digit',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -163,18 +163,27 @@ void main() {
           ),
         ),
       );
-      final allText = tester
+      await tester.pumpAndSettle(); // let the medallion overlay measure + place
+
+      // The continuous paragraph carries the empty ayah medallion (U+06DD); the
+      // verse number is drawn as a separate overlaid Urdu numeral on top of it.
+      final paragraph = tester
           .widgetList<Text>(find.byType(Text))
           .where((t) => t.textSpan != null)
           .map((t) => t.textSpan!.toPlainText())
           .join();
-      expect(allText.contains('۝'), isFalse);
-      // Reading view marks verses with Eastern Arabic-Indic (Urdu) digits ۱۲۳۴,
-      // not the canonical ٢ rosette (which reads as "4" to Urdu readers).
+      expect(paragraph, contains('۝'));
+
+      // Each verse number is an Eastern Arabic-Indic (Urdu) digit ۱۲۳۴ — NOT the
+      // canonical ٢ rosette (which reads as "4" to Urdu readers), and NOT inline
+      // in the Arabic paragraph (it's an overlay Text).
+      final allText = tester
+          .widgetList<Text>(find.byType(Text))
+          .map((t) => t.data ?? t.textSpan?.toPlainText() ?? '')
+          .join();
       for (final n in ['۱', '۲', '۳', '۴']) {
         expect(allText, contains(n));
       }
-      // And NOT the Arabic-Indic forms.
       expect(allText.contains('١'), isFalse);
     });
 

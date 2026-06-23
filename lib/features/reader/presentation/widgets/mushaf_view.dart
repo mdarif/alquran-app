@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show BoxHeightStyle;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -212,9 +213,7 @@ class _MushafViewState extends State<MushafView>
       for (final ayah in group) {
         _verseStart[ayah.id] = offset;
         offset += ayah.textArabic.length +
-            2 // leading + trailing space around the number
-            +
-            toUrduDigits(ayah.ayahNumber).length;
+            3; // ' ۝ ' — leading space + medallion (U+06DD) + trailing space
       }
     }
   }
@@ -390,53 +389,17 @@ class _MushafViewState extends State<MushafView>
                       Bismillah(fontSize: fontSize),
                       const SizedBox(height: 18),
                     ],
-                    // One Text.rich per surah group → continuous inline flow. After
-                    // each verse we append its number as a plain Urdu/Persian
-                    // numeral (۲), in the accent colour, in the Urdu face — Urdu
-                    // readers read ۲ as "2" (the canonical Arabic-Indic ٢ that the
-                    // KFGQPC font composes into a rosette reads like "4" to them).
-                    // It's real text, so it orders correctly in RTL and reflows/
-                    // zooms natively — no WidgetSpan/placeholder (those bidi-reverse)
-                    // and no overlay (invisible on-device). The marker overrides the
-                    // font because KFGQPC maps U+06F0+ to placeholder dotted-circles.
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapUp: (d) => _onGroupTap(d, group),
-                      child: Text.rich(
-                        key: _groupKeyFor(group.first.surahId),
-                        TextSpan(
-                          children: [
-                            for (final ayah in group) ...[
-                              TextSpan(
-                                text: ayah.textArabic,
-                                style: (_highlightAyahId == ayah.id ||
-                                        _selectedAyah?.id == ayah.id)
-                                    ? TextStyle(
-                                        backgroundColor: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.16),
-                                      )
-                                    : null,
-                              ),
-                              TextSpan(
-                                text: ' ${toUrduDigits(ayah.ayahNumber)} ',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontFamily: AppTheme.urduFontFamily,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        textAlign: TextAlign.center,
-                        textDirection: TextDirection.rtl,
-                        locale: const Locale('ar'),
-                        style: QuranTextStyle.madani.copyWith(
-                          fontSize: fontSize,
-                          height: 1.9,
-                        ),
-                      ),
+                    // Continuous Mushaf paragraph with each ayah's number drawn as
+                    // a readable Urdu numeral centred inside the font's ornate ayah
+                    // medallion (U+06DD). See [_MarkedParagraph].
+                    _MarkedParagraph(
+                      group: group,
+                      fontSize: fontSize,
+                      paragraphKey: _groupKeyFor(group.first.surahId),
+                      highlightAyahId: _highlightAyahId,
+                      selectedAyahId: _selectedAyah?.id,
+                      onTap: (d) => _onGroupTap(d, group),
+                      markerColor: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(height: 28),
                   ],
@@ -495,6 +458,212 @@ class _MushafViewState extends State<MushafView>
       group.first.surahId != _surahAlFatiha &&
       group.first.surahId != _surahAtTawbah &&
       group.first.ayahNumber == 1;
+}
+
+/// One surah group's continuous Mushaf paragraph.
+///
+/// Each ayah's number is drawn as a **readable Urdu numeral centred inside the
+/// font's ornate ayah medallion** (U+06DD). The medallion is inline *text*, so
+/// it orders correctly in RTL, reflows and zooms with the verses, and is always
+/// drawn (graceful degradation — if the overlay ever mis-measures, you still see
+/// the medallion, never an empty gap). The numeral is overlaid because KFGQPC
+/// can only compose the canonical Arabic-Indic ٢ into its rosette (which reads
+/// like "4" to Urdu readers), not a U+06F0+ Urdu digit.
+///
+/// Word-final `ـىٰٓ` words (e.g. ٱلۡيَتَٰمَىٰٓ) are shaped without `calt` to lift
+/// their madd off the letter — see [AppTheme.arabicFontFeaturesNoCalt].
+class _MarkedParagraph extends StatefulWidget {
+  const _MarkedParagraph({
+    required this.group,
+    required this.fontSize,
+    required this.paragraphKey,
+    required this.highlightAyahId,
+    required this.selectedAyahId,
+    required this.onTap,
+    required this.markerColor,
+  });
+
+  final List<Ayah> group;
+  final double fontSize;
+  final GlobalKey paragraphKey;
+  final int? highlightAyahId;
+  final int? selectedAyahId;
+  final void Function(TapUpDetails) onTap;
+  final Color markerColor;
+
+  @override
+  State<_MarkedParagraph> createState() => _MarkedParagraphState();
+}
+
+class _MarkedParagraphState extends State<_MarkedParagraph> {
+  // The empty ayah medallion glyph; the Urdu numeral is overlaid on its centre.
+  static const String _medallion = '۝';
+
+  // Character offset of each ayah's medallion glyph within the paragraph.
+  final List<int> _markerOffsets = [];
+
+  // Measured medallion boxes (paragraph-local), one per ayah; empty until laid out.
+  List<Rect> _rects = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _computeOffsets();
+  }
+
+  @override
+  void didUpdateWidget(covariant _MarkedParagraph old) {
+    super.didUpdateWidget(old);
+    if (old.group != widget.group) _computeOffsets();
+  }
+
+  void _computeOffsets() {
+    _markerOffsets
+      ..clear()
+      ..addAll(_offsetsFor(widget.group));
+  }
+
+  static List<int> _offsetsFor(List<Ayah> group) {
+    final offsets = <int>[];
+    var offset = 0;
+    for (final ayah in group) {
+      // ' ۝ ' = leading space + medallion + trailing space; the medallion sits
+      // one char past the verse text and the leading space.
+      offsets.add(offset + ayah.textArabic.length + 1);
+      offset += ayah.textArabic.length + 3;
+    }
+    return offsets;
+  }
+
+  void _measure() {
+    if (!mounted) return;
+    final obj = widget.paragraphKey.currentContext?.findRenderObject();
+    if (obj is! RenderParagraph || !obj.attached) return;
+    final rects = <Rect>[
+      for (final off in _markerOffsets)
+        () {
+          final boxes = obj.getBoxesForSelection(
+            TextSelection(baseOffset: off, extentOffset: off + 1),
+            boxHeightStyle: BoxHeightStyle.tight,
+          );
+          return boxes.isEmpty ? Rect.zero : boxes.first.toRect();
+        }(),
+    ];
+    if (!_rectsClose(rects, _rects)) {
+      setState(() => _rects = rects);
+    }
+  }
+
+  static bool _rectsClose(List<Rect> a, List<Rect> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if ((a[i].center - b[i].center).distanceSquared > 0.25 ||
+          (a[i].height - b[i].height).abs() > 0.5) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Re-measure after each layout (zoom / reflow / rotation). Guarded so it only
+    // setStates when a medallion actually moves — no rebuild loop.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
+
+    final spans = <InlineSpan>[];
+    for (final ayah in widget.group) {
+      final highlighted = widget.highlightAyahId == ayah.id ||
+          widget.selectedAyahId == ayah.id;
+      spans.addAll(
+        _verseTextSpans(
+          ayah.textArabic,
+          highlighted
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.16)
+              : null,
+        ),
+      );
+      spans.add(
+        TextSpan(
+          text: ' $_medallion ',
+          style: TextStyle(color: widget.markerColor),
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapUp: widget.onTap,
+          child: Text.rich(
+            key: widget.paragraphKey,
+            TextSpan(children: spans),
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            locale: const Locale('ar'),
+            style: QuranTextStyle.madani.copyWith(
+              fontSize: widget.fontSize,
+              height: 1.9,
+            ),
+          ),
+        ),
+        for (var i = 0; i < _rects.length; i++)
+          if (_rects[i] != Rect.zero)
+            Positioned.fromRect(
+              rect: _rects[i],
+              child: IgnorePointer(
+                child: Center(
+                  child: Text(
+                    toUrduDigits(widget.group[i].ayahNumber),
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      fontFamily: AppTheme.urduFontFamily,
+                      color: widget.markerColor,
+                      height: 1.0,
+                      // Sized to the medallion's interior, so multi-digit numbers
+                      // (e.g. ۲۸۶) still fit; scales with pinch-zoom via the box.
+                      fontSize: _rects[i].height * 0.30,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+/// Spans for one verse's Arabic text. Words carrying a word-final alef-maqsura +
+/// superscript-alef (`ىٰ`, U+0649 U+0670) are shaped without `calt` so their madd
+/// lifts off the letter; everything else keeps `calt` (for Allah/Bism ligatures).
+/// [bg] is the highlight colour (null when not highlighted).
+List<InlineSpan> _verseTextSpans(String text, Color? bg) {
+  final base = bg == null ? null : TextStyle(backgroundColor: bg);
+  final noCalt = TextStyle(
+    fontFeatures: AppTheme.arabicFontFeaturesNoCalt,
+    backgroundColor: bg,
+  );
+  final spans = <InlineSpan>[];
+  final buffer = StringBuffer();
+  void flush() {
+    if (buffer.isEmpty) return;
+    spans.add(TextSpan(text: buffer.toString(), style: base));
+    buffer.clear();
+  }
+
+  final words = text.split(' ');
+  for (var i = 0; i < words.length; i++) {
+    if (words[i].contains('ىٰ')) {
+      flush();
+      spans.add(TextSpan(text: words[i], style: noCalt));
+    } else {
+      buffer.write(words[i]);
+    }
+    if (i < words.length - 1) buffer.write(' ');
+  }
+  flush();
+  return spans;
 }
 
 /// A subtle "Page N" readout that fades in while scrolling and out when idle.
