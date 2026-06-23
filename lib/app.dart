@@ -7,7 +7,6 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
-import 'core/theme/app_theme.dart';
 import 'core/theme/theme_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
 
@@ -41,6 +40,8 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     // re-enable on resume, release when paused/hidden.
     if (state == AppLifecycleState.resumed) {
       unawaited(WakelockPlus.enable());
+      // Time may have crossed into a new "Light of Day" phase while backgrounded.
+      GetIt.I<ThemeCubit>().refresh();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       unawaited(WakelockPlus.disable());
@@ -51,14 +52,16 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return BlocProvider<ThemeCubit>.value(
       value: GetIt.I<ThemeCubit>(),
-      child: BlocBuilder<ThemeCubit, ThemeMode>(
-        builder: (context, mode) {
+      child: BlocBuilder<ThemeCubit, ThemeState>(
+        builder: (context, themeState) {
           return MaterialApp(
             title: 'Al Quran',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            themeMode: mode,
+            theme: themeState.palette.toTheme(),
+            // A gentle cross-fade as the light changes — the surface "breathes"
+            // between phases instead of snapping.
+            themeAnimationDuration: const Duration(milliseconds: 700),
+            themeAnimationCurve: Curves.easeInOut,
             scrollBehavior: const QuranScrollBehavior(),
             navigatorObservers: [routeObserver],
             home: const HomePage(),

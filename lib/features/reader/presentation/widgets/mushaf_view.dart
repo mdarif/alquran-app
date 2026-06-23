@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
@@ -271,11 +272,9 @@ class _MushafViewState extends State<MushafView>
     final viewportGlobalY = (context.findRenderObject()! as RenderBox)
         .localToGlobal(Offset.zero)
         .dy;
-    final target = (_controller.offset +
-            (groupGlobalY - viewportGlobalY) +
-            verseTop -
-            48)
-        .clamp(0.0, _controller.position.maxScrollExtent);
+    final target =
+        (_controller.offset + (groupGlobalY - viewportGlobalY) + verseTop - 48)
+            .clamp(0.0, _controller.position.maxScrollExtent);
     _controller.animateTo(
       target,
       duration: const Duration(milliseconds: 450),
@@ -563,8 +562,8 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
     for (final ayah in widget.group) {
-      final highlighted = widget.highlightAyahId == ayah.id ||
-          widget.selectedAyahId == ayah.id;
+      final highlighted =
+          widget.highlightAyahId == ayah.id || widget.selectedAyahId == ayah.id;
       spans.add(
         TextSpan(
           text: ayah.textArabic,
@@ -829,7 +828,8 @@ class Bismillah extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gold = AppTheme.ornamentGold(Theme.of(context).brightness);
+    final gold = Theme.of(context).extension<MushafColors>()?.gold ??
+        Theme.of(context).colorScheme.primary;
     final star = Text(
       '۞',
       style: QuranTextStyle.madani.copyWith(

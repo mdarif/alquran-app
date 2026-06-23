@@ -153,7 +153,8 @@ void main() {
       expect(flow.textDirection, TextDirection.rtl);
     });
 
-    testWidgets('marks each ayah with the U+06DD medallion + overlaid Western digit',
+    testWidgets(
+        'marks each ayah with the U+06DD medallion + overlaid Western digit',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -520,7 +521,10 @@ void main() {
 
     // Regression: deep in a long surah, BOTH enlarging and shrinking the font
     // must keep the reader on (or very near) the same verse — not jump to v1.
-    for (final change in const [('enlarge', 24.0, 40.0), ('shrink', 40.0, 24.0)]) {
+    for (final change in const [
+      ('enlarge', 24.0, 40.0),
+      ('shrink', 40.0, 24.0),
+    ]) {
       testWidgets('${change.$1} font keeps the verse (deep scroll, 286 verses)',
           (tester) async {
         final reported = <int>[];

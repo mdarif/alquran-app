@@ -45,8 +45,10 @@ Future<void> _pumpHome(
   WidgetTester tester, {
   bool advancedNavigation = true,
 }) async {
-  SharedPreferences.setMockInitialValues(const {});
+  // A fixed light (not auto) so there's no Light-of-Day ticker to leak in tests.
+  SharedPreferences.setMockInitialValues(const {'theme_choice': 'duha'});
   final theme = ThemeCubit(await SharedPreferences.getInstance());
+  addTearDown(theme.close);
   await tester.pumpWidget(
     BlocProvider<ThemeCubit>.value(
       value: theme,

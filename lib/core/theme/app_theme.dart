@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// App theme. Light is the default; dark is user-toggleable (see ThemeCubit).
+import 'mushaf_palette.dart';
+
+/// App-wide font faces + theme entry points. The actual reading **surfaces** are
+/// the day-phase palettes in [MushafPalette] ("Light of Day"); the cubit picks
+/// the active one. `light()`/`dark()` here are convenience anchors (Duha / Isha).
 class AppTheme {
   AppTheme._();
-
-  static const Color _seed = Color(0xFF12705B); // Al Marfa green
 
   // Primary Arabic face (PRD 4.1). Falls back gracefully if the .ttf is not
   // yet bundled in assets/fonts/.
@@ -30,51 +32,11 @@ class AppTheme {
   // header). Playfair Display (SIL OFL). Swap here to change the heading face.
   static const String displayFontFamily = 'PlayfairDisplay';
 
-  /// Gold accent reserved for sacred ornamentation (the Bismillah, and any
-  /// future illuminated markers). Tuned per brightness for legibility: a deep
-  /// antique gold on the light cream (≈4.3:1), a bright gold on the dark ground
-  /// (≈11.5:1). Keep its use intentional — don't spread it across the UI.
-  static Color ornamentGold(Brightness brightness) =>
-      brightness == Brightness.dark
-          ? const Color(0xFFE6C76A)
-          : const Color(0xFF9C6F02);
+  /// The bright-midday surface — the default light theme anchor.
+  static ThemeData light() => MushafPalette.of(DayPhase.duha).toTheme();
 
-  static ThemeData light() => _build(
-        Brightness.light,
-        const Color(0xFFFBF9F3), // warm off-white
-      );
-
-  static ThemeData dark() => _build(
-        Brightness.dark,
-        const Color(0xFF12100E), // warm near-black
-      );
-
-  static ThemeData _build(Brightness brightness, Color scaffold) {
-    final base = ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: _seed,
-        brightness: brightness,
-      ),
-      useMaterial3: true,
-    );
-    return base.copyWith(
-      scaffoldBackgroundColor: scaffold,
-      // Flat, centered bar that blends into the warm page — drops the Material
-      // "slab" look for a calmer, more premium reading frame.
-      appBarTheme: AppBarTheme(
-        backgroundColor: scaffold,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: base.colorScheme.onSurface,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        titleTextStyle: base.textTheme.titleMedium?.copyWith(
-          color: base.colorScheme.onSurface,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  /// The deep-night surface — the default dark theme anchor.
+  static ThemeData dark() => MushafPalette.of(DayPhase.isha).toTheme();
 }
 
 /// Canonical Arabic (Madani/Uthmani) text style. No colour — the text inherits
