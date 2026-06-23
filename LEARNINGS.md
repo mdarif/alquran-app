@@ -592,11 +592,19 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   be representation-agnostic too: compare time-of-day, not instants, or both
   operands must be normalized the same way.)
 - **Encode a creed constraint as code, never as a setting.** The owner follows
-  Salafi/Ahle-Hadith: MWL method + Standard (Shafi) Asr, Hanafi never offered.
-  So `_method` and `_madhab` are the *only* two calc constants, hard-wired in
-  the repo and never surfaced in any UI. Guard it with a **regression test that
-  computes the Hanafi Asr alongside and asserts ours is earlier** — a refactor
-  can't silently flip the creed without going red.
+  Salafi/Ahle-Hadith: Standard (Shafi) Asr, Hanafi never offered. So `_method`
+  and `_madhab` are the *only* two calc constants, hard-wired in the repo and
+  never surfaced in any UI. Guard it with a **regression test that computes the
+  Hanafi Asr alongside and asserts ours is earlier** — a refactor can't silently
+  flip the creed without going red.
+- **Calculation method is regional, not creedal — pick it for the audience.**
+  The *method* sets only the Fajr/Isha twilight angles; Asr is method-independent
+  (it follows the madhab's shadow ratio). So the method is free to track the
+  user base: this app's Urdu/Hindi audience is subcontinental, where the standard
+  is **University of Islamic Sciences, Karachi** (18°/18°). We started on MWL
+  (17° Isha) and it ran ~6 min early vs the owner's local Delhi reference;
+  Karachi matched every prayer to the minute. Verify a method against a trusted
+  local source before hard-wiring it — the angles diverge most at Isha/Fajr.
 - **Keep `adhan`/`geolocator` out of `domain/`.** Domain owns a plain `Prayer`
   enum + a `LocationProvider` interface; the data layer maps the package types
   to domain types. The cubit depends on the repo interface, so it tests with a
