@@ -390,7 +390,6 @@ class _MushafViewState extends State<MushafView>
                       highlightAyahId: _highlightAyahId,
                       selectedAyahId: _selectedAyah?.id,
                       onTap: (d) => _onGroupTap(d, group),
-                      markerColor: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(height: 28),
                   ],
@@ -472,7 +471,6 @@ class _MarkedParagraph extends StatefulWidget {
     required this.highlightAyahId,
     required this.selectedAyahId,
     required this.onTap,
-    required this.markerColor,
   });
 
   final List<Ayah> group;
@@ -481,7 +479,6 @@ class _MarkedParagraph extends StatefulWidget {
   final int? highlightAyahId;
   final int? selectedAyahId;
   final void Function(TapUpDetails) onTap;
-  final Color markerColor;
 
   @override
   State<_MarkedParagraph> createState() => _MarkedParagraphState();
@@ -563,6 +560,7 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     // setStates when a medallion actually moves — no rebuild loop.
     WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
 
+    final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
     for (final ayah in widget.group) {
       final highlighted = widget.highlightAyahId == ayah.id ||
@@ -571,19 +569,17 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
         TextSpan(
           text: ayah.textArabic,
           style: highlighted
-              ? TextStyle(
-                  backgroundColor: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.16),
-                )
+              ? TextStyle(backgroundColor: cs.primary.withValues(alpha: 0.16))
               : null,
         ),
       );
+      // The medallion glyph is INVISIBLE — it only reserves the inline slot and
+      // is the measurable anchor (U+06DD boxes cleanly). The visible verse badge
+      // is the circle overlaid on its box below.
       spans.add(
-        TextSpan(
+        const TextSpan(
           text: ' $_medallion ',
-          style: TextStyle(color: widget.markerColor),
+          style: TextStyle(color: Color(0x00000000)),
         ),
       );
     }
@@ -605,29 +601,36 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
             ),
           ),
         ),
+        // The visible verse badge: a clean filled circle with the Western number,
+        // matching the TOC / Detailed-view CircleAvatar (not the font's ornate
+        // Mushaf rosette). Drawn over the invisible medallion anchor's box, so it
+        // keeps correct RTL order + reflow + pinch-zoom (a WidgetSpan would bidi-
+        // reverse). Sized off the measured box.
         for (var i = 0; i < _rects.length; i++)
           if (_rects[i] != Rect.zero)
             Positioned.fromRect(
               rect: _rects[i],
               child: IgnorePointer(
                 child: Center(
-                  // The medallion's inner field. FittedBox scales the number down
-                  // to fit it, so a 3-digit ayah (e.g. 286) never overflows the
-                  // ornament; it scales with pinch-zoom via the measured box.
-                  child: SizedBox(
-                    width: _rects[i].width * 0.46,
-                    height: _rects[i].height * 0.40,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        // Western digits — unambiguous and consistent with the TOC
-                        // and Detailed-view badges (the Arabic-Indic ٢ the rosette
-                        // would compose reads as "4" to Urdu readers).
-                        '${widget.group[i].ayahNumber}',
-                        style: TextStyle(
-                          color: widget.markerColor,
-                          fontWeight: FontWeight.w600,
-                          height: 1.0,
+                  child: Container(
+                    width: _rects[i].shortestSide,
+                    height: _rects[i].shortestSide,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: cs.primaryContainer,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.all(_rects[i].shortestSide * 0.22),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${widget.group[i].ayahNumber}',
+                          style: TextStyle(
+                            color: cs.onPrimaryContainer,
+                            fontWeight: FontWeight.w600,
+                            height: 1.0,
+                          ),
                         ),
                       ),
                     ),
