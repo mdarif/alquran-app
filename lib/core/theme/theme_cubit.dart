@@ -32,14 +32,25 @@ class ThemeState {
 /// holds a single light the reader chose. The choice is persisted; a light ticker
 /// re-resolves the auto surface as the day moves.
 class ThemeCubit extends Cubit<ThemeState> {
-  ThemeCubit(this._prefs, {DateTime Function()? clock})
-      : _clock = clock ?? DateTime.now,
+  ThemeCubit(
+    this._prefs, {
+    DateTime Function()? clock,
+    DayPhase Function(DateTime now)? phaseResolver,
+  })  : _clock = clock ?? DateTime.now,
+        _phaseResolver = phaseResolver,
         super(_initial(_prefs, clock ?? DateTime.now)) {
     if (state.auto) _startTicker();
   }
 
   final SharedPreferences _prefs;
   final DateTime Function() _clock;
+
+  /// Resolves the [DayPhase] for [now] from the user's prayer times when known
+  /// (wired in DI). Optional + defaulted to null → the clock-hour fallback below,
+  /// so behaviour is unchanged (and all existing theme tests pass) until a
+  /// location is set.
+  final DayPhase Function(DateTime now)? _phaseResolver;
+
   Timer? _ticker;
 
   static const String _key = 'theme_choice'; // 'auto' | DayPhase.name
@@ -86,7 +97,9 @@ class ThemeCubit extends Cubit<ThemeState> {
   }
 
   void _resolveAuto({bool force = false}) {
-    final phase = MushafPalette.phaseForHour(_clock().hour);
+    final now = _clock();
+    final phase =
+        _phaseResolver?.call(now) ?? MushafPalette.phaseForHour(now.hour);
     if (!force && state.auto && state.phase == phase) return;
     emit(ThemeState(palette: MushafPalette.of(phase), auto: true));
   }

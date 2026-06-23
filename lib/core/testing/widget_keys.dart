@@ -21,4 +21,8 @@ class WidgetKeys {
   static const peekCard = Key('reader-peek-card');
   static const langStripClose = Key('reader-lang-strip-close');
   static Key langChip(String languageCode) => Key('lang-chip-$languageCode');
+
+  // Prayer times
+  static const nextPrayerPill = Key('next-prayer-pill');
+  static const prayerTimesSheet = Key('prayer-times-sheet');
 }

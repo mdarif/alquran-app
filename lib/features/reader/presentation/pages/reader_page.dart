@@ -12,6 +12,7 @@ import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
+import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/reader_cubit.dart';
@@ -170,6 +171,7 @@ class _ReaderViewState extends State<_ReaderView> {
             icon: const Icon(Icons.format_size_rounded),
             onPressed: _toggleFontSlider,
           ),
+          const NextPrayerPill(),
           const ThemeToggleButton(),
         ],
       ),

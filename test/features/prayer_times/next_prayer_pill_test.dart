@@ -1,0 +1,93 @@
+import 'package:al_quran/core/testing/widget_keys.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
+import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
+import 'package:al_quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
+import 'package:al_quran/features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
+import 'package:al_quran/features/prayer_times/presentation/widgets/next_prayer_pill.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+const _loc = GeoLocation(latitude: 24.45, longitude: 54.38);
+
+class _FakeRepo implements PrayerTimesRepository {
+  _FakeRepo({this.saved});
+  GeoLocation? saved;
+
+  @override
+  GeoLocation? get location => saved;
+
+  @override
+  Future<LocationResult> acquireLocation() async {
+    saved = _loc;
+    return const LocationResult(LocationStatus.ok, _loc);
+  }
+
+  @override
+  DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
+    final d = DateTime(date.year, date.month, date.day);
+    return DailyPrayerTimes(
+      fajr: d.add(const Duration(hours: 5)),
+      sunrise: d.add(const Duration(hours: 6, minutes: 30)),
+      dhuhr: d.add(const Duration(hours: 12)),
+      asr: d.add(const Duration(hours: 15, minutes: 30)),
+      maghrib: d.add(const Duration(hours: 18, minutes: 42)),
+      isha: d.add(const Duration(hours: 20)),
+      location: location,
+      date: d,
+    );
+  }
+}
+
+PrayerTimesCubit _cubit({GeoLocation? saved, int hour = 17}) {
+  final cubit = PrayerTimesCubit(
+    _FakeRepo(saved: saved),
+    clock: () => DateTime(2026, 6, 23, hour),
+  );
+  addTearDown(cubit.close);
+  return cubit;
+}
+
+Future<void> _pump(WidgetTester tester, PrayerTimesCubit? cubit) {
+  const bar = Scaffold(appBar: null, body: Center(child: NextPrayerPill()));
+  return tester.pumpWidget(
+    MaterialApp(
+      home: cubit == null
+          ? bar
+          : BlocProvider<PrayerTimesCubit>.value(value: cubit, child: bar),
+    ),
+  );
+}
+
+void main() {
+  testWidgets('shows the next prayer + time when located', (tester) async {
+    await _pump(tester, _cubit(saved: _loc, hour: 17)); // → Maghrib 18:42
+    expect(find.byKey(WidgetKeys.nextPrayerPill), findsOneWidget);
+    expect(find.textContaining('Maghrib'), findsOneWidget);
+    expect(find.textContaining('6:42'), findsOneWidget);
+  });
+
+  testWidgets('tapping opens the all-five sheet', (tester) async {
+    await _pump(tester, _cubit(saved: _loc, hour: 17));
+    await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(WidgetKeys.prayerTimesSheet), findsOneWidget);
+    for (final name in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
+      expect(find.text(name), findsOneWidget);
+    }
+  });
+
+  testWidgets('no location → a discreet enable affordance', (tester) async {
+    await _pump(tester, _cubit(saved: null));
+    expect(find.byKey(WidgetKeys.nextPrayerPill), findsOneWidget);
+    expect(find.byIcon(Icons.location_searching_rounded), findsOneWidget);
+  });
+
+  testWidgets('renders nothing when no cubit is provided (defensive)',
+      (tester) async {
+    await _pump(tester, null);
+    expect(find.byKey(WidgetKeys.nextPrayerPill), findsNothing);
+  });
+}

@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
 import 'core/theme/theme_cubit.dart';
+import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
 
 class AlQuranApp extends StatefulWidget {
@@ -40,7 +41,8 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     // re-enable on resume, release when paused/hidden.
     if (state == AppLifecycleState.resumed) {
       unawaited(WakelockPlus.enable());
-      // Time may have crossed into a new "Light of Day" phase while backgrounded.
+      // Time may have crossed a prayer / "Light of Day" phase while backgrounded.
+      GetIt.I<PrayerTimesCubit>().refresh();
       GetIt.I<ThemeCubit>().refresh();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -50,8 +52,13 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<ThemeCubit>.value(
-      value: GetIt.I<ThemeCubit>(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<ThemeCubit>.value(value: GetIt.I<ThemeCubit>()),
+        BlocProvider<PrayerTimesCubit>.value(
+          value: GetIt.I<PrayerTimesCubit>(),
+        ),
+      ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp(
