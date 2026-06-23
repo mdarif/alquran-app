@@ -174,6 +174,32 @@ renderer or the font — not the data. When the text itself is suspect, **diff i
 canonical edition** before inventing transformation rules; the canonical encoding already
 encodes the right answer (here, where kashidas go).
 
+**يَتَٰمَى / مَىٰ words render CORRECTLY in current Flutter — verified empirically.**
+When a "marks are mispositioned" report keeps surviving "fresh installs", do NOT keep
+re-theorising about the font/GPOS. **Render the exact word through Flutter's own engine and
+look.** A throwaway `lib/diag_main.dart` showing the word in `QuranTextStyle.madani`, run on
+a booted iPhone sim (`flutter run -t lib/diag_main.dart -d <sim>`) and screenshotted
+(`xcrun simctl io booted screenshot`), settled it in minutes:
+- `وَٱلۡيَتَٰمَىٰ` (Al-Baqarah 2:83) renders with both dagger-alefs correctly seated, at
+  `height:1.9`, at `height:1.0`, with `calt/rlig/liga`, and with no features — all correct.
+- Re-run with `--enable-impeller`: **pixel-identical and still correct.** On Flutter 3.41
+  the old Impeller Arabic-GPOS bug is gone; toggling Impeller changes nothing here.
+- The hb-view reference render of the same word is also correct. Font + data are fine.
+
+**So when the device still shows it broken, the device is running STALE code — not a
+font/renderer problem.** The decisive tell is the **numeral canary**: the surah-header
+medallion renders `_toArabicIndic(n)` → `٢` (U+0662), which is renderer-independent pure
+Dart — *any* engine draws U+0662 as ٢. If the device still shows Latin `2`, the build is
+not running current source (a hand-installed/prebuilt APK, wrong flavour, or a build that
+didn't pick up the commit). Fix the build path (`flutter run` from THIS repo, or rebuild
+the APK from source) before chasing anything else — the ٢ appearing is proof the new code
+landed; the marks come right with it.
+
+(Impeller-off is still set in the native manifests as belt-and-suspenders — Android:
+`io.flutter.embedding.android.EnableImpeller=false`; iOS: `FLTEnableImpeller=<false/>` —
+and a manifest change needs `flutter clean` to take. But on 3.41 it is no longer the cause
+of this specific bug.)
+
 ---
 
 ## 2. QPC Quran text data specifics
