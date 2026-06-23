@@ -1,4 +1,3 @@
-import 'package:al_quran/core/util/arabic_digits.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/presentation/widgets/surah_tile.dart';
 import 'package:flutter/material.dart';
@@ -27,10 +26,7 @@ void main() {
 
       expect(find.text('Al-Fatihah'), findsOneWidget);
       expect(find.text('الفاتحة'), findsOneWidget);
-      expect(
-        find.text(toUrduDigits(1)), // leading badge — Urdu/Persian numeral ۱
-        findsOneWidget,
-      );
+      expect(find.text('1'), findsOneWidget); // leading badge
       expect(find.text('Makkah'), findsOneWidget);
       expect(find.textContaining('ayahs'), findsNothing); // count hidden
     });

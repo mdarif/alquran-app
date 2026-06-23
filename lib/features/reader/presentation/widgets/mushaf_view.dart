@@ -23,13 +23,12 @@ const String _bismillah = 'بِسۡمِ ٱللَّهِ'
 const int _surahAlFatiha = 1;
 const int _surahAtTawbah = 9;
 
-// Verse-number numerals live in core/util/arabic_digits.dart:
-//  • the ayah-end ROSETTE uses Arabic-Indic (toArabicIndicDigits) — KFGQPC's
-//    GSUB composes those code points into the ornate medallion glyph (e.g.
-//    ٢٨٦ → one rosette). They stay in one run with the Arabic style so the
-//    substitution fires, and we DON'T add U+06DD (that draws a second circle).
-//  • the chapter-header MEDALLION (plain UI chrome) uses Urdu/Persian digits
-//    (toUrduDigits) so Urdu readers see familiar numerals.
+// The ayah-end ROSETTE uses Arabic-Indic digits (toArabicIndicDigits): KFGQPC's
+// GSUB composes those code points into the ornate medallion glyph (e.g.
+// ٢٨٦ → one rosette). They stay in one run with the Arabic style so the
+// substitution fires, and we DON'T add U+06DD (that draws a second circle).
+// Plain UI number badges (TOC, chapter medallion, ayah badge) stay Western —
+// the owner wants English numerals in chrome.
 
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
 /// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
@@ -594,7 +593,7 @@ class SurahHeaderCard extends StatelessWidget {
               border: Border.all(color: cs.primary.withValues(alpha: 0.45)),
             ),
             child: Text(
-              toUrduDigits(number),
+              '$number',
               style: TextStyle(
                 color: cs.primary,
                 fontWeight: FontWeight.w700,

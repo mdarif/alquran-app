@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
-import '../../../../core/util/arabic_digits.dart';
 import '../../../reader/domain/entities/reader_target.dart';
 import '../../../reader/presentation/pages/reader_page.dart';
 import '../../domain/entities/index_entry.dart';
@@ -79,7 +78,7 @@ class _IndexTile extends StatelessWidget {
         radius: 16,
         backgroundColor: theme.colorScheme.primaryContainer,
         child: Text(
-          toUrduDigits(entry.number),
+          '${entry.number}',
           style: TextStyle(
             color: theme.colorScheme.onPrimaryContainer,
             fontWeight: FontWeight.w600,
