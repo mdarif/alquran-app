@@ -597,7 +597,7 @@ class SurahHeaderCard extends StatelessWidget {
               border: Border.all(color: cs.primary.withValues(alpha: 0.45)),
             ),
             child: Text(
-              '$number',
+              _toArabicIndic(number),
               style: TextStyle(
                 color: cs.primary,
                 fontWeight: FontWeight.w700,
