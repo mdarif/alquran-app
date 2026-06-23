@@ -174,42 +174,47 @@ renderer or the font — not the data. When the text itself is suspect, **diff i
 canonical edition** before inventing transformation rules; the canonical encoding already
 encodes the right answer (here, where kashidas go).
 
-**يَتَٰمَى / مَىٰ words render CORRECTLY in current Flutter — verified empirically.**
-When a "marks are mispositioned" report keeps surviving "fresh installs", do NOT keep
-re-theorising about the font/GPOS. **Render the exact word through Flutter's own engine and
-look.** A throwaway `lib/diag_main.dart` showing the word in `QuranTextStyle.madani`, run on
-a booted iPhone sim (`flutter run -t lib/diag_main.dart -d <sim>`) and screenshotted
-(`xcrun simctl io booted screenshot`), settled it in minutes:
-- `وَٱلۡيَتَٰمَىٰ` (Al-Baqarah 2:83) renders with both dagger-alefs correctly seated, at
-  `height:1.9`, at `height:1.0`, with `calt/rlig/liga`, and with no features — all correct.
-- Re-run with `--enable-impeller`: **pixel-identical and still correct.** On Flutter 3.41
-  the old Impeller Arabic-GPOS bug is gone; toggling Impeller changes nothing here.
-- The hb-view reference render of the same word is also correct. Font + data are fine.
+**Elongated madd on `مَىٰ` words (ٱلۡيَتَٰمَىٰٓ, ٱلۡأَعۡمَىٰ): ROOT CAUSE = one font lookup; FIX =
+patch the font (`tool/patch_arabic_font.py`).** This took many wrong turns — record the *method*,
+not just the answer.
+- **Symptom:** the superscript-alef/madd on a word-final alef-maqsura *preceded by meem* hugs the
+  letter instead of floating above it.
+- **Root cause:** KFGQPC's `calt`, in that meem context, chains into a **Single-Substitution
+  lookup (Lookup[92])** that swaps the normal final alef-maqsura `afii57450.zz04` for a
+  **Tajweed-form glyph `TJ065`** (note the `TJ` = Tajweed prefix) whose superscript/madd GPOS
+  anchor sits at **y≈75 vs ≈480** on the normal form. Confirm: `hb-shape font.ttf "ٱلۡيَتَٰمَىٰٓ"`
+  shows `TJ065` + a mark at y≈75; `--features="-calt"` shows the normal glyph at y≈480.
+- **Fix:** rewrite that one substitution to an **identity map** in the font (`fontTools`: find the
+  Type-1 lookup whose value is `TJ065`, set `mapping[k]=k`). `calt` still fires (Allah/Bismillah
+  ligatures intact — they ride *other* `calt` lookups) but the alef-maqsura keeps its high-madd
+  form. Idempotent; one-liner `make patch-font`. **Licensing:** modifying the KFGQPC face is
+  unverified-on-top-of-unverified — clear before release.
 
-**Final word on the `ـىٰٓ` "tight madd" (e.g. `ٱلۡيَتَٰمَىٰٓ`, An-Nisa 4:2): it is the CANONICAL
-KFGQPC rendering — not a bug, and not cleanly fixable. Owner accepted it.** The madd hugs the
-alef-maqsura because `calt` substitutes word-final alef-maqsura to the Tajweed glyph `TJ065`,
-whose superscript/madd anchor sits at **y≈75** vs **≈480** on the normal final form
-(`afii57450.zz04`). Confirm: `hb-shape font.ttf "ٱلۡيَتَٰمَىٰٓ"` (mark at 75 on TJ065) vs
-`--features="-calt"` (mark at 480). This is identical to what quran.com ships (same font +
-text) and to the printed Madani Mushaf — verify An-Nisa 4:2 on quran.com. The contrast with
-`يَـٰٓأَيُّهَا` (which floats high) is that the latter has a **tatweel carrier**; `ـىٰٓ` words
-carry the madd on the letter itself, and Tanzil/canonical add no carrier there.
-Disabling `calt` **globally** lifts the madd but (a) deforms the alef-maqsura swash, (b) widens
-the text so Bismillah wraps, and (c) **shatters the Allah ligature** (`Allah`→5 glyphs) and
-Bismillah — `calt` drives those too. **The fix we shipped: per-word `-calt`, but ONLY for the
-right words.** `TJ065` (the low madd) fires in EXACTLY ONE context: a **word-final alef-maqsura
-immediately preceded by meem** (`مَىٰ`). Proven by shaping all **664** `ـىٰ` words in the DB and
-checking for `TJ065` in the hb output: only **15** match, every one a `مَىٰ` ending (ٱلۡيَتَٰمَىٰ,
-ٱلۡأَعۡمَىٰ, رَمَىٰ, …). After **any other** preceding letter (lam `إِلَىٰٓ`, ra `نَصَٰرَىٰ`, waw, …) the
-madd is ALREADY high under `calt` — so a broad "any `ـىٰ` word" `-calt` *shifts those right and
-makes them worse* (this was a real "half-fixed" regression). `_verseTextSpans` splits each verse
-and applies `AppTheme.arabicFontFeaturesNoCalt` to only the words matching
-`_meemAlefMaqsuraEnding()` (robust to trailing pause marks ۖ ۚ and a shadda'd meem تُسَمَّىٰ);
-everything else — including Allah/Bism (never `مَىٰ`) — keeps `calt`. **Method: classify the whole
-word-set by shaping each and grepping the substituted glyph; don't guess the context from one example.**
-**Flutter gotcha:** `calt` is default-ON; `FontFeature.enable('rlig')` alone does NOT disable
-it — you must pass `FontFeature.disable('calt')` explicitly (omitting ≠ off).
+**Dead ends (do not repeat):**
+- *"It's the data / a missing tatweel carrier."* WRONG — our text is **byte-identical to canonical
+  Tanzil** (diff the codepoints: `quran-uthmani-tanzil.json['4:2']`). Never a data problem.
+- *"It's canonical, accept it."* WRONG — the owner was right that other KFGQPC apps render it
+  cleanly; the font *can* do it, the Tajweed swap is the defect.
+- *"Disable `calt` globally."* Lifts the madd but **shatters the Allah ligature** (`Allah`→5 glyphs),
+  widens text so Bismillah wraps. (`calt` is default-ON; to disable you need
+  `FontFeature.disable('calt')`, not just omitting it — omitting ≠ off.)
+- *"Per-word `-calt` on `مَىٰ` words."* **The worst trap, because it half-works.** Disabling `calt`
+  for a whole word disrupts **every** mark in it: it lifts the final madd but shoves the *taa's*
+  dagger-alef from y=375 to **y=975** (flies off). And a *broad* "any `ـىٰ` word" rule also shifts
+  already-correct words (`إِلَىٰٓ`, `نَصَٰرَىٰ`) right — the "half fixed" report. Font-feature
+  overrides are per-span and per-word at best; you cannot scope them to one glyph, so they are the
+  wrong tool for a single-glyph defect.
+
+**The method that finally worked (general rule for "font renders X wrong"):**
+1. **Diff your text against a canonical edition** → rules out data (it did).
+2. **Other apps use the same font fine?** → the font is capable; the defect is a specific
+   lookup/feature, find it.
+3. **`hb-shape` the word with/without each feature** to see which substitution/anchor is wrong
+   (here `--features="-calt"` localised it to a `calt` chain producing `TJ065`).
+4. **Dump GSUB with fontTools** to find the exact lookup and confirm it's chain-only (not directly
+   feature-referenced, so neutralising it is safe).
+5. **Patch the font** (identity-map the bad substitution / or fix the GPOS anchor) — a single-glyph
+   defect is fixed in the font, never with per-word feature hacks in the app.
 
 (Impeller-off is still set in the native manifests — Android:
 `io.flutter.embedding.android.EnableImpeller=false`; iOS: `FLTEnableImpeller=<false/>` —
