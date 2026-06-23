@@ -35,10 +35,9 @@ Future<PrayerTimesRepositoryImpl> _repo(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  final provider = _FakeLocationProvider(const LocationResult(
-    LocationStatus.ok,
-    _abuDhabi,
-  ));
+  final provider = _FakeLocationProvider(
+    const LocationResult(LocationStatus.ok, _abuDhabi),
+  );
 
   group('PrayerTimesRepositoryImpl.timesFor (adhan)', () {
     test('produces the six daily times in ascending order, on the date',
@@ -47,8 +46,11 @@ void main() {
       final t = repo.timesFor(_abuDhabi, _date);
       final ordered = [t.fajr, t.sunrise, t.dhuhr, t.asr, t.maghrib, t.isha];
       for (var i = 1; i < ordered.length; i++) {
-        expect(ordered[i].isAfter(ordered[i - 1]), isTrue,
-            reason: 'time $i not after ${i - 1}');
+        expect(
+          ordered[i].isAfter(ordered[i - 1]),
+          isTrue,
+          reason: 'time $i not after ${i - 1}',
+        );
       }
       // Plausible for Abu Dhabi in June (UTC times; local = +4): Fajr early AM.
       expect(t.fajr.day, 23);
@@ -69,8 +71,11 @@ void main() {
         utcOffset: _date.timeZoneOffset,
       ).asr;
 
-      expect(ours.isBefore(hanafi), isTrue,
-          reason: 'Asr must be Shafi (earlier), got ours=$ours hanafi=$hanafi');
+      expect(
+        ours.isBefore(hanafi),
+        isTrue,
+        reason: 'Asr must be Shafi (earlier), got ours=$ours hanafi=$hanafi',
+      );
     });
   });
 
