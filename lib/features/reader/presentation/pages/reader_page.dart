@@ -85,6 +85,11 @@ class _ReaderViewState extends State<_ReaderView> {
   // widget's ancestor is unsafe"), so we hold the reference instead.
   late final ReaderCubit _cubit;
 
+  // The active viewport registers its position-flush here so _setDetailed()
+  // can capture the exact current verse synchronously — before the debounce
+  // timer fires — ensuring a viewport toggle never loses your place.
+  VoidCallback? _flushCurrentPosition;
+
   late double _arabicFont = _settings.fontSize.clamp(_minFont, _maxFont);
 
   // The currently displayed section. Swiping moves it to an adjacent section
@@ -202,6 +207,7 @@ class _ReaderViewState extends State<_ReaderView> {
                     selectedLanguages: _activeLangs(state.resources),
                     onToggleLanguage: (code) =>
                         _toggleLang(code, state.resources),
+                    onRegisterFlush: (cb) => _flushCurrentPosition = cb,
                   );
                 }
                 // Detailed view owns its own SelectionArea (around the verses)
@@ -221,6 +227,7 @@ class _ReaderViewState extends State<_ReaderView> {
                   arabicFontSize: _arabicFont,
                   focusAyahId: _focusAyahId,
                   onVisibleAyah: _onVisibleAyah,
+                  onRegisterFlush: (cb) => _flushCurrentPosition = cb,
                 );
               },
             ),
@@ -342,6 +349,10 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _setDetailed(bool detailed) {
+    // Capture the current reading position from the active viewport NOW —
+    // before setState tears it down. This updates _focusAyahId synchronously
+    // so the incoming viewport homes to the exact verse, not a stale debounce.
+    _flushCurrentPosition?.call();
     // Session-only toggle: the choice holds while this reader is open (including
     // across swipes) but is intentionally NOT persisted as the open default — a
     // fresh open always starts in Reading. It IS recorded on the Last Read point
@@ -414,6 +425,7 @@ class _DetailedList extends StatefulWidget {
     required this.arabicFontSize,
     this.focusAyahId,
     this.onVisibleAyah,
+    this.onRegisterFlush,
     super.key,
   });
 
@@ -438,6 +450,9 @@ class _DetailedList extends StatefulWidget {
   final double arabicFontSize;
   final int? focusAyahId;
   final ValueChanged<Ayah>? onVisibleAyah;
+
+  /// See [MushafView.onRegisterFlush] — same contract.
+  final void Function(VoidCallback?)? onRegisterFlush;
 
   /// The editions actually rendered in each tile: the enabled ones, falling back
   /// to all if a stale saved selection matches nothing available.
@@ -476,10 +491,12 @@ class _DetailedListState extends State<_DetailedList> {
     if (id != null && _ayahRowIndex.containsKey(id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
     }
+    widget.onRegisterFlush?.call(_reportTopmost);
   }
 
   @override
   void dispose() {
+    widget.onRegisterFlush?.call(null);
     // Flush the resume point before tearing down: a pending debounce timer is
     // about to be cancelled, so without this a quick pop (back-button mid-scroll,
     // within the 400ms window) would lose the final position and Last Read would

@@ -47,6 +47,7 @@ class MushafView extends StatefulWidget {
     this.onVisibleAyah,
     this.selectedLanguages = const {},
     this.onToggleLanguage,
+    this.onRegisterFlush,
     super.key,
   });
 
@@ -68,6 +69,12 @@ class MushafView extends StatefulWidget {
 
   /// Toggle a language in the shared selection (from the peek card's chips).
   final ValueChanged<String>? onToggleLanguage;
+
+  /// Called once in initState with a flush callback, and again with null on
+  /// dispose. The parent stores the callback and invokes it before switching
+  /// viewports so it can capture the exact reading position synchronously —
+  /// before the debounce timer fires and before this widget is torn down.
+  final void Function(VoidCallback?)? onRegisterFlush;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -128,6 +135,7 @@ class _MushafViewState extends State<MushafView>
     if (id != null && widget.ayahs.any((a) => a.id == id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
     }
+    widget.onRegisterFlush?.call(_reportTopmost);
   }
 
   @override
@@ -162,6 +170,7 @@ class _MushafViewState extends State<MushafView>
 
   @override
   void dispose() {
+    widget.onRegisterFlush?.call(null);
     _hideTimer?.cancel();
     _highlightTimer?.cancel();
     _controller.dispose();
