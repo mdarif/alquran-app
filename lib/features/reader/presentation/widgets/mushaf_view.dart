@@ -466,8 +466,9 @@ class _MushafViewState extends State<MushafView>
 /// glyph) because KFGQPC's rosette can only hold the canonical Arabic-Indic ٢,
 /// which reads like "4" to Urdu readers; a FittedBox keeps 1–3 digits inside.
 ///
-/// Word-final `مَىٰ` words (e.g. ٱلۡيَتَٰمَىٰٓ) are shaped without `calt` to lift
-/// their madd off the letter — see [_meemAlefMaqsuraEnding].
+/// (The elongated-madd fix for `مَىٰ` words like ٱلۡيَتَٰمَىٰٓ is in the FONT, not
+/// here — `tool/patch_arabic_font.py` neutralises the Tajweed-form substitution
+/// that dropped the madd. So this just renders the text straight.)
 class _MarkedParagraph extends StatefulWidget {
   const _MarkedParagraph({
     required this.group,
@@ -571,11 +572,16 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     for (final ayah in widget.group) {
       final highlighted = widget.highlightAyahId == ayah.id ||
           widget.selectedAyahId == ayah.id;
-      spans.addAll(
-        _verseTextSpans(
-          ayah.textArabic,
-          highlighted
-              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.16)
+      spans.add(
+        TextSpan(
+          text: ayah.textArabic,
+          style: highlighted
+              ? TextStyle(
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.16),
+                )
               : null,
         ),
       );
@@ -638,71 +644,6 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     );
   }
 }
-
-/// Spans for one verse's Arabic text. Words matching [_meemAlefMaqsuraEnding]
-/// are shaped without `calt` so their madd lifts off the letter; everything else
-/// keeps `calt` (for the Allah/Bismillah ligatures, and for the many other `ـىٰ`
-/// words whose madd is already correctly seated under `calt`).
-/// [bg] is the highlight colour (null when not highlighted).
-List<InlineSpan> _verseTextSpans(String text, Color? bg) {
-  final base = bg == null ? null : TextStyle(backgroundColor: bg);
-  final noCalt = TextStyle(
-    fontFeatures: AppTheme.arabicFontFeaturesNoCalt,
-    backgroundColor: bg,
-  );
-  final spans = <InlineSpan>[];
-  final buffer = StringBuffer();
-  void flush() {
-    if (buffer.isEmpty) return;
-    spans.add(TextSpan(text: buffer.toString(), style: base));
-    buffer.clear();
-  }
-
-  final words = text.split(' ');
-  for (var i = 0; i < words.length; i++) {
-    if (_meemAlefMaqsuraEnding(words[i])) {
-      flush();
-      spans.add(TextSpan(text: words[i], style: noCalt));
-    } else {
-      buffer.write(words[i]);
-    }
-    if (i < words.length - 1) buffer.write(' ');
-  }
-  flush();
-  return spans;
-}
-
-/// True when [word] ends in a **meem + word-final alef-maqsura + superscript-alef**
-/// (`مَىٰ`, e.g. ٱلۡيَتَٰمَىٰٓ, ٱلۡأَعۡمَىٰ). That is the ONLY context where KFGQPC's
-/// `calt` swaps the alef-maqsura for its Tajweed glyph (TJ065), whose madd anchor
-/// sits low (≈75 vs ≈480). After any other letter — lam, ra, waw … — the madd is
-/// already high, so dropping `calt` would shift it *wrong*. Verified by shaping all
-/// 664 `ـىٰ` words: exactly these 15 produce TJ065. Robust to trailing pause marks
-/// (ۖ ۚ) and a shadda'd meem (تُسَمَّىٰ).
-bool _meemAlefMaqsuraEnding(String word) {
-  final i = word.lastIndexOf('ى'); // alef-maqsura
-  if (i < 0 || i + 1 >= word.length || word.codeUnitAt(i + 1) != 0x0670) {
-    return false; // must be immediately followed by the superscript-alef
-  }
-  for (var k = i + 2; k < word.length; k++) {
-    if (!_isArabicMark(word.codeUnitAt(k))) return false; // alef-maqsura is final
-  }
-  var j = i - 1;
-  while (j >= 0 && _isArabicMark(word.codeUnitAt(j))) {
-    j--; // skip the meem's vowel/shadda
-  }
-  return j >= 0 && word.codeUnitAt(j) == 0x0645; // meem
-}
-
-/// A combining Arabic mark (harakat, shadda, superscript-alef, maddah, tatweel,
-/// or a small high/low pause sign) — i.e. not a base letter.
-bool _isArabicMark(int c) =>
-    (c >= 0x064B && c <= 0x0652) || // fathatan … sukun (incl. shadda 0651)
-    c == 0x0670 || // superscript alef
-    c == 0x0653 || // maddah
-    c == 0x0656 || // subscript alef
-    c == 0x0640 || // tatweel
-    (c >= 0x06D6 && c <= 0x06ED); // small high/low Quranic annotation signs
 
 /// A subtle "Page N" readout that fades in while scrolling and out when idle.
 /// It's an estimate over flowed text, not a page-faithful boundary.

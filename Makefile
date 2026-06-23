@@ -55,3 +55,6 @@ seed-version: ## Refresh the DB version marker (run after replacing quran.db)
 	@sqlite3 assets/db/quran.db "SELECT value FROM db_meta WHERE key='built_at';" \
 		| tr -d '\n' > assets/db/quran.db.version
 	@echo "seed-version: $$(cat assets/db/quran.db.version)"
+
+patch-font: ## Neutralise KFGQPC's low-madd Tajweed substitution (run after replacing the .ttf)
+	@python3 tool/patch_arabic_font.py
