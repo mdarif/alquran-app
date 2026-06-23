@@ -546,6 +546,12 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   not registered." Fix: hot **restart** (`R`) or rerun. No production impact (no
   hot reload there); it only bites during dev. Rule: DI graph changes need a
   restart, not a reload.
+- **"Const class cannot remove fields … Try a hot restart" = you changed a
+  widget's field layout.** Adding/removing a field on a (esp. `const`) class —
+  e.g. dropping `NextPrayerPill`'s `compact` flag — alters the class shape, which
+  hot reload (`r`) can't patch in place; it aborts with that message. Same family
+  as the DI gotcha: structural changes need a hot **restart** (`R`), not a reload.
+  Not a code error — analyze/tests stay green.
 - **`native_assets … references objective_c` build error** after clearing caches
   → fix with `flutter clean && flutter pub get`.
 - **Disk:** iOS builds + `~/Library/Developer/Xcode/DerivedData` balloon fast and
