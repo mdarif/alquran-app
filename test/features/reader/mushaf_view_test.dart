@@ -153,7 +153,7 @@ void main() {
       expect(flow.textDirection, TextDirection.rtl);
     });
 
-    testWidgets('marks each ayah with the U+06DD medallion + overlaid Urdu digit',
+    testWidgets('marks each ayah with the U+06DD medallion + overlaid Western digit',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -166,7 +166,7 @@ void main() {
       await tester.pumpAndSettle(); // let the medallion overlay measure + place
 
       // The continuous paragraph carries the empty ayah medallion (U+06DD); the
-      // verse number is drawn as a separate overlaid Urdu numeral on top of it.
+      // verse number is drawn as a separate overlaid Text on top of it.
       final paragraph = tester
           .widgetList<Text>(find.byType(Text))
           .where((t) => t.textSpan != null)
@@ -174,17 +174,19 @@ void main() {
           .join();
       expect(paragraph, contains('۝'));
 
-      // Each verse number is an Eastern Arabic-Indic (Urdu) digit ۱۲۳۴ — NOT the
-      // canonical ٢ rosette (which reads as "4" to Urdu readers), and NOT inline
-      // in the Arabic paragraph (it's an overlay Text).
-      final allText = tester
+      // Each verse number is a Western digit 1-4 (consistent with the TOC and
+      // Detailed badges) — overlaid, NOT inline in the Arabic paragraph, and NOT
+      // the canonical Arabic-Indic ٢ rosette (which reads as "4" to Urdu readers).
+      final overlays = tester
           .widgetList<Text>(find.byType(Text))
-          .map((t) => t.data ?? t.textSpan?.toPlainText() ?? '')
-          .join();
-      for (final n in ['۱', '۲', '۳', '۴']) {
-        expect(allText, contains(n));
+          .map((t) => t.data)
+          .whereType<String>()
+          .toList();
+      for (final n in ['1', '2', '3', '4']) {
+        expect(overlays, contains(n));
       }
-      expect(allText.contains('١'), isFalse);
+      expect(paragraph.contains('١'), isFalse);
+      expect(paragraph.contains('٢'), isFalse);
     });
 
     testWidgets('shows the Bismillah for an ordinary surah starting at ayah 1',

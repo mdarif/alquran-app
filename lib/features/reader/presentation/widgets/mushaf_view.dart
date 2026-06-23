@@ -6,7 +6,6 @@ import 'package:flutter/rendering.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/util/arabic_digits.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
@@ -24,12 +23,9 @@ const String _bismillah = 'بِسۡمِ ٱللَّهِ'
 const int _surahAlFatiha = 1;
 const int _surahAtTawbah = 9;
 
-// Verse numbers (see core/util/arabic_digits.dart):
-//  • Reading view marks each ayah with a plain Urdu/Persian numeral (toUrduDigits,
-//    ۲) in the Urdu face — readable to the Urdu/Hindi audience. We deliberately
-//    dropped the font's Arabic-Indic rosette: its ٢ reads like "4" to them.
-//  • Plain UI number badges (TOC, chapter medallion, ayah badge) stay Western —
-//    the owner wants English numerals in chrome.
+// Verse numbers are Western digits everywhere (TOC, chapter medallion, ayah badge,
+// and — overlaid on the Reading-view ayah medallion — see [_MarkedParagraph]). The
+// font's Arabic-Indic rosette (٢) is dropped: it reads like "4" to Urdu readers.
 
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
 /// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
@@ -462,16 +458,16 @@ class _MushafViewState extends State<MushafView>
 
 /// One surah group's continuous Mushaf paragraph.
 ///
-/// Each ayah's number is drawn as a **readable Urdu numeral centred inside the
-/// font's ornate ayah medallion** (U+06DD). The medallion is inline *text*, so
-/// it orders correctly in RTL, reflows and zooms with the verses, and is always
-/// drawn (graceful degradation — if the overlay ever mis-measures, you still see
-/// the medallion, never an empty gap). The numeral is overlaid because KFGQPC
-/// can only compose the canonical Arabic-Indic ٢ into its rosette (which reads
-/// like "4" to Urdu readers), not a U+06F0+ Urdu digit.
+/// Each ayah's number is drawn as a **Western digit centred inside the font's
+/// ornate ayah medallion** (U+06DD). The medallion is inline *text*, so it orders
+/// correctly in RTL, reflows and zooms with the verses, and is always drawn
+/// (graceful degradation — if the overlay ever mis-measures, you still see the
+/// medallion, never an empty gap). The number is overlaid (not composed into the
+/// glyph) because KFGQPC's rosette can only hold the canonical Arabic-Indic ٢,
+/// which reads like "4" to Urdu readers; a FittedBox keeps 1–3 digits inside.
 ///
-/// Word-final `ـىٰٓ` words (e.g. ٱلۡيَتَٰمَىٰٓ) are shaped without `calt` to lift
-/// their madd off the letter — see [AppTheme.arabicFontFeaturesNoCalt].
+/// Word-final `مَىٰ` words (e.g. ٱلۡيَتَٰمَىٰٓ) are shaped without `calt` to lift
+/// their madd off the letter — see [_meemAlefMaqsuraEnding].
 class _MarkedParagraph extends StatefulWidget {
   const _MarkedParagraph({
     required this.group,
@@ -614,16 +610,25 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
               rect: _rects[i],
               child: IgnorePointer(
                 child: Center(
-                  child: Text(
-                    toUrduDigits(widget.group[i].ayahNumber),
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      fontFamily: AppTheme.urduFontFamily,
-                      color: widget.markerColor,
-                      height: 1.0,
-                      // Sized to the medallion's interior, so multi-digit numbers
-                      // (e.g. ۲۸۶) still fit; scales with pinch-zoom via the box.
-                      fontSize: _rects[i].height * 0.30,
+                  // The medallion's inner field. FittedBox scales the number down
+                  // to fit it, so a 3-digit ayah (e.g. 286) never overflows the
+                  // ornament; it scales with pinch-zoom via the measured box.
+                  child: SizedBox(
+                    width: _rects[i].width * 0.46,
+                    height: _rects[i].height * 0.40,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        // Western digits — unambiguous and consistent with the TOC
+                        // and Detailed-view badges (the Arabic-Indic ٢ the rosette
+                        // would compose reads as "4" to Urdu readers).
+                        '${widget.group[i].ayahNumber}',
+                        style: TextStyle(
+                          color: widget.markerColor,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -634,9 +639,10 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
   }
 }
 
-/// Spans for one verse's Arabic text. Words carrying a word-final alef-maqsura +
-/// superscript-alef (`ىٰ`, U+0649 U+0670) are shaped without `calt` so their madd
-/// lifts off the letter; everything else keeps `calt` (for Allah/Bism ligatures).
+/// Spans for one verse's Arabic text. Words matching [_meemAlefMaqsuraEnding]
+/// are shaped without `calt` so their madd lifts off the letter; everything else
+/// keeps `calt` (for the Allah/Bismillah ligatures, and for the many other `ـىٰ`
+/// words whose madd is already correctly seated under `calt`).
 /// [bg] is the highlight colour (null when not highlighted).
 List<InlineSpan> _verseTextSpans(String text, Color? bg) {
   final base = bg == null ? null : TextStyle(backgroundColor: bg);
@@ -654,7 +660,7 @@ List<InlineSpan> _verseTextSpans(String text, Color? bg) {
 
   final words = text.split(' ');
   for (var i = 0; i < words.length; i++) {
-    if (words[i].contains('ىٰ')) {
+    if (_meemAlefMaqsuraEnding(words[i])) {
       flush();
       spans.add(TextSpan(text: words[i], style: noCalt));
     } else {
@@ -665,6 +671,38 @@ List<InlineSpan> _verseTextSpans(String text, Color? bg) {
   flush();
   return spans;
 }
+
+/// True when [word] ends in a **meem + word-final alef-maqsura + superscript-alef**
+/// (`مَىٰ`, e.g. ٱلۡيَتَٰمَىٰٓ, ٱلۡأَعۡمَىٰ). That is the ONLY context where KFGQPC's
+/// `calt` swaps the alef-maqsura for its Tajweed glyph (TJ065), whose madd anchor
+/// sits low (≈75 vs ≈480). After any other letter — lam, ra, waw … — the madd is
+/// already high, so dropping `calt` would shift it *wrong*. Verified by shaping all
+/// 664 `ـىٰ` words: exactly these 15 produce TJ065. Robust to trailing pause marks
+/// (ۖ ۚ) and a shadda'd meem (تُسَمَّىٰ).
+bool _meemAlefMaqsuraEnding(String word) {
+  final i = word.lastIndexOf('ى'); // alef-maqsura
+  if (i < 0 || i + 1 >= word.length || word.codeUnitAt(i + 1) != 0x0670) {
+    return false; // must be immediately followed by the superscript-alef
+  }
+  for (var k = i + 2; k < word.length; k++) {
+    if (!_isArabicMark(word.codeUnitAt(k))) return false; // alef-maqsura is final
+  }
+  var j = i - 1;
+  while (j >= 0 && _isArabicMark(word.codeUnitAt(j))) {
+    j--; // skip the meem's vowel/shadda
+  }
+  return j >= 0 && word.codeUnitAt(j) == 0x0645; // meem
+}
+
+/// A combining Arabic mark (harakat, shadda, superscript-alef, maddah, tatweel,
+/// or a small high/low pause sign) — i.e. not a base letter.
+bool _isArabicMark(int c) =>
+    (c >= 0x064B && c <= 0x0652) || // fathatan … sukun (incl. shadda 0651)
+    c == 0x0670 || // superscript alef
+    c == 0x0653 || // maddah
+    c == 0x0656 || // subscript alef
+    c == 0x0640 || // tatweel
+    (c >= 0x06D6 && c <= 0x06ED); // small high/low Quranic annotation signs
 
 /// A subtle "Page N" readout that fades in while scrolling and out when idle.
 /// It's an estimate over flowed text, not a page-faithful boundary.
