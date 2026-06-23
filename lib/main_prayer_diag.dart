@@ -126,6 +126,9 @@ class _DiagPageState extends State<_DiagPage> {
             for (final (label, cubit) in _states.take(5))
               _PillRow(label: label, cubit: cubit, compact: true),
             const Divider(height: 32),
+            const _SectionLabel('Reader app-bar — new layout (tap ⋮)'),
+            _ReaderBarDemo(prayerCubit: _states.first.$2),
+            const Divider(height: 32),
             const _SectionLabel('Sheet — light (Duha)'),
             _SheetDemo(phase: DayPhase.duha, day: sampleDay),
             const Divider(height: 32),
@@ -179,6 +182,59 @@ class _PillRow extends StatelessWidget {
             ),
           ],
         ),
+      );
+}
+
+/// A non-functional mock of the reader app bar's new layout: viewport toggle +
+/// compact prayer icon + a ⋮ overflow holding Text size / Reading light. The
+/// menu items are visual only here (no-op) — the real wiring lives in the reader.
+class _ReaderBarDemo extends StatelessWidget {
+  const _ReaderBarDemo({required this.prayerCubit});
+
+  final PrayerTimesCubit prayerCubit;
+
+  @override
+  Widget build(BuildContext context) => AppBar(
+        primary: false,
+        automaticallyImplyLeading: false,
+        title: const Text('Al-Baqarah'),
+        actions: [
+          IconButton(
+            tooltip: 'Detailed view',
+            icon: const Icon(Icons.subject_rounded),
+            onPressed: () {},
+          ),
+          BlocProvider<PrayerTimesCubit>.value(
+            value: prayerCubit,
+            child: const NextPrayerPill(compact: true),
+          ),
+          PopupMenuButton<int>(
+            tooltip: 'More',
+            icon: const Icon(Icons.more_vert_rounded),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 0,
+                child: Row(
+                  children: [
+                    Icon(Icons.format_size_rounded, size: 20),
+                    SizedBox(width: 12),
+                    Text('Text size'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 1,
+                child: Row(
+                  children: [
+                    Icon(Icons.light_mode_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Reading light'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       );
 }
 
