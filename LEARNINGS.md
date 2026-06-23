@@ -454,14 +454,32 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   and async setters. Fire setters with `unawaited(...)` (satisfies the
   `unawaited_futures` lint). For pinch-zoom, persist the **final** value on
   pointer-up, not on every move, to avoid write spam.
-- **Runtime light/dark with Cubit:** hold `ThemeMode` in a `ThemeCubit`
-  (persisted, light default), provide it above `MaterialApp`, and a
-  `BlocBuilder` sets `theme`/`darkTheme`/`themeMode`. Put a one-tap toggle in the
-  app bars (read brightness via `Theme.of(context).brightness`, not the cubit, so
-  the icon reflects the actual theme). **Gotcha:** any *hardcoded* text colour
-  (we had `0xFF1A1A1A` on the Arabic style) is invisible in the other mode —
-  drop it so the text inherits the theme's `onSurface`; audit `grep "Color(0xFF"`
-  for stragglers outside the theme file.
+- **"Light of Day" — time-adaptive theming (the signature differentiator).** Instead of a
+  light/dark flip, the reading surface follows the day: 5 hand-tuned palettes (`DayPhase`
+  fajr→isha) in `mushaf_palette.dart`, each a full `MushafPalette` (surface/ink/accent/
+  badge/gold) → `toTheme()` (M3 `ColorScheme.fromSeed(accent).copyWith(surface,onSurface,
+  primary,primaryContainer)` + flat chrome). `ThemeCubit` emits a `ThemeState{palette,auto}`:
+  in AUTO it resolves the phase from an injectable clock (re-ticks every 5 min + on app
+  resume) or holds a fixed light; choice persisted under one key (`'auto'|DayPhase.name`).
+  `app.dart` drives a SINGLE `theme:` (no darkTheme/themeMode) with `themeAnimationDuration:
+  700ms` + `easeInOut` so the surface cross-fades ("breathes") between phases.
+  - **Custom theme colours** (the ornament gold, with no `ColorScheme` slot) → a
+    `ThemeExtension` (`MushafColors`): `toTheme()` adds `extensions:[MushafColors(gold:…)]`,
+    read via `Theme.of(context).extension<MushafColors>()!.gold`. Implement `lerp` so it
+    cross-fades with the theme animation.
+  - **Gotcha — an auto ticker leaks in widget tests.** A `Timer.periodic` (the auto re-tick)
+    is still pending at the pending-timer invariant check, which runs BEFORE `addTearDown`
+    callbacks — so `addTearDown(cubit.close)` is too late and the test throws "A Timer is
+    still pending". Fix: widget tests use a **fixed-phase** cubit (seed `theme_choice` to a
+    `DayPhase.name`, no ticker); cover the auto LOGIC in pure (non-widget) cubit tests with an
+    **injected clock**.
+  - **Gotcha — `context.watch<Cubit>()` in `build` throws if the cubit isn't provided**, so a
+    shared app-bar widget breaks every test that pumps a screen in isolation. Read it
+    DEFENSIVELY (`try { BlocProvider.of<T>(context) } catch { null }`) + depend on
+    `Theme.of(context)` for reactivity (the cubit drives the theme, so its value is current on
+    the theme-triggered rebuild) — degrades gracefully and stays reactive.
+  - **Gotcha:** any *hardcoded* text colour is invisible on the other surfaces — let text
+    inherit `onSurface`; audit `grep "Color(0xFF"` outside the theme files.
 - **Centralize the Arabic style** once (`QuranTextStyle.madani`) and
   `.copyWith(fontSize: …)` at call sites — avoids drift across widgets.
 - **RTL text still left-aligns inside a `Column`.** A `Text` with
