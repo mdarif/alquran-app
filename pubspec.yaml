@@ -32,6 +32,8 @@ dependencies:
   # ayah even when its tile isn't built yet (Last Read resume).
   scrollable_positioned_list: ^0.3.8
   wakelock_plus: ^1.6.1
+  adhan: ^2.0.0+1
+  geolocator: ^14.0.3
 
 dev_dependencies:
   flutter_test:
