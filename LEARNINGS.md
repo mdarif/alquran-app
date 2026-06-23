@@ -186,19 +186,37 @@ a booted iPhone sim (`flutter run -t lib/diag_main.dart -d <sim>`) and screensho
   the old Impeller Arabic-GPOS bug is gone; toggling Impeller changes nothing here.
 - The hb-view reference render of the same word is also correct. Font + data are fine.
 
-**So when the device still shows it broken, the device is running STALE code — not a
-font/renderer problem.** The decisive tell is the **numeral canary**: the surah-header
-medallion renders `_toArabicIndic(n)` → `٢` (U+0662), which is renderer-independent pure
-Dart — *any* engine draws U+0662 as ٢. If the device still shows Latin `2`, the build is
-not running current source (a hand-installed/prebuilt APK, wrong flavour, or a build that
-didn't pick up the commit). Fix the build path (`flutter run` from THIS repo, or rebuild
-the APK from source) before chasing anything else — the ٢ appearing is proof the new code
-landed; the marks come right with it.
-
-(Impeller-off is still set in the native manifests as belt-and-suspenders — Android:
+(Impeller-off is still set in the native manifests — Android:
 `io.flutter.embedding.android.EnableImpeller=false`; iOS: `FLTEnableImpeller=<false/>` —
 and a manifest change needs `flutter clean` to take. But on 3.41 it is no longer the cause
 of this specific bug.)
+
+**The "stale build / numeral canary" theory was WRONG — it was the wrong widget.**
+When the user kept reporting the verse number as a Latin `2` after "fresh installs", I
+concluded the device was running stale code (canary: pure-Dart `٢` can't be a renderer
+bug, so a Latin `2` means old code). **False.** The device WAS on current code — I had only
+fixed the chapter-header medallion (`SurahHeaderCard`) and never the widget the user was
+actually looking at: the **Detailed-view ayah badge** (`ayah_tile.dart`), which still
+rendered `'${ayah.ayahNumber}'`. There were *several* number-badge sites
+(`ayah_tile`, `surah_tile` leading circle, `index_list_view` leading circle, the chapter
+medallion); patching one and declaring victory is whack-a-mole. **Lesson: when a UI value
+"won't change", grep for EVERY widget that renders it (`grep "ayahNumber}\|surah.id}\|\.number}"`)
+before concluding it's a build/cache problem.** A screenshot localises which widget — the
+green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text glyph.
+
+**Numeral convention — two scripts, two places (`core/util/arabic_digits.dart`):**
+- **Plain UI badges** (ayah badge, surah/nav circles, chapter medallion) use **Urdu/Persian
+  "Extended Arabic-Indic" digits, U+06F0–U+06F9** (`toUrduDigits`) in the **system font**, so
+  Urdu/Hindi readers see the digit they read as "2" (`۲`).
+- **The Mushaf ayah-end ROSETTE** keeps **canonical Arabic-Indic, U+0660–U+0669**
+  (`toArabicIndicDigits`). KFGQPC's GSUB only composes *those* code points into the ornate
+  medallion (`٢`→`_771`); feed it `۲` (U+06F2) and you get a bare digit (`uni06F2`, no rosette).
+  Verify with `hb-shape font.ttf "٢"` vs `"۲"`.
+- **Gotcha that caused 3 rounds of "still showing 4":** the Arabic-Indic **`٢` (2) looks like
+  the Urdu/Persian `۴` (4)** to an Urdu reader. The rosette `٢` is correct (every printed
+  Mushaf, incl. Urdu ones, uses it) but *reads* as 4. Proof for the user: render `١ ٢ ٣ ٤`
+  as rosettes (`hb-view ... "١ ٢ ٣ ٤"`, RTL) so they see the 2 and the 4 are different glyphs.
+  This is why the badges (not the font-locked rosette) were switched to Urdu numerals.
 
 ---
 
