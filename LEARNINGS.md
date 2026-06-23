@@ -414,15 +414,27 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
     so there are no per-verse anchor widgets. Place a `GlobalKey` on each group's
     `Text` widget and pre-compute each verse's **character offset** within its group
     (`_buildOffsets()`: iterate ayahs, accumulate `textArabic.length + marker.length`
-    per verse). To scroll to a verse: `key.currentContext.findRenderObject()` gives
-    the `RenderParagraph`; call `getBoxesForSelection(TextSelection(baseOffset: offset,
-    extentOffset: offset + 1))` to get the bounding box of the verse's first character
-    (local Y); convert to scroll coordinates via `obj.localToGlobal(Offset.zero).dy -
+    per verse). To get a verse's local Y from its char offset, use
+    **`obj.getOffsetForCaret(TextPosition(offset: o), Rect.zero).dy`** —
+    convert to scroll coordinates via `obj.localToGlobal(Offset.zero).dy -
     viewportBox.localToGlobal(Offset.zero).dy` and animate. Detect the topmost verse
-    the same way: loop groups/verses, compare `groupGlobalY + boxes.first.top` to the
-    viewport top, take the last one at/above the fold. Rebuild offsets in both
-    `initState` and `didUpdateWidget` (when `ayahs` changes). Note: `context.findRenderObject()`
-    returns `RenderObject`, not `RenderBox` — cast explicitly before calling `localToGlobal`.
+    the same way: loop groups/verses, compare `groupGlobalY + caretY` to the viewport
+    top, take the last one at/above the fold. Rebuild offsets in both `initState` and
+    `didUpdateWidget` (when `ayahs` changes). `context.findRenderObject()` returns
+    `RenderObject`, not `RenderBox` — cast before `localToGlobal`.
+    > **DO NOT use `RenderParagraph.getBoxesForSelection(o, o+1)` for this** — it
+    > returns an **EMPTY list for almost every offset in heavily-shaped Arabic text**
+    > (only isolated glyphs like the U+06DD medallion or spaces box cleanly). Verified
+    > on the iOS sim: offsets 0/100/1000/2000/3837 → 0 boxes, while `getOffsetForCaret`
+    > returns a correct Y for all of them. Using `getBoxesForSelection` silently broke
+    > focus-scroll, Last-Read resume, AND the font-size re-anchor (the functions bailed
+    > on the empty list, so the scroll position drifted — to verse 1 on zoom-in,
+    > "stays-ish" on zoom-out). **This is invisible to widget tests**: the test font
+    > boxes every glyph (no real shaping), so `getBoxesForSelection` never returns empty
+    > there — only a real-device render exposes it. Reproduce/diagnose with a throwaway
+    > diag that opens the real reader at a deep verse and `debugPrint`s the boxes vs
+    > caret for several offsets. (`getBoxesForSelection` is still fine where you need the
+    > box *size* of an isolated glyph — e.g. the medallion overlay measuring U+06DD.)
   - *Detailed list:* a lazy `ListView.builder` can't `ensureVisible` an unbuilt
     tile, so use **`scrollable_positioned_list`** — `ItemScrollController.scrollTo(
     index:)` handles unbuilt items, and `ItemPositionsListener` gives the topmost
