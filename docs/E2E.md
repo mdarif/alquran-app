@@ -19,6 +19,7 @@ integration_test/
   reader_flow_test.dart          launch → surah list → reader → peek → detailed
   reader_resume_test.dart        Last Read: record progress; resume in the same viewport
   reader_interactions_test.dart  peek dismiss; swipe to the next surah
+  prayer_times_test.dart         location permission (grant/deny) → next-prayer pill + sheet
 lib/core/testing/widget_keys.dart   stable WidgetKeys for finders
 ```
 
@@ -75,6 +76,11 @@ patrol develop -t integration_test/reader_flow_test.dart
   surah in Reading; tap a verse → peek card; toggle Reading⇄Detailed; peek
   dismiss; swipe to the next surah; **Last Read** records progress and resumes
   in the same viewport (Reading vs Detailed) — locking the resume fixes.
+- **P0 prayer times** — the indicator is present on launch; **granting** the
+  native location permission resolves the schedule (pill → all-times sheet with
+  the five salah + Sunrise); **denying** degrades gracefully (no crash, the
+  enable affordance stays). This is the suite's first native-permission flow —
+  see the caveats in `prayer_times_test.dart` and Troubleshooting below.
 - **P1** — swipe next/prev surah; font slider + pinch (bounds 20–48); language
   filter toggle + collapse-to-pill + carry-over; theme persist; Jump-to
   Page/Juz/Hizb/Ruku.
@@ -96,11 +102,22 @@ patrol develop -t integration_test/reader_flow_test.dart
   `patrol:` block (patrol_cli defaults to `patrol_test/`).
 - **`patrol test` uninstalls the app/test APKs after a run**, so you can't
   `adb shell am instrument` manually afterwards — re-run `patrol test`.
+- **Prayer-times grant path shows no schedule** — the coarse fix needs the
+  device/emulator to actually have a location. On an Android emulator set one via
+  Extended controls → Location (set a point and **Send**), or the request times
+  out (10s) and degrades to the enable affordance (correct, but no times appear).
+- **Permission dialog doesn't re-appear** — native permission grants/denies
+  **persist** across runs; `bootstrapApp` only clears Dart prefs, not OS
+  permissions. The tests guard every dialog with `isPermissionDialogVisible`, so
+  they won't hang, but to re-exercise a clean grant/deny reset them first:
+  `adb shell pm reset-permissions` (Android) or delete the app (iOS sim).
 
 ## Notes
 
 - This toolchain reports a high Flutter version; `patrol 4.6.1` resolved and the
   Dart layer analyzes clean. If a native build fails on a version mismatch, pin
   a Patrol version from its compatibility matrix.
-- The app is fully offline with no permissions/notifications, so we use Patrol's
-  Dart finders (`$`) and system-back, not its heavier native automation.
+- The app is fully offline. Its one OS permission is **location** (prayer times,
+  geolocator) — `prayer_times_test.dart` drives that native dialog with Patrol's
+  `$.platformAutomator.mobile` (grant/deny). Everything else uses Dart finders
+  (`$`) and system-back.

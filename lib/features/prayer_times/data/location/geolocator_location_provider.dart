@@ -25,11 +25,15 @@ class GeolocatorLocationProvider implements LocationProvider {
         return const LocationResult(LocationStatus.denied);
       }
       // A cached fix is plenty for prayer times and instant; fall back to a
-      // fresh coarse fix if there's none.
+      // fresh coarse fix if there's none. The timeLimit guarantees we never hang
+      // forever waiting for a fix that won't come (services on but no signal /
+      // an emulator with no location): it throws, caught below → `unavailable`,
+      // so the indicator degrades to the enable affordance instead of limbo.
       final position = await Geolocator.getLastKnownPosition() ??
           await Geolocator.getCurrentPosition(
             locationSettings: const LocationSettings(
               accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 10),
             ),
           );
       return LocationResult(
