@@ -197,11 +197,17 @@ text) and to the printed Madani Mushaf — verify An-Nisa 4:2 on quran.com. The 
 carry the madd on the letter itself, and Tanzil/canonical add no carrier there.
 Disabling `calt` **globally** lifts the madd but (a) deforms the alef-maqsura swash, (b) widens
 the text so Bismillah wraps, and (c) **shatters the Allah ligature** (`Allah`→5 glyphs) and
-Bismillah — `calt` drives those too. **The fix we shipped: per-word `-calt`.** `_verseTextSpans`
-in `mushaf_view.dart` splits each verse, putting ONLY words that contain `ىٰ` (U+0649 U+0670)
-into a span styled with `AppTheme.arabicFontFeaturesNoCalt`; everything else keeps `calt`, so
-Allah/Bism (never in a `ـىٰٓ` word) stay intact. The visual lift is modest (the alef-maqsura
-also changes swash), but it's the only ligature-safe way to move the madd.
+Bismillah — `calt` drives those too. **The fix we shipped: per-word `-calt`, but ONLY for the
+right words.** `TJ065` (the low madd) fires in EXACTLY ONE context: a **word-final alef-maqsura
+immediately preceded by meem** (`مَىٰ`). Proven by shaping all **664** `ـىٰ` words in the DB and
+checking for `TJ065` in the hb output: only **15** match, every one a `مَىٰ` ending (ٱلۡيَتَٰمَىٰ,
+ٱلۡأَعۡمَىٰ, رَمَىٰ, …). After **any other** preceding letter (lam `إِلَىٰٓ`, ra `نَصَٰرَىٰ`, waw, …) the
+madd is ALREADY high under `calt` — so a broad "any `ـىٰ` word" `-calt` *shifts those right and
+makes them worse* (this was a real "half-fixed" regression). `_verseTextSpans` splits each verse
+and applies `AppTheme.arabicFontFeaturesNoCalt` to only the words matching
+`_meemAlefMaqsuraEnding()` (robust to trailing pause marks ۖ ۚ and a shadda'd meem تُسَمَّىٰ);
+everything else — including Allah/Bism (never `مَىٰ`) — keeps `calt`. **Method: classify the whole
+word-set by shaping each and grepping the substituted glyph; don't guess the context from one example.**
 **Flutter gotcha:** `calt` is default-ON; `FontFeature.enable('rlig')` alone does NOT disable
 it — you must pass `FontFeature.disable('calt')` explicitly (omitting ≠ off).
 
@@ -223,27 +229,27 @@ medallion); patching one and declaring victory is whack-a-mole. **Lesson: when a
 before concluding it's a build/cache problem.** A screenshot localises which widget — the
 green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text glyph.
 
-**Numeral convention — FINAL (owner-decided), `core/util/arabic_digits.dart`:**
-- **Plain UI chrome badges** (TOC surah circle, chapter-header medallion, Detailed-view
-  ayah badge, nav-index circle) stay **Western digits** (`'$n'`). The owner wants English
-  numerals in chrome. (An Urdu-digit experiment on these was tried and reverted.)
-- **Reading-view ayah marker = empty medallion + overlaid Urdu numeral** (`_MarkedParagraph`).
+**Numeral convention — FINAL (owner-decided):** every verse/surah number is a **Western digit**.
+- **Plain UI chrome badges** (TOC surah circle, chapter-header medallion, Detailed-view ayah
+  badge, nav-index circle) are `'$n'`. (An Urdu-digit experiment on these was tried and reverted.)
+- **Reading-view ayah marker = empty medallion + overlaid Western digit** (`_MarkedParagraph`).
   Render the font's **empty ayah ornament U+06DD (`۝`)** inline as the marker — it's real text
   (correct RTL order, reflow, zoom) and *always drawn* (graceful degradation: worst case is a
-  medallion with no number, never an empty gap). Then **overlay** a readable Urdu numeral
-  (`toUrduDigits`, U+06F0+, in `AppTheme.urduFontFamily`) centred on each medallion, positioned
-  via `RenderParagraph.getBoxesForSelection(offset, offset+1, BoxHeightStyle.tight)` in a
-  post-frame callback with a *guarded* setState (re-measures on zoom/reflow; the guard stops a
-  rebuild loop). Size the digit off the measured box (`rect.height * 0.30`) so multi-digit
-  numbers fit and it scales with pinch-zoom. Offset bookkeeping: the marker is always the single
-  char `۝`, so `_verseStart` advances `textLen + 3` (` ۝ `), NOT the digit length.
-- **Why the overlay (not inline text, not the native rosette):** KFGQPC's GSUB composes
-  Arabic-Indic U+0660–U+0669 into the ornate rosette (`٢`→`_771`) — but `٢` reads like Urdu `۴`
-  to the audience (the 3+ rounds of "it still shows 4"; prove `٢≠4` with `hb-view ... "١ ٢ ٣ ٤"`).
-  Feeding the rosette a U+06F2 Urdu digit does NOT compose (bare `uni06F2`), and KFGQPC has no
-  enclosing-circle (U+20DD `.notdef`) — so the ornate circle can ONLY hold the canonical `٢`.
-  To get a circle around a *readable* digit you must overlay. (Owner first chose a plain Urdu
-  digit with no circle, then asked for the circle back → medallion + overlay.)
+  medallion with no number, never an empty gap). Then **overlay** the number centred on each
+  medallion, positioned via `RenderParagraph.getBoxesForSelection(offset, offset+1,
+  BoxHeightStyle.tight)` in a post-frame callback with a *guarded* setState (re-measures on
+  zoom/reflow; guard stops a rebuild loop). Wrap the digit in a `FittedBox(scaleDown)` sized to
+  the medallion's inner field (`rect.width*0.46 × rect.height*0.40`) so a 3-digit ayah (286)
+  scales to fit instead of overflowing, and it tracks pinch-zoom via the measured box. Offset
+  bookkeeping: the marker is ALWAYS the single char `۝`, so `_verseStart` advances `textLen + 3`
+  (` ۝ `), NOT the digit length.
+- **Why overlay, not the native rosette:** KFGQPC's GSUB composes Arabic-Indic U+0660–U+0669 into
+  the ornate rosette (`٢`→`_771`) — but `٢` reads like Urdu `۴` to the audience (3+ rounds of "it
+  still shows 4"; prove `٢≠4` with `hb-view ... "١ ٢ ٣ ٤"`). The rosette can ONLY hold the
+  canonical `٢` (feeding it U+06F2 → bare `uni06F2`; KFGQPC has no enclosing-circle U+20DD →
+  `.notdef`), so a circle around a *readable* digit MUST be an overlay. Evolution across rounds:
+  native rosette `٢` → plain Urdu `۲` (owner wanted readable, dropped circle) → owner wanted the
+  circle back AND English like the badges → **medallion + overlaid Western digit**.
 
 ---
 
