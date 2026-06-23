@@ -64,4 +64,24 @@ void main() {
     expect(cubit.isAuto, isFalse);
     expect(cubit.activePhase, DayPhase.isha);
   });
+
+  testWidgets('the auto card shows the live phase when following the day',
+      (tester) async {
+    // An AUTO cubit (default) runs a ticker — close it inside the body, since the
+    // pending-timer invariant is checked before addTearDown runs.
+    SharedPreferences.setMockInitialValues(const {});
+    final cubit = ThemeCubit(
+      await SharedPreferences.getInstance(),
+      clock: () => DateTime(2026, 6, 23, 11), // Duha
+    );
+    await _pump(tester, cubit);
+    await tester.tap(find.byType(ThemeToggleButton));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Following the day'), findsOneWidget);
+    // "now Duha" on the auto card + the Duha swatch label.
+    expect(find.textContaining('Duha'), findsWidgets);
+
+    await cubit.close(); // cancel the auto ticker
+  });
 }

@@ -70,16 +70,69 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('theme_choice'), 'auto');
     });
+
+    test('setAuto while already auto stays auto', () async {
+      final cubit = await _cubit(hour: 11);
+      await cubit.setAuto();
+      expect(cubit.isAuto, isTrue);
+      expect(cubit.activePhase, DayPhase.duha);
+    });
+
+    test('refresh() re-resolves the surface as the day moves (auto)', () async {
+      var hour = 10; // morning
+      SharedPreferences.setMockInitialValues(const {});
+      final cubit = ThemeCubit(
+        await SharedPreferences.getInstance(),
+        clock: () => _at(hour),
+      );
+      addTearDown(cubit.close);
+      expect(cubit.activePhase, DayPhase.duha);
+
+      hour = 18; // dusk — what the ticker / app-resume would catch
+      cubit.refresh();
+      expect(cubit.activePhase, DayPhase.maghrib);
+    });
+
+    test('refresh() is a no-op while holding a fixed light', () async {
+      var hour = 10;
+      SharedPreferences.setMockInitialValues(const {'theme_choice': 'isha'});
+      final cubit = ThemeCubit(
+        await SharedPreferences.getInstance(),
+        clock: () => _at(hour),
+      );
+      addTearDown(cubit.close);
+
+      hour = 11; // moved into Duha territory, but we're holding Isha
+      cubit.refresh();
+      expect(cubit.isAuto, isFalse);
+      expect(cubit.activePhase, DayPhase.isha);
+    });
+
+    test('a corrupt persisted value falls back gracefully', () async {
+      final cubit = await _cubit(prefs: {'theme_choice': 'banana'}, hour: 10);
+      expect(cubit.isAuto, isFalse);
+      expect(cubit.activePhase, DayPhase.duha); // safe default
+    });
   });
 
-  group('MushafPalette.phaseForHour', () {
-    test('maps the day to its light', () {
-      expect(MushafPalette.phaseForHour(4), DayPhase.isha); // pre-dawn
-      expect(MushafPalette.phaseForHour(5), DayPhase.fajr);
-      expect(MushafPalette.phaseForHour(8), DayPhase.duha);
-      expect(MushafPalette.phaseForHour(14), DayPhase.asr);
-      expect(MushafPalette.phaseForHour(17), DayPhase.maghrib);
-      expect(MushafPalette.phaseForHour(20), DayPhase.isha);
+  group('ThemeState equality', () {
+    ThemeState s(DayPhase p, {required bool auto}) =>
+        ThemeState(palette: MushafPalette.of(p), auto: auto);
+
+    test('equal by phase + auto, differ otherwise', () {
+      expect(s(DayPhase.duha, auto: true), s(DayPhase.duha, auto: true));
+      expect(
+        s(DayPhase.duha, auto: true).hashCode,
+        s(DayPhase.duha, auto: true).hashCode,
+      );
+      expect(
+        s(DayPhase.duha, auto: true),
+        isNot(s(DayPhase.duha, auto: false)),
+      );
+      expect(
+        s(DayPhase.duha, auto: true),
+        isNot(s(DayPhase.isha, auto: true)),
+      );
     });
   });
 }

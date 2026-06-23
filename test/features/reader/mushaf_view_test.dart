@@ -1,3 +1,4 @@
+import 'package:al_quran/core/theme/mushaf_palette.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
@@ -214,6 +215,18 @@ void main() {
         ),
       );
       expect(find.byType(Bismillah), findsNothing);
+    });
+
+    testWidgets('the Bismillah ornament uses the surface gold', (tester) async {
+      final palette = MushafPalette.of(DayPhase.duha);
+      await tester.pumpWidget(
+        MaterialApp(theme: palette.toTheme(), home: Scaffold(body: _view())),
+      );
+      // The rub-el-hizb stars ۞ are tinted with the palette's gold (via the
+      // MushafColors theme extension), not a hard-coded colour.
+      final stars = tester.widgetList<Text>(find.text('۞'));
+      expect(stars, isNotEmpty);
+      expect(stars.every((s) => s.style?.color == palette.gold), isTrue);
     });
 
     testWidgets('shows a current-page readout when ayahs carry page numbers',
