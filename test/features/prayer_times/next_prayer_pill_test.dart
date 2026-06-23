@@ -68,6 +68,13 @@ void main() {
     expect(find.textContaining('6:42'), findsOneWidget);
   });
 
+  testWidgets('during the dawn window the pill shows Sunrise', (tester) async {
+    // Fake repo: fajr 5:00, sunrise 6:30 → at 06:00 the next marker is Sunrise.
+    await _pump(tester, _cubit(saved: _loc, hour: 6));
+    expect(find.textContaining('Sunrise'), findsOneWidget);
+    expect(find.textContaining('6:30'), findsOneWidget);
+  });
+
   testWidgets('tapping opens the all-five sheet', (tester) async {
     await _pump(tester, _cubit(saved: _loc, hour: 17));
     await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));

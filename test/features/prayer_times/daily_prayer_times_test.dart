@@ -32,6 +32,13 @@ void main() {
       expect(_day.nextAfter(_t(19))?.$1, Prayer.isha); // after Maghrib
     });
 
+    test('in the dawn window (Fajr→sunrise) the next marker is Sunrise', () {
+      // Fajr 4:30, sunrise 6:00 — sunrise marks when the Fajr window expires.
+      expect(_day.nextAfter(_t(5))?.$1, Prayer.sunrise); // mid-dawn
+      expect(_day.nextAfter(_t(5))?.$2, _day.sunrise);
+      expect(_day.nextAfter(_t(7))?.$1, Prayer.dhuhr); // after sunrise → Dhuhr
+    });
+
     test('a time exactly at a prayer returns the FOLLOWING prayer', () {
       expect(_day.nextAfter(_day.asr)?.$1, Prayer.maghrib);
       expect(_day.nextAfter(_day.isha), isNull);

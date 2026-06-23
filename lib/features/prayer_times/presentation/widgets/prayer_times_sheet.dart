@@ -51,7 +51,7 @@ class PrayerTimesSheet extends StatelessWidget {
             _PrayerRow(
               label: 'Sunrise',
               time: times.sunrise,
-              isNext: false,
+              isNext: next == Prayer.sunrise,
               muted: true,
             ),
             for (final (prayer, time) in times.schedule.skip(1))

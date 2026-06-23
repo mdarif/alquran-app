@@ -65,6 +65,14 @@ void main() {
     expect(cubit.state.next!.remaining, const Duration(hours: 2, minutes: 30));
   });
 
+  test('in the dawn window the next marker is Sunrise', () {
+    // fajr 4:30, sunrise 6:00 → at 05:00 the next marker is Sunrise.
+    final cubit = PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(5));
+    addTearDown(cubit.close);
+    expect(cubit.state.next!.prayer, Prayer.sunrise);
+    expect(cubit.state.next!.at, DateTime(2026, 6, 23, 6));
+  });
+
   test('after Isha, next rolls over to tomorrow Fajr', () {
     final cubit = PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(23));
     addTearDown(cubit.close);

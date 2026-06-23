@@ -34,10 +34,24 @@ class DailyPrayerTimes {
         (Prayer.isha, isha),
       ];
 
-  /// The next obligatory prayer strictly after [now], or null once all of this
-  /// day's prayers have passed (the caller then recomputes for the next day).
+  /// The chronological "next event" sequence — the five salah plus Sunrise.
+  /// Sunrise bounds the Fajr window: between Fajr and sunrise the meaningful
+  /// upcoming marker is Sunrise (when Fajr time expires), not Dhuhr; after
+  /// sunrise it's Dhuhr.
+  List<(Prayer, DateTime)> get _markers => [
+        (Prayer.fajr, fajr),
+        (Prayer.sunrise, sunrise),
+        (Prayer.dhuhr, dhuhr),
+        (Prayer.asr, asr),
+        (Prayer.maghrib, maghrib),
+        (Prayer.isha, isha),
+      ];
+
+  /// The next marker strictly after [now] — a salah, or Sunrise during the dawn
+  /// (post-Fajr) window. Null once Isha has passed (the caller then recomputes
+  /// for the next day).
   (Prayer, DateTime)? nextAfter(DateTime now) {
-    for (final entry in schedule) {
+    for (final entry in _markers) {
       if (entry.$2.isAfter(now)) return entry;
     }
     return null;
