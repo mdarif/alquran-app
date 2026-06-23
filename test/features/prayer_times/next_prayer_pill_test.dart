@@ -74,9 +74,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(WidgetKeys.prayerTimesSheet), findsOneWidget);
-    for (final name in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
+    for (final name in ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
       expect(find.text(name), findsOneWidget);
     }
+    expect(find.text('6:30'), findsOneWidget); // sunrise time shown
   });
 
   testWidgets('no location → a discreet enable affordance', (tester) async {

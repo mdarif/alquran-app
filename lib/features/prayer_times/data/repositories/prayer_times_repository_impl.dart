@@ -17,10 +17,14 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
   static const String _kLabel = 'prayer_label';
 
   // The ONLY two calculation knobs, fixed and never surfaced in the UI:
-  //  • method = Muslim World League (the widely-adopted global default)
-  //  • Asr    = Standard / Shafi  — the Ahle-Hadith rule (NOT Hanafi).
+  //  • method = University of Islamic Sciences, Karachi (18°/18°) — the
+  //    de-facto standard across the Indian subcontinent (this app's Urdu/Hindi
+  //    audience); matches local references to the minute. MWL's 17° Isha ran
+  //    ~6 min early here. (Method sets the Fajr/Isha twilight angles only.)
+  //  • Asr    = Standard / Shafi  — the Ahle-Hadith rule (NOT Hanafi). Asr is
+  //    method-independent: it's the madhab's shadow ratio, so this is unchanged.
   static const adhan.CalculationMethod _method =
-      adhan.CalculationMethod.muslim_world_league;
+      adhan.CalculationMethod.karachi;
   static const adhan.Madhab _madhab = adhan.Madhab.shafi;
 
   @override

@@ -41,9 +41,22 @@ class PrayerTimesSheet extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 12),
-            for (final (prayer, time) in times.schedule)
+            // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq — not a
+            // salah, so never highlighted), then the remaining four prayers.
+            _PrayerRow(
+              label: Prayer.fajr.label,
+              time: times.fajr,
+              isNext: next == Prayer.fajr,
+            ),
+            _PrayerRow(
+              label: 'Sunrise',
+              time: times.sunrise,
+              isNext: false,
+              muted: true,
+            ),
+            for (final (prayer, time) in times.schedule.skip(1))
               _PrayerRow(
-                prayer: prayer,
+                label: prayer.label,
                 time: time,
                 isNext: prayer == next,
               ),
@@ -56,20 +69,28 @@ class PrayerTimesSheet extends StatelessWidget {
 
 class _PrayerRow extends StatelessWidget {
   const _PrayerRow({
-    required this.prayer,
+    required this.label,
     required this.time,
     required this.isNext,
+    this.muted = false,
   });
 
-  final Prayer prayer;
+  final String label;
   final DateTime time;
   final bool isNext;
+
+  /// A non-salah marker (Sunrise) — dimmed and never highlightable as "next".
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final fg = isNext ? cs.onPrimaryContainer : cs.onSurface;
+    final fg = isNext
+        ? cs.onPrimaryContainer
+        : (muted ? cs.onSurfaceVariant : cs.onSurface);
+    final weight =
+        isNext ? FontWeight.w700 : (muted ? FontWeight.w400 : FontWeight.w500);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -79,11 +100,15 @@ class _PrayerRow extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (muted) ...[
+            Icon(Icons.wb_twilight_rounded, size: 16, color: fg),
+            const SizedBox(width: 8),
+          ],
           Text(
-            prayer.label,
+            label,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: fg,
-              fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
+              fontWeight: weight,
             ),
           ),
           const Spacer(),
@@ -91,7 +116,7 @@ class _PrayerRow extends StatelessWidget {
             formatPrayerTime(time),
             style: theme.textTheme.bodyLarge?.copyWith(
               color: fg,
-              fontWeight: isNext ? FontWeight.w700 : FontWeight.w500,
+              fontWeight: weight,
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),

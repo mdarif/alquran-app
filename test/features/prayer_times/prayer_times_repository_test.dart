@@ -63,10 +63,11 @@ void main() {
       final ours = repo.timesFor(_abuDhabi, _date).asr;
 
       // Compute the Hanafi Asr directly; it is strictly LATER than Shafi's.
+      // (Asr is method-independent — only the madhab differs here.)
       final hanafi = adhan.PrayerTimes(
         adhan.Coordinates(_abuDhabi.latitude, _abuDhabi.longitude),
         adhan.DateComponents.from(_date),
-        adhan.CalculationMethod.muslim_world_league.getParameters()
+        adhan.CalculationMethod.karachi.getParameters()
           ..madhab = adhan.Madhab.hanafi,
         utcOffset: _date.timeZoneOffset,
       ).asr;
