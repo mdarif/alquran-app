@@ -174,21 +174,29 @@ renderer or the font — not the data. When the text itself is suspect, **diff i
 canonical edition** before inventing transformation rules; the canonical encoding already
 encodes the right answer (here, where kashidas go).
 
-**Elongated madd on `مَىٰ` words (ٱلۡيَتَٰمَىٰٓ, ٱلۡأَعۡمَىٰ): ROOT CAUSE = one font lookup; FIX =
-patch the font (`tool/patch_arabic_font.py`).** This took many wrong turns — record the *method*,
-not just the answer.
-- **Symptom:** the superscript-alef/madd on a word-final alef-maqsura *preceded by meem* hugs the
+**Elongated madd on word-final `ـىٰ` (ٱلۡيَتَٰمَىٰٓ, حَتَّىٰ, ٱلۡأَعۡمَىٰ): ROOT CAUSE = inconsistent
+GPOS mark anchors across the alef-maqsura glyph FAMILY; FIX = lift them all in the font
+(`tool/patch_arabic_font.py` + `make patch-font`).** Took many wrong turns — record the *method*.
+- **Symptom:** the dagger-alef / composed dagger-alef+maddah on a word-final alef-maqsura hugs the
   letter instead of floating above it.
-- **Root cause:** KFGQPC's `calt`, in that meem context, chains into a **Single-Substitution
-  lookup (Lookup[92])** that swaps the normal final alef-maqsura `afii57450.zz04` for a
-  **Tajweed-form glyph `TJ065`** (note the `TJ` = Tajweed prefix) whose superscript/madd GPOS
-  anchor sits at **y≈75 vs ≈480** on the normal form. Confirm: `hb-shape font.ttf "ٱلۡيَتَٰمَىٰٓ"`
-  shows `TJ065` + a mark at y≈75; `--features="-calt"` shows the normal glyph at y≈480.
-- **Fix:** rewrite that one substitution to an **identity map** in the font (`fontTools`: find the
-  Type-1 lookup whose value is `TJ065`, set `mapping[k]=k`). `calt` still fires (Allah/Bismillah
-  ligatures intact — they ride *other* `calt` lookups) but the alef-maqsura keeps its high-madd
-  form. Idempotent; one-liner `make patch-font`. **Licensing:** modifying the KFGQPC face is
-  unverified-on-top-of-unverified — clear before release.
+- **Root cause:** KFGQPC ships the word-final alef-maqsura as a whole **family** of contextual /
+  Tajweed-form glyphs (`afii57449`, `afii57450.zz04`, `TJ043 TJ062 TJ065 TJ067 TJ082 TJ083 TJ136`,
+  selected by `calt`/joining context). Their **GPOS mark-to-base base-anchors** for `uni0670`
+  (dagger) and `uni0670_uni0653` (composed madd) are **inconsistent**: the standard `afii57449`
+  seats the madd at **Y=550**, but several Tajweed forms seat it at **75–350**. So whichever words
+  land on a low-anchored form show a collapsed madd. **Quantify it:** shape all 664 `ـىٰ` words from
+  the DB, read the final-cluster mark's y-offset → 138 good (afii57449/550), ~166 low. **Do this
+  census FIRST** — it's what turned "one meem word" into "a family of 166 across 7 glyphs" and
+  stopped the one-glyph-at-a-time whack-a-mole (e.g. حَتَّىٰ uses `TJ082`, not `TJ065`).
+- **Fix:** raise the base-anchors. `tool/patch_arabic_font.py` finds the reference (`afii57449`'s
+  madd anchor) and, for **every base glyph that carries the composed-madd anchor** (= exactly the
+  alef-maqsura forms — nothing else takes `uni0670_uni0653`), lifts its dagger + madd base-anchors
+  to the reference. **No GSUB edits**, so every glyph keeps its shape and all ligatures/contextual
+  forms are untouched (Allah/Bism verified). Idempotent. **Gotcha:** the *base* anchor and the
+  shaped *net* y-offset differ by the mark's own anchor, which varies by mark-class — so 14
+  `مَىٰ`+maddah words net 425 not 550 even after the lift; visually identical (the composed madd is
+  a tall glyph) so left as-is. **Licensing:** modifying KFGQPC is unverified-on-unverified — clear
+  before release.
 
 **Dead ends (do not repeat):**
 - *"It's the data / a missing tatweel carrier."* WRONG — our text is **byte-identical to canonical
@@ -203,18 +211,23 @@ not just the answer.
   dagger-alef from y=375 to **y=975** (flies off). And a *broad* "any `ـىٰ` word" rule also shifts
   already-correct words (`إِلَىٰٓ`, `نَصَٰرَىٰ`) right — the "half fixed" report. Font-feature
   overrides are per-span and per-word at best; you cannot scope them to one glyph, so they are the
-  wrong tool for a single-glyph defect.
+  wrong tool for a glyph/anchor defect.
+- *"Neutralise the one Tajweed substitution (`TJ065→identity`)."* **Incomplete — fixed 1 of a
+  family.** It cured the meem words but left `حَتَّىٰ`/`أُنثَىٰ` (TJ082), `لَيَطۡغَىٰ` (TJ083), etc.
+  still low. **Lesson: before fixing one instance, census the whole set** (shape all N candidates,
+  bucket by the offending glyph/anchor) so you fix the family in one pass.
 
 **The method that finally worked (general rule for "font renders X wrong"):**
-1. **Diff your text against a canonical edition** → rules out data (it did).
-2. **Other apps use the same font fine?** → the font is capable; the defect is a specific
-   lookup/feature, find it.
-3. **`hb-shape` the word with/without each feature** to see which substitution/anchor is wrong
-   (here `--features="-calt"` localised it to a `calt` chain producing `TJ065`).
-4. **Dump GSUB with fontTools** to find the exact lookup and confirm it's chain-only (not directly
-   feature-referenced, so neutralising it is safe).
-5. **Patch the font** (identity-map the bad substitution / or fix the GPOS anchor) — a single-glyph
-   defect is fixed in the font, never with per-word feature hacks in the app.
+1. **Diff your text against a canonical edition** → rules out data (it did — byte-identical).
+2. **Other apps use the same font fine?** → the font is capable; the defect is in a glyph/feature/
+   anchor, find it (don't conclude "canonical, accept it").
+3. **`hb-shape` with/without each feature** to localise (here `-calt` showed a `calt` chain swapping
+   in a low-anchored Tajweed glyph).
+4. **CENSUS the whole affected set**, not one example: shape every candidate word, read the mark's
+   y-offset, bucket by base glyph → reveals the *family* and which are low vs the good reference.
+5. **Dump GSUB/GPOS with fontTools**; prefer **fixing the GPOS anchor** (shape-preserving, hits the
+   whole family) over GSUB substitution edits (per-glyph, changes shapes). A glyph/anchor defect is
+   fixed in the font, never with per-word feature hacks in the app.
 
 (Impeller-off is still set in the native manifests — Android:
 `io.flutter.embedding.android.EnableImpeller=false`; iOS: `FLTEnableImpeller=<false/>` —
