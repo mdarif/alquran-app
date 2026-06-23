@@ -11,10 +11,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
-import '../../../../core/theme/mushaf_palette.dart';
-import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
-import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/reader_cubit.dart';
@@ -166,13 +163,16 @@ class _ReaderViewState extends State<_ReaderView> {
             ),
             onPressed: () => _setDetailed(isReading),
           ),
-          // Prayer indicator — icon-only on the reader's busy bar; the full
-          // text pill lives on the roomier Home bar.
-          const NextPrayerPill(compact: true),
-          // Text size + Reading light fold into one overflow so the bar stays
-          // calm. Both are occasional, and the surface colour is itself the
-          // light cue — so neither needs a permanent slot here.
-          _readerMenu(context),
+          // Text size: reveals the inline slider below the bar. (Prayer times
+          // live on the Home bar, so there's no indicator here — keeps the
+          // reader calm and leaves room for the reading controls.)
+          IconButton(
+            key: WidgetKeys.fontSizeButton,
+            tooltip: 'Text size',
+            icon: const Icon(Icons.format_size_rounded),
+            onPressed: _toggleFontSlider,
+          ),
+          const ThemeToggleButton(),
         ],
       ),
       body: Stack(
@@ -342,45 +342,6 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   // --------------------------------------------------------------------------
-
-  /// The reader's overflow (⋮): Text size + Reading light, off the main bar.
-  Widget _readerMenu(BuildContext context) {
-    DayPhase? phase;
-    try {
-      phase = BlocProvider.of<ThemeCubit>(context).activePhase;
-    } catch (_) {
-      phase = null;
-    }
-    return PopupMenuButton<_ReaderMenu>(
-      tooltip: 'More',
-      icon: const Icon(Icons.more_vert_rounded),
-      onSelected: (item) {
-        switch (item) {
-          case _ReaderMenu.textSize:
-            _toggleFontSlider();
-          case _ReaderMenu.readingLight:
-            showReadingLightSheet(
-              context,
-              BlocProvider.of<ThemeCubit>(context),
-            );
-        }
-      },
-      itemBuilder: (_) => [
-        const PopupMenuItem(
-          key: WidgetKeys.fontSizeButton,
-          value: _ReaderMenu.textSize,
-          child: _MenuRow(icon: Icons.format_size_rounded, label: 'Text size'),
-        ),
-        PopupMenuItem(
-          value: _ReaderMenu.readingLight,
-          child: _MenuRow(
-            icon: phaseIcon(phase ?? DayPhase.duha),
-            label: 'Reading light',
-          ),
-        ),
-      ],
-    );
-  }
 
   void _toggleFontSlider() =>
       setState(() => _showFontSlider = !_showFontSlider);
@@ -981,24 +942,4 @@ class _LangChip extends StatelessWidget {
       ),
     );
   }
-}
-
-/// The reader's overflow-menu entries.
-enum _ReaderMenu { textSize, readingLight }
-
-/// One overflow-menu row: leading icon + label, matching Material menu spacing.
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 12),
-          Text(label),
-        ],
-      );
 }

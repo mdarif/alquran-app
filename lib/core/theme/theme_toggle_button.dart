@@ -4,9 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'mushaf_palette.dart';
 import 'theme_cubit.dart';
 
-/// The icon for a [DayPhase]'s light (dawn → sun → dusk → moon). Shared by the
-/// app-bar button and the reader's overflow menu entry.
-IconData phaseIcon(DayPhase phase) => switch (phase) {
+IconData _phaseIcon(DayPhase phase) => switch (phase) {
       DayPhase.fajr => Icons.wb_twilight_outlined,
       DayPhase.duha => Icons.light_mode_outlined,
       DayPhase.asr => Icons.wb_sunny_outlined,
@@ -34,24 +32,21 @@ class ThemeToggleButton extends StatelessWidget {
     }
     return IconButton(
       tooltip: 'Reading light',
-      icon: Icon(phaseIcon(cubit?.activePhase ?? DayPhase.duha)),
-      onPressed:
-          cubit == null ? null : () => showReadingLightSheet(context, cubit!),
+      icon: Icon(_phaseIcon(cubit?.activePhase ?? DayPhase.duha)),
+      onPressed: cubit == null ? null : () => _openSheet(context, cubit!),
     );
   }
-}
 
-/// Open the **Light of Day** picker as a bottom sheet. Shared by the app-bar
-/// button and the reader's overflow menu (both need the same [cubit]-bound sheet).
-void showReadingLightSheet(BuildContext context, ThemeCubit cubit) {
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (_) => BlocProvider<ThemeCubit>.value(
-      value: cubit,
-      child: const ReadingLightSheet(),
-    ),
-  );
+  void _openSheet(BuildContext context, ThemeCubit cubit) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => BlocProvider<ThemeCubit>.value(
+        value: cubit,
+        child: const ReadingLightSheet(),
+      ),
+    );
+  }
 }
 
 /// The "Reading light" picker: choose **Light of Day** (auto) or hold a single
@@ -144,7 +139,7 @@ class _AutoCard extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                phaseIcon(currentPhase),
+                _phaseIcon(currentPhase),
                 color: active ? cs.onPrimaryContainer : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
