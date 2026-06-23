@@ -638,6 +638,24 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   (2) The default sheet height cap (~half screen) overflows the 800×600 test
   surface → set `isScrollControlled: true` so the sheet sizes to its (small,
   fixed) content. Both render fine on a real phone but fail the test harness.
+- **Forbidden-prayer windows: derive what the lib won't give you, and be honest
+  about the rest.** The three times prayer is prohibited (after sunrise, zenith,
+  before sunset) need the sun's elevation, which `adhan` doesn't expose. Two of
+  the three boundaries are still computable exactly: the **zenith** window
+  anchors on real solar noon = midpoint(sunrise, sunset), and since Maghrib *is*
+  sunset, `solarNoon = sunrise + (maghrib - sunrise)/2`; it ends at Dhuhr
+  (zawāl). The "spear's length" after sunrise and the yellowing before sunset
+  fall back to documented ~15-min constants — name them, don't bury them, and
+  drop any degenerate span (`start >= end`) so odd inputs can't render a
+  backwards window. Compute the *active* window from TODAY's schedule **before**
+  any after-Isha rollover swaps the day for tomorrow.
+- **Reuse the palette's semantic extension for a new accent instead of a hard
+  colour.** A caution amber that had to read on five hand-tuned surfaces (incl.
+  the dark night) would need five values — but `MushafColors.gold` already is
+  that, phase-tuned, and a golden cue suits the sun-at-the-horizon meaning.
+  Read theme extensions **defensively** (`Theme.of(context).extension<…>()?.x ??
+  fallback`): bare test themes (plain `MaterialApp`) don't carry them, so a
+  non-null assertion would crash every widget test that pumps the screen alone.
 
 ---
 
