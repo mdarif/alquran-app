@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/util/arabic_digits.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
@@ -22,17 +23,13 @@ const String _bismillah = 'بِسۡمِ ٱللَّهِ'
 const int _surahAlFatiha = 1;
 const int _surahAtTawbah = 9;
 
-/// The verse number as Arabic-Indic digits (٠١٢…). In KFGQPC UthmanicHafs1B the
-/// digits of an ayah number compose — via the font's GSUB — into the ornate
-/// end-of-ayah rosette *with the number inside it* (e.g. ٢٨٦ → one medallion
-/// glyph). So we DON'T add U+06DD (that would draw a second, empty circle) and
-/// we keep the digits in one text run with the surrounding Arabic style, which
-/// is what lets the substitution fire (it won't across separate TextSpans).
-String _toArabicIndic(int n) => n
-    .toString()
-    .split('')
-    .map((d) => String.fromCharCode(0x0660 + (d.codeUnitAt(0) - 0x30)))
-    .join();
+// Verse-number numerals live in core/util/arabic_digits.dart:
+//  • the ayah-end ROSETTE uses Arabic-Indic (toArabicIndicDigits) — KFGQPC's
+//    GSUB composes those code points into the ornate medallion glyph (e.g.
+//    ٢٨٦ → one rosette). They stay in one run with the Arabic style so the
+//    substitution fires, and we DON'T add U+06DD (that draws a second circle).
+//  • the chapter-header MEDALLION (plain UI chrome) uses Urdu/Persian digits
+//    (toUrduDigits) so Urdu readers see familiar numerals.
 
 /// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
 /// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
@@ -218,7 +215,7 @@ class _MushafViewState extends State<MushafView>
         offset += ayah.textArabic.length +
             2 // leading + trailing space around the number
             +
-            _toArabicIndic(ayah.ayahNumber).length;
+            toArabicIndicDigits(ayah.ayahNumber).length;
       }
     }
   }
@@ -424,7 +421,7 @@ class _MushafViewState extends State<MushafView>
                                     : null,
                               ),
                               TextSpan(
-                                text: ' ${_toArabicIndic(ayah.ayahNumber)} ',
+                                text: ' ${toArabicIndicDigits(ayah.ayahNumber)} ',
                                 style: TextStyle(
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
@@ -597,7 +594,7 @@ class SurahHeaderCard extends StatelessWidget {
               border: Border.all(color: cs.primary.withValues(alpha: 0.45)),
             ),
             child: Text(
-              _toArabicIndic(number),
+              toUrduDigits(number),
               style: TextStyle(
                 color: cs.primary,
                 fontWeight: FontWeight.w700,

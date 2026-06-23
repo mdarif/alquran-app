@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/util/arabic_digits.dart';
 import '../../domain/ayah_share.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/translation_resource.dart';
@@ -56,7 +57,9 @@ class AyahTile extends StatelessWidget {
                 radius: 14,
                 backgroundColor: theme.colorScheme.primaryContainer,
                 child: Text(
-                  '${ayah.ayahNumber}',
+                  // Urdu/Persian numerals (۲ for 2) so Urdu/Hindi readers see a
+                  // familiar digit; the Arabic-Indic ٢ reads as "4" to them.
+                  toUrduDigits(ayah.ayahNumber),
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onPrimaryContainer,

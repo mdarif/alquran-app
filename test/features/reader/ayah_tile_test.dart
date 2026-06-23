@@ -1,3 +1,4 @@
+import 'package:al_quran/core/util/arabic_digits.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/presentation/widgets/ayah_tile.dart';
@@ -56,7 +57,10 @@ void main() {
         ),
       );
 
-      expect(find.text('1'), findsOneWidget); // ayah number badge
+      expect(
+        find.text(toUrduDigits(1)), // ayah number badge — Urdu/Persian ۱
+        findsOneWidget,
+      );
       expect(find.text('بِسْمِ ٱللَّهِ'), findsOneWidget);
       expect(find.text('اللہ کے نام'), findsOneWidget);
       expect(find.text('अल्लाह के नाम'), findsOneWidget);

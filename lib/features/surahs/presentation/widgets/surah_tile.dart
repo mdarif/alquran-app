@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/util/arabic_digits.dart';
 import '../../domain/entities/surah.dart';
 
 class SurahTile extends StatelessWidget {
@@ -22,7 +23,7 @@ class SurahTile extends StatelessWidget {
         radius: 16,
         backgroundColor: theme.colorScheme.primaryContainer,
         child: Text(
-          '${surah.id}',
+          toUrduDigits(surah.id),
           style: TextStyle(
             color: theme.colorScheme.onPrimaryContainer,
             fontWeight: FontWeight.w600,
