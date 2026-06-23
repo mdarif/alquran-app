@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms e2e e2e-setup
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -58,3 +58,6 @@ seed-version: ## Refresh the DB version marker (run after replacing quran.db)
 
 patch-font: ## Neutralise KFGQPC's low-madd Tajweed substitution (run after replacing the .ttf)
 	@python3 tool/patch_arabic_font.py
+
+location-perms: ## Re-apply prayer-times location perms to android/ + ios/ (run after a flutter create)
+	@python3 tool/apply_location_perms.py

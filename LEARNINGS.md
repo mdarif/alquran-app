@@ -566,7 +566,61 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
 
 ---
 
-## 5. Methodology meta-learnings
+## 5. Prayer times — offline calc + a prayer-aware theme
+
+- **Compute on-device with `adhan` (pure Dart) — no backend, fits the offline
+  ethos.** `PrayerTimes(Coordinates(lat,lon), DateComponents.from(date),
+  params, utcOffset: …)` where `params = CalculationMethod.muslim_world_league
+  .getParameters()..madhab = Madhab.shafi`. The six getters
+  (`fajr/sunrise/dhuhr/asr/maghrib/isha`) are non-null `late DateTime`.
+- **`utcOffset` does double duty.** In production pass `date.timeZoneOffset`
+  (the user is physically at the GPS location, so the device offset is right,
+  DST included). In tests, build the date with `DateTime.utc(...)` → offset 0 →
+  the returned times are deterministic UTC you can assert to the minute, no
+  ambient-timezone flakiness.
+- **Encode a creed constraint as code, never as a setting.** The owner follows
+  Salafi/Ahle-Hadith: MWL method + Standard (Shafi) Asr, Hanafi never offered.
+  So `_method` and `_madhab` are the *only* two calc constants, hard-wired in
+  the repo and never surfaced in any UI. Guard it with a **regression test that
+  computes the Hanafi Asr alongside and asserts ours is earlier** — a refactor
+  can't silently flip the creed without going red.
+- **Keep `adhan`/`geolocator` out of `domain/`.** Domain owns a plain `Prayer`
+  enum + a `LocationProvider` interface; the data layer maps the package types
+  to domain types. The cubit depends on the repo interface, so it tests with a
+  fake repo and no GPS.
+- **Core must not import a feature — pass primitives across the seam.** The
+  "Light of Day" theme lives in `core/theme`; the prayer schedule lives in a
+  feature. So `core/theme/prayer_phase.dart` exposes
+  `phaseForBoundaries({fajr, sunrise, asr, maghrib, isha, now})` taking bare
+  `DateTime`s, and `ThemeCubit` gains an **optional** `phaseResolver` closure.
+  The DI graph (which may see both layers) wires the closure to read the prayer
+  repo, falling back to `phaseForHour` when no location is known. Optional +
+  defaulted params kept all 16 existing theme tests green byte-for-byte.
+- **A static indicator needs no `Timer` — so it can't leak or drain.** The pill
+  shows the *next* prayer, not a live countdown; the cubit recomputes only on
+  `refresh()` (app-resume + the theme's existing tick). Contrast the auto-theme
+  ticker, whose pending timer trips the widget-test invariant.
+- **Read the cubit defensively in shared app-bar widgets.** `NextPrayerPill`
+  does `try { BlocProvider.of<…>(context) } catch (_) { null }` →
+  `SizedBox.shrink()`, so a screen pumped in isolation (no provider) renders
+  nothing instead of throwing — same trick as `ThemeToggleButton`.
+- **Native location perms are gitignored — make re-applying them one command.**
+  `ACCESS_COARSE/FINE_LOCATION` (AndroidManifest) and
+  `NSLocationWhenInUseUsageDescription` (Info.plist) live under `android/`/`ios/`,
+  which `flutter create` regenerates. `make location-perms`
+  (`tool/apply_location_perms.py`) idempotently re-inserts both — run it after
+  any platform regen, like `make patch-font` for the font.
+- **Two modal-bottom-sheet bugs that ONLY surface in widget tests** (a reason to
+  keep them): (1) a `Column` whose rows use `Row` + `Spacer` must be
+  `crossAxisAlignment.stretch` — a `MainAxisSize.min` column doesn't bound the
+  row's width, so `Spacer` has unbounded width → "content cannot be laid out".
+  (2) The default sheet height cap (~half screen) overflows the 800×600 test
+  surface → set `isScrollControlled: true` so the sheet sizes to its (small,
+  fixed) content. Both render fine on a real phone but fail the test harness.
+
+---
+
+## 6. Methodology meta-learnings
 
 - For a **visual bug**, reproduce it outside the app first (hb-view PNGs, cmap
   dumps). Two blind "evidence-based" code fixes still missed because the real
@@ -581,7 +635,7 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
 
 ---
 
-## 6. Licensing (clear before any release)
+## 7. Licensing (clear before any release)
 - **KFGQPC** fonts: licence UNVERIFIED — the King Fahd Complex terms must be
   confirmed for redistribution in an app store build.
 - **Noto Nastaliq Urdu:** SIL OFL 1.1 — clean.
