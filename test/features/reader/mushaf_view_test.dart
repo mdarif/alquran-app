@@ -517,6 +517,70 @@ void main() {
 
       expect(reported.last, greaterThanOrEqualTo(before));
     });
+
+    // Regression: deep in a long surah, BOTH enlarging and shrinking the font
+    // must keep the reader on (or very near) the same verse — not jump to v1.
+    for (final change in const [('enlarge', 24.0, 40.0), ('shrink', 40.0, 24.0)]) {
+      testWidgets('${change.$1} font keeps the verse (deep scroll, 286 verses)',
+          (tester) async {
+        final reported = <int>[];
+        var fontSize = change.$2;
+        late StateSetter setOuter;
+        final ayahs = _ayahs(2, 286);
+
+        await tester.pumpWidget(
+          _wrap(
+            StatefulBuilder(
+              builder: (context, setState) {
+                setOuter = setState;
+                return MushafView(
+                  ayahs: ayahs,
+                  headings: _headings(2, 'Al-Baqarah', 286),
+                  arabicFontSize: fontSize,
+                  resources: const [],
+                  onVisibleAyah: (a) => reported.add(a.ayahNumber),
+                );
+              },
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // Scroll deep into the surah.
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(0, -4000),
+        );
+        await tester.pump(const Duration(seconds: 2));
+        // Nudge to fire a fresh report of where we actually are.
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(0, -20),
+        );
+        await tester.pump(const Duration(seconds: 2));
+        final before = reported.last;
+        expect(before, greaterThan(10), reason: 'should be deep in the surah');
+
+        reported.clear();
+        setOuter(() => fontSize = change.$3);
+        await tester.pump(); // didUpdateWidget + relayout
+        await tester.pump(); // post-frame re-anchor
+        // Read the ACTUAL position after the change (not the re-anchor's own
+        // report) by nudging the scroll.
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(0, -20),
+        );
+        await tester.pump(const Duration(seconds: 2));
+
+        // The position must not have collapsed back toward verse 1.
+        expect(
+          reported.last,
+          greaterThan(before - 15),
+          reason: '${change.$1}: jumped from ~$before to ${reported.last}',
+        );
+      });
+    }
   });
 
   // -------------------------------------------------------------------------

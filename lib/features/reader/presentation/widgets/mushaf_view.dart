@@ -242,6 +242,18 @@ class _MushafViewState extends State<MushafView>
     );
   }
 
+  /// Local Y of [ayahId]'s first character within its paragraph [obj].
+  ///
+  /// Uses `getOffsetForCaret`, NOT `getBoxesForSelection`: the latter returns an
+  /// EMPTY list for most offsets in heavily-shaped Arabic text (only isolated
+  /// glyphs like the medallion/spaces box cleanly), which silently broke
+  /// focus-scroll, Last-Read resume, and the font-size re-anchor on real verses —
+  /// the anchor functions bailed out, so the position drifted (badly on zoom-in).
+  double _verseLocalTop(RenderParagraph obj, int ayahId) {
+    final offset = _verseStart[ayahId] ?? 0;
+    return obj.getOffsetForCaret(TextPosition(offset: offset), Rect.zero).dy;
+  }
+
   void _scrollToFocus(int ayahId) {
     if (!mounted) return;
     final surahId = widget.ayahs
@@ -254,21 +266,14 @@ class _MushafViewState extends State<MushafView>
     if (key?.currentContext == null) return;
     final obj = key!.currentContext!.findRenderObject();
     if (obj is! RenderParagraph || !obj.attached) return;
-    final offset = _verseStart[ayahId] ?? 0;
-    final boxes = obj.getBoxesForSelection(
-      TextSelection(
-        baseOffset: offset,
-        extentOffset: offset + 1,
-      ),
-    );
-    if (boxes.isEmpty) return;
+    final verseTop = _verseLocalTop(obj, ayahId);
     final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
     final viewportGlobalY = (context.findRenderObject()! as RenderBox)
         .localToGlobal(Offset.zero)
         .dy;
     final target = (_controller.offset +
             (groupGlobalY - viewportGlobalY) +
-            boxes.first.top -
+            verseTop -
             48)
         .clamp(0.0, _controller.position.maxScrollExtent);
     _controller.animateTo(
@@ -299,12 +304,7 @@ class _MushafViewState extends State<MushafView>
       if (obj is! RenderParagraph || !obj.attached) continue;
       final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
       for (final ayah in group) {
-        final offset = _verseStart[ayah.id] ?? 0;
-        final boxes = obj.getBoxesForSelection(
-          TextSelection(baseOffset: offset, extentOffset: offset + 1),
-        );
-        if (boxes.isEmpty) continue;
-        if (groupGlobalY + boxes.first.top <= viewportTop + 12) {
+        if (groupGlobalY + _verseLocalTop(obj, ayah.id) <= viewportTop + 12) {
           current = ayah;
         } else {
           break outer;
@@ -330,18 +330,13 @@ class _MushafViewState extends State<MushafView>
         .surahId;
     final obj = _groupKeys[surahId]?.currentContext?.findRenderObject();
     if (obj is! RenderParagraph || !obj.attached) return null;
-    final offset = _verseStart[ayahId] ?? 0;
-    final boxes = obj.getBoxesForSelection(
-      TextSelection(baseOffset: offset, extentOffset: offset + 1),
-    );
-    if (boxes.isEmpty) return null;
     final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
     final viewportGlobalY = (context.findRenderObject()! as RenderBox)
         .localToGlobal(Offset.zero)
         .dy;
     return (_controller.offset +
             (groupGlobalY - viewportGlobalY) +
-            boxes.first.top -
+            _verseLocalTop(obj, ayahId) -
             16)
         .clamp(0.0, _controller.position.maxScrollExtent);
   }
