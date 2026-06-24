@@ -26,4 +26,8 @@ class WidgetKeys {
   static const nextPrayerPill = Key('next-prayer-pill');
   static const prayerTimesSheet = Key('prayer-times-sheet');
   static const hijriDateLine = Key('hijri-date-line');
+
+  // Sunnah reminders
+  static const upcomingRemindersSection = Key('upcoming-reminders-section');
+  static const enableRemindersCard = Key('enable-reminders-card');
 }

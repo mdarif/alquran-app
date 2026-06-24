@@ -5,12 +5,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'app_navigator.dart';
 import 'core/home_widget/widget_publisher.dart';
 import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
 import 'core/theme/theme_cubit.dart';
 import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
+import 'features/reminders/domain/scheduling/notification_scheduler.dart';
+import 'features/reminders/presentation/cubit/reminders_cubit.dart';
 
 class AlQuranApp extends StatefulWidget {
   const AlQuranApp({super.key});
@@ -29,6 +32,14 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     unawaited(WakelockPlus.enable());
     // Refresh the home-screen widget with the current schedule on launch.
     unawaited(GetIt.I<WidgetPublisher>().publish());
+    // (Re)schedule the Sunnah-reminder rolling window on launch.
+    unawaited(GetIt.I<RemindersCubit>().refresh());
+    // If a tapped reminder cold-launched the app, route it after the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final payload =
+          await GetIt.I<NotificationScheduler>().consumeLaunchPayload();
+      routeFromPayload(payload);
+    });
   }
 
   @override
@@ -49,6 +60,8 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
       GetIt.I<ThemeCubit>().refresh();
       // Keep the home-screen widget in step (new day → new schedule).
       unawaited(GetIt.I<WidgetPublisher>().publish());
+      // Roll the reminder window forward (new day/month → new Hijri events).
+      unawaited(GetIt.I<RemindersCubit>().refresh());
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       unawaited(WakelockPlus.disable());
@@ -63,12 +76,17 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
         BlocProvider<PrayerTimesCubit>.value(
           value: GetIt.I<PrayerTimesCubit>(),
         ),
+        BlocProvider<RemindersCubit>.value(
+          value: GetIt.I<RemindersCubit>(),
+        ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
           return MaterialApp(
             title: 'Al Quran',
             debugShowCheckedModeBanner: false,
+            // Global key so a tapped reminder can route from outside the tree.
+            navigatorKey: navigatorKey,
             theme: themeState.palette.toTheme(),
             // A gentle cross-fade as the light changes — the surface "breathes"
             // between phases instead of snapping.

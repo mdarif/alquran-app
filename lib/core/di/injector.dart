@@ -15,6 +15,11 @@ import '../../features/reader/domain/repositories/ayah_repository.dart';
 import '../../features/reader/domain/repositories/last_read_repository.dart';
 import '../../features/reader/domain/repositories/reader_settings_repository.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
+import '../../features/reminders/data/repositories/reminder_settings_repository_impl.dart';
+import '../../features/reminders/data/scheduling/local_notification_scheduler.dart';
+import '../../features/reminders/domain/repositories/reminder_settings_repository.dart';
+import '../../features/reminders/domain/scheduling/notification_scheduler.dart';
+import '../../features/reminders/presentation/cubit/reminders_cubit.dart';
 import '../../features/surahs/data/repositories/surah_repository_impl.dart';
 import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
@@ -102,6 +107,20 @@ Future<void> configureDependencies() async {
     )
     ..registerLazySingleton<ReaderSettingsRepository>(
       () => ReaderSettingsRepositoryImpl(getIt<SharedPreferences>()),
+    )
+    // Sunnah reminders: local notifications only. The scheduler is init'd in
+    // main.dart (after timezone setup); the cubit is app-wide (Home + resume).
+    ..registerLazySingleton<NotificationScheduler>(
+      LocalNotificationScheduler.new,
+    )
+    ..registerLazySingleton<ReminderSettingsRepository>(
+      () => ReminderSettingsRepositoryImpl(getIt<SharedPreferences>()),
+    )
+    ..registerLazySingleton<RemindersCubit>(
+      () => RemindersCubit(
+        getIt<ReminderSettingsRepository>(),
+        getIt<NotificationScheduler>(),
+      ),
     )
     // Cubits (new instance per screen)
     ..registerFactory<SurahListCubit>(

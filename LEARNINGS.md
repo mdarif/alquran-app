@@ -705,6 +705,27 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   shipped form is plain English ("07 Muharram 1448 AH"). (If you DO render Urdu —
   e.g. the companion website — use **Urdu-Indic digits (U+06F0)**, never
   Arabic-Indic (U+0660); same digit split as the Mushaf numerals.)
+- **Islamic reminders with local notifications only — no backend, no Hijri
+  inverse.** Find Hijri-dated events (Ashura, Arafah, Ayyam al-Bid…) by
+  **forward-scanning Gregorian days** through the existing `HijriDate.fromGregorian`
+  (Gregorian→Hijri only) and matching month/day — a pure, testable engine like
+  `DailyPrayerTimes`, no new calendar engine. Scheduling reliability comes from a
+  **rolling window**: `cancelAll()` + reschedule the next ~50 one-shots on every
+  app launch/resume, so far-future months roll in and you stay under **iOS's
+  64-pending-notification cap**. Use **`AndroidScheduleMode.inexactAllowWhileIdle`**
+  (a 20:00 reminder doesn't need second-accuracy) to AVOID the
+  `SCHEDULE_EXACT_ALARM` special-access prompt. Register one **weekly-repeating**
+  notification for recurring events (Al-Kahf via `DateTimeComponents.dayOfWeekAndTime`)
+  rather than enumerating every week. FLN boot receivers re-arm after a reboot;
+  the gitignored native config (POST_NOTIFICATIONS + receivers) re-applies via
+  `make notif-perms` (mirrors `make location-perms`).
+- **Package-version gotchas (current as of FLN 22 / flutter_timezone 5):**
+  `initialize({required settings: …})` is now NAMED (was positional);
+  `FlutterTimezone.getLocalTimezone()` returns a `TimezoneInfo` (use
+  `.identifier`), not a `String`; and `tz.setLocalLocation(...)` MUST run before
+  any `zonedSchedule` — do it in `main()` after DI, wrapped in try/catch with a
+  UTC fallback so a timezone lookup can't block launch. Always re-check a plugin's
+  current signatures against the resolved version (`pubspec.lock`), not the docs.
 
 ---
 
