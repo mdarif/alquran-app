@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Prayer-times home-screen widget. -->
-    <string name="widget_label">Next prayer</string>
-    <string name="widget_default_location">Prayer times</string>
+    <!-- Prayer-times home-screen widgets. -->
     <string name="widget_no_location_title">Set location</string>
     <string name="widget_no_location_subtitle">Tap to open</string>
     <string name="prayer_widget_description">Next prayer time</string>
+    <string name="prayer_schedule_widget_description">Today\'s prayer schedule</string>
 </resources>

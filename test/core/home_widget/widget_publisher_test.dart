@@ -40,25 +40,35 @@ class _FakeRepo implements PrayerTimesRepository {
 
 /// Records what the publisher hands to the platform seam.
 class _RecordingClient implements HomeWidgetClient {
+  String? appGroupId;
   final Map<String, String> saved = {};
-  final List<String> updated = [];
+  final List<String> androidUpdated = [];
+  final List<String> iosUpdated = [];
+
+  @override
+  Future<void> setAppGroupId(String groupId) async => appGroupId = groupId;
 
   @override
   Future<void> saveData(String key, String value) async => saved[key] = value;
 
   @override
-  Future<void> updateWidget({required String qualifiedAndroidName}) async =>
-      updated.add(qualifiedAndroidName);
+  Future<void> update({String? qualifiedAndroidName, String? iOSName}) async {
+    if (qualifiedAndroidName != null) androidUpdated.add(qualifiedAndroidName);
+    if (iOSName != null) iosUpdated.add(iOSName);
+  }
 }
 
-/// Fails on the first plugin call — proves publish() never rethrows.
+/// Fails mid-publish — proves publish() never rethrows.
 class _ThrowingClient implements HomeWidgetClient {
+  @override
+  Future<void> setAppGroupId(String groupId) async {}
+
   @override
   Future<void> saveData(String key, String value) async =>
       throw Exception('plugin unavailable');
 
   @override
-  Future<void> updateWidget({required String qualifiedAndroidName}) async {}
+  Future<void> update({String? qualifiedAndroidName, String? iOSName}) async {}
 }
 
 void main() {
@@ -67,10 +77,13 @@ void main() {
   WidgetPublisher publisher(PrayerTimesRepository repo, HomeWidgetClient client) =>
       WidgetPublisher(WidgetBridge(repo, clock: () => base), client);
 
-  test('publishes the encoded payload + redraws the qualified Android provider',
+  test('publishes the payload + redraws both Android providers and iOS kinds',
       () async {
     final client = _RecordingClient();
     await publisher(_FakeRepo(saved: _loc), client).publish();
+
+    // App Group set so the iOS extension can read the shared container.
+    expect(client.appGroupId, WidgetPublisher.appGroupId);
 
     // Saved under the agreed key, and it's the bridge's JSON.
     final raw = client.saved[WidgetPublisher.payloadKey];
@@ -79,8 +92,9 @@ void main() {
     expect(json['hasLocation'], true);
     expect((json['days'] as List), hasLength(3));
 
-    // Redraw targets the fully-qualified receiver, exactly once.
-    expect(client.updated, [WidgetPublisher.androidProvider]);
+    // Every widget on both platforms is asked to redraw.
+    expect(client.androidUpdated, WidgetPublisher.androidProviders);
+    expect(client.iosUpdated, WidgetPublisher.iosWidgetKinds);
   });
 
   test('still publishes a (location-less) payload when no location is set',
@@ -91,7 +105,8 @@ void main() {
     final raw = client.saved[WidgetPublisher.payloadKey];
     expect(raw, isNotNull);
     expect((jsonDecode(raw!) as Map<String, dynamic>)['hasLocation'], false);
-    expect(client.updated, [WidgetPublisher.androidProvider]);
+    expect(client.androidUpdated, WidgetPublisher.androidProviders);
+    expect(client.iosUpdated, WidgetPublisher.iosWidgetKinds);
   });
 
   test('swallows plugin errors — a failing widget push never breaks the app',

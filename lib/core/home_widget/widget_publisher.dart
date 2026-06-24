@@ -6,11 +6,16 @@ import 'widget_bridge.dart';
 /// without a platform channel — mirrors how `LocationProvider` hides `geolocator`
 /// from the prayer-times repo.
 abstract interface class HomeWidgetClient {
-  /// Persist [value] under [key] in the store the native widget reads.
+  /// iOS: point the plugin at the shared App Group container so the widget
+  /// extension can read what the app writes. No-op on Android.
+  Future<void> setAppGroupId(String groupId);
+
+  /// Persist [value] under [key] in the store the native widgets read.
   Future<void> saveData(String key, String value);
 
-  /// Ask the platform to redraw the Android widget receiver.
-  Future<void> updateWidget({required String qualifiedAndroidName});
+  /// Ask the platform to redraw a widget — an Android receiver
+  /// ([qualifiedAndroidName]) and/or an iOS WidgetKit kind ([iOSName]).
+  Future<void> update({String? qualifiedAndroidName, String? iOSName});
 }
 
 /// Real implementation, backed by the plugin.
@@ -18,17 +23,25 @@ class PluginHomeWidgetClient implements HomeWidgetClient {
   const PluginHomeWidgetClient();
 
   @override
+  Future<void> setAppGroupId(String groupId) =>
+      HomeWidget.setAppGroupId(groupId);
+
+  @override
   Future<void> saveData(String key, String value) =>
       HomeWidget.saveWidgetData<String>(key, value);
 
   @override
-  Future<void> updateWidget({required String qualifiedAndroidName}) =>
-      HomeWidget.updateWidget(qualifiedAndroidName: qualifiedAndroidName);
+  Future<void> update({String? qualifiedAndroidName, String? iOSName}) =>
+      HomeWidget.updateWidget(
+        qualifiedAndroidName: qualifiedAndroidName,
+        iOSName: iOSName,
+      );
 }
 
-/// Pushes the [WidgetBridge] payload to the OS home-screen widget, then asks the
-/// platform to redraw it. The plugin-touching half is kept OUT of [WidgetBridge]
-/// (which stays pure) and behind [HomeWidgetClient] (which keeps this testable).
+/// Pushes the [WidgetBridge] payload to every home-screen widget (both Android
+/// providers and both iOS kinds), then asks each to redraw. The plugin-touching
+/// half is kept OUT of [WidgetBridge] (which stays pure) and behind
+/// [HomeWidgetClient] (which keeps this testable).
 ///
 /// Every call is best-effort and swallows errors: there may be no widget placed,
 /// the plugin may be unavailable on a platform, etc. — none of that should ever
@@ -39,20 +52,41 @@ class WidgetPublisher {
   final WidgetBridge _bridge;
   final HomeWidgetClient _client;
 
-  /// Key the native widget reads the JSON payload from.
+  /// Key the native widgets read the JSON payload from.
   static const String payloadKey = 'prayer_widget_payload';
 
-  /// Fully-qualified Android receiver, so the redraw targets the right provider
-  /// regardless of launcher. (iOS adds its own name later.)
-  static const String androidProvider =
-      'com.almarfa.al_quran.PrayerWidgetProvider';
+  /// iOS App Group shared by the app + widget extension (matches the
+  /// `com.almarfa.alQuran` bundle id). iOS-only; ignored on Android.
+  static const String appGroupId = 'group.com.almarfa.alQuran';
 
-  /// Rebuild the payload from the current schedule and hand it to the widget.
+  /// Fully-qualified Android receivers — both read the same payload.
+  static const String nextPrayerProvider =
+      'com.almarfa.al_quran.PrayerWidgetProvider';
+  static const String scheduleProvider =
+      'com.almarfa.al_quran.PrayerScheduleWidgetProvider';
+  static const List<String> androidProviders = [
+    nextPrayerProvider,
+    scheduleProvider,
+  ];
+
+  /// WidgetKit "kind" strings for the two iOS widgets.
+  static const List<String> iosWidgetKinds = [
+    'PrayerWidget',
+    'PrayerScheduleWidget',
+  ];
+
+  /// Rebuild the payload from the current schedule and hand it to every widget.
   Future<void> publish() async {
     try {
+      await _client.setAppGroupId(appGroupId);
       final payload = _bridge.buildPayload();
       await _client.saveData(payloadKey, payload.encode());
-      await _client.updateWidget(qualifiedAndroidName: androidProvider);
+      for (final provider in androidProviders) {
+        await _client.update(qualifiedAndroidName: provider);
+      }
+      for (final kind in iosWidgetKinds) {
+        await _client.update(iOSName: kind);
+      }
     } catch (_) {
       // No widget on the home screen yet, plugin missing on this platform, etc.
     }

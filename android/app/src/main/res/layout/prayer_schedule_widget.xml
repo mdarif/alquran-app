@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Today's prayers" home-screen widget (wide). Five equal cells, each a prayer
+     name centered over its time; the next prayer's cell is highlighted at runtime
+     by PrayerScheduleWidgetProvider. Times render without AM/PM (h:mm) so the five
+     columns stay uniform width. android:text values are picker-preview defaults. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_schedule_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:baselineAligned="false"
+    android:gravity="center"
+    android:weightSum="5"
+    android:background="@drawable/prayer_widget_bg"
+    android:paddingLeft="8dp"
+    android:paddingRight="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <LinearLayout
+        android:id="@+id/cell_0"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp">
+        <TextView android:id="@+id/name_0" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:maxLines="1" android:ellipsize="end" android:textAllCaps="true"
+            android:textColor="#7FA89E" android:textSize="10sp" android:text="Fajr" />
+        <TextView android:id="@+id/time_0" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:layout_marginTop="2dp" android:maxLines="1"
+            android:textColor="#DCE8E3" android:textSize="15sp" android:text="4:30" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cell_1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp">
+        <TextView android:id="@+id/name_1" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:maxLines="1" android:ellipsize="end" android:textAllCaps="true"
+            android:textColor="#7FA89E" android:textSize="10sp" android:text="Dhuhr" />
+        <TextView android:id="@+id/time_1" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:layout_marginTop="2dp" android:maxLines="1"
+            android:textColor="#DCE8E3" android:textSize="15sp" android:text="12:15" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cell_2"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp">
+        <TextView android:id="@+id/name_2" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:maxLines="1" android:ellipsize="end" android:textAllCaps="true"
+            android:textColor="#7FA89E" android:textSize="10sp" android:text="Asr" />
+        <TextView android:id="@+id/time_2" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:layout_marginTop="2dp" android:maxLines="1"
+            android:textColor="#DCE8E3" android:textSize="15sp" android:text="3:30" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cell_3"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp">
+        <TextView android:id="@+id/name_3" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:maxLines="1" android:ellipsize="end" android:textAllCaps="true"
+            android:textColor="#7FA89E" android:textSize="10sp" android:text="Maghrib" />
+        <TextView android:id="@+id/time_3" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:layout_marginTop="2dp" android:maxLines="1"
+            android:textColor="#DCE8E3" android:textSize="15sp" android:text="6:45" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/cell_4"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="5dp"
+        android:paddingBottom="5dp"
+        android:paddingLeft="1dp"
+        android:paddingRight="1dp">
+        <TextView android:id="@+id/name_4" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:maxLines="1" android:ellipsize="end" android:textAllCaps="true"
+            android:textColor="#7FA89E" android:textSize="10sp" android:text="Isha" />
+        <TextView android:id="@+id/time_4" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center"
+            android:layout_marginTop="2dp" android:maxLines="1"
+            android:textColor="#DCE8E3" android:textSize="15sp" android:text="8:15" />
+    </LinearLayout>
+</LinearLayout>

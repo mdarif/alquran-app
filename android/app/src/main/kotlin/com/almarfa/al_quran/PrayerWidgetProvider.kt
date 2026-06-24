@@ -4,7 +4,7 @@ import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.SharedPreferences
-import android.view.View
+import android.util.TypedValue
 import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetProvider
 import org.json.JSONObject
@@ -13,10 +13,11 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Home-screen "Next prayer" widget. Renders ONLY — every minute of prayer-times
- * math (Karachi method + Shafi Asr, the forbidden windows) lives in Dart and
- * reaches us as the `prayer_widget_payload` JSON written by WidgetPublisher. We
- * just find the next marker after `now` across the serialised days and draw it.
+ * Compact home-screen "Next prayer" widget: a tight caps prayer-name label over a
+ * hero time. Renders ONLY — every minute of prayer-times math (Karachi method +
+ * Shafi Asr, the forbidden windows) lives in Dart and reaches us as the
+ * `prayer_widget_payload` JSON written by WidgetPublisher. We just find the next
+ * marker after `now` across the serialised days and draw it.
  */
 class PrayerWidgetProvider : HomeWidgetProvider() {
 
@@ -53,16 +54,6 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
                 return
             }
 
-            val label = if (root.isNull("locationLabel")) {
-                context.getString(R.string.widget_default_location)
-            } else {
-                root.optString("locationLabel", "")
-                    .ifBlank { context.getString(R.string.widget_default_location) }
-            }
-
-            views.setViewVisibility(R.id.widget_location, View.VISIBLE)
-            views.setTextViewText(R.id.widget_location, label)
-            views.setTextViewText(R.id.widget_label, context.getString(R.string.widget_label))
             views.setTextViewText(R.id.widget_prayer, next.name)
             views.setTextViewText(R.id.widget_time, TIME_FORMAT.format(Date(next.at)))
         } catch (e: Exception) {
@@ -85,10 +76,10 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
     }
 
     private fun showPrompt(context: Context, views: RemoteViews) {
-        views.setViewVisibility(R.id.widget_location, View.GONE)
-        views.setTextViewText(R.id.widget_label, context.getString(R.string.widget_label))
         views.setTextViewText(R.id.widget_prayer, context.getString(R.string.widget_no_location_title))
         views.setTextViewText(R.id.widget_time, context.getString(R.string.widget_no_location_subtitle))
+        // The hero time font is too large for the prompt's "Tap to open" — shrink it.
+        views.setTextViewTextSize(R.id.widget_time, TypedValue.COMPLEX_UNIT_SP, 14f)
     }
 
     private fun launchIntent(context: Context): PendingIntent {
