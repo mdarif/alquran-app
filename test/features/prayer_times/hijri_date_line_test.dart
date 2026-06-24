@@ -4,13 +4,13 @@ import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
 import 'package:al_quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
 import 'package:al_quran/features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
-import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_header.dart';
+import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_line.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// No saved location → the header falls back to the civil date (no sunset roll),
-// which keeps the conversion deterministic from the injected clock.
+// No saved location → the line falls back to the civil date (no sunset roll),
+// keeping the conversion deterministic from the injected clock.
 class _NoLocRepo implements PrayerTimesRepository {
   @override
   GeoLocation? get location => null;
@@ -23,8 +23,7 @@ class _NoLocRepo implements PrayerTimesRepository {
 }
 
 void main() {
-  testWidgets('shows the Hijri date over the weekday + Gregorian',
-      (tester) async {
+  testWidgets('renders the compact Hijri dateline', (tester) async {
     final cubit =
         PrayerTimesCubit(_NoLocRepo(), clock: () => DateTime(2000, 1, 1, 10));
     addTearDown(cubit.close);
@@ -33,23 +32,20 @@ void main() {
         home: Scaffold(
           body: BlocProvider<PrayerTimesCubit>.value(
             value: cubit,
-            child: const HijriDateHeader(),
+            child: const HijriDateLine(),
           ),
         ),
       ),
     );
 
-    // 2000-01-01 (a Saturday) → 24 Ramadan 1420.
-    expect(find.text('24 Ramadan 1420 AH'), findsOneWidget);
-    expect(find.text('Saturday · 1 January 2000'), findsOneWidget);
+    expect(find.text('24 Ramadan 1420 AH'), findsOneWidget); // 2000-01-01
   });
 
   testWidgets('renders without a prayer cubit (defensive)', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: HijriDateHeader())),
+      const MaterialApp(home: Scaffold(body: HijriDateLine())),
     );
-    // Falls back to today's civil date — no provider, no throw.
-    expect(find.byKey(WidgetKeys.hijriDateHeader), findsOneWidget);
+    expect(find.byKey(WidgetKeys.hijriDateLine), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

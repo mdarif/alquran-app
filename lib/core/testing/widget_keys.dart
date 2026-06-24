@@ -25,5 +25,5 @@ class WidgetKeys {
   // Prayer times
   static const nextPrayerPill = Key('next-prayer-pill');
   static const prayerTimesSheet = Key('prayer-times-sheet');
-  static const hijriDateHeader = Key('hijri-date-header');
+  static const hijriDateLine = Key('hijri-date-line');
 }
