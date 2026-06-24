@@ -2,6 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Audio recitation: just_audio's stream+cache source proxies through
+	     localhost (plain HTTP), which iOS ATS blocks by default. Allow only local
+	     networking — the CDN itself is HTTPS. Re-apply after a `flutter create`
+	     regen — see `make audio-perms`. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<!-- Prayer times: location to compute the daily schedule on-device.
 	     Re-apply after a `flutter create` regen — see `make location-perms`. -->
 	<key>NSLocationWhenInUseUsageDescription</key>

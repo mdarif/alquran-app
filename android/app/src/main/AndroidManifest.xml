@@ -9,9 +9,13 @@
          `make notif-perms`. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Audio recitation: stream verse audio from the CDN (and cache it). The
+         release manifest doesn't get INTERNET for free — see `make audio-perms`. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="Al Quran"
         android:name="${applicationName}"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

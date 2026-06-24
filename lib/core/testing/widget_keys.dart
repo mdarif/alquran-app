@@ -25,6 +25,10 @@ class WidgetKeys {
   static const langStripClose = Key('reader-lang-strip-close');
   static Key langChip(String languageCode) => Key('lang-chip-$languageCode');
 
+  // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
+  static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');
+  static const peekPlayButton = Key('reader-peek-play-button');
+
   // Prayer times
   static const nextPrayerPill = Key('next-prayer-pill');
   static const prayerTimesSheet = Key('prayer-times-sheet');

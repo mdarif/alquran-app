@@ -39,6 +39,15 @@ dependencies:
   timezone: ^0.11.0
   flutter_timezone: ^5.1.0
 
+  # Audio recitation (behind FeatureFlags.audioRecitation). just_audio is pinned
+  # to the 0.9.x line: 0.10.x requires Flutter >=3.27 / Dart >=3.6, above our
+  # floor (environment below). LockCachingAudioSource (stream + cache) lives in
+  # just_audio core. audio_session stays on the 0.1.x line just_audio 0.9.x
+  # depends on (NOT 0.2.x) — it sets the iOS playback category so recitation is
+  # audible with the silent switch on, and makes call-interruption pause reliable.
+  just_audio: ^0.9.46
+  audio_session: ^0.1.25
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Audio recitation: just_audio's LockCachingAudioSource (stream + cache) plays
+     through a localhost HTTP proxy, and Android blocks cleartext HTTP by default
+     (targetSdk >= 28). Permit cleartext ONLY to the loopback addresses; the CDN
+     itself is HTTPS, so general cleartext stays blocked. Mirrors the iOS
+     NSAllowsLocalNetworking exception. Re-applied by `make audio-perms`. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

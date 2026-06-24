@@ -14,10 +14,9 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   static const String _kScript = 'reader_script';
 
   @override
-  ArabicScript get script =>
-      _prefs.getString(_kScript) == 'indopak'
-          ? ArabicScript.indopak
-          : ArabicScript.uthmani;
+  ArabicScript get script => _prefs.getString(_kScript) == 'indopak'
+      ? ArabicScript.indopak
+      : ArabicScript.uthmani;
 
   @override
   Future<void> setScript(ArabicScript value) =>

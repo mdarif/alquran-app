@@ -1,4 +1,6 @@
 PODS:
+  - audio_session (0.0.1):
+    - Flutter
   - CocoaAsyncSocket (7.6.5)
   - Flutter (1.0.0)
   - flutter_local_notifications (0.0.1):
@@ -12,6 +14,9 @@ PODS:
     - Flutter
   - integration_test (0.0.1):
     - Flutter
+  - just_audio (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - package_info_plus (0.4.5):
     - Flutter
   - patrol (0.0.1):
@@ -52,12 +57,14 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
+  - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - Flutter (from `Flutter`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - flutter_timezone (from `.symlinks/plugins/flutter_timezone/ios`)
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - home_widget (from `.symlinks/plugins/home_widget/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
+  - just_audio (from `.symlinks/plugins/just_audio/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - patrol (from `.symlinks/plugins/patrol/darwin`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
@@ -71,6 +78,8 @@ SPEC REPOS:
     - sqlite3
 
 EXTERNAL SOURCES:
+  audio_session:
+    :path: ".symlinks/plugins/audio_session/ios"
   Flutter:
     :path: Flutter
   flutter_local_notifications:
@@ -83,6 +92,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/home_widget/ios"
   integration_test:
     :path: ".symlinks/plugins/integration_test/ios"
+  just_audio:
+    :path: ".symlinks/plugins/just_audio/darwin"
   package_info_plus:
     :path: ".symlinks/plugins/package_info_plus/ios"
   patrol:
@@ -97,6 +108,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/wakelock_plus/ios"
 
 SPEC CHECKSUMS:
+  audio_session: 19e9480dbdd4e5f6c4543826b2e8b0e4ab6145fe
   CocoaAsyncSocket: 065fd1e645c7abab64f7a6a2007a48038fdc6a99
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_local_notifications: eda81afddbf18f8589f6ec069ce593c4c6378769
@@ -104,6 +116,7 @@ SPEC CHECKSUMS:
   geolocator_apple: 66b711889fd333205763b83c9dcf0a57a28c7afd
   home_widget: fdbbfaa90f06f3022cb57f79678d4d58b9c5e140
   integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
+  just_audio: a42c63806f16995daf5b219ae1d679deb76e6a79
   package_info_plus: c0502532a26c7662a62a356cebe2692ec5fe4ec4
   patrol: d49fcd015892f19189a4cec572f21f3c3358e761
   share_plus: 8b6f8b3447e494cca5317c8c3073de39b3600d1f

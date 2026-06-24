@@ -30,8 +30,8 @@ class AyahRepositoryImpl implements AyahRepository {
     // IndoPak column only when the feature is ON and the reader chose it; the
     // `?? uthmani` fallback guarantees non-null text even if the column is
     // unexpectedly empty. Flag off => always Uthmani (current behaviour).
-    final indopak = FeatureFlags.indopakScript &&
-        _settings.script == ArabicScript.indopak;
+    final indopak =
+        FeatureFlags.indopakScript && _settings.script == ArabicScript.indopak;
 
     return [
       for (final r in rows)

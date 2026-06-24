@@ -12,6 +12,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../domain/reader_navigation.dart';
+import '../cubit/ayah_audio_cubit.dart';
 import 'scroll_to_top_button.dart';
 
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
@@ -43,6 +44,8 @@ class MushafView extends StatefulWidget {
     this.selectedLanguages = const {},
     this.onToggleLanguage,
     this.onRegisterFlush,
+    this.audioState,
+    this.onTogglePlay,
     super.key,
   });
 
@@ -75,6 +78,14 @@ class MushafView extends StatefulWidget {
   /// viewports so it can capture the exact reading position synchronously —
   /// before the debounce timer fires and before this widget is torn down.
   final void Function(VoidCallback?)? onRegisterFlush;
+
+  /// Live recitation state (audio feature on); null when off. Drives the sticky
+  /// now-playing highlight and the peek card's play button.
+  final AyahAudioState? audioState;
+
+  /// Toggle recitation for the given global ayah id. Null hides the peek card's
+  /// play control (the flag-off path renders exactly as before).
+  final ValueChanged<int>? onTogglePlay;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -395,6 +406,7 @@ class _MushafViewState extends State<MushafView>
                       paragraphKey: _groupKeyFor(group.first.surahId),
                       highlightAyahId: _highlightAyahId,
                       selectedAyahId: _selectedAyah?.id,
+                      playingAyahId: widget.audioState?.playingAyahId,
                       onTap: (d) => _onGroupTap(d, group),
                     ),
                     const SizedBox(height: 28),
@@ -442,6 +454,8 @@ class _MushafViewState extends State<MushafView>
                 selected: widget.selectedLanguages,
                 onToggleLanguage: widget.onToggleLanguage,
                 onDismiss: _dismissPeek,
+                audioState: widget.audioState,
+                onTogglePlay: widget.onTogglePlay,
               ),
             ),
           ),
@@ -477,6 +491,7 @@ class _MarkedParagraph extends StatefulWidget {
     required this.paragraphKey,
     required this.highlightAyahId,
     required this.selectedAyahId,
+    required this.playingAyahId,
     required this.onTap,
   });
 
@@ -486,6 +501,9 @@ class _MarkedParagraph extends StatefulWidget {
   final GlobalKey paragraphKey;
   final int? highlightAyahId;
   final int? selectedAyahId;
+
+  /// The verse currently being recited — kept tinted for the whole playback.
+  final int? playingAyahId;
   final void Function(TapUpDetails) onTap;
 
   @override
@@ -571,8 +589,9 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
     for (final ayah in widget.group) {
-      final highlighted =
-          widget.highlightAyahId == ayah.id || widget.selectedAyahId == ayah.id;
+      final highlighted = widget.highlightAyahId == ayah.id ||
+          widget.selectedAyahId == ayah.id ||
+          widget.playingAyahId == ayah.id;
       spans.add(
         TextSpan(
           text: ayah.textArabic,
@@ -890,6 +909,8 @@ class _MushafPeekCard extends StatelessWidget {
     required this.selected,
     required this.onToggleLanguage,
     required this.onDismiss,
+    this.audioState,
+    this.onTogglePlay,
   });
 
   final Ayah? ayah;
@@ -899,6 +920,11 @@ class _MushafPeekCard extends StatelessWidget {
   final Set<String> selected;
   final ValueChanged<String>? onToggleLanguage;
   final VoidCallback onDismiss;
+
+  /// Live recitation state + toggle for the tapped verse. Null when the audio
+  /// feature is off → no play control (the card renders exactly as before).
+  final AyahAudioState? audioState;
+  final ValueChanged<int>? onTogglePlay;
 
   @override
   Widget build(BuildContext context) {
@@ -974,8 +1000,12 @@ class _MushafPeekCard extends StatelessWidget {
                     // Reference + multi-select language chips (the shared
                     // selection, also reflected in Detailed view).
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        if (onTogglePlay != null) ...[
+                          _peekPlayButton(context, current.id),
+                          const SizedBox(width: 2),
+                        ],
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(top: 4),
@@ -1049,6 +1079,35 @@ class _MushafPeekCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Recitation control for the tapped verse: play ▸ / pause ❚❚ / a spinner while
+  /// buffering / an error glyph (tap to retry).
+  Widget _peekPlayButton(BuildContext context, int ayahId) {
+    final cs = Theme.of(context).colorScheme;
+    final audio = audioState;
+    final Widget icon;
+    if (audio != null && audio.isLoading(ayahId)) {
+      icon = SizedBox(
+        width: 22,
+        height: 22,
+        child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+      );
+    } else if (audio != null && audio.isPlaying(ayahId)) {
+      icon =
+          Icon(Icons.pause_circle_filled_rounded, color: cs.primary, size: 30);
+    } else if (audio != null && audio.hasError(ayahId)) {
+      icon = Icon(Icons.error_outline_rounded, color: cs.error, size: 28);
+    } else {
+      icon = Icon(Icons.play_circle_fill_rounded, color: cs.primary, size: 30);
+    }
+    return IconButton(
+      key: WidgetKeys.peekPlayButton,
+      tooltip: 'Play recitation',
+      visualDensity: VisualDensity.compact,
+      onPressed: () => onTogglePlay!(ayahId),
+      icon: icon,
     );
   }
 }

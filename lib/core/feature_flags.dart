@@ -14,4 +14,12 @@ abstract final class FeatureFlags {
   /// just sits unused). Flip to true to surface the Uthmani/IndoPak toggle once
   /// the font + UX are signed off on device.
   static const bool indopakScript = true;
+
+  /// In-app, single-ayah audio recitation (Mishary Rashid Alafasy), streamed
+  /// from the islamic.network CDN and cached to disk for offline replay. Shipped
+  /// DARK: while false the reader shows no play affordance, the audio cubit/player
+  /// is never constructed, and zero network code runs — the app stays fully
+  /// offline. Flip to true once on-device playback and the audio source's
+  /// licensing are signed off (see the plan + ATTRIBUTION).
+  static const bool audioRecitation = false;
 }

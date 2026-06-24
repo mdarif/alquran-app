@@ -17,6 +17,7 @@ import '../../domain/entities/translation_resource.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
+import '../cubit/ayah_audio_cubit.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
@@ -42,13 +43,26 @@ class ReaderPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final view = _ReaderView(
+      initialTarget: target,
+      focusAyahId: focusAyahId,
+      initialDetailed: initialDetailed,
+    );
+    // The audio cubit rides alongside the reader cubit only when the feature is
+    // on; it's a per-screen factory, so leaving the reader closes it (which stops
+    // playback). Flag off → single provider, identical to before.
+    if (FeatureFlags.audioRecitation) {
+      return MultiBlocProvider(
+        providers: [
+          BlocProvider(create: (_) => GetIt.I<ReaderCubit>()..load(target)),
+          BlocProvider(create: (_) => GetIt.I<AyahAudioCubit>()),
+        ],
+        child: view,
+      );
+    }
     return BlocProvider(
       create: (_) => GetIt.I<ReaderCubit>()..load(target),
-      child: _ReaderView(
-        initialTarget: target,
-        focusAyahId: focusAyahId,
-        initialDetailed: initialDetailed,
-      ),
+      child: view,
     );
   }
 }
@@ -208,19 +222,29 @@ class _ReaderViewState extends State<_ReaderView> {
                 if (isReading) {
                   // No SelectionArea in Reading mode — it competes in the gesture
                   // arena and swallows the taps needed for tap-to-peek translation.
-                  return MushafView(
-                    key: sectionKey,
-                    ayahs: state.ayahs,
-                    headings: state.headings,
-                    arabicFontSize: _arabicFont,
-                    arabicStyle: _arabicStyle,
-                    resources: state.resources,
-                    focusAyahId: _focusAyahId,
-                    onVisibleAyah: _onVisibleAyah,
-                    selectedLanguages: _activeLangs(state.resources),
-                    onToggleLanguage: (code) =>
-                        _toggleLang(code, state.resources),
-                    onRegisterFlush: (cb) => _flushCurrentPosition = cb,
+                  MushafView buildMushaf(AyahAudioState? audio) => MushafView(
+                        key: sectionKey,
+                        ayahs: state.ayahs,
+                        headings: state.headings,
+                        arabicFontSize: _arabicFont,
+                        arabicStyle: _arabicStyle,
+                        resources: state.resources,
+                        focusAyahId: _focusAyahId,
+                        onVisibleAyah: _onVisibleAyah,
+                        selectedLanguages: _activeLangs(state.resources),
+                        onToggleLanguage: (code) =>
+                            _toggleLang(code, state.resources),
+                        onRegisterFlush: (cb) => _flushCurrentPosition = cb,
+                        audioState: audio,
+                        onTogglePlay: audio == null
+                            ? null
+                            : (id) => context.read<AyahAudioCubit>().toggle(id),
+                      );
+                  // Rebuild only when the active verse changes (sticky highlight)
+                  // or its status flips — a handful of events, not per-frame.
+                  if (!FeatureFlags.audioRecitation) return buildMushaf(null);
+                  return BlocBuilder<AyahAudioCubit, AyahAudioState>(
+                    builder: (context, audio) => buildMushaf(audio),
                   );
                 }
                 // Detailed view owns its own SelectionArea (around the verses)
@@ -278,6 +302,11 @@ class _ReaderViewState extends State<_ReaderView> {
     final cubit = _cubit;
     final next = adjacentTarget(_target, delta, cubit.state.headings);
     if (next == null) return; // at the first/last section — no wrap-around
+    // Swiping to another section: stop any verse playing here — it's no longer
+    // on screen, so leaving it sounding would be confusing.
+    if (FeatureFlags.audioRecitation) {
+      context.read<AyahAudioCubit>().stopAll();
+    }
     setState(() {
       _target = next;
       _focusAyahId = null; // a swiped section opens at its top, not a resume
@@ -681,6 +710,21 @@ class _DetailedListState extends State<_DetailedList> {
     );
   }
 
+  Widget _ayahTile(BuildContext context, Ayah ayah, AyahAudioState? audio) {
+    return AyahTile(
+      ayah: ayah,
+      resources: widget.shownResources,
+      arabicFontSize: widget.arabicFontSize,
+      arabicStyle: widget.arabicStyle,
+      surahName: widget.headings[ayah.surahId]?.nameEnglish,
+      highlight: _highlightAyahId == ayah.id,
+      audioState: audio,
+      onTogglePlay: audio == null
+          ? null
+          : () => context.read<AyahAudioCubit>().toggle(ayah.id),
+    );
+  }
+
   Widget _buildRow(BuildContext context, int i) {
     final row = _rows[i];
     if (row is _HeaderMarker) {
@@ -703,14 +747,13 @@ class _DetailedListState extends State<_DetailedList> {
       );
     }
     final ayah = row as Ayah;
-    final tile = AyahTile(
-      ayah: ayah,
-      resources: widget.shownResources,
-      arabicFontSize: widget.arabicFontSize,
-      arabicStyle: widget.arabicStyle,
-      surahName: widget.headings[ayah.surahId]?.nameEnglish,
-      highlight: _highlightAyahId == ayah.id,
-    );
+    // Under the audio flag each tile rebuilds on its own audio state (cheap,
+    // per-tile); off-flag it builds exactly as before.
+    final Widget tile = FeatureFlags.audioRecitation
+        ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
+            builder: (context, audio) => _ayahTile(context, ayah, audio),
+          )
+        : _ayahTile(context, ayah, null);
     // A light hairline separates consecutive verses. It's omitted after the
     // last verse (nothing follows) and before a surah header (the chapter
     // header is its own separator).

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/ayah_share.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/translation_resource.dart';
+import '../cubit/ayah_audio_cubit.dart';
 
 /// Detailed-mode row (PRD 4.3): Arabic stacked over each translation.
 class AyahTile extends StatelessWidget {
@@ -16,6 +18,8 @@ class AyahTile extends StatelessWidget {
     this.arabicStyle = QuranTextStyle.madani,
     this.surahName,
     this.highlight = false,
+    this.audioState,
+    this.onTogglePlay,
     super.key,
   });
 
@@ -30,6 +34,14 @@ class AyahTile extends StatelessWidget {
   /// Briefly tints the tile when the reader resumes on this verse (Last Read).
   final bool highlight;
 
+  /// Live recitation state (audio feature on); null when off. Drives the play
+  /// button's icon and the now-playing tint for THIS verse.
+  final AyahAudioState? audioState;
+
+  /// Toggle recitation for this verse. Null hides the play control entirely
+  /// (the flag-off path renders exactly as before).
+  final VoidCallback? onTogglePlay;
+
   /// Neutral Arabic size: at this value translations keep their designed size.
   static const double _baseArabicFontSize = 28;
 
@@ -43,11 +55,17 @@ class AyahTile extends StatelessWidget {
     final translationFontSize =
         baseTranslationSize * (arabicFontSize / _baseArabicFontSize);
 
+    // Now-playing gets a distinct (tertiary/gold) sticky tint so it reads
+    // differently from the brief Last-Read flash (primary).
+    final isAudioActive = audioState?.isActive(ayah.id) ?? false;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 600),
-      color: highlight
-          ? theme.colorScheme.primary.withValues(alpha: 0.10)
-          : Colors.transparent,
+      color: isAudioActive
+          ? theme.colorScheme.tertiary.withValues(alpha: 0.10)
+          : highlight
+              ? theme.colorScheme.primary.withValues(alpha: 0.10)
+              : Colors.transparent,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         // Stretch so the Arabic and each translation fill the row width and can
@@ -79,6 +97,7 @@ class AyahTile extends StatelessWidget {
                 ),
               ],
               const Spacer(),
+              if (onTogglePlay != null) _playButton(theme),
               PopupMenuButton<_AyahAction>(
                 tooltip: 'Copy or share',
                 icon: Icon(
@@ -127,6 +146,40 @@ class AyahTile extends StatelessWidget {
               ),
         ],
       ),
+    );
+  }
+
+  /// The per-verse recitation control: play ▸ / pause ❚❚ / a spinner while
+  /// buffering / an error glyph (tap to retry). Shown only when [onTogglePlay]
+  /// is wired (audio feature on).
+  Widget _playButton(ThemeData theme) {
+    final cs = theme.colorScheme;
+    final audio = audioState;
+    final Widget icon;
+    var tooltip = 'Play recitation';
+    if (audio != null && audio.isLoading(ayah.id)) {
+      icon = SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+      );
+      tooltip = 'Loading…';
+    } else if (audio != null && audio.isPlaying(ayah.id)) {
+      icon = Icon(Icons.pause_rounded, size: 22, color: cs.primary);
+      tooltip = 'Pause';
+    } else if (audio != null && audio.hasError(ayah.id)) {
+      icon = Icon(Icons.error_outline_rounded, size: 22, color: cs.error);
+      tooltip = 'Couldn\'t play — tap to retry';
+    } else {
+      icon =
+          Icon(Icons.play_arrow_rounded, size: 22, color: cs.onSurfaceVariant);
+    }
+    return IconButton(
+      key: WidgetKeys.ayahPlayButton(ayah.id),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      onPressed: onTogglePlay,
+      icon: icon,
     );
   }
 

@@ -14,6 +14,7 @@ import '../../features/reader/data/repositories/reader_settings_repository_impl.
 import '../../features/reader/domain/repositories/ayah_repository.dart';
 import '../../features/reader/domain/repositories/last_read_repository.dart';
 import '../../features/reader/domain/repositories/reader_settings_repository.dart';
+import '../../features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
 import '../../features/reminders/data/repositories/reminder_settings_repository_impl.dart';
 import '../../features/reminders/data/scheduling/local_notification_scheduler.dart';
@@ -23,6 +24,7 @@ import '../../features/reminders/presentation/cubit/reminders_cubit.dart';
 import '../../features/surahs/data/repositories/surah_repository_impl.dart';
 import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
+import '../audio/ayah_recitation_player.dart';
 import '../database/app_database.dart';
 import '../database/db_seeder.dart';
 import '../home_widget/widget_bridge.dart';
@@ -134,5 +136,18 @@ Future<void> configureDependencies() async {
     )
     ..registerFactory<IndexListCubit>(
       () => IndexListCubit(getIt<IndexRepository>()),
+    );
+
+  // Audio recitation. Registered UNCONDITIONALLY but LAZILY: the player (lazy
+  // singleton) and cubit (factory) aren't constructed until the reader actually
+  // reads them, which only happens behind FeatureFlags.audioRecitation. So while
+  // the flag is off the just_audio plugin is still never touched and no network
+  // runs — and because DI no longer depends on the flag, flipping it survives a
+  // hot reload (gating DI on the flag crashed on reload: main/DI doesn't re-run,
+  // so the reloaded UI saw flag=true but GetIt had no AyahAudioCubit).
+  getIt
+    ..registerLazySingleton<AyahRecitationPlayer>(JustAudioRecitationPlayer.new)
+    ..registerFactory<AyahAudioCubit>(
+      () => AyahAudioCubit(getIt<AyahRecitationPlayer>()),
     );
 }
