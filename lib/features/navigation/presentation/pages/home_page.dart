@@ -31,8 +31,8 @@ class HomePage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            HijriDateLine(),
             Text('Al Quran'),
+            HijriDateLine(),
           ],
         ),
         actions: [
