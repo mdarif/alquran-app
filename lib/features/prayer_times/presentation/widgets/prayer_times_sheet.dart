@@ -12,14 +12,6 @@ String formatPrayerTime(DateTime t) {
   return '$h:${t.minute.toString().padLeft(2, '0')}';
 }
 
-const List<String> _gregorianMonths = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December', //
-];
-
-String formatGregorianDate(DateTime d) =>
-    '${d.day} ${_gregorianMonths[d.month - 1]} ${d.year}';
-
 /// The all-five-prayers sheet shown when the indicator is tapped. Lean: the
 /// Islamic (Urdu) + Gregorian date, then the schedule with the next prayer
 /// highlighted (the prayer names disambiguate AM/PM, so no clutter).

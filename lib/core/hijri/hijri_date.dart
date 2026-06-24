@@ -70,3 +70,22 @@ class HijriDate {
     'Dhu al-Hijjah',
   ];
 }
+
+// --- Gregorian-side formatting (shared by the date displays). ---
+
+const List<String> _gregorianMonths = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December', //
+];
+
+const List<String> _weekdays = [
+  'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+  'Sunday', //
+];
+
+/// `24 June 2026`.
+String formatGregorianDate(DateTime d) =>
+    '${d.day} ${_gregorianMonths[d.month - 1]} ${d.year}';
+
+/// `Wednesday` (DateTime.weekday is 1=Mon … 7=Sun).
+String weekdayName(DateTime d) => _weekdays[d.weekday - 1];
