@@ -15,6 +15,7 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
   static const String _kLat = 'prayer_lat';
   static const String _kLon = 'prayer_lon';
   static const String _kLabel = 'prayer_label';
+  static const String _kHijriAdj = 'hijri_adjustment';
 
   // The ONLY two calculation knobs, fixed and never surfaced in the UI:
   //  • method = University of Islamic Sciences, Karachi (18°/18°) — the
@@ -38,6 +39,12 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
       label: _prefs.getString(_kLabel),
     );
   }
+
+  @override
+  int get hijriAdjustment => _prefs.getInt(_kHijriAdj) ?? 0;
+
+  @override
+  Future<void> setHijriAdjustment(int days) => _prefs.setInt(_kHijriAdj, days);
 
   @override
   Future<LocationResult> acquireLocation() async {

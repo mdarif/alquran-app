@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/hijri/hijri_date.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/entities/daily_prayer_times.dart';
 import '../../domain/entities/forbidden_window.dart';
@@ -11,14 +13,40 @@ String formatPrayerTime(DateTime t) {
   return '$h:${t.minute.toString().padLeft(2, '0')}';
 }
 
-/// The all-five-prayers sheet shown when the indicator is tapped. Lean: just the
-/// schedule, with the next prayer highlighted (the prayer names disambiguate
-/// AM/PM, so no clutter).
+const List<String> _gregorianMonths = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December', //
+];
+
+String formatGregorianDate(DateTime d) =>
+    '${d.day} ${_gregorianMonths[d.month - 1]} ${d.year}';
+
+/// The all-five-prayers sheet shown when the indicator is tapped. Lean: the
+/// Islamic (Urdu) + Gregorian date, then the schedule with the next prayer
+/// highlighted (the prayer names disambiguate AM/PM, so no clutter).
 class PrayerTimesSheet extends StatelessWidget {
-  const PrayerTimesSheet({required this.times, required this.next, super.key});
+  const PrayerTimesSheet({
+    required this.times,
+    required this.next,
+    this.hijriBaseDate,
+    this.gregorianDate,
+    this.hijriAdjustment = 0,
+    this.onAdjustHijri,
+    super.key,
+  });
 
   final DailyPrayerTimes times;
   final Prayer? next;
+
+  /// Gregorian date to convert to Hijri (already Maghrib-rolled by the caller);
+  /// null hides the date block. The [gregorianDate] (civil, for the line beneath)
+  /// defaults to it when omitted.
+  final DateTime? hijriBaseDate;
+  final DateTime? gregorianDate;
+  final int hijriAdjustment;
+
+  /// Persist a changed ± day correction; null hides the adjust control.
+  final ValueChanged<int>? onAdjustHijri;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +72,15 @@ class PrayerTimesSheet extends StatelessWidget {
                 times.location.label!,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
+            if (hijriBaseDate != null) ...[
+              const SizedBox(height: 12),
+              _HijriDateLabel(
+                baseDate: hijriBaseDate!,
+                gregorianDate: gregorianDate ?? hijriBaseDate!,
+                initialAdjustment: hijriAdjustment,
+                onAdjust: onAdjustHijri,
               ),
             ],
             const SizedBox(height: 12),
@@ -180,4 +217,118 @@ class _ForbiddenNote extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The Islamic date for the audience: the Hijri date in Urdu (Nastaliq + Urdu
+/// numerals) over the Gregorian date. A discreet ± control nudges the Hijri day
+/// (clamped ±2) to match the local moon-sighting; the change persists via
+/// [onAdjust]. Local state so the nudge updates instantly without reopening.
+class _HijriDateLabel extends StatefulWidget {
+  const _HijriDateLabel({
+    required this.baseDate,
+    required this.gregorianDate,
+    required this.initialAdjustment,
+    this.onAdjust,
+  });
+
+  final DateTime baseDate;
+  final DateTime gregorianDate;
+  final int initialAdjustment;
+  final ValueChanged<int>? onAdjust;
+
+  @override
+  State<_HijriDateLabel> createState() => _HijriDateLabelState();
+}
+
+class _HijriDateLabelState extends State<_HijriDateLabel> {
+  late int _adj = widget.initialAdjustment;
+
+  void _nudge(int delta) {
+    final next = (_adj + delta).clamp(-2, 2);
+    if (next == _adj) return;
+    setState(() => _adj = next);
+    widget.onAdjust?.call(_adj);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final hijri =
+        HijriDate.fromGregorian(widget.baseDate, adjustmentDays: _adj);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        if (widget.onAdjust != null) ...[
+          _NudgeButton(
+            icon: Icons.remove_rounded,
+            tooltip: 'Hijri −1 day (moon sighting)',
+            onTap: () => _nudge(-1),
+            color: cs.onSurfaceVariant,
+          ),
+          if (_adj != 0)
+            Text(
+              _adj > 0 ? '+$_adj' : '$_adj',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          _NudgeButton(
+            icon: Icons.add_rounded,
+            tooltip: 'Hijri +1 day (moon sighting)',
+            onTap: () => _nudge(1),
+            color: cs.onSurfaceVariant,
+          ),
+          const SizedBox(width: 4),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                hijri.urduLong,
+                textDirection: TextDirection.rtl,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontFamily: AppTheme.urduFontFamily,
+                  height: 2,
+                  color: cs.onSurface,
+                ),
+              ),
+              Text(
+                formatGregorianDate(widget.gregorianDate),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NudgeButton extends StatelessWidget {
+  const _NudgeButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        icon: Icon(icon, size: 18),
+        tooltip: tooltip,
+        onPressed: onTap,
+        color: color,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      );
 }

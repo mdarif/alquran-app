@@ -19,6 +19,12 @@ class _FakeRepo implements PrayerTimesRepository {
   GeoLocation? get location => saved;
 
   @override
+  int get hijriAdjustment => 0;
+
+  @override
+  Future<void> setHijriAdjustment(int days) async {}
+
+  @override
   Future<LocationResult> acquireLocation() async {
     saved = _loc;
     return const LocationResult(LocationStatus.ok, _loc);
@@ -86,6 +92,7 @@ void main() {
     }
     expect(find.text('6:30'), findsOneWidget); // sunrise time shown
     expect(find.textContaining('No prayer'), findsWidgets); // forbidden marks
+    expect(find.textContaining('2026'), findsOneWidget); // Gregorian date line
   });
 
   testWidgets('inside a forbidden window the pill warns + tap opens sheet',

@@ -108,7 +108,14 @@ class NextPrayerPill extends StatelessWidget {
       showDragHandle: true,
       // Size to the (small, fixed) content instead of the half-screen cap.
       isScrollControlled: true,
-      builder: (_) => PrayerTimesSheet(times: today, next: state.next?.prayer),
+      builder: (_) => PrayerTimesSheet(
+        times: today,
+        next: state.next?.prayer,
+        hijriBaseDate: cubit.hijriBaseDate,
+        gregorianDate: cubit.gregorianDate,
+        hijriAdjustment: cubit.hijriAdjustment,
+        onAdjustHijri: cubit.setHijriAdjustment,
+      ),
     );
   }
 

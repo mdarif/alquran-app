@@ -33,6 +33,12 @@ class _DiagRepo implements PrayerTimesRepository {
   GeoLocation? get location => loc;
 
   @override
+  int get hijriAdjustment => 0;
+
+  @override
+  Future<void> setHijriAdjustment(int days) async {}
+
+  @override
   Future<LocationResult> acquireLocation() async => loc == null
       ? const LocationResult(LocationStatus.denied)
       : LocationResult(LocationStatus.ok, loc);
@@ -186,7 +192,13 @@ class _SheetDemo extends StatelessWidget {
           builder: (ctx) => Container(
             color: Theme.of(ctx).colorScheme.surface,
             margin: const EdgeInsets.symmetric(horizontal: 12),
-            child: PrayerTimesSheet(times: day, next: Prayer.asr),
+            child: PrayerTimesSheet(
+              times: day,
+              next: Prayer.asr,
+              hijriBaseDate: day.date,
+              gregorianDate: day.date,
+              onAdjustHijri: (_) {},
+            ),
           ),
         ),
       );

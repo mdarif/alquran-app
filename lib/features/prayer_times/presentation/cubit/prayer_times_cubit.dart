@@ -65,6 +65,31 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     );
   }
 
+  /// The Gregorian date the Islamic (Hijri) date should reflect — rolled to the
+  /// NEXT day once Maghrib has passed, because the Hijri day begins at sunset.
+  /// Uses today's civil schedule (not [state.today], which is already tomorrow's
+  /// after Isha), so it stays correct all evening.
+  DateTime get hijriBaseDate {
+    final now = _clock();
+    final civil = DateTime(now.year, now.month, now.day);
+    final location = _repo.location;
+    if (location == null) return civil;
+    final sunset = _repo.timesFor(location, now).maghrib;
+    return now.isBefore(sunset) ? civil : civil.add(const Duration(days: 1));
+  }
+
+  /// The civil (wall-calendar) date, for the Gregorian line beneath the Hijri.
+  DateTime get gregorianDate {
+    final now = _clock();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  /// The user's Hijri ± day correction (to match a local moon-sighting).
+  int get hijriAdjustment => _repo.hijriAdjustment;
+
+  /// Persist a new Hijri correction.
+  Future<void> setHijriAdjustment(int days) => _repo.setHijriAdjustment(days);
+
   /// Re-resolve against the current clock (catches a passed prayer / midnight).
   void refresh() {
     final location = _repo.location;

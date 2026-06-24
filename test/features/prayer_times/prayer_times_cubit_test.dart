@@ -23,6 +23,12 @@ class _FakeRepo implements PrayerTimesRepository {
   GeoLocation? get location => saved;
 
   @override
+  int hijriAdjustment = 0;
+
+  @override
+  Future<void> setHijriAdjustment(int days) async => hijriAdjustment = days;
+
+  @override
   Future<LocationResult> acquireLocation() async {
     acquireCalls++;
     if (acquireResult.status == LocationStatus.ok) {

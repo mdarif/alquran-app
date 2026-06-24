@@ -3,9 +3,9 @@ import '../entities/geo_location.dart';
 import '../location/location_provider.dart';
 
 /// Reads/persists the user's location and computes prayer times on-device
-/// (offline). The calculation method (Muslim World League) and the Asr rule
-/// (Standard/Shafi — Ahle-Hadith) are fixed in the implementation and never
-/// surfaced.
+/// (offline). The calculation method (University of Islamic Sciences, Karachi)
+/// and the Asr rule (Standard/Shafi — Ahle-Hadith) are fixed in the
+/// implementation and never surfaced.
 abstract interface class PrayerTimesRepository {
   /// The saved location, or null until a fix has been obtained. Synchronous
   /// (reads the cached value) — mirrors the settings-repo pattern.
@@ -17,4 +17,11 @@ abstract interface class PrayerTimesRepository {
 
   /// Prayer times for [location] on [date] (local DateTimes).
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date);
+
+  /// The Hijri-date correction in days (− earlier · + later) the user set to
+  /// align the calculated Islamic date with their local moon-sighting. 0 = none.
+  int get hijriAdjustment;
+
+  /// Persist the Hijri-date correction.
+  Future<void> setHijriAdjustment(int days);
 }
