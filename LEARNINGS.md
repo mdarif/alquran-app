@@ -726,6 +726,19 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   any `zonedSchedule` — do it in `main()` after DI, wrapped in try/catch with a
   UTC fallback so a timezone lookup can't block launch. Always re-check a plugin's
   current signatures against the resolved version (`pubspec.lock`), not the docs.
+- **iOS drops FOREGROUND local notifications unless you set the notification
+  delegate.** A `show()`/`zonedSchedule` that fires while the app is open shows
+  nothing on iOS until `UNUserNotificationCenter.current().delegate` is set (so
+  the plugin's `willPresentNotification` runs) — `flutter_local_notifications`
+  does NOT set it itself; the app must, in `AppDelegate.swift`
+  (`if #available(iOS 10.0,*){ UNUserNotificationCenter.current().delegate = self }`
+  + `import UserNotifications`). `FlutterAppDelegate` conforms to the delegate and
+  forwards to FLN. This bit a "send a test reminder" button (fires foreground) on
+  the iOS sim while real evening reminders (delivered backgrounded) worked fine —
+  background delivery needs no delegate, foreground presentation does. The
+  `defaultPresentBanner/Alert/Sound` init flags already default to `true`, so it's
+  the delegate, not the present flags. `ios/` is gitignored → re-applied by
+  `make notif-perms` (`tool/apply_notification_config.py`), like the Android receivers.
 
 ---
 

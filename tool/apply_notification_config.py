@@ -6,12 +6,16 @@ notification permission + the flutter_local_notifications boot/scheduled
 receivers don't survive a regen. Run this (via `make notif-perms`) after any
 `flutter create` to put them back. Idempotent — safe to run repeatedly.
 
-Android only: POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED, plus the FLN
-receivers that re-arm pending notifications after a reboot / app update. We use
-INEXACT scheduling, so SCHEDULE_EXACT_ALARM is deliberately NOT added. iOS needs
-no change for v1 — permission is requested from Dart and the plugin auto-registers
-(notifications deliver in the background; foreground-presentation delegate is a
-follow-up). Mirrors tool/apply_location_perms.py.
+Android: POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED, plus the FLN receivers
+that re-arm pending notifications after a reboot / app update. We use INEXACT
+scheduling, so SCHEDULE_EXACT_ALARM is deliberately NOT added.
+
+iOS: set the UNUserNotificationCenter delegate in AppDelegate.swift so a
+notification fired while the app is FOREGROUNDED is presented (the plugin's
+`willPresentNotification` needs the delegate; FlutterAppDelegate forwards to it).
+Without it, the "send a test reminder" button shows nothing on-screen while the
+app is open (background-delivered reminders are unaffected). Mirrors
+tool/apply_location_perms.py.
 """
 from __future__ import annotations
 
@@ -20,6 +24,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ANDROID_MANIFEST = ROOT / "android/app/src/main/AndroidManifest.xml"
+IOS_APPDELEGATE = ROOT / "ios/Runner/AppDelegate.swift"
+
+# Set in application(_:didFinishLaunchingWithOptions:), before the super call.
+IOS_DELEGATE = """    // Sunnah reminders: present notifications while the app is foregrounded
+    // (flutter_local_notifications' willPresentNotification needs the delegate).
+    // Re-apply after a `flutter create` regen — see `make notif-perms`.
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self
+    }
+"""
 
 ANDROID_PERMS = """    <!-- Sunnah reminders (local notifications). No SCHEDULE_EXACT_ALARM — we
          use inexact scheduling. Re-apply after a `flutter create` regen — see
@@ -73,9 +87,30 @@ def patch_android() -> list[str]:
     return out
 
 
+def patch_ios() -> str:
+    if not IOS_APPDELEGATE.exists():
+        return f"skip  ios — {IOS_APPDELEGATE} not found (run `flutter create`)"
+    text = IOS_APPDELEGATE.read_text()
+    if "UNUserNotificationCenter.current().delegate" in text:
+        return "ok    ios — notification delegate already set"
+
+    # `UNUserNotificationCenter` lives in the UserNotifications framework.
+    if "import UserNotifications" not in text:
+        text = text.replace("import UIKit", "import UIKit\nimport UserNotifications", 1)
+
+    anchor = (
+        "    return super.application(application, "
+        "didFinishLaunchingWithOptions: launchOptions)"
+    )
+    if anchor not in text:
+        return "ERROR ios — could not find didFinishLaunchingWithOptions return anchor"
+    text = text.replace(anchor, IOS_DELEGATE + anchor, 1)
+    IOS_APPDELEGATE.write_text(text)
+    return "added ios — UNUserNotificationCenter delegate (foreground presentation)"
+
+
 def main() -> int:
-    results = patch_android()
-    results.append("note  ios — no change needed for v1 (Dart permission + auto-register)")
+    results = [*patch_android(), patch_ios()]
     for line in results:
         print(line)
     return 1 if any(r.startswith("ERROR") for r in results) else 0
