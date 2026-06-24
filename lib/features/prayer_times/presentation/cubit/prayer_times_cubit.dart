@@ -84,12 +84,6 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     return DateTime(now.year, now.month, now.day);
   }
 
-  /// The user's Hijri ± day correction (to match a local moon-sighting).
-  int get hijriAdjustment => _repo.hijriAdjustment;
-
-  /// Persist a new Hijri correction.
-  Future<void> setHijriAdjustment(int days) => _repo.setHijriAdjustment(days);
-
   /// Re-resolve against the current clock (catches a passed prayer / midnight).
   void refresh() {
     final location = _repo.location;

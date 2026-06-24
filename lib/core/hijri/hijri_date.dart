@@ -1,15 +1,12 @@
 /// An Islamic (Hijri) calendar date, converted from a Gregorian date with the
 /// standard tabular (Kuwaiti) algorithm — pure, offline, deterministic. The
 /// tabular calendar can differ from a local moon-sighting by a day, so callers
-/// pass an [adjustmentDays] correction to align with the local sighting (e.g. a
-/// subcontinental Ahle-Hadith one). Rendering is Urdu-first (month names +
-/// Urdu-Indic numerals U+06F0, the digits Urdu readers expect — NOT Arabic-Indic
-/// U+0660).
+/// may pass an [adjustmentDays] correction.
 class HijriDate {
   const HijriDate({required this.year, required this.month, required this.day});
 
   /// Convert a Gregorian [date] (only its y/m/d are used) to Hijri, shifting by
-  /// [adjustmentDays] first (− earlier · + later) to match a local sighting.
+  /// [adjustmentDays] first (− earlier · + later).
   factory HijriDate.fromGregorian(DateTime date, {int adjustmentDays = 0}) {
     final d = DateTime(date.year, date.month, date.day)
         .add(Duration(days: adjustmentDays));
@@ -20,11 +17,12 @@ class HijriDate {
   final int month; // 1..12
   final int day; // 1..30
 
-  /// Urdu month name (محرم … ذی الحجہ).
-  String get urduMonth => _urduMonths[month - 1];
+  /// English month name (Muharram … Dhu al-Hijjah).
+  String get monthName => _months[month - 1];
 
-  /// `۹ ذی الحجہ ۱۴۴۷ھ` — day · Urdu month · year · the Hijri marker (ھ).
-  String get urduLong => '${_urduDigits(day)} $urduMonth ${_urduDigits(year)}ھ';
+  /// `07 Muharram 1448 AH` — zero-padded day · month · year · the AH marker.
+  String get formatted =>
+      '${day.toString().padLeft(2, '0')} $monthName $year AH';
 
   // --- Conversion (integer Kuwaiti algorithm; matches PHP/JS Hijri calcs). ---
 
@@ -57,24 +55,18 @@ class HijriDate {
     return HijriDate(year: year, month: month, day: day);
   }
 
-  static String _urduDigits(int n) => n
-      .toString()
-      .split('')
-      .map((c) => String.fromCharCode(0x06F0 + c.codeUnitAt(0) - 0x30))
-      .join();
-
-  static const List<String> _urduMonths = [
-    'محرم',
-    'صفر',
-    'ربیع الاول',
-    'ربیع الثانی',
-    'جمادی الاول',
-    'جمادی الثانی',
-    'رجب',
-    'شعبان',
-    'رمضان',
-    'شوال',
-    'ذی القعدہ',
-    'ذی الحجہ',
+  static const List<String> _months = [
+    'Muharram',
+    'Safar',
+    'Rabi al-Awwal',
+    'Rabi al-Thani',
+    'Jumada al-Awwal',
+    'Jumada al-Thani',
+    'Rajab',
+    "Sha'ban",
+    'Ramadan',
+    'Shawwal',
+    "Dhu al-Qa'dah",
+    'Dhu al-Hijjah',
   ];
 }

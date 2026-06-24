@@ -113,8 +113,6 @@ class NextPrayerPill extends StatelessWidget {
         next: state.next?.prayer,
         hijriBaseDate: cubit.hijriBaseDate,
         gregorianDate: cubit.gregorianDate,
-        hijriAdjustment: cubit.hijriAdjustment,
-        onAdjustHijri: cubit.setHijriAdjustment,
       ),
     );
   }

@@ -34,18 +34,17 @@ void main() {
     });
   });
 
-  group('Urdu rendering', () {
-    test('urduLong uses Urdu month, Urdu-Indic digits, and the ھ marker', () {
+  group('English rendering', () {
+    test('formatted: day · month · year · the AH marker', () {
       final h =
           HijriDate.fromGregorian(DateTime(2000, 1, 1)); // 24 Ramadan 1420
-      expect(h.urduLong, '۲۴ رمضان ۱۴۲۰ھ');
+      expect(h.formatted, '24 Ramadan 1420 AH');
     });
 
-    test('digits are Urdu-Indic (U+06F0), not Arabic-Indic (U+0660)', () {
-      const h = HijriDate(year: 1447, month: 12, day: 9);
-      expect(h.urduLong.contains('۹'), isTrue); // U+06F9
-      expect(h.urduLong.contains('٩'), isFalse); // U+0669 (Arabic-Indic)
-      expect(h.urduMonth, 'ذی الحجہ');
+    test('the day is zero-padded to two digits', () {
+      const h = HijriDate(year: 1448, month: 1, day: 7);
+      expect(h.formatted, '07 Muharram 1448 AH');
+      expect(h.monthName, 'Muharram');
     });
   });
 }

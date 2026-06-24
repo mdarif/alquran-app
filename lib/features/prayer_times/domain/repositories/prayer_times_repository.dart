@@ -17,11 +17,4 @@ abstract interface class PrayerTimesRepository {
 
   /// Prayer times for [location] on [date] (local DateTimes).
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date);
-
-  /// The Hijri-date correction in days (− earlier · + later) the user set to
-  /// align the calculated Islamic date with their local moon-sighting. 0 = none.
-  int get hijriAdjustment;
-
-  /// Persist the Hijri-date correction.
-  Future<void> setHijriAdjustment(int days);
 }
