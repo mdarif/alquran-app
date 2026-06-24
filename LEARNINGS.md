@@ -662,6 +662,22 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   Read theme extensions **defensively** (`Theme.of(context).extension<…>()?.x ??
   fallback`): bare test themes (plain `MaterialApp`) don't carry them, so a
   non-null assertion would crash every widget test that pumps the screen alone.
+- **Hijri date: the Islamic day begins at SUNSET, not midnight.** A calculated
+  Hijri date must roll to the next day once Maghrib has passed — and we already
+  have Maghrib, so it's a free, knowledgeable touch. Subtlety: compute it from
+  **today's civil Maghrib**, not the next-prayer schedule (which after Isha has
+  already rolled to *tomorrow's* day) — otherwise late evening you'd lose the
+  +1. Show the Gregorian line as the civil (phone) date; the Hijri being one
+  ahead after Maghrib is correct, not a bug.
+- **Hijri conversion needs no package — and no settings screen for the ± fix.**
+  The integer **Kuwaiti tabular algorithm** (Gregorian→JDN→Islamic) is ~25 lines
+  of pure Dart, deterministic and offline; anchor a test on a known pair
+  (`2000-01-01 → 24 Ramadan 1420`). The tabular calendar differs from a local
+  moon-sighting by up to a day, so expose a small **± day adjustment** (clamp it,
+  e.g. ±2) applied by offsetting the input date; persist it in the feature's
+  existing prefs repo and nudge it from a discreet inline control — no dedicated
+  settings UI required. Render Urdu with **Urdu-Indic digits (U+06F0)**, never
+  Arabic-Indic (U+0660) — the same digit split as the Mushaf numerals.
 
 ---
 
