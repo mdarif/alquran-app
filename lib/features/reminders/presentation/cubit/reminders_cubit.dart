@@ -73,7 +73,7 @@ class RemindersCubit extends Cubit<RemindersState> {
       }
     }
     await _scheduler.showTest(
-      title: 'Sunnah reminder',
+      title: 'Sunnah Reminder',
       body: 'This is how your Sunnah reminders will look.',
     );
   }
