@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:al_quran/core/audio/ayah_recitation_player.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
@@ -7,6 +10,7 @@ import 'package:al_quran/features/reader/domain/entities/translation_resource.da
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
+import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
 import 'package:al_quran/features/reader/presentation/pages/reader_page.dart';
 import 'package:al_quran/features/reader/presentation/widgets/mushaf_view.dart';
@@ -159,13 +163,32 @@ Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
   await tester.pumpAndSettle();
 }
 
+/// No-op player so ReaderPage's audio branch (behind FeatureFlags.audioRecitation)
+/// can resolve an AyahAudioCubit from GetIt — these tests don't exercise audio.
+class _SilentPlayer implements AyahRecitationPlayer {
+  @override
+  Stream<RecitationPlayback> get playbackStream =>
+      const Stream<RecitationPlayback>.empty();
+  @override
+  Future<void> play(int ayahId) async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> resume() async {}
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> dispose() async {}
+}
+
 void main() {
   setUp(() {
     GetIt.I
       ..registerFactory<ReaderCubit>(
         () => ReaderCubit(_FakeAyahRepository(), _FakeLastReadRepository()),
       )
-      ..registerLazySingleton<ReaderSettingsRepository>(_FakeSettings.new);
+      ..registerLazySingleton<ReaderSettingsRepository>(_FakeSettings.new)
+      ..registerFactory<AyahAudioCubit>(() => AyahAudioCubit(_SilentPlayer()));
   });
   tearDown(GetIt.I.reset);
 

@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:al_quran/core/audio/ayah_recitation_player.dart';
 import 'package:al_quran/core/feature_flags.dart';
 import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/core/theme/app_theme.dart';
+import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
@@ -78,6 +82,24 @@ class _Settings implements ReaderSettingsRepository {
       selectedTranslations = codes;
 }
 
+/// No-op player so ReaderPage's audio branch (behind FeatureFlags.audioRecitation)
+/// can resolve an AyahAudioCubit from GetIt — these tests don't exercise audio.
+class _SilentPlayer implements AyahRecitationPlayer {
+  @override
+  Stream<RecitationPlayback> get playbackStream =>
+      const Stream<RecitationPlayback>.empty();
+  @override
+  Future<void> play(int ayahId) async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> resume() async {}
+  @override
+  Future<void> stop() async {}
+  @override
+  Future<void> dispose() async {}
+}
+
 void main() {
   late _Repo repo;
   late _Settings settings;
@@ -87,7 +109,8 @@ void main() {
     settings = _Settings();
     GetIt.I
       ..registerFactory<ReaderCubit>(() => ReaderCubit(repo, _LastRead()))
-      ..registerLazySingleton<ReaderSettingsRepository>(() => settings);
+      ..registerLazySingleton<ReaderSettingsRepository>(() => settings)
+      ..registerFactory<AyahAudioCubit>(() => AyahAudioCubit(_SilentPlayer()));
   });
   tearDown(GetIt.I.reset);
 
