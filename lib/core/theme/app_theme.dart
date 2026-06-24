@@ -21,6 +21,17 @@ class AppTheme {
     FontFeature.enable('liga'),
   ];
 
+  // IndoPak (Noorehuda) Naskh face — the Phase-2 South-Asian script option
+  // (behind FeatureFlags.indopakScript), rendered over the standard-Unicode
+  // text_arabic_indopak column. Noorehuda is "ligature-free" (no `liga`
+  // dependency), so it shapes correctly in Flutter via calt/ccmp/init/medi/fina
+  // — verified headlessly. CC BY-NC — see assets/fonts/README.md.
+  static const String indopakFontFamily = 'Noorehuda';
+  static const List<FontFeature> indopakFontFeatures = [
+    FontFeature.enable('calt'),
+    FontFeature.enable('ccmp'),
+  ];
+
   // Urdu translation face — Noto Nastaliq Urdu (proper nastaliq script).
   static const String urduFontFamily = 'NotoNastaliqUrdu';
 
@@ -49,6 +60,14 @@ class QuranTextStyle {
     fontFamily: AppTheme.arabicFontFamily,
     fontFeatures: AppTheme.arabicFontFeatures,
     height: 1.9,
+  );
+
+  /// IndoPak (Noorehuda) text style — the Phase-2 South-Asian script option.
+  /// Slightly looser line height suits the Naskh face; tune on device.
+  static const TextStyle indopak = TextStyle(
+    fontFamily: AppTheme.indopakFontFamily,
+    fontFeatures: AppTheme.indopakFontFeatures,
+    height: 1.95,
   );
 }
 

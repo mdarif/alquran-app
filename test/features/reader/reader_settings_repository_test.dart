@@ -1,4 +1,5 @@
 import 'package:al_quran/features/reader/data/repositories/reader_settings_repository_impl.dart';
+import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,6 +43,30 @@ void main() {
       expect(repo.selectedTranslations, ['ur', 'en']);
       await repo.setSelectedTranslations(['ur']);
       expect(repo.selectedTranslations, ['ur']);
+    });
+
+    test('script: defaults to Uthmani', () async {
+      final repo = await _repo();
+      expect(repo.script, ArabicScript.uthmani);
+    });
+
+    test('script: persists IndoPak, then back to Uthmani', () async {
+      final repo = await _repo();
+      await repo.setScript(ArabicScript.indopak);
+      expect(repo.script, ArabicScript.indopak);
+      await repo.setScript(ArabicScript.uthmani);
+      expect(repo.script, ArabicScript.uthmani);
+    });
+
+    test('script: a legacy/unknown stored value falls back to Uthmani',
+        () async {
+      SharedPreferences.setMockInitialValues(
+        const {'reader_script': 'something-else'},
+      );
+      final repo = ReaderSettingsRepositoryImpl(
+        await SharedPreferences.getInstance(),
+      );
+      expect(repo.script, ArabicScript.uthmani);
     });
   });
 }

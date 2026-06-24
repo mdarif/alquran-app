@@ -16,6 +16,9 @@ class WidgetKeys {
   static const viewportToggle = Key('reader-viewport-toggle');
   static const fontSizeButton = Key('reader-font-size-button');
   static const themeToggle = Key('reader-theme-toggle');
+  // Uthmani/IndoPak script switch, inside the text-size panel (only rendered
+  // while FeatureFlags.indopakScript is on).
+  static const scriptToggle = Key('reader-script-toggle');
 
   // Reader content
   static const peekCard = Key('reader-peek-card');

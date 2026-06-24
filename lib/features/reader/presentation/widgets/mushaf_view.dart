@@ -37,6 +37,7 @@ class MushafView extends StatefulWidget {
     required this.headings,
     required this.arabicFontSize,
     required this.resources,
+    this.arabicStyle = QuranTextStyle.madani,
     this.focusAyahId,
     this.onVisibleAyah,
     this.selectedLanguages = const {},
@@ -48,6 +49,11 @@ class MushafView extends StatefulWidget {
   final List<Ayah> ayahs;
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
+
+  /// Base Arabic style (font/features/height) for the AYAH text — Uthmani
+  /// (default) or IndoPak (Noorehuda). Surah-name/bismillah headers keep the
+  /// default Uthmani face.
+  final TextStyle arabicStyle;
   final List<TranslationResource> resources;
 
   /// Global ayah id to scroll to on open (Last Read resume); null starts at top.
@@ -385,6 +391,7 @@ class _MushafViewState extends State<MushafView>
                     _MarkedParagraph(
                       group: group,
                       fontSize: fontSize,
+                      arabicStyle: widget.arabicStyle,
                       paragraphKey: _groupKeyFor(group.first.surahId),
                       highlightAyahId: _highlightAyahId,
                       selectedAyahId: _selectedAyah?.id,
@@ -466,6 +473,7 @@ class _MarkedParagraph extends StatefulWidget {
   const _MarkedParagraph({
     required this.group,
     required this.fontSize,
+    required this.arabicStyle,
     required this.paragraphKey,
     required this.highlightAyahId,
     required this.selectedAyahId,
@@ -474,6 +482,7 @@ class _MarkedParagraph extends StatefulWidget {
 
   final List<Ayah> group;
   final double fontSize;
+  final TextStyle arabicStyle;
   final GlobalKey paragraphKey;
   final int? highlightAyahId;
   final int? selectedAyahId;
@@ -578,7 +587,15 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
       spans.add(
         const TextSpan(
           text: ' $_medallion ',
-          style: TextStyle(color: Color(0x00000000)),
+          // Invisible anchor: render the U+06DD rosette in the Uthmani face
+          // ALWAYS, so the measured box — and thus the overlaid verse badge and
+          // its inline spacing — stay the same size whatever the ayah font is
+          // (Noorehuda's rosette is far larger). It still scales with the
+          // inherited font size (zoom).
+          style: TextStyle(
+            color: Color(0x00000000),
+            fontFamily: AppTheme.arabicFontFamily,
+          ),
         ),
       );
     }
@@ -594,10 +611,7 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             locale: const Locale('ar'),
-            style: QuranTextStyle.madani.copyWith(
-              fontSize: widget.fontSize,
-              height: 1.9,
-            ),
+            style: widget.arabicStyle.copyWith(fontSize: widget.fontSize),
           ),
         ),
         // The visible verse badge: a clean filled circle with the Western number,

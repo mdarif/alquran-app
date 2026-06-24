@@ -74,7 +74,10 @@ class _ThrowingClient implements HomeWidgetClient {
 void main() {
   final base = DateTime(2026, 6, 23, 13);
 
-  WidgetPublisher publisher(PrayerTimesRepository repo, HomeWidgetClient client) =>
+  WidgetPublisher publisher(
+    PrayerTimesRepository repo,
+    HomeWidgetClient client,
+  ) =>
       WidgetPublisher(WidgetBridge(repo, clock: () => base), client);
 
   test('publishes the payload + redraws both Android providers and iOS kinds',

@@ -1,3 +1,4 @@
+import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
@@ -140,6 +141,10 @@ class _FakeSettings implements ReaderSettingsRepository {
   bool detailed;
   @override
   List<String>? selectedTranslations;
+  @override
+  ArabicScript script = ArabicScript.uthmani;
+  @override
+  Future<void> setScript(ArabicScript value) async => script = value;
   @override
   Future<void> setFontSize(double value) async => fontSize = value;
   @override

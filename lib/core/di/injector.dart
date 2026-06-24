@@ -49,7 +49,10 @@ Future<void> configureDependencies() async {
       () => SurahRepositoryImpl(getIt<AppDatabase>()),
     )
     ..registerLazySingleton<AyahRepository>(
-      () => AyahRepositoryImpl(getIt<AppDatabase>()),
+      () => AyahRepositoryImpl(
+        getIt<AppDatabase>(),
+        getIt<ReaderSettingsRepository>(),
+      ),
     )
     ..registerLazySingleton<IndexRepository>(
       () => IndexRepositoryImpl(getIt<AppDatabase>()),

@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../domain/entities/arabic_script.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 
 class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
@@ -10,6 +11,17 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   static const String _kFontSize = 'reader_font_size';
   static const String _kDetailed = 'reader_detailed';
   static const String _kSelectedLangs = 'reader_selected_translations';
+  static const String _kScript = 'reader_script';
+
+  @override
+  ArabicScript get script =>
+      _prefs.getString(_kScript) == 'indopak'
+          ? ArabicScript.indopak
+          : ArabicScript.uthmani;
+
+  @override
+  Future<void> setScript(ArabicScript value) =>
+      _prefs.setString(_kScript, value.name);
 
   @override
   double get fontSize =>

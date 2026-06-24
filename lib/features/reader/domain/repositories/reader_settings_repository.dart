@@ -1,6 +1,13 @@
+import '../entities/arabic_script.dart';
+
 /// Persists the user's global reading preferences (zoom level + viewport) so
 /// they survive app restarts. Reads are synchronous (defaulted); writes async.
 abstract interface class ReaderSettingsRepository {
+  /// The Arabic script the reader renders. Defaults to [ArabicScript.uthmani];
+  /// only meaningful while `FeatureFlags.indopakScript` is on.
+  ArabicScript get script;
+  Future<void> setScript(ArabicScript value);
+
   /// Arabic font size in points; defaults to [defaultFontSize].
   double get fontSize;
 

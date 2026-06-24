@@ -13,6 +13,7 @@ class AyahTile extends StatelessWidget {
     required this.ayah,
     required this.resources,
     required this.arabicFontSize,
+    this.arabicStyle = QuranTextStyle.madani,
     this.surahName,
     this.highlight = false,
     super.key,
@@ -21,6 +22,9 @@ class AyahTile extends StatelessWidget {
   final Ayah ayah;
   final List<TranslationResource> resources;
   final double arabicFontSize;
+
+  /// Base Arabic style for the ayah text (Uthmani default / IndoPak Noorehuda).
+  final TextStyle arabicStyle;
   final String? surahName;
 
   /// Briefly tints the tile when the reader resumes on this verse (Last Read).
@@ -112,7 +116,7 @@ class AyahTile extends StatelessWidget {
             textDirection: TextDirection.rtl,
             // Tag the script so TalkBack/VoiceOver pick the Arabic speech engine.
             locale: const Locale('ar'),
-            style: QuranTextStyle.madani.copyWith(fontSize: arabicFontSize),
+            style: arabicStyle.copyWith(fontSize: arabicFontSize),
           ),
           for (final r in resources)
             if (ayah.translations[r.id] != null)

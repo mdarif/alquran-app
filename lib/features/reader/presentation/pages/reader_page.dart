@@ -5,8 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
+import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
@@ -111,6 +114,13 @@ class _ReaderViewState extends State<_ReaderView> {
   // Whether the inline text-size slider is revealed (toggled by the "Aa" button).
   bool _showFontSlider = false;
 
+  // The Arabic script the reader renders the ayah text in. The toggle only
+  // appears while FeatureFlags.indopakScript is on; persisted across launches.
+  late ArabicScript _script = _settings.script;
+  TextStyle get _arabicStyle => _script == ArabicScript.indopak
+      ? QuranTextStyle.indopak
+      : QuranTextStyle.madani;
+
   // The reader's chosen translation editions, shared by the Reading peek and the
   // Detailed view (set once, honoured in both). null = not yet chosen → resolved
   // to a sensible default. Restored from settings so it survives restarts.
@@ -203,6 +213,7 @@ class _ReaderViewState extends State<_ReaderView> {
                     ayahs: state.ayahs,
                     headings: state.headings,
                     arabicFontSize: _arabicFont,
+                    arabicStyle: _arabicStyle,
                     resources: state.resources,
                     focusAyahId: _focusAyahId,
                     onVisibleAyah: _onVisibleAyah,
@@ -227,6 +238,7 @@ class _ReaderViewState extends State<_ReaderView> {
                   ),
                   headings: state.headings,
                   arabicFontSize: _arabicFont,
+                  arabicStyle: _arabicStyle,
                   focusAyahId: _focusAyahId,
                   onVisibleAyah: _onVisibleAyah,
                   onRegisterFlush: (cb) => _flushCurrentPosition = cb,
@@ -253,6 +265,8 @@ class _ReaderViewState extends State<_ReaderView> {
               minFont: _minFont,
               maxFont: _maxFont,
               onChanged: _applyFont,
+              script: _script,
+              onScriptChanged: _applyScript,
             ),
           ),
         ],
@@ -405,6 +419,16 @@ class _ReaderViewState extends State<_ReaderView> {
     unawaited(_settings.setFontSize(_arabicFont));
   }
 
+  // Switch the Arabic script: persist it, then reload the section so the repo
+  // re-reads the matching column. The current verse (_focusAyahId, tracked by
+  // _onVisibleAyah) is preserved when the section reopens.
+  void _applyScript(ArabicScript value) {
+    if (value == _script) return;
+    setState(() => _script = value);
+    unawaited(_settings.setScript(value));
+    _cubit.load(_target);
+  }
+
   void _setFont(double value) {
     final clamped = value.clamp(_minFont, _maxFont);
     if (clamped != _arabicFont) setState(() => _arabicFont = clamped);
@@ -425,6 +449,7 @@ class _DetailedList extends StatefulWidget {
     required this.onToggleStrip,
     required this.headings,
     required this.arabicFontSize,
+    this.arabicStyle = QuranTextStyle.madani,
     this.focusAyahId,
     this.onVisibleAyah,
     this.onRegisterFlush,
@@ -450,6 +475,7 @@ class _DetailedList extends StatefulWidget {
 
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
+  final TextStyle arabicStyle;
   final int? focusAyahId;
   final ValueChanged<Ayah>? onVisibleAyah;
 
@@ -681,6 +707,7 @@ class _DetailedListState extends State<_DetailedList> {
       ayah: ayah,
       resources: widget.shownResources,
       arabicFontSize: widget.arabicFontSize,
+      arabicStyle: widget.arabicStyle,
       surahName: widget.headings[ayah.surahId]?.nameEnglish,
       highlight: _highlightAyahId == ayah.id,
     );
@@ -728,6 +755,8 @@ class _FontSizeBar extends StatelessWidget {
     required this.minFont,
     required this.maxFont,
     required this.onChanged,
+    required this.script,
+    required this.onScriptChanged,
   });
 
   final bool visible;
@@ -735,6 +764,8 @@ class _FontSizeBar extends StatelessWidget {
   final double minFont;
   final double maxFont;
   final ValueChanged<double> onChanged;
+  final ArabicScript script;
+  final ValueChanged<ArabicScript> onScriptChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -754,20 +785,50 @@ class _FontSizeBar extends StatelessWidget {
             shadowColor: Colors.black.withValues(alpha: 0.2),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('A', style: TextStyle(fontSize: 13)),
-                  Expanded(
-                    child: Slider(
-                      value: fontSize.clamp(minFont, maxFont),
-                      min: minFont,
-                      max: maxFont,
-                      divisions: ((maxFont - minFont) / 2).round(),
-                      label: '${fontSize.round()}',
-                      onChanged: onChanged,
-                    ),
+                  Row(
+                    children: [
+                      const Text('A', style: TextStyle(fontSize: 13)),
+                      Expanded(
+                        child: Slider(
+                          value: fontSize.clamp(minFont, maxFont),
+                          min: minFont,
+                          max: maxFont,
+                          divisions: ((maxFont - minFont) / 2).round(),
+                          label: '${fontSize.round()}',
+                          onChanged: onChanged,
+                        ),
+                      ),
+                      const Text('A', style: TextStyle(fontSize: 22)),
+                    ],
                   ),
-                  const Text('A', style: TextStyle(fontSize: 22)),
+                  // Script switch — only while the IndoPak feature is enabled.
+                  if (FeatureFlags.indopakScript)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: SegmentedButton<ArabicScript>(
+                        key: WidgetKeys.scriptToggle,
+                        showSelectedIcon: false,
+                        style: SegmentedButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          textStyle: const TextStyle(fontSize: 12),
+                        ),
+                        segments: const [
+                          ButtonSegment(
+                            value: ArabicScript.uthmani,
+                            label: Text('Uthmani'),
+                          ),
+                          ButtonSegment(
+                            value: ArabicScript.indopak,
+                            label: Text('IndoPak'),
+                          ),
+                        ],
+                        selected: {script},
+                        onSelectionChanged: (s) => onScriptChanged(s.first),
+                      ),
+                    ),
                 ],
               ),
             ),
