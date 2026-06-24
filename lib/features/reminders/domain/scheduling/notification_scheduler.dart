@@ -16,6 +16,9 @@ abstract interface class NotificationScheduler {
   /// Cancel every pending reminder (before rescheduling the rolling window).
   Future<void> cancelAll();
 
+  /// Show a notification immediately — a "what will reminders look like?" test.
+  Future<void> showTest({required String title, required String body});
+
   /// Schedule a one-shot notification at [fireAt] (local wall-clock).
   Future<void> scheduleOneShot({
     required int id,

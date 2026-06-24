@@ -7,6 +7,7 @@ class _FakeScheduler implements NotificationScheduler {
   bool granted = true;
   int cancelAllCalls = 0;
   int weeklyCalls = 0;
+  int testCalls = 0;
   final List<int> oneShotIds = [];
 
   @override
@@ -17,6 +18,9 @@ class _FakeScheduler implements NotificationScheduler {
   Future<bool> hasPermission() async => granted;
   @override
   Future<void> cancelAll() async => cancelAllCalls++;
+  @override
+  Future<void> showTest({required String title, required String body}) async =>
+      testCalls++;
   @override
   Future<String?> consumeLaunchPayload() async => null;
 
@@ -131,5 +135,17 @@ void main() {
     final c = build(_FakeSettings(enabled: true), _FakeScheduler());
     expect(c.state.enabled, isTrue);
     expect(c.state.upcoming, isNotEmpty);
+  });
+
+  test('sendTestReminder shows a notification when permitted', () async {
+    final sch = _FakeScheduler()..granted = true;
+    await build(_FakeSettings(), sch).sendTestReminder();
+    expect(sch.testCalls, 1);
+  });
+
+  test('sendTestReminder is a no-op when permission is denied', () async {
+    final sch = _FakeScheduler()..granted = false;
+    await build(_FakeSettings(), sch).sendTestReminder();
+    expect(sch.testCalls, 0);
   });
 }

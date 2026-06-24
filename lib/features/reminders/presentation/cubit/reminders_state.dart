@@ -31,7 +31,7 @@ class RemindersState extends Equatable {
   List<Object?> get props => [
         enabled,
         permissionGranted,
-        // ReminderOccurrence isn't Equatable — compare by (kind, fireAt).
-        [for (final o in upcoming) (o.kind, o.fireAt)],
+        // ReminderOccurrence isn't Equatable — compare by (event id, fireAt).
+        [for (final o in upcoming) (o.event.id, o.fireAt)],
       ];
 }

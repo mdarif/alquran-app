@@ -95,6 +95,18 @@ class LocalNotificationScheduler implements NotificationScheduler {
   }
 
   @override
+  Future<void> showTest({required String title, required String body}) async {
+    try {
+      await _plugin.show(
+        id: 99,
+        title: title,
+        body: body,
+        notificationDetails: _details(),
+      );
+    } catch (_) {}
+  }
+
+  @override
   Future<void> scheduleOneShot({
     required int id,
     required DateTime fireAt,

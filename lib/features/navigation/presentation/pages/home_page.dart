@@ -6,7 +6,7 @@ import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
-import '../../../reminders/presentation/widgets/upcoming_reminders_section.dart';
+import '../../../reminders/presentation/widgets/reminders_button.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
 import 'index_list_page.dart';
@@ -44,13 +44,13 @@ class HomePage extends StatelessWidget {
               icon: const Icon(Icons.format_list_numbered_rounded),
               onPressed: () => _openJumpSheet(context),
             ),
+          const RemindersButton(),
           const NextPrayerPill(),
           const ThemeToggleButton(),
         ],
       ),
       body: const Column(
         children: [
-          UpcomingRemindersSection(),
           LastReadBanner(),
           Expanded(child: SurahListView()),
         ],

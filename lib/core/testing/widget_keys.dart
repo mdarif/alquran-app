@@ -28,6 +28,7 @@ class WidgetKeys {
   static const hijriDateLine = Key('hijri-date-line');
 
   // Sunnah reminders
-  static const upcomingRemindersSection = Key('upcoming-reminders-section');
-  static const enableRemindersCard = Key('enable-reminders-card');
+  static const remindersButton = Key('reminders-button');
+  static const remindersSheet = Key('reminders-sheet');
+  static const testReminderButton = Key('test-reminder-button');
 }

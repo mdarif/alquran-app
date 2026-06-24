@@ -1,5 +1,4 @@
 import 'package:al_quran/core/hijri/hijri_date.dart';
-import 'package:al_quran/features/reminders/domain/entities/sunnah_event.dart';
 import 'package:al_quran/features/reminders/domain/scheduling/occurrence_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,20 +14,19 @@ void main() {
   // 2026-06-24 is 8 Muharram 1448 (per the tabular converter), 10:00 local.
   final now = DateTime(2026, 6, 24, 10);
 
-  test('emits the near-term occurrences; far-off events stay out of the window',
-      () {
-    final kinds = engine.upcoming(now).map((o) => o.kind).toSet();
-    expect(kinds, contains(SunnahKind.alKahf));
-    expect(kinds, contains(SunnahKind.ashura)); // 9 Muharram is tomorrow
-    expect(kinds, contains(SunnahKind.ayyamAlBid)); // 13 Muharram this month
+  test('emits the near-term events; far-off ones stay out of the window', () {
+    final ids = engine.upcoming(now).map((o) => o.event.id).toSet();
+    expect(ids, contains('al_kahf'));
+    expect(ids, contains('ashura')); // 9 Muharram is tomorrow
+    expect(ids, contains('ayyam_al_bid')); // 13 Muharram this month
     // Arafah / first-10 Dhul Hijjah are ~11 months out → beyond 120 days.
-    expect(kinds, isNot(contains(SunnahKind.arafah)));
-    expect(kinds, isNot(contains(SunnahKind.firstTenDhulHijjah)));
+    expect(ids, isNot(contains('arafah')));
+    expect(ids, isNot(contains('first_ten_dhul_hijjah')));
   });
 
   test('Ashura targets 9 Muharram and fires the evening before', () {
     final ashura =
-        engine.upcoming(now).firstWhere((o) => o.kind == SunnahKind.ashura);
+        engine.upcoming(now).firstWhere((o) => o.event.id == 'ashura');
     final hd = HijriDate.fromGregorian(ashura.eventDate);
     expect((hd.month, hd.day), (1, 9));
     expect(ashura.fireAt, _eveOf(ashura.eventDate));
@@ -36,14 +34,15 @@ void main() {
 
   test('Ayyam al-Bid targets the 13th and fires the evening before', () {
     final wb =
-        engine.upcoming(now).firstWhere((o) => o.kind == SunnahKind.ayyamAlBid);
+        engine.upcoming(now).firstWhere((o) => o.event.id == 'ayyam_al_bid');
     expect(HijriDate.fromGregorian(wb.eventDate).day, 13);
     expect(wb.fireAt, _eveOf(wb.eventDate));
   });
 
-  test('Al-Kahf is a Thursday and fires that Thursday evening', () {
+  test('Al-Kahf is a Thursday and fires that Thursday evening (fireSameDay)',
+      () {
     final kahf =
-        engine.upcoming(now).firstWhere((o) => o.kind == SunnahKind.alKahf);
+        engine.upcoming(now).firstWhere((o) => o.event.id == 'al_kahf');
     expect(kahf.eventDate.weekday, DateTime.thursday);
     expect(
       kahf.fireAt,
@@ -54,6 +53,7 @@ void main() {
         20,
       ),
     );
+    expect(kahf.opensAlKahf, isTrue);
   });
 
   test('results are sorted by fireAt and never in the past', () {
@@ -70,24 +70,17 @@ void main() {
     // 21:00 is past Ashura's 20:00 eve fire; the next Ashura is ~a year out.
     final later = DateTime(2026, 6, 24, 21);
     final occ = engine.upcoming(later);
-    expect(occ.any((o) => o.kind == SunnahKind.ashura), isFalse);
+    expect(occ.any((o) => o.event.id == 'ashura'), isFalse);
     // Al-Kahf is still present (next Thursday is unaffected).
-    expect(occ.any((o) => o.kind == SunnahKind.alKahf), isTrue);
+    expect(occ.any((o) => o.event.id == 'al_kahf'), isTrue);
   });
 
-  test('one-shot notification ids are unique within the window', () {
+  test('one-shot (non-weekly) notification ids are unique in the window', () {
     final ids = engine
         .upcoming(now)
-        .where((o) => o.kind != SunnahKind.alKahf)
+        .where((o) => !o.event.weekly)
         .map((o) => o.notificationId)
         .toList();
     expect(ids.toSet().length, ids.length);
-  });
-
-  test('copy + action are wired per kind', () {
-    expect(SunnahKind.alKahf.action, ReminderAction.openSurahAlKahf);
-    expect(SunnahKind.ashura.action, ReminderAction.none);
-    expect(SunnahKind.alKahf.title, 'Read Surah Al-Kahf');
-    expect(SunnahKind.ashura.title, 'Fast Ashura Tomorrow');
   });
 }

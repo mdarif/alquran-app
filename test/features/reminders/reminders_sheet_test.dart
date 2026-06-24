@@ -2,13 +2,14 @@ import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/features/reminders/domain/repositories/reminder_settings_repository.dart';
 import 'package:al_quran/features/reminders/domain/scheduling/notification_scheduler.dart';
 import 'package:al_quran/features/reminders/presentation/cubit/reminders_cubit.dart';
-import 'package:al_quran/features/reminders/presentation/widgets/upcoming_reminders_section.dart';
+import 'package:al_quran/features/reminders/presentation/widgets/reminders_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeScheduler implements NotificationScheduler {
   bool granted = true;
+  int testCalls = 0;
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {}
   @override
@@ -17,6 +18,9 @@ class _FakeScheduler implements NotificationScheduler {
   Future<bool> hasPermission() async => granted;
   @override
   Future<void> cancelAll() async {}
+  @override
+  Future<void> showTest({required String title, required String body}) async =>
+      testCalls++;
   @override
   Future<String?> consumeLaunchPayload() async => null;
   @override
@@ -49,25 +53,21 @@ class _FakeSettings implements ReminderSettingsRepository {
 
 final _now = DateTime(2026, 6, 24, 10); // 8 Muharram 1448
 
-Future<void> _pump(WidgetTester tester, RemindersCubit? cubit) {
-  const section = Scaffold(body: UpcomingRemindersSection());
+Future<void> _pump(WidgetTester tester, RemindersCubit cubit) {
   return tester.pumpWidget(
     MaterialApp(
-      home: cubit == null
-          ? section
-          : BlocProvider<RemindersCubit>.value(value: cubit, child: section),
+      home: Scaffold(
+        body: BlocProvider<RemindersCubit>.value(
+          value: cubit,
+          child: const RemindersSheet(),
+        ),
+      ),
     ),
   );
 }
 
 void main() {
-  testWidgets('renders nothing without a cubit (defensive)', (tester) async {
-    await _pump(tester, null);
-    expect(find.byKey(WidgetKeys.enableRemindersCard), findsNothing);
-    expect(find.byKey(WidgetKeys.upcomingRemindersSection), findsNothing);
-  });
-
-  testWidgets('shows the Enable card when disabled', (tester) async {
+  testWidgets('disabled: toggle off, no test button', (tester) async {
     final cubit = RemindersCubit(
       _FakeSettings(),
       _FakeScheduler(),
@@ -76,23 +76,42 @@ void main() {
     addTearDown(cubit.close);
     await _pump(tester, cubit);
 
-    expect(find.byKey(WidgetKeys.enableRemindersCard), findsOneWidget);
-    expect(find.text('Enable'), findsOneWidget);
+    expect(find.byKey(WidgetKeys.remindersSheet), findsOneWidget);
+    expect(find.byKey(WidgetKeys.testReminderButton), findsNothing);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
   });
 
-  testWidgets('lists upcoming events when enabled', (tester) async {
+  testWidgets('enabled: shows the test button + upcoming list', (tester) async {
     final cubit = RemindersCubit(
       _FakeSettings(enabled: true),
       _FakeScheduler()..granted = true,
       clock: () => _now,
     );
     addTearDown(cubit.close);
-    await cubit.refresh(); // populates upcoming + permissionGranted
+    await cubit.refresh();
     await _pump(tester, cubit);
     await tester.pump();
 
-    expect(find.byKey(WidgetKeys.upcomingRemindersSection), findsOneWidget);
-    expect(find.textContaining('Al-Kahf'), findsWidgets); // the Al-Kahf row
-    expect(find.textContaining('Ashura'), findsWidgets); // a fasting row
+    expect(find.byKey(WidgetKeys.testReminderButton), findsOneWidget);
+    expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.textContaining('Al-Kahf'), findsWidgets);
+  });
+
+  testWidgets('tapping the test button fires a test notification',
+      (tester) async {
+    final sch = _FakeScheduler()..granted = true;
+    final cubit = RemindersCubit(
+      _FakeSettings(enabled: true),
+      sch,
+      clock: () => _now,
+    );
+    addTearDown(cubit.close);
+    await cubit.refresh();
+    await _pump(tester, cubit);
+    await tester.pump();
+
+    await tester.tap(find.byKey(WidgetKeys.testReminderButton));
+    await tester.pump();
+    expect(sch.testCalls, 1);
   });
 }

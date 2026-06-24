@@ -1,7 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../domain/entities/reminder_occurrence.dart';
-import '../../domain/entities/sunnah_event.dart';
+import '../../domain/entities/sunnah_events.dart';
 import '../../domain/repositories/reminder_settings_repository.dart';
 import '../../domain/scheduling/notification_scheduler.dart';
 import '../../domain/scheduling/occurrence_engine.dart';
@@ -62,6 +62,22 @@ class RemindersCubit extends Cubit<RemindersState> {
     emit(const RemindersState(enabled: false, permissionGranted: true));
   }
 
+  /// Fire a notification right now, so the user can see what a reminder looks
+  /// like (ensures permission first).
+  Future<void> sendTestReminder() async {
+    if (!await _scheduler.hasPermission()) {
+      final granted = await _scheduler.requestPermission();
+      if (!granted) {
+        emit(state.copyWith(permissionGranted: false));
+        return;
+      }
+    }
+    await _scheduler.showTest(
+      title: 'Sunnah reminder',
+      body: 'This is how your Sunnah reminders will look.',
+    );
+  }
+
   /// Recompute + reschedule on app-resume (catches day/month rollover; reflects
   /// OS-level permission revocation).
   Future<void> refresh() async {
@@ -90,29 +106,30 @@ class RemindersCubit extends Cubit<RemindersState> {
     final all = _engine.upcoming(now);
     await _scheduler.cancelAll();
 
-    final oneShots =
-        all.where((o) => o.kind != SunnahKind.alKahf).take(_maxOneShots);
+    // One-shots for non-weekly events.
+    final oneShots = all.where((o) => !o.event.weekly).take(_maxOneShots);
     for (final o in oneShots) {
       await _scheduler.scheduleOneShot(
         id: o.notificationId,
         fireAt: o.fireAt,
         title: o.title,
         body: o.body,
-        payload: o.action == ReminderAction.openSurahAlKahf
-            ? openAlKahfPayload
-            : null,
+        payload: o.opensAlKahf ? openAlKahfPayload : null,
       );
     }
 
-    await _scheduler.scheduleWeekly(
-      id: SunnahKind.alKahf.notificationIdBase,
-      weekday: DateTime.thursday,
-      hour: OccurrenceEngine.fireHour,
-      minute: OccurrenceEngine.fireMinute,
-      title: SunnahKind.alKahf.title,
-      body: SunnahKind.alKahf.body,
-      payload: openAlKahfPayload,
-    );
+    // A single repeating notification per weekly event (e.g. Al-Kahf).
+    for (final e in sunnahEvents.where((e) => e.weekly)) {
+      await _scheduler.scheduleWeekly(
+        id: e.idBase,
+        weekday: e.weeklyWeekday!,
+        hour: OccurrenceEngine.fireHour,
+        minute: OccurrenceEngine.fireMinute,
+        title: e.title,
+        body: e.body,
+        payload: e.opensAlKahf ? openAlKahfPayload : null,
+      );
+    }
 
     emit(
       RemindersState(
