@@ -1,11 +1,26 @@
-# iOS home-screen widgets — Xcode setup (one-time)
-
-The Swift/plist/entitlements here are code-complete, but a WidgetKit widget needs
-an **extension target** in the Xcode project, which must be added in Xcode (it
-can't be safely scripted into `project.pbxproj`). ~5 minutes.
+# iOS home-screen widgets — setup
 
 App Group used everywhere: **`group.com.almarfa.alQuran`** (matches the
 `com.almarfa.alQuran` bundle id and `WidgetPublisher.appGroupId` in Dart).
+
+## Automated (done)
+
+The WidgetKit **extension target** is created by a script (using the `xcodeproj`
+gem that ships with CocoaPods) rather than by hand in Xcode:
+
+```bash
+ruby ios/PrayerWidget/add_target.rb   # idempotent; re-run if ios/ is regenerated
+```
+
+It adds the `PrayerWidget` app-extension target (bundle id
+`com.almarfa.alQuran.PrayerWidget`), compiles `PrayerWidget.swift`, embeds it in
+Runner, and sets the App Group entitlement on both targets.
+
+- **Simulator:** no code signing needed — just `flutter run`.
+- **Real device:** open `ios/Runner.xcworkspace` and set your Team on the
+  **PrayerWidget** target (Signing & Capabilities) once.
+
+## Manual fallback (if you ever need to redo it in Xcode)
 
 ## Steps
 

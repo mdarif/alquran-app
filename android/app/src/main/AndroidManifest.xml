@@ -4,6 +4,11 @@
          Re-apply after a `flutter create` regen — see `make location-perms`. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Sunnah reminders (local notifications). No SCHEDULE_EXACT_ALARM — we
+         use inexact scheduling. Re-apply after a `flutter create` regen — see
+         `make notif-perms`. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
         android:label="Al Quran"
         android:name="${applicationName}"
@@ -69,6 +74,20 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/prayer_schedule_widget_info" />
         </receiver>
+        <!-- Sunnah reminders (flutter_local_notifications): re-arm pending
+             notifications after a reboot / app update. Re-apply after a
+             `flutter create` regen — see `make notif-perms`. -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
