@@ -552,6 +552,15 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   hot reload (`r`) can't patch in place; it aborts with that message. Same family
   as the DI gotcha: structural changes need a hot **restart** (`R`), not a reload.
   Not a code error — analyze/tests stay green.
+- **"No top-level method 'X' declared" at runtime = you MOVED a top-level
+  function between libraries and hot-reloaded.** Hot reload patches each library
+  in place; it doesn't track a top-level `X` migrating from file A to file B, so
+  the caller can't find it and its `build()` throws — which then *cascades* into a
+  nonsense layout error (e.g. "RenderFlex overflowed by 99687 pixels" as an
+  ErrorWidget fills a sheet). Both vanish on hot **restart** (`R`). Tell-tale: a
+  clean `flutter analyze` (the symbol resolves in a real build) + the second error
+  being secondary ("Another exception was thrown: …"). Same restart-not-reload
+  family as the const-class and DI gotchas.
 - **`native_assets … references objective_c` build error** after clearing caches
   → fix with `flutter clean && flutter pub get`.
 - **Disk:** iOS builds + `~/Library/Developer/Xcode/DerivedData` balloon fast and
