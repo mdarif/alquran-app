@@ -329,6 +329,27 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
 - When a reader section spans surahs, group consecutive ayahs by `surah_id` and
   draw a chapter header per group; show the Basmala only when a group starts at
   `ayah_number == 1` (so a juz that begins mid-surah correctly omits it).
+- **IndoPak script: use the AUTHENTIC text (Quran.com `text_indopak`), normalised
+  for Noorehuda — not a standard-Unicode substitute (2026-06-24).** The first IndoPak
+  attempt rendered the `quran-simple-enhanced` (Tanzil) text in Noorehuda: it shaped
+  with 0 `.notdef` but the *orthography was wrong* — the owner spotted it on al-Fatiha
+  (iyyaka written `إِيَّاكَ` with a spurious hamza instead of bare `اِيَّاكَ`; maalik
+  with a written-out alef instead of the dagger-alef `مٰلِكِ`; missing zer under the
+  alef in ihdina). The fix is the genuine IndoPak text, which is authored for
+  **PDMS_Saleem** and carries 1383 Private-Use-Area glyphs. Normalise it for Noorehuda
+  (`build_indopak_source.py`): **map** the PUA marks that have a Unicode form
+  (E003→U+0656 subscript-alef, E004→U+0657 inverted-damma) and the two letters
+  Noorehuda spells the standard way (U+06AA swash-kaf→U+0643, U+06D2 yeh-barree→U+064A);
+  **strip** the 7 IndoPak-specific waqf symbols that have NO Unicode form
+  (E01A/E01B/E01C/E01E/E01F/E021/E022 — the ز ص ق ع-ruku family, ~1378×) plus zero-width
+  /directional controls (200B–200F, FEFF, 0604). The *standard-Unicode* waqf marks
+  (U+0615, U+06D6, U+06D9 …) are kept and render natively. Result: 0 `.notdef` across
+  all 6236 ayahs AND correct letterforms. Quran.com serves each ayah WITHOUT a bundled
+  basmala (`2:1 = الٓمّٓ`), so no basmala-strip step (unlike AlQuran-Cloud). Validate
+  headlessly with uharfbuzz + the font's cmap (0 notdef + 0 uncovered codepoints), and
+  pin the owner's flagged words as **codepoint canaries in `verify_db.py`** so the
+  spelling can't silently regress. Lesson: "0 `.notdef`" only proves it *renders*, not
+  that it's the *right text* — eyeball the orthography against a reference Mushaf.
 
 ---
 

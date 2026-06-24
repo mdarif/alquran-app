@@ -29,4 +29,14 @@ Bundled faces (declared in `pubspec.yaml`):
   the variable-weight file from Google Fonts; we render it around weight 600.
   Swap the face by changing `AppTheme.displayFontFamily`.
 
+- **`Noorehuda.ttf`** — family `Noorehuda`, the **IndoPak (South-Asian Naskh)**
+  Quran face, behind `FeatureFlags.indopakScript`. By **abu saad /
+  noorehidayat.org** (v1.002). **Licence: CC BY-NC** — free for non-commercial
+  use **with attribution**, which this free / da'wah app satisfies; credit the
+  Noor-e-Hidayat project in an about/credits screen, and re-clear before any
+  paid/commercial release. Renders the `text_arabic_indopak` column — the
+  **authentic Quran.com IndoPak** text (`text_indopak`), normalised for this font
+  in the data pipeline (PUA marks mapped/stripped) — in IndoPak Naskh style; it is
+  "ligature-free" so it shapes correctly in Flutter (no `liga` dependency).
+
 `Kitab` is the planned alternate naskh face.

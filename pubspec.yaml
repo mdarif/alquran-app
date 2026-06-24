@@ -99,6 +99,12 @@ flutter:
     - family: UthmanicHafs
       fonts:
         - asset: assets/fonts/UthmanicHafs1-Ver18.ttf
+    # IndoPak Quran face (Phase 2, behind FeatureFlags.indopakScript) — Noorehuda
+    # by abu saad / noorehidayat.org. CC BY-NC (free, non-commercial, attribution
+    # required) — see assets/fonts/README.md.
+    - family: Noorehuda
+      fonts:
+        - asset: assets/fonts/Noorehuda.ttf
     # Urdu translation face — Noto Nastaliq Urdu (Google, SIL OFL — licence-clean).
     - family: NotoNastaliqUrdu
       fonts:

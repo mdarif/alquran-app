@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms diag-prayer e2e e2e-setup
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms diag-prayer diag-arabic e2e e2e-setup
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -67,3 +67,6 @@ notif-perms: ## Re-apply Sunnah-reminders notification config to android/ (run a
 
 diag-prayer: ## Preview every prayer-times indicator state + sheet (dev-only screen)
 	flutter run -t lib/main_prayer_diag.dart
+
+diag-arabic: ## Arabic mark-rendering matrix in both fonts (dev-only screen)
+	flutter run -t lib/main_arabic_diag.dart
