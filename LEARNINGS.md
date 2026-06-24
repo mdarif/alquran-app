@@ -673,11 +673,14 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   The integer **Kuwaiti tabular algorithm** (Gregorian→JDN→Islamic) is ~25 lines
   of pure Dart, deterministic and offline; anchor a test on a known pair
   (`2000-01-01 → 24 Ramadan 1420`). The tabular calendar differs from a local
-  moon-sighting by up to a day, so expose a small **± day adjustment** (clamp it,
-  e.g. ±2) applied by offsetting the input date; persist it in the feature's
-  existing prefs repo and nudge it from a discreet inline control — no dedicated
-  settings UI required. Render Urdu with **Urdu-Indic digits (U+06F0)**, never
-  Arabic-Indic (U+0660) — the same digit split as the Mushaf numerals.
+  moon-sighting by up to a day, so a **± day adjustment** (offset the input date)
+  is tempting — but a *bare* inline ± control read as unexplained clutter to the
+  owner ("what's that +/- signs?") and got pulled. Lesson: don't surface a raw
+  nudge with no label/context; if a correction is needed, give it a clear home
+  (a labelled setting) or skip it and flag the calc-vs-sighting gap in words. The
+  shipped form is plain English ("07 Muharram 1448 AH"). (If you DO render Urdu —
+  e.g. the companion website — use **Urdu-Indic digits (U+06F0)**, never
+  Arabic-Indic (U+0660); same digit split as the Mushaf numerals.)
 
 ---
 
