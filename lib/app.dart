@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'core/home_widget/widget_publisher.dart';
 import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
 import 'core/theme/theme_cubit.dart';
@@ -26,6 +27,8 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     // Keep the screen awake while the app is open — long-form reading/recitation
     // shouldn't be interrupted by the display dimming or locking.
     unawaited(WakelockPlus.enable());
+    // Refresh the home-screen widget with the current schedule on launch.
+    unawaited(GetIt.I<WidgetPublisher>().publish());
   }
 
   @override
@@ -44,6 +47,8 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
       // Time may have crossed a prayer / "Light of Day" phase while backgrounded.
       GetIt.I<PrayerTimesCubit>().refresh();
       GetIt.I<ThemeCubit>().refresh();
+      // Keep the home-screen widget in step (new day → new schedule).
+      unawaited(GetIt.I<WidgetPublisher>().publish());
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       unawaited(WakelockPlus.disable());

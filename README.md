@@ -37,25 +37,26 @@ assets/
 
 ## First-time setup
 
-This repo contains the Dart source, the bundled DB, and config — but **not** the
-generated platform folders or Drift codegen. Generate them once:
+This repo contains the Dart source, the bundled DB, config, and the committed
+`android/` + `ios/` runners (they carry the native home-screen widget code) — but
+**not** Drift codegen or the desktop/web runners. Set up once:
 
 ```bash
 cd ~/code/alquran-app
 
-# 1. Generate android/ios (etc.) runners. flutter create preserves existing
-#    files (lib/, pubspec.yaml) and only adds what's missing.
-flutter create --org com.almarfa --project-name al_quran --platforms=android,ios .
-
-# 2. Fetch packages
+# 1. Fetch packages
 flutter pub get
 
-# 3. Generate Drift code (creates lib/core/database/app_database.g.dart)
+# 2. Generate Drift code (creates lib/core/database/app_database.g.dart)
 dart run build_runner build --delete-conflicting-outputs
 
-# 4. Run
+# 3. Run
 flutter run
 ```
+
+> `android/` and `ios/` are committed, so no `flutter create` is needed for them.
+> To (re)generate the unused desktop/web runners, run
+> `flutter create --org com.almarfa --project-name al_quran .`.
 
 > If the analyzer flags a missing `app_database.g.dart` before step 3, that's
 > expected — it's produced by build_runner.

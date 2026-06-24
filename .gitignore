@@ -22,10 +22,11 @@ integration_test/test_bundle.dart
 # OS
 .DS_Store
 
-# Platform folders are generated locally with `flutter create` (see README)
-# Comment these out if you decide to commit the platform runners.
-/android/
-/ios/
+# Platform runners. android/ & ios/ are now COMMITTED — the app ships native
+# home-screen widget code (iOS WidgetKit extension + Android receiver) that must
+# live in version control. Build artifacts inside them are excluded by
+# android/.gitignore and ios/.gitignore. The unused desktop/web runners are still
+# generated locally with `flutter create`, so stay ignored.
 /linux/
 /macos/
 /windows/

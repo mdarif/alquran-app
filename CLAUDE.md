@@ -57,8 +57,10 @@ Implemented and present:
 NOT done yet / next up:
 - **Not compile-checked** — built in an environment without Flutter. Run
   `flutter analyze` first; expect minor fixes.
-- Platform folders (`android/`, `ios/`) are **not** committed — generate with
-  `flutter create` (see below). They're gitignored.
+- Platform folders `android/` and `ios/` are **committed** (since 2026-06) — the
+  app ships native home-screen widget code that must live in version control.
+  Build artifacts stay ignored via each folder's own `.gitignore`. The unused
+  desktop/web runners (`linux/ macos/ windows/ web/`) are still generated-only.
 - Drift codegen (`*.g.dart`) is **not** committed — run `build_runner`.
 - Navigation UI for Page/Juz/Hizb/Ruku, the Reading↔Detailed toggle, and the
   KFGQPC font are not done. The DB already carries all the indices for them.

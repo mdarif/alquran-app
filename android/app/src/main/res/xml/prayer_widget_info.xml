@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- updatePeriodMillis=0: we refresh by pushing from the app (launch / resume /
+     location change), not the system timer (whose 30-min floor is too coarse and
+     unnecessary — the next-prayer time is an absolute value that only changes
+     across day boundaries). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:description="@string/prayer_widget_description"
+    android:initialLayout="@layout/prayer_widget"
+    android:previewLayout="@layout/prayer_widget"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

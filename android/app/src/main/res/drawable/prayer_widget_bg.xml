@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rounded deep-emerald surface for the prayer widget. A single calm colour for
+     v1; Light-of-Day phase tinting is a later increment. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#10403B" />
+    <corners android:radius="22dp" />
+</shape>

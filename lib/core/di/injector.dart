@@ -20,6 +20,8 @@ import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
 import '../database/app_database.dart';
 import '../database/db_seeder.dart';
+import '../home_widget/widget_bridge.dart';
+import '../home_widget/widget_publisher.dart';
 import '../theme/mushaf_palette.dart';
 import '../theme/prayer_phase.dart';
 import '../theme/theme_cubit.dart';
@@ -55,6 +57,14 @@ Future<void> configureDependencies() async {
         const GeolocatorLocationProvider(),
       ),
     )
+    // Home-screen widget bridge: the pure WidgetBridge serialises the schedule;
+    // the publisher pushes it to the OS widget. Best-effort, never throws.
+    ..registerLazySingleton<WidgetPublisher>(
+      () => WidgetPublisher(
+        WidgetBridge(getIt<PrayerTimesRepository>()),
+        const PluginHomeWidgetClient(),
+      ),
+    )
     // App-wide theme. "Light of Day" auto-phase snaps to the user's real prayer
     // times when a location is set, falling back to clock hours otherwise.
     ..registerLazySingleton<ThemeCubit>(
@@ -81,7 +91,10 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton<PrayerTimesCubit>(
       () => PrayerTimesCubit(
         getIt<PrayerTimesRepository>(),
-        onLocationFixed: () => getIt<ThemeCubit>().refresh(),
+        onLocationFixed: () {
+          getIt<ThemeCubit>().refresh();
+          getIt<WidgetPublisher>().publish();
+        },
       ),
     )
     ..registerLazySingleton<LastReadRepository>(
