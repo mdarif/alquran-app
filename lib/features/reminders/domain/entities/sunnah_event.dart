@@ -13,6 +13,7 @@ class SunnahEvent {
     required this.shortLabel,
     required this.occursOn,
     this.hijriLabel,
+    this.occasion,
     this.fireSameDay = false,
     this.weekly = false,
     this.weeklyWeekday,
@@ -35,6 +36,11 @@ class SunnahEvent {
 
   /// Optional Hijri label for the row, e.g. "9 Muharram".
   final String Function(HijriDate hijri)? hijriLabel;
+
+  /// Short occasion name for the "special date" gold pill on the Hijri date
+  /// (e.g. "Ashura"). Distinct from the notification-framed [title]/[shortLabel].
+  /// Null → not surfaced as a dated occasion (e.g. the weekly Al-Kahf nudge).
+  final String? occasion;
 
   /// Fire on the observance day's evening (Al-Kahf) rather than the EVENING
   /// BEFORE (the default — gives fasting reminders their "…Tomorrow" framing).

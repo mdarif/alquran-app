@@ -83,4 +83,26 @@ void main() {
         .toList();
     expect(ids.toSet().length, ids.length);
   });
+
+  group('occasionOn (special-date pill)', () {
+    test('9 Muharram resolves to Ashura', () {
+      // 2026-06-25 is 9 Muharram — and also a Thursday, so this doubly proves
+      // the weekly Al-Kahf is excluded in favour of the dated Ashura.
+      final e = engine.occasionOn(DateTime(2026, 6, 25));
+      expect(e?.id, 'ashura');
+      expect(e?.occasion, 'Ashura');
+    });
+
+    test('an ordinary day resolves to null', () {
+      // 2026-06-24 is 8 Muharram — no dated occasion.
+      expect(engine.occasionOn(DateTime(2026, 6, 24, 10)), isNull);
+    });
+
+    test('a plain Thursday resolves to null (weekly Al-Kahf excluded)', () {
+      // 2026-07-02 is a Thursday but ~16 Muharram — no dated occasion.
+      final day = DateTime(2026, 7, 2);
+      expect(day.weekday, DateTime.thursday);
+      expect(engine.occasionOn(day), isNull);
+    });
+  });
 }

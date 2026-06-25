@@ -87,4 +87,21 @@ void main() {
     expect(find.textContaining('No prayer · 11:55'), findsOneWidget);
     expect(find.textContaining('No prayer · 5:15'), findsOneWidget);
   });
+
+  testWidgets('gilds the Hijri date on a Sunnah occasion', (tester) async {
+    // 2026-06-25 is 9 Muharram → Ashura. The bare test theme carries no
+    // MushafColors extension, so the gild falls back to the default gold.
+    await _pumpSheet(tester, base: DateTime(2026, 6, 25));
+    final hijri = tester.widget<Text>(find.text('09 Muharram 1448 AH'));
+    expect(hijri.style?.color, const Color(0xFF9C6F02));
+    expect(hijri.style?.fontWeight, FontWeight.w700);
+  });
+
+  testWidgets('leaves the Hijri date plain on an ordinary day', (tester) async {
+    // 2000-01-01 is 24 Ramadan — not a Sunnah occasion.
+    await _pumpSheet(tester, base: DateTime(2000, 1, 1));
+    final hijri = tester.widget<Text>(find.text('24 Ramadan 1420 AH'));
+    expect(hijri.style?.color, isNot(const Color(0xFF9C6F02)));
+    expect(hijri.style?.fontWeight, isNot(FontWeight.w700));
+  });
 }

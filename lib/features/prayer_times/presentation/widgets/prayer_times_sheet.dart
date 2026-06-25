@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/hijri/hijri_date.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/mushaf_palette.dart';
+import '../../../reminders/presentation/sunnah_occasion.dart';
 import '../../domain/entities/daily_prayer_times.dart';
 import '../../domain/entities/forbidden_window.dart';
 import '../../domain/entities/prayer.dart';
@@ -237,13 +238,19 @@ class _HijriDateLabel extends StatelessWidget {
     final cs = theme.colorScheme;
     final hijri = HijriDate.fromGregorian(baseDate);
     final muted = theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
+    // On a Sunnah occasion the Hijri date itself is gilded (gold + bolder).
+    final isSunnah = sunnahOccasionName(baseDate) != null;
+    final gold = theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
         Text(
           hijri.formatted,
-          style: theme.textTheme.titleSmall?.copyWith(color: cs.onSurface),
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: isSunnah ? gold : cs.onSurface,
+            fontWeight: isSunnah ? FontWeight.w700 : null,
+          ),
         ),
         Text('  ·  ', style: muted),
         Flexible(

@@ -77,6 +77,22 @@ class OccurrenceEngine {
         .toList();
   }
 
+  /// The dated Sunnah occasion falling on [day] (if any) — for the "special date"
+  /// gold pill on the Hijri date. Reuses each event's [SunnahEvent.occursOn]
+  /// against [day]'s Hijri date, so it shares one source of truth with the
+  /// reminders. Weekly events (the Al-Kahf nudge) and events without an
+  /// [SunnahEvent.occasion] name are skipped; returns the first match. Pure.
+  SunnahEvent? occasionOn(DateTime day, {List<SunnahEvent>? events}) {
+    final defs = events ?? sunnahEvents;
+    final d = DateTime(day.year, day.month, day.day);
+    final h = HijriDate.fromGregorian(d);
+    for (final e in defs) {
+      if (e.weekly || e.occasion == null) continue;
+      if (e.occursOn(d, h)) return e;
+    }
+    return null;
+  }
+
   static DateTime _evening(DateTime day) =>
       DateTime(day.year, day.month, day.day, fireHour, fireMinute);
 }

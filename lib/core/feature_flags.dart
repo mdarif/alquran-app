@@ -53,6 +53,13 @@ abstract final class FeatureFlags {
   /// times sheet. Off hides both. Kept on.
   static const bool hijriDate = true;
 
+  /// "Special date" gilding: on a Sunnah occasion (Ashura, Ayyam al-Bid, Arafah,
+  /// first 10 of Dhul Hijjah) the Hijri date itself turns gold + a touch bolder
+  /// wherever it's shown (Home dateline + prayer sheet) — a subtle in-place
+  /// emphasis, no extra element. Drawn from the reminders registry. Off → the
+  /// date renders plain everywhere. Kept on.
+  static const bool sunnahOccasions = true;
+
   /// In-app, single-ayah audio recitation (Mishary Rashid Alafasy), streamed
   /// from the islamic.network CDN and cached to disk for offline replay. Shipped
   /// DARK: while false the reader shows no play affordance, the audio cubit/player

@@ -69,7 +69,9 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
         '${_surahName ?? lastRead.target.title} · Ayah ${lastRead.ayahNumber}';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+      // No top padding: the app bar already provides the breathing room, so the
+      // card sits snug under it instead of leaving a gap.
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
       child: Material(
         color: theme.colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),

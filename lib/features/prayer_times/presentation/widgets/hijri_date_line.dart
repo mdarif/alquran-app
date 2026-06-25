@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/hijri/hijri_date.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/mushaf_palette.dart';
+import '../../../reminders/presentation/sunnah_occasion.dart';
 import '../cubit/prayer_times_cubit.dart';
 
 /// A tiny Hijri dateline (`08 Muharram 1448 AH`) — small and muted, sized to sit
@@ -24,11 +26,17 @@ class HijriDateLine extends StatelessWidget {
     final base = cubit?.hijriBaseDate ?? DateTime(now.year, now.month, now.day);
     final theme = Theme.of(context);
 
+    // On a Sunnah occasion (Ashura, Ayyam al-Bid …) the date itself is gilded —
+    // gold + a touch bolder — to mark the day's importance. No extra element.
+    final isSunnah = sunnahOccasionName(base) != null;
+    final gold = theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
+
     return Text(
       HijriDate.fromGregorian(base).formatted,
       key: WidgetKeys.hijriDateLine,
       style: theme.textTheme.labelSmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
+        color: isSunnah ? gold : theme.colorScheme.onSurfaceVariant,
+        fontWeight: isSunnah ? FontWeight.w700 : null,
         letterSpacing: 0.2,
       ),
     );
