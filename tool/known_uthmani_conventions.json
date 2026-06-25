@@ -1,0 +1,18 @@
+{
+  "_comment": "Accepted QPC-vs-quran.com Uthmani MARK conventions per letter (our marks -> quran.com marks). Letters/rasm are not here. Grow with: python3 tool/verify_uthmani.py --surah N --learn.",
+  "marks": [
+    [
+      [
+        "064E",
+        "0654",
+        "0670"
+      ],
+      [
+        "064E",
+        "0654",
+        "0670",
+        "06E1"
+      ]
+    ]
+  ]
+}

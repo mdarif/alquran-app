@@ -1,3 +1,9 @@
+# Verification tooling: fetched reference cache + Python bytecode + generated reports
+tool/.cache/
+tool/__pycache__/
+tool/uthmani_diff_*.html
+tool/uthmani_verification*
+
 # Flutter / Dart
 .dart_tool/
 .packages
