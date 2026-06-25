@@ -1,11 +1,15 @@
 import 'package:al_quran/core/theme/theme_cubit.dart';
+import 'package:al_quran/core/theme/theme_toggle_button.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_entry.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_kind.dart';
 import 'package:al_quran/features/navigation/domain/repositories/index_repository.dart';
 import 'package:al_quran/features/navigation/presentation/cubit/index_list_cubit.dart';
 import 'package:al_quran/features/navigation/presentation/pages/home_page.dart';
+import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_line.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
+import 'package:al_quran/features/reader/presentation/widgets/last_read_banner.dart';
+import 'package:al_quran/features/reminders/presentation/widgets/reminders_button.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
 import 'package:al_quran/features/surahs/presentation/cubit/surah_list_cubit.dart';
@@ -44,6 +48,10 @@ class _FakeIndexRepository implements IndexRepository {
 Future<void> _pumpHome(
   WidgetTester tester, {
   bool advancedNavigation = true,
+  bool hijriDate = true,
+  bool sunnahReminders = true,
+  bool lastReadBanner = true,
+  bool lightOfDay = true,
 }) async {
   // A fixed light (not auto) so there's no Light-of-Day ticker to leak in tests.
   SharedPreferences.setMockInitialValues(const {'theme_choice': 'duha'});
@@ -53,7 +61,13 @@ Future<void> _pumpHome(
     BlocProvider<ThemeCubit>.value(
       value: theme,
       child: MaterialApp(
-        home: HomePage(advancedNavigation: advancedNavigation),
+        home: HomePage(
+          advancedNavigation: advancedNavigation,
+          hijriDate: hijriDate,
+          sunnahReminders: sunnahReminders,
+          lastReadBanner: lastReadBanner,
+          lightOfDay: lightOfDay,
+        ),
       ),
     ),
   );
@@ -109,6 +123,32 @@ void main() {
         (tester) async {
       await _pumpHome(tester, advancedNavigation: false);
       expect(find.byIcon(Icons.format_list_numbered_rounded), findsNothing);
+      expect(find.byType(SurahListView), findsOneWidget);
+    });
+
+    testWidgets('surfaces the flagged features when their flags are on',
+        (tester) async {
+      await _pumpHome(tester); // all default to on
+      expect(find.byType(HijriDateLine), findsOneWidget);
+      expect(find.byType(RemindersButton), findsOneWidget);
+      expect(find.byType(ThemeToggleButton), findsOneWidget);
+      expect(find.byType(LastReadBanner), findsOneWidget);
+    });
+
+    testWidgets('hides each flagged feature when its flag is off',
+        (tester) async {
+      await _pumpHome(
+        tester,
+        hijriDate: false,
+        sunnahReminders: false,
+        lastReadBanner: false,
+        lightOfDay: false,
+      );
+      expect(find.byType(HijriDateLine), findsNothing);
+      expect(find.byType(RemindersButton), findsNothing);
+      expect(find.byType(ThemeToggleButton), findsNothing);
+      expect(find.byType(LastReadBanner), findsNothing);
+      // The reading list itself is unaffected.
       expect(find.byType(SurahListView), findsOneWidget);
     });
   });

@@ -19,6 +19,10 @@ class HomePage extends StatelessWidget {
     super.key,
     this.advancedNavigation = FeatureFlags.advancedNavigation,
     this.prayerTimes = FeatureFlags.prayerTimes,
+    this.hijriDate = FeatureFlags.hijriDate,
+    this.sunnahReminders = FeatureFlags.sunnahReminders,
+    this.lastReadBanner = FeatureFlags.lastReadBanner,
+    this.lightOfDay = FeatureFlags.lightOfDay,
   });
 
   /// Whether to surface Page/Juz/Hizb/Ruku navigation. Injectable for tests.
@@ -28,17 +32,29 @@ class HomePage extends StatelessWidget {
   /// and location request). Injectable for tests.
   final bool prayerTimes;
 
+  /// Whether to show the Hijri dateline under the title. Injectable for tests.
+  final bool hijriDate;
+
+  /// Whether to show the Sunnah-reminders button. Injectable for tests.
+  final bool sunnahReminders;
+
+  /// Whether to show the "continue reading" resume banner. Injectable for tests.
+  final bool lastReadBanner;
+
+  /// Whether to show the reading-light (Light of Day) toggle. Injectable for tests.
+  final bool lightOfDay;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        title: const Column(
+        title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Al Quran'),
-            HijriDateLine(),
+            const Text('Al Quran'),
+            if (hijriDate) const HijriDateLine(),
           ],
         ),
         actions: [
@@ -49,15 +65,15 @@ class HomePage extends StatelessWidget {
               icon: const Icon(Icons.format_list_numbered_rounded),
               onPressed: () => _openJumpSheet(context),
             ),
-          const RemindersButton(),
+          if (sunnahReminders) const RemindersButton(),
           if (prayerTimes) const NextPrayerPill(),
-          const ThemeToggleButton(),
+          if (lightOfDay) const ThemeToggleButton(),
         ],
       ),
-      body: const Column(
+      body: Column(
         children: [
-          LastReadBanner(),
-          Expanded(child: SurahListView()),
+          if (lastReadBanner) const LastReadBanner(),
+          const Expanded(child: SurahListView()),
         ],
       ),
     );

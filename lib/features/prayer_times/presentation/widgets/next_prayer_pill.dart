@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/entities/forbidden_window.dart';
@@ -111,7 +112,8 @@ class NextPrayerPill extends StatelessWidget {
       builder: (_) => PrayerTimesSheet(
         times: today,
         next: state.next?.prayer,
-        hijriBaseDate: cubit.hijriBaseDate,
+        // The Hijri date block is gated; null hides it (the sheet just renders).
+        hijriBaseDate: FeatureFlags.hijriDate ? cubit.hijriBaseDate : null,
         gregorianDate: cubit.gregorianDate,
       ),
     );

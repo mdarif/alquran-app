@@ -10,6 +10,7 @@ import 'core/feature_flags.dart';
 import 'core/home_widget/widget_publisher.dart';
 import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
+import 'core/theme/mushaf_palette.dart';
 import 'core/theme/theme_cubit.dart';
 import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
@@ -35,14 +36,16 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     if (FeatureFlags.homeScreenWidgets) {
       unawaited(GetIt.I<WidgetPublisher>().publish());
     }
-    // (Re)schedule the Sunnah-reminder rolling window on launch.
-    unawaited(GetIt.I<RemindersCubit>().refresh());
-    // If a tapped reminder cold-launched the app, route it after the first frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final payload =
-          await GetIt.I<NotificationScheduler>().consumeLaunchPayload();
-      routeFromPayload(payload);
-    });
+    if (FeatureFlags.sunnahReminders) {
+      // (Re)schedule the Sunnah-reminder rolling window on launch.
+      unawaited(GetIt.I<RemindersCubit>().refresh());
+      // If a tapped reminder cold-launched the app, route it after the first frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final payload =
+            await GetIt.I<NotificationScheduler>().consumeLaunchPayload();
+        routeFromPayload(payload);
+      });
+    }
   }
 
   @override
@@ -68,7 +71,9 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
         unawaited(GetIt.I<WidgetPublisher>().publish());
       }
       // Roll the reminder window forward (new day/month → new Hijri events).
-      unawaited(GetIt.I<RemindersCubit>().refresh());
+      if (FeatureFlags.sunnahReminders) {
+        unawaited(GetIt.I<RemindersCubit>().refresh());
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       unawaited(WakelockPlus.disable());
@@ -89,12 +94,17 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(
         builder: (context, themeState) {
+          // Light of Day drives the adaptive surface; gated off, hold one static
+          // light (the bright-day paper) so the page never shifts.
+          final palette = FeatureFlags.lightOfDay
+              ? themeState.palette
+              : MushafPalette.of(DayPhase.duha);
           return MaterialApp(
             title: 'Al Quran',
             debugShowCheckedModeBanner: false,
             // Global key so a tapped reminder can route from outside the tree.
             navigatorKey: navigatorKey,
-            theme: themeState.palette.toTheme(),
+            theme: palette.toTheme(),
             // A gentle cross-fade as the light changes — the surface "breathes"
             // between phases instead of snapping.
             themeAnimationDuration: const Duration(milliseconds: 700),

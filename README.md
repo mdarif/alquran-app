@@ -13,8 +13,10 @@ The living inventory of what the app does today. **Keep this current:** when a
 feature lands, ships, or flips a flag, update the matching row in the same commit.
 Source of truth for gating is `lib/core/feature_flags.dart` — if a flag value here
 disagrees with that file, the file wins. Status: **Shipped** = visible in a default
-build · **Dark** = built but gated off behind a `FeatureFlags` constant · **Roadmap**
-= planned, not built. _Last updated: 2026-06-25._
+build · **Shipped (flag on)** = shipped but behind a `FeatureFlags` constant that's
+currently `true`, so it can be turned off without code surgery · **Dark** = built
+but gated off behind a `FeatureFlags` constant that's `false` · **Roadmap** =
+planned, not built. _Last updated: 2026-06-25._
 
 **Core reading**
 - Surah browsing (all 114) → ayah reader — *Shipped*
@@ -22,26 +24,29 @@ build · **Dark** = built but gated off behind a `FeatureFlags` constant · **Ro
 - Urdu (Junagarhi) + Hindi (Tanzil `hi.hindi`) translations, order Urdu → Hindi — *Shipped*
 - Dual viewport: Reading (Arabic only) ↔ Detailed (Arabic + translations) — *Shipped*
 - Pinch-to-zoom + font ± controls (accessibility requirement) — *Shipped*
-- Last-read banner (resume) and scroll-to-top — *Shipped*
-- IndoPak script option (Noorehuda font, authentic `text_indopak`) — *Shipped* (`indopakScript` = true)
+- Last-read resume banner — *Shipped (flag on)* (`lastReadBanner` = true; off hides the banner, reader still records position)
+- Scroll-to-top on long surahs — *Shipped*
+- IndoPak script option (Noorehuda font, authentic `text_indopak`) — *Shipped (flag on)* (`indopakScript` = true)
 
 **Theming**
-- "Light of Day" time-adaptive, prayer-aware reading surface + Reading-light toggle — *Shipped*
+- "Light of Day" time-adaptive, prayer-aware reading surface + Reading-light toggle — *Shipped (flag on)* (`lightOfDay` = true; off → one static light and the toggle is hidden on Home + reader)
 
 **Prayer times** (`prayerTimes` = true)
-- Offline calc (Karachi method + Shafi Asr, hard-wired per creed), next-prayer app-bar pill, all-five-prayers sheet, forbidden-prayer-window cue — *Shipped*
+- Offline calc (Karachi method + Shafi Asr, hard-wired per creed), next-prayer app-bar pill, all-five-prayers sheet, forbidden-prayer-window cue — *Shipped (flag on)*
 - Drives the prayer-AWARE tint of Light of Day (snaps to real Fajr/Sunrise/Asr/Maghrib/Isha). Flag off → Light of Day falls back to clock-hour phases.
 
 **Reminders**
-- Sunnah reminders — local-notification nudges at exact times, settings sheet, and a battery-optimization reliability hint (one-tap OS exemption so OEMs don't drop alarms) — *Shipped*
+- Sunnah reminders — local-notification nudges at exact times, settings sheet, and a battery-optimization reliability hint (one-tap OS exemption so OEMs don't drop alarms) — *Shipped (flag on)* (`sunnahReminders` = true; off hides the button and skips all scheduling)
 
 **Hijri date**
-- Home dateline (Maghrib-rolled when prayer times are on, civil date otherwise) — *Shipped*
+- Home dateline + the date block in the prayer-times sheet (Maghrib-rolled when prayer times are on, civil date otherwise) — *Shipped (flag on)* (`hijriDate` = true; off hides both)
+
+**Audio**
+- Tap-a-verse recitation (Mishary Rashid Alafasy), streamed + cached, in-app — *Shipped (flag on)* (`audioRecitation` = true). ⚠️ On pending on-device playback + audio-source licensing sign-off — confirm before release.
 
 **Behind dark flags (built, not surfaced in v1)**
 - Home-screen widgets — Android Next Prayer + "Today's prayers", iOS WidgetKit PrayerWidget — *Dark* (`homeScreenWidgets` = false). The Dart flag stops the app feeding the widgets; the native widget targets still exist in the build (see caveat).
 - Advanced navigation — Page / Juz / Hizb / Ruku "Jump to" sheet — *Dark* (`advancedNavigation` = false)
-- Audio recitation — tap-a-verse Alafasy, streamed + cached, in-app — *Dark* (`audioRecitation` = false)
 
 **Roadmap (not built)**
 - Hifz / page-wise memorization mode

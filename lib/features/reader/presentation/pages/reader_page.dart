@@ -196,7 +196,7 @@ class _ReaderViewState extends State<_ReaderView> {
             icon: const Icon(Icons.format_size_rounded),
             onPressed: _toggleFontSlider,
           ),
-          const ThemeToggleButton(),
+          if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
         ],
       ),
       body: Stack(

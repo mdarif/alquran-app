@@ -34,11 +34,30 @@ abstract final class FeatureFlags {
   /// the iOS widget extension target and the Android `<receiver>` registrations.
   static const bool homeScreenWidgets = false;
 
+  /// "Light of Day" adaptive reading surface + the reading-light picker. On: the
+  /// page follows the time of day (and the user's prayer phases when prayer times
+  /// are on) and the app-bar light toggle is shown on Home and in the reader. Off:
+  /// the app holds a single static light and the toggle is hidden. Kept on.
+  static const bool lightOfDay = true;
+
+  /// The "continue reading" resume banner on Home (last-read tracking is surfaced
+  /// through it). Off hides the banner; the reader still records position. Kept on.
+  static const bool lastReadBanner = true;
+
+  /// Sunnah reminders: the Home reminders button/sheet plus the local-notification
+  /// (re)scheduling on launch & resume and tapped-reminder routing. Off hides the
+  /// button and skips all scheduling. Kept on.
+  static const bool sunnahReminders = true;
+
+  /// The Hijri (Islamic) date — the Home dateline and the date block in the prayer
+  /// times sheet. Off hides both. Kept on.
+  static const bool hijriDate = true;
+
   /// In-app, single-ayah audio recitation (Mishary Rashid Alafasy), streamed
   /// from the islamic.network CDN and cached to disk for offline replay. Shipped
   /// DARK: while false the reader shows no play affordance, the audio cubit/player
   /// is never constructed, and zero network code runs — the app stays fully
   /// offline. Flip to true once on-device playback and the audio source's
   /// licensing are signed off (see the plan + ATTRIBUTION).
-  static const bool audioRecitation = false;
+  static const bool audioRecitation = true;
 }
