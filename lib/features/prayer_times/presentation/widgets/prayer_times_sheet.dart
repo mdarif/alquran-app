@@ -237,10 +237,12 @@ class _HijriDateLabel extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final hijri = HijriDate.fromGregorian(baseDate);
-    final muted = theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
+    final muted =
+        theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
     // On a Sunnah occasion the Hijri date itself is gilded (gold + bolder).
     final isSunnah = sunnahOccasionName(baseDate) != null;
-    final gold = theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
+    final gold =
+        theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,

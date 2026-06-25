@@ -113,7 +113,8 @@ class LocalNotificationScheduler implements NotificationScheduler {
   Future<bool> isBatteryOptimizationExempt() async {
     if (_android == null) return true; // iOS / not applicable
     try {
-      return await _native.invokeMethod<bool>('isIgnoringBatteryOptimizations') ??
+      return await _native
+              .invokeMethod<bool>('isIgnoringBatteryOptimizations') ??
           false;
     } catch (_) {
       return false;

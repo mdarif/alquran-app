@@ -50,7 +50,8 @@ void main() {
   testWidgets('lists the five prayers plus Sunrise with their times',
       (tester) async {
     await _pumpSheet(tester, base: DateTime(2000, 1, 1));
-    for (final label in ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
+    const labels = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    for (final label in labels) {
       expect(find.text(label), findsOneWidget);
     }
     // 12-hour, no AM/PM (the names disambiguate): Fajr 5:00, Asr 15:00 → 3:00.

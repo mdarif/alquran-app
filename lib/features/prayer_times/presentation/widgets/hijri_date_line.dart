@@ -29,7 +29,8 @@ class HijriDateLine extends StatelessWidget {
     // On a Sunnah occasion (Ashura, Ayyam al-Bid …) the date itself is gilded —
     // gold + a touch bolder — to mark the day's importance. No extra element.
     final isSunnah = sunnahOccasionName(base) != null;
-    final gold = theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
+    final gold =
+        theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
 
     return Text(
       HijriDate.fromGregorian(base).formatted,
