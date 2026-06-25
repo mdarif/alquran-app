@@ -45,28 +45,36 @@ class PrayerTimesSheet extends StatelessWidget {
       key: WidgetKeys.prayerTimesSheet,
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Prayer times', style: theme.textTheme.titleMedium),
-            if (times.location.label != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                times.location.label!,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ],
+            Row(
+              children: [
+                Text('Prayer Times', style: theme.textTheme.titleMedium),
+                if (times.location.label != null) ...[
+                  const Spacer(),
+                  Flexible(
+                    child: Text(
+                      times.location.label!,
+                      textAlign: TextAlign.end,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             if (hijriBaseDate != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               _HijriDateLabel(
                 baseDate: hijriBaseDate!,
                 gregorianDate: gregorianDate ?? hijriBaseDate!,
               ),
             ],
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq — not a
             // salah, so never highlighted), then the remaining four prayers.
             _PrayerRow(
@@ -123,17 +131,17 @@ class _PrayerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final fg = isNext
-        ? cs.onPrimaryContainer
-        : (muted ? cs.onSurfaceVariant : cs.onSurface);
+    final fg = muted ? cs.onSurfaceVariant : cs.onSurface;
     final weight =
         isNext ? FontWeight.w700 : (muted ? FontWeight.w400 : FontWeight.w500);
     final window = forbidden;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.symmetric(vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: isNext ? cs.primaryContainer : Colors.transparent,
+        color: isNext
+            ? cs.primaryContainer.withValues(alpha: 0.45)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -141,8 +149,19 @@ class _PrayerRow extends StatelessWidget {
         children: [
           Row(
             children: [
+              // A slim accent rail marks the next prayer; the (transparent) bar
+              // is reserved on every row so the labels stay aligned.
+              Container(
+                width: 3,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: isNext ? cs.primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 11),
               if (muted) ...[
-                Icon(Icons.wb_twilight_rounded, size: 16, color: fg),
+                Icon(Icons.wb_twilight_rounded, size: 15, color: fg),
                 const SizedBox(width: 8),
               ],
               Text(
@@ -156,7 +175,7 @@ class _PrayerRow extends StatelessWidget {
               Text(
                 formatPrayerTime(time),
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  color: fg,
+                  color: isNext ? cs.primary : fg,
                   fontWeight: weight,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
@@ -183,15 +202,16 @@ class _ForbiddenNote extends StatelessWidget {
     final gold =
         theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
     return Padding(
-      padding: const EdgeInsets.only(top: 5),
+      // top: tight; left: 14 (accent rail 3 + 11 gap) so it sits under the label.
+      padding: const EdgeInsets.only(top: 2, left: 14),
       child: Row(
         children: [
-          Icon(Icons.do_not_disturb_on_outlined, size: 13, color: gold),
-          const SizedBox(width: 6),
+          Icon(Icons.do_not_disturb_on_outlined, size: 11, color: gold),
+          const SizedBox(width: 5),
           Text(
             'No prayer · ${formatPrayerTime(window.start)}'
             '–${formatPrayerTime(window.end)}',
-            style: theme.textTheme.bodySmall?.copyWith(
+            style: theme.textTheme.labelSmall?.copyWith(
               color: gold,
               fontWeight: FontWeight.w500,
             ),
@@ -203,7 +223,8 @@ class _ForbiddenNote extends StatelessWidget {
 }
 
 /// The Islamic date for the audience: the Hijri date (e.g. `07 Muharram
-/// 1448 AH`) over the civil Gregorian date.
+/// 1448 AH`) and, after a dot, the civil Gregorian date — kept on one line to
+/// stay compact. (Two discrete Texts so each remains findable in tests.)
 class _HijriDateLabel extends StatelessWidget {
   const _HijriDateLabel({required this.baseDate, required this.gregorianDate});
 
@@ -215,18 +236,21 @@ class _HijriDateLabel extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final hijri = HijriDate.fromGregorian(baseDate);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final muted = theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
         Text(
           hijri.formatted,
           style: theme.textTheme.titleSmall?.copyWith(color: cs.onSurface),
         ),
-        const SizedBox(height: 1),
-        Text(
-          formatGregorianDate(gregorianDate),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
+        Text('  ·  ', style: muted),
+        Flexible(
+          child: Text(
+            formatGregorianDate(gregorianDate),
+            overflow: TextOverflow.ellipsis,
+            style: muted,
           ),
         ),
       ],
