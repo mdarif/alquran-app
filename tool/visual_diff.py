@@ -146,7 +146,7 @@ A “◌” just means the mark is shown on an empty circle so you can see it on
 """
 
 
-def render(surah: int) -> str:
+def render(surah: int, all_verses: bool = False) -> str:
     ours = vu.load_db(vu.APP_DB, surah)
     qc = vu.load_qurancom(surah, refresh=False)
     real, cos_total = {}, 0
@@ -175,8 +175,8 @@ def render(surah: int) -> str:
             f'{len(ours) - len(real)} are identical; {cos_total} word(s) across the surah '
             f'differ only in <i>invisible</i> encoding (spacing · kashida · mark order).</p></div>')
 
-    for a in sorted(real):
-        rd = real[a]
+    for a in (sorted(ours) if all_verses else sorted(real)):
+        rd = real.get(a, [])
         diffset = {o for o, _ in rd} | {t for _, t in rd}
 
         def hi(text):
@@ -211,9 +211,11 @@ def render(surah: int) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--surah", type=int, default=1)
+    ap.add_argument("--all", action="store_true",
+                    help="render EVERY ayah (ours vs quran.com), not just diffs")
     args = ap.parse_args()
     out = TOOL / f"uthmani_diff_{args.surah}.html"
-    out.write_text(render(args.surah), encoding="utf-8")
+    out.write_text(render(args.surah, all_verses=args.all), encoding="utf-8")
     print(f"wrote {out}")
     print(f"open it with:  open {out}")
     return 0

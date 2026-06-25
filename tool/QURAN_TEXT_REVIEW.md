@@ -60,8 +60,16 @@ Swept all 114 vs quran.com `text_indopak` (`tool/sweep_indopak.py`):
   - **Invisible spacing** (U+200B ZWS, U+2002 EN SPACE) normalised to plain spaces.
   - **2 letter-FORM maps across the whole Qur'an** (17 spots): swash-kaf ڪ→ك (16×)
     and yeh-barree ے→ي (1×, 4:84). Same letters/reading; mapped for the font.
-- **No fix needed.** Optional only: restore ڪ/ے *if* Noorehuda has those glyphs
-  (calligraphic nicety — verify font coverage first).
+- **Rendering VERIFIED (not assumed), tool/visual_indopak.py + uharfbuzz:**
+  - Shaped all **6236** IndoPak ayahs through Noorehuda → **0 `.notdef`** (no broken
+    glyphs anywhere).
+  - Noorehuda **lacks** ڪ (U+06AA) and ے (U+06D2) — not in cmap, shape to `.notdef`
+    — so the ڪ→ك / ے→ي maps are **necessary**, not optional. Keeping quran.com's
+    forms would render as tofu. The maps preserve the letter/reading.
+  - Per-surah: Fatiha matches quran.com letter-for-letter; Baqarah's 30 diffs are
+    all the necessary swash-kaf/yeh-barree maps.
+- **No fix needed / possible** without switching to a font that carries ڪ/ے
+  (a font decision, not a data bug). IndoPak text + Noorehuda rendering are correct.
 
 ## Fix plan — consolidated, applied across the whole Qur'an at the end
 1. **Source of truth.** Cleanest: adopt quran.com **`text_qpc_hafs`** as our

@@ -39,3 +39,4 @@ integration_test/test_bundle.dart
 /web/
 
 
+tool/indopak_diff_*.html
