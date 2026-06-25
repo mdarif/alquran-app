@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'app_navigator.dart';
+import 'core/feature_flags.dart';
 import 'core/home_widget/widget_publisher.dart';
 import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
@@ -31,7 +32,9 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     // shouldn't be interrupted by the display dimming or locking.
     unawaited(WakelockPlus.enable());
     // Refresh the home-screen widget with the current schedule on launch.
-    unawaited(GetIt.I<WidgetPublisher>().publish());
+    if (FeatureFlags.homeScreenWidgets) {
+      unawaited(GetIt.I<WidgetPublisher>().publish());
+    }
     // (Re)schedule the Sunnah-reminder rolling window on launch.
     unawaited(GetIt.I<RemindersCubit>().refresh());
     // If a tapped reminder cold-launched the app, route it after the first frame.
@@ -56,10 +59,14 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(WakelockPlus.enable());
       // Time may have crossed a prayer / "Light of Day" phase while backgrounded.
-      GetIt.I<PrayerTimesCubit>().refresh();
+      if (FeatureFlags.prayerTimes) {
+        GetIt.I<PrayerTimesCubit>().refresh();
+      }
       GetIt.I<ThemeCubit>().refresh();
       // Keep the home-screen widget in step (new day → new schedule).
-      unawaited(GetIt.I<WidgetPublisher>().publish());
+      if (FeatureFlags.homeScreenWidgets) {
+        unawaited(GetIt.I<WidgetPublisher>().publish());
+      }
       // Roll the reminder window forward (new day/month → new Hijri events).
       unawaited(GetIt.I<RemindersCubit>().refresh());
     } else if (state == AppLifecycleState.paused ||

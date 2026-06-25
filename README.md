@@ -7,6 +7,52 @@ Ultra-lightweight, fully-offline Quran reader for **Al Marfa Technologies**
 Implements PRD v1.1.1 MVP foundations: single-script Uthmani/Madani Arabic with
 Urdu + Hindi translations, built on Clean Architecture (Cubit + Drift + GetIt).
 
+## Features
+
+The living inventory of what the app does today. **Keep this current:** when a
+feature lands, ships, or flips a flag, update the matching row in the same commit.
+Source of truth for gating is `lib/core/feature_flags.dart` — if a flag value here
+disagrees with that file, the file wins. Status: **Shipped** = visible in a default
+build · **Dark** = built but gated off behind a `FeatureFlags` constant · **Roadmap**
+= planned, not built. _Last updated: 2026-06-25._
+
+**Core reading**
+- Surah browsing (all 114) → ayah reader — *Shipped*
+- Uthmani Arabic in the matched KFGQPC Hafs (UthmanicHafs1 Ver18) font — *Shipped*
+- Urdu (Junagarhi) + Hindi (Tanzil `hi.hindi`) translations, order Urdu → Hindi — *Shipped*
+- Dual viewport: Reading (Arabic only) ↔ Detailed (Arabic + translations) — *Shipped*
+- Pinch-to-zoom + font ± controls (accessibility requirement) — *Shipped*
+- Last-read banner (resume) and scroll-to-top — *Shipped*
+- IndoPak script option (Noorehuda font, authentic `text_indopak`) — *Shipped* (`indopakScript` = true)
+
+**Theming**
+- "Light of Day" time-adaptive, prayer-aware reading surface + Reading-light toggle — *Shipped*
+
+**Prayer times** (`prayerTimes` = true)
+- Offline calc (Karachi method + Shafi Asr, hard-wired per creed), next-prayer app-bar pill, all-five-prayers sheet, forbidden-prayer-window cue — *Shipped*
+- Drives the prayer-AWARE tint of Light of Day (snaps to real Fajr/Sunrise/Asr/Maghrib/Isha). Flag off → Light of Day falls back to clock-hour phases.
+
+**Reminders**
+- Sunnah reminders — local-notification nudges at exact times, settings sheet, and a battery-optimization reliability hint (one-tap OS exemption so OEMs don't drop alarms) — *Shipped*
+
+**Hijri date**
+- Home dateline (Maghrib-rolled when prayer times are on, civil date otherwise) — *Shipped*
+
+**Behind dark flags (built, not surfaced in v1)**
+- Home-screen widgets — Android Next Prayer + "Today's prayers", iOS WidgetKit PrayerWidget — *Dark* (`homeScreenWidgets` = false). The Dart flag stops the app feeding the widgets; the native widget targets still exist in the build (see caveat).
+- Advanced navigation — Page / Juz / Hizb / Ruku "Jump to" sheet — *Dark* (`advancedNavigation` = false)
+- Audio recitation — tap-a-verse Alafasy, streamed + cached, in-app — *Dark* (`audioRecitation` = false)
+
+**Roadmap (not built)**
+- Hifz / page-wise memorization mode
+- Companion Quran website (next project)
+
+> **Caveat:** translation/font/audio-source licensing is unverified — clear before
+> any release (see the alquran-data HANDOFF). Dark features need their flag flipped
+> and a rebuild to appear. The `homeScreenWidgets` flag only stops the app feeding
+> the OS widgets — to keep them out of v1 entirely, also drop the iOS widget
+> extension target and the Android `<receiver>` registrations from the build.
+
 ## What's in this scaffold
 
 - **Clean Architecture** with a Flutter-free domain layer (PRD 7.1).
@@ -68,8 +114,7 @@ flutter run
   block in `pubspec.yaml` to use the proper Madani face (PRD 4.1).
 - **Bundle size / NFRs:** ship arm64-only via per-ABI splits (PRD NFR-1); profile
   cold start on low-spec Android (NFR-3).
-- **Deferred (PRD backlog):** Page/Juz/Hizb/Ruku navigation UI, Reading↔Detailed
-  toggle, audio, bookmarks, dark mode, search. The DB already carries the
-  page/juz/hizb/rub/ruku/sajda indices for when those land.
+- **Feature status:** see the **Features** section above — it's the maintained
+  inventory of what's shipped, what's built-but-dark-flagged, and what's roadmap.
 - **Licensing:** translation/font licences are unverified — see the alquran-data
   HANDOFF before any public release.

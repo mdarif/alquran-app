@@ -18,10 +18,15 @@ class HomePage extends StatelessWidget {
   const HomePage({
     super.key,
     this.advancedNavigation = FeatureFlags.advancedNavigation,
+    this.prayerTimes = FeatureFlags.prayerTimes,
   });
 
   /// Whether to surface Page/Juz/Hizb/Ruku navigation. Injectable for tests.
   final bool advancedNavigation;
+
+  /// Whether to surface the next-prayer pill (and, through it, the times sheet
+  /// and location request). Injectable for tests.
+  final bool prayerTimes;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +50,7 @@ class HomePage extends StatelessWidget {
               onPressed: () => _openJumpSheet(context),
             ),
           const RemindersButton(),
-          const NextPrayerPill(),
+          if (prayerTimes) const NextPrayerPill(),
           const ThemeToggleButton(),
         ],
       ),

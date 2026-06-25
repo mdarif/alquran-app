@@ -26,6 +26,7 @@ import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
 import '../audio/ayah_recitation_player.dart';
 import '../database/app_database.dart';
+import '../feature_flags.dart';
 import '../database/db_seeder.dart';
 import '../home_widget/widget_bridge.dart';
 import '../home_widget/widget_publisher.dart';
@@ -81,6 +82,12 @@ Future<void> configureDependencies() async {
       () => ThemeCubit(
         getIt<SharedPreferences>(),
         phaseResolver: (now) {
+          // With prayer times gated off, "Light of Day" stays on but tracks the
+          // clock rather than the user's real prayer boundaries (and we never
+          // touch the location-backed repo).
+          if (!FeatureFlags.prayerTimes) {
+            return MushafPalette.phaseForHour(now.hour);
+          }
           final repo = getIt<PrayerTimesRepository>();
           final loc = repo.location;
           if (loc == null) return MushafPalette.phaseForHour(now.hour);
@@ -103,7 +110,9 @@ Future<void> configureDependencies() async {
         getIt<PrayerTimesRepository>(),
         onLocationFixed: () {
           getIt<ThemeCubit>().refresh();
-          getIt<WidgetPublisher>().publish();
+          if (FeatureFlags.homeScreenWidgets) {
+            getIt<WidgetPublisher>().publish();
+          }
         },
       ),
     )
