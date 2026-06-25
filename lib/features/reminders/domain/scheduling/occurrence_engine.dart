@@ -56,25 +56,46 @@ class OccurrenceEngine {
     return out;
   }
 
-  /// The NEXT batch to surface: the soonest upcoming occurrence plus any others
-  /// firing the SAME evening (e.g. tonight could be Ashura + Al-Kahf together).
-  /// Empty when nothing is upcoming.
-  List<ReminderOccurrence> nextGroup(
+  /// The reminders to SURFACE in the sheet — distinct from [upcoming], which is
+  /// scheduling-oriented and drops a reminder the instant its night-before alarm
+  /// time passes. This scans by event DAY (starting today) and never filters on
+  /// [ReminderOccurrence.fireAt], so an event LINGERS through its own day: on the
+  /// 10th of Muharram "Today is Ashura — fast it" stays on screen even though the
+  /// alarm already fired the evening before. Weekly events (Al-Kahf) collapse to
+  /// their nearest instance; soonest first, at most [limit].
+  List<ReminderOccurrence> upNext(
     DateTime now, {
     int horizon = horizonDays,
+    int limit = 5,
     List<SunnahEvent>? events,
   }) {
-    final all = upcoming(now, horizon: horizon, events: events);
-    if (all.isEmpty) return const [];
-    final first = all.first.fireAt;
-    return all
-        .where(
-          (o) =>
-              o.fireAt.year == first.year &&
-              o.fireAt.month == first.month &&
-              o.fireAt.day == first.day,
-        )
-        .toList();
+    final defs = events ?? sunnahEvents;
+    final today = DateTime(now.year, now.month, now.day);
+    final seen = <String>{};
+    final out = <ReminderOccurrence>[];
+
+    for (var i = 0; i <= horizon; i++) {
+      final day = today.add(Duration(days: i));
+      final h = HijriDate.fromGregorian(day);
+      for (final e in defs) {
+        if (!e.occursOn(day, h)) continue;
+        if (!seen.add(e.id)) continue; // nearest instance per event only
+        final fireAt = e.fireSameDay
+            ? _evening(day)
+            : _evening(day.subtract(const Duration(days: 1)));
+        out.add(
+          ReminderOccurrence(
+            event: e,
+            eventDate: day,
+            fireAt: fireAt,
+            hijriLabel: e.hijriLabel?.call(h),
+          ),
+        );
+      }
+    }
+
+    out.sort((a, b) => a.eventDate.compareTo(b.eventDate));
+    return out.take(limit).toList();
   }
 
   /// The dated Sunnah occasion falling on [day] (if any) — for the "special date"

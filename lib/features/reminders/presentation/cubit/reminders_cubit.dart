@@ -37,12 +37,12 @@ class RemindersCubit extends Cubit<RemindersState> {
     final enabled = settings.enabled;
     return RemindersState(
       enabled: enabled,
-      upcoming: enabled ? _nextGroup(clock()) : const [],
+      upcoming: enabled ? _upNext(clock()) : const [],
     );
   }
 
-  static List<ReminderOccurrence> _nextGroup(DateTime now) =>
-      const OccurrenceEngine().nextGroup(now);
+  static List<ReminderOccurrence> _upNext(DateTime now) =>
+      const OccurrenceEngine().upNext(now);
 
   /// Turn reminders on: request OS permission, then nudge toward RELIABLE
   /// delivery (allow exact alarms + exempt from battery optimization — both
@@ -87,7 +87,7 @@ class RemindersCubit extends Cubit<RemindersState> {
         RemindersState(
           enabled: true,
           permissionGranted: false,
-          upcoming: _nextGroup(_clock()),
+          upcoming: _upNext(_clock()),
         ),
       );
       return;
@@ -128,13 +128,40 @@ class RemindersCubit extends Cubit<RemindersState> {
     }
 
     final exempt = await _scheduler.isBatteryOptimizationExempt();
+    final exact = await _scheduler.canScheduleExact();
     emit(
       RemindersState(
         enabled: true,
         permissionGranted: true,
         batteryOptimized: !exempt,
-        upcoming: _engine.nextGroup(now),
+        exactAlarmsAllowed: exact,
+        upcoming: _engine.upNext(now),
       ),
     );
+  }
+
+  /// DEBUG ONLY (surfaced under `kDebugMode`): re-open the exact-alarm system
+  /// screen, then refresh the live delivery status.
+  Future<void> fixExactAlarms() async {
+    await _scheduler.requestExactAlarmPermission();
+    await refresh();
+  }
+
+  /// DEBUG ONLY: fire a real SCHEDULED notification ~2 minutes out through the
+  /// live AlarmManager path — the only way to prove on-device delivery (an
+  /// immediate `show` always works and would prove nothing). Returns a short
+  /// report: the captured error if scheduling threw, else the OS pending count
+  /// (so 0 pending ⇒ scheduling silently failed; ≥1 ⇒ queued, watch for the
+  /// fire). Lock the phone and wait ~2 min.
+  Future<String> scheduleDeliveryTest() async {
+    final error = await _scheduler.scheduleOneShotDebug(
+      id: 99,
+      fireAt: _clock().add(const Duration(minutes: 2)),
+      title: 'Reminder delivery test',
+      body: 'Scheduled ~2 min ago. Seeing this means Android delivery works.',
+    );
+    if (error != null) return 'Schedule FAILED — $error';
+    final pending = await _scheduler.pendingCount();
+    return 'Scheduled ✓ — $pending queued. Lock the phone, wait ~2 min.';
   }
 }

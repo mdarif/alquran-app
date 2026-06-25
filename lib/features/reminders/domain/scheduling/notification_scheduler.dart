@@ -18,6 +18,11 @@ abstract interface class NotificationScheduler {
   /// (older Android, iOS). Without this, reminders fall back to inexact timing.
   Future<void> requestExactAlarmPermission();
 
+  /// Whether the OS will honor EXACT alarm timing right now (Android 12+ gate;
+  /// always true where not applicable). When false, scheduled reminders fall back
+  /// to inexact timing that Doze can defer. Surfaced in the debug delivery panel.
+  Future<bool> canScheduleExact();
+
   /// Whether the app is exempt from battery optimization (Android). Aggressive
   /// OEMs freeze non-exempt apps and drop their scheduled alarms. Always true
   /// where not applicable (iOS / pre-Android-6).
@@ -29,6 +34,20 @@ abstract interface class NotificationScheduler {
 
   /// Cancel every pending reminder (before rescheduling the rolling window).
   Future<void> cancelAll();
+
+  /// DEBUG: how many notifications the OS currently has queued (-1 on error).
+  /// Lets the debug panel confirm a scheduled test actually landed in the queue
+  /// — distinguishing "scheduling failed" from "OS dropped a queued alarm".
+  Future<int> pendingCount();
+
+  /// DEBUG: like [scheduleOneShot] but RETURNS the captured error (null on
+  /// success) instead of swallowing it — reveals a silent scheduling failure.
+  Future<String?> scheduleOneShotDebug({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+  });
 
   /// Schedule a one-shot notification at [fireAt] (local wall-clock).
   Future<void> scheduleOneShot({

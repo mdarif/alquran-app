@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -17,6 +18,18 @@ const List<String> _monthAbbr = [
 
 String _shortDate(DateTime d) =>
     '${weekdayName(d).substring(0, 3)} ${d.day} ${_monthAbbr[d.month - 1]}';
+
+/// "Today"/"Tomorrow" for the near days (so an event lingering on its own day
+/// reads as current), else the short date. Uses the real clock — display only.
+String _relativeDate(DateTime d) {
+  final now = DateTime.now();
+  final days = DateTime(d.year, d.month, d.day)
+      .difference(DateTime(now.year, now.month, now.day))
+      .inDays;
+  if (days == 0) return 'Today';
+  if (days == 1) return 'Tomorrow';
+  return _shortDate(d);
+}
 
 /// The Sunnah-reminders control sheet (opened from the app-bar bell — kept OFF
 /// Home so it doesn't eat top space). A master switch, a "send a test reminder"
@@ -71,6 +84,7 @@ class RemindersSheet extends StatelessWidget {
                     const SizedBox(height: 8),
                     _ReliabilityHint(onFix: cubit.fixReliability),
                   ],
+                  if (kDebugMode) _DebugDeliveryPanel(state: state, cubit: cubit),
                   if (state.upcoming.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     Text(
@@ -102,10 +116,13 @@ class _Row extends StatelessWidget {
     final gold =
         theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
     final isKahf = occurrence.opensAlKahf;
+    final relative = _relativeDate(occurrence.eventDate);
+    final isToday = relative == 'Today';
 
     final content = Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (isKahf)
             Icon(Icons.menu_book_rounded, size: 18, color: cs.primary)
@@ -118,15 +135,26 @@ class _Row extends StatelessWidget {
             ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              occurrence.shortLabel,
-              style: theme.textTheme.bodyMedium,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(occurrence.shortLabel, style: theme.textTheme.bodyMedium),
+                if (occurrence.hijriLabel != null)
+                  Text(
+                    occurrence.hijriLabel!,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+              ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
-            _shortDate(occurrence.eventDate),
-            style:
-                theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            relative,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: isToday ? gold : cs.onSurfaceVariant,
+              fontWeight: isToday ? FontWeight.w600 : null,
+            ),
           ),
           if (isKahf) ...[
             const SizedBox(width: 6),
@@ -187,6 +215,121 @@ class _ReliabilityHint extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// DEBUG ONLY (`kDebugMode`) — never ships. A live readout of the three things
+/// that gate Android scheduled delivery, plus a button that schedules a REAL
+/// notification ~2 min out through AlarmManager (an immediate `show` would prove
+/// nothing). Lets us verify on-device delivery without waiting for a real event.
+class _DebugDeliveryPanel extends StatefulWidget {
+  const _DebugDeliveryPanel({required this.state, required this.cubit});
+
+  final RemindersState state;
+  final RemindersCubit cubit;
+
+  @override
+  State<_DebugDeliveryPanel> createState() => _DebugDeliveryPanelState();
+}
+
+class _DebugDeliveryPanelState extends State<_DebugDeliveryPanel> {
+  String? _report;
+
+  RemindersState get state => widget.state;
+  RemindersCubit get cubit => widget.cubit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 10, right: 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'debug · delivery (kDebugMode)',
+            style: theme.textTheme.labelSmall?.copyWith(color: cs.tertiary),
+          ),
+          const SizedBox(height: 6),
+          _statusRow('notifications allowed', state.permissionGranted),
+          _statusRow(
+            'exact alarms allowed',
+            state.exactAlarmsAllowed,
+            onFix: cubit.fixExactAlarms,
+          ),
+          _statusRow(
+            'battery exempt',
+            !state.batteryOptimized,
+            onFix: cubit.fixReliability,
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final report = await cubit.scheduleDeliveryTest();
+                debugPrint('[reminders] delivery test: $report');
+                if (mounted) setState(() => _report = report);
+              },
+              icon: const Icon(Icons.schedule_send_outlined, size: 18),
+              label: const Text('Schedule test in 2 min'),
+            ),
+          ),
+          if (_report != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _report!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: _report!.startsWith('Scheduled') ? cs.primary : cs.error,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statusRow(String label, bool ok, {VoidCallback? onFix}) {
+    return Builder(
+      builder: (context) {
+        final theme = Theme.of(context);
+        final cs = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: [
+              Icon(
+                ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                size: 16,
+                color: ok ? Colors.green : cs.error,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(label, style: theme.textTheme.bodySmall),
+              ),
+              if (!ok && onFix != null)
+                GestureDetector(
+                  onTap: onFix,
+                  child: Text(
+                    'tap to fix',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

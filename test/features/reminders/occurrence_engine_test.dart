@@ -75,6 +75,34 @@ void main() {
     expect(occ.any((o) => o.event.id == 'al_kahf'), isTrue);
   });
 
+  test('upNext lingers past the night-before alarm, through the event day', () {
+    // 21:00 on 9 Muharram: the 10th-of-Muharram (ashura_day) alarm fired at
+    // 20:00, so `upcoming` has dropped it — but the fast is tomorrow, so the
+    // reminder must STILL surface in the sheet.
+    final afterFire = DateTime(2026, 6, 25, 21);
+    expect(
+      engine.upcoming(afterFire).any((o) => o.event.id == 'ashura_day'),
+      isFalse,
+    );
+    expect(
+      engine.upNext(afterFire).any((o) => o.event.id == 'ashura_day'),
+      isTrue,
+    );
+  });
+
+  test('upNext collapses the weekly Al-Kahf to a single nearest entry', () {
+    final kahf = engine.upNext(now).where((o) => o.event.id == 'al_kahf');
+    expect(kahf.length, 1);
+  });
+
+  test('upNext is soonest-first and capped by limit', () {
+    final out = engine.upNext(now, limit: 3);
+    expect(out.length, lessThanOrEqualTo(3));
+    for (var i = 1; i < out.length; i++) {
+      expect(out[i].eventDate.isBefore(out[i - 1].eventDate), isFalse);
+    }
+  });
+
   test('one-shot (non-weekly) notification ids are unique in the window', () {
     final ids = engine
         .upcoming(now)

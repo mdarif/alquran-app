@@ -21,12 +21,27 @@ class _FakeScheduler implements NotificationScheduler {
   @override
   Future<void> requestExactAlarmPermission() async => exactAlarmCalls++;
   @override
+  Future<bool> canScheduleExact() async => true;
+  @override
   Future<bool> isBatteryOptimizationExempt() async => batteryExempt;
   @override
   Future<void> requestBatteryOptimizationExemption() async =>
       batteryExemptionCalls++;
   @override
   Future<void> cancelAll() async => cancelAllCalls++;
+  @override
+  Future<int> pendingCount() async => oneShotIds.length;
+  @override
+  Future<String?> scheduleOneShotDebug({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+  }) async {
+    oneShotIds.add(id);
+    return null;
+  }
+
   @override
   Future<String?> consumeLaunchPayload() async => null;
 
@@ -175,5 +190,13 @@ void main() {
     final sch = _FakeScheduler()..granted = true;
     await build(_FakeSettings(enabled: true), sch).fixReliability();
     expect(sch.batteryExemptionCalls, 1);
+  });
+
+  test('scheduleDeliveryTest queues a one-shot and reports success', () async {
+    final sch = _FakeScheduler()..granted = true;
+    final report = await build(_FakeSettings(enabled: true), sch)
+        .scheduleDeliveryTest();
+    expect(sch.oneShotIds, contains(99));
+    expect(report, contains('Scheduled'));
   });
 }

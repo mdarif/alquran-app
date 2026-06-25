@@ -20,12 +20,24 @@ class _FakeScheduler implements NotificationScheduler {
   @override
   Future<void> requestExactAlarmPermission() async {}
   @override
+  Future<bool> canScheduleExact() async => true;
+  @override
   Future<bool> isBatteryOptimizationExempt() async => batteryExempt;
   @override
   Future<void> requestBatteryOptimizationExemption() async =>
       batteryExemptionCalls++;
   @override
   Future<void> cancelAll() async {}
+  @override
+  Future<int> pendingCount() async => 0;
+  @override
+  Future<String?> scheduleOneShotDebug({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+  }) async =>
+      null;
   @override
   Future<String?> consumeLaunchPayload() async => null;
   @override

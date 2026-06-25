@@ -100,6 +100,38 @@ class LocalNotificationScheduler implements NotificationScheduler {
   }
 
   @override
+  Future<int> pendingCount() async {
+    try {
+      final pending = await _plugin.pendingNotificationRequests();
+      return pending.length;
+    } catch (_) {
+      return -1;
+    }
+  }
+
+  @override
+  Future<String?> scheduleOneShotDebug({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+  }) async {
+    try {
+      await _plugin.zonedSchedule(
+        id: id,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
+        notificationDetails: _details(),
+        androidScheduleMode: await _scheduleMode(),
+      );
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  @override
   Future<void> requestExactAlarmPermission() async {
     try {
       final android = _android;
@@ -107,6 +139,17 @@ class LocalNotificationScheduler implements NotificationScheduler {
       final allowed = await android.canScheduleExactNotifications() ?? false;
       if (!allowed) await android.requestExactAlarmsPermission();
     } catch (_) {}
+  }
+
+  @override
+  Future<bool> canScheduleExact() async {
+    final android = _android;
+    if (android == null) return true; // iOS / not applicable
+    try {
+      return await android.canScheduleExactNotifications() ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
@@ -205,6 +248,14 @@ class LocalNotificationScheduler implements NotificationScheduler {
           channelDescription: _channelDesc,
           importance: Importance.high,
           priority: Priority.high,
+          // Tag as a REMINDER so the OS (and aggressive OEM skins) treat it as a
+          // time-sensitive nudge rather than a disposable alert.
+          category: AndroidNotificationCategory.reminder,
+          // Linger in the shade until the user swipes it away — a Sunnah nudge
+          // shouldn't vanish on the next unlock (autoCancel defaults to true,
+          // which clears it the moment it's tapped/brushed). Tapping still opens
+          // the app via the payload route; it just no longer self-dismisses.
+          autoCancel: false,
         ),
         iOS: DarwinNotificationDetails(),
       );
