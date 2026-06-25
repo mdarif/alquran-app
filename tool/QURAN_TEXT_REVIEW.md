@@ -90,6 +90,14 @@ Swept all 114 vs quran.com `text_indopak` (`tool/sweep_indopak.py`):
 - **No genuine matn errors found anywhere** — every difference is the kashida
   graft, an invisible encoding (space / mark-order), or one of the 2 notation spots.
 
+## Final verification
+- **All 114 surahs / 6,236 ayahs: 0 reading-level differences** from quran.com's
+  displayed QPC Hafs (`tool/diff_all.py` → `uthmani_deltas.html`, delta-only).
+  The whole Uthmani text now matches what quran.com renders, aside from the 628
+  necessary madd carriers (correct elongation) and cosmetic spacing/mark-order.
+- IndoPak: rendering verified (0 `.notdef` in Noorehuda); deferred for any further
+  review per owner.
+
 ## Status log
 - **2026-06-25**
   - Corrected the reference: `text_uthmani` → `text_qpc_hafs` (what quran.com shows).
