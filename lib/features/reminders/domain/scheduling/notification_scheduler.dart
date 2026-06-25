@@ -13,11 +13,22 @@ abstract interface class NotificationScheduler {
   /// Whether the app may currently post notifications.
   Future<bool> hasPermission();
 
+  /// Ask the OS to permit EXACT alarms (Android 14+ opens the system setting).
+  /// Self-guarding + best-effort: a no-op where exact alarms are already allowed
+  /// (older Android, iOS). Without this, reminders fall back to inexact timing.
+  Future<void> requestExactAlarmPermission();
+
+  /// Whether the app is exempt from battery optimization (Android). Aggressive
+  /// OEMs freeze non-exempt apps and drop their scheduled alarms. Always true
+  /// where not applicable (iOS / pre-Android-6).
+  Future<bool> isBatteryOptimizationExempt();
+
+  /// Prompt the user to exempt the app from battery optimization (Android shows a
+  /// one-tap system dialog). Self-guarding + best-effort; no-op on iOS.
+  Future<void> requestBatteryOptimizationExemption();
+
   /// Cancel every pending reminder (before rescheduling the rolling window).
   Future<void> cancelAll();
-
-  /// Show a notification immediately — a "what will reminders look like?" test.
-  Future<void> showTest({required String title, required String body});
 
   /// Schedule a one-shot notification at [fireAt] (local wall-clock).
   Future<void> scheduleOneShot({

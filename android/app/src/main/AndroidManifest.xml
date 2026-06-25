@@ -4,11 +4,15 @@
          Re-apply after a `flutter create` regen — see `make location-perms`. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- Sunnah reminders (local notifications). No SCHEDULE_EXACT_ALARM — we
-         use inexact scheduling. Re-apply after a `flutter create` regen — see
-         `make notif-perms`. -->
+    <!-- Sunnah reminders (local notifications) with EXACT-time delivery.
+         SCHEDULE_EXACT_ALARM fires the reminder at the set minute even in Doze
+         (user-granted on Android 14+); REQUEST_IGNORE_BATTERY_OPTIMIZATIONS lets
+         the app prompt to exempt itself so aggressive OEMs don't freeze the alarm.
+         Re-apply after a `flutter create` regen — see `make notif-perms`. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Audio recitation: stream verse audio from the CDN (and cache it). The
          release manifest doesn't get INTERNET for free — see `make audio-perms`. -->
     <uses-permission android:name="android.permission.INTERNET" />

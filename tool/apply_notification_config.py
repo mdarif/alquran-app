@@ -6,9 +6,11 @@ notification permission + the flutter_local_notifications boot/scheduled
 receivers don't survive a regen. Run this (via `make notif-perms`) after any
 `flutter create` to put them back. Idempotent — safe to run repeatedly.
 
-Android: POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED, plus the FLN receivers
-that re-arm pending notifications after a reboot / app update. We use INEXACT
-scheduling, so SCHEDULE_EXACT_ALARM is deliberately NOT added.
+Android: POST_NOTIFICATIONS + RECEIVE_BOOT_COMPLETED + SCHEDULE_EXACT_ALARM +
+REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, plus the FLN receivers that re-arm pending
+notifications after a reboot / app update. Reminders fire at an EXACT minute
+(SCHEDULE_EXACT_ALARM) and the app can prompt the user to exempt itself from
+battery optimization so aggressive OEMs don't freeze the alarm.
 
 iOS: set the UNUserNotificationCenter delegate in AppDelegate.swift so a
 notification fired while the app is FOREGROUNDED is presented (the plugin's
@@ -35,11 +37,15 @@ IOS_DELEGATE = """    // Sunnah reminders: present notifications while the app i
     }
 """
 
-ANDROID_PERMS = """    <!-- Sunnah reminders (local notifications). No SCHEDULE_EXACT_ALARM — we
-         use inexact scheduling. Re-apply after a `flutter create` regen — see
-         `make notif-perms`. -->
+ANDROID_PERMS = """    <!-- Sunnah reminders (local notifications) with EXACT-time delivery.
+         SCHEDULE_EXACT_ALARM fires the reminder at the set minute even in Doze
+         (user-granted on Android 14+); REQUEST_IGNORE_BATTERY_OPTIMIZATIONS lets
+         the app prompt to exempt itself so aggressive OEMs don't freeze the alarm.
+         Re-apply after a `flutter create` regen — see `make notif-perms`. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 """
 
 ANDROID_RECEIVERS = """        <!-- Sunnah reminders (flutter_local_notifications): re-arm pending

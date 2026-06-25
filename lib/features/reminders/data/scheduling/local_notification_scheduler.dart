@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -18,6 +19,10 @@ class LocalNotificationScheduler implements NotificationScheduler {
   static const String _channelName = 'Sunnah Reminders';
   static const String _channelDesc =
       'Gentle reminders for Sunnah acts (Surah Al-Kahf, fasting days, etc.)';
+
+  /// Native bridge for the battery-optimization exemption (see MainActivity.kt).
+  static const MethodChannel _native =
+      MethodChannel('com.almarfa.al_quran/reminders');
 
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {
@@ -95,14 +100,31 @@ class LocalNotificationScheduler implements NotificationScheduler {
   }
 
   @override
-  Future<void> showTest({required String title, required String body}) async {
+  Future<void> requestExactAlarmPermission() async {
     try {
-      await _plugin.show(
-        id: 99,
-        title: title,
-        body: body,
-        notificationDetails: _details(),
-      );
+      final android = _android;
+      if (android == null) return; // iOS / not applicable
+      final allowed = await android.canScheduleExactNotifications() ?? false;
+      if (!allowed) await android.requestExactAlarmsPermission();
+    } catch (_) {}
+  }
+
+  @override
+  Future<bool> isBatteryOptimizationExempt() async {
+    if (_android == null) return true; // iOS / not applicable
+    try {
+      return await _native.invokeMethod<bool>('isIgnoringBatteryOptimizations') ??
+          false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<void> requestBatteryOptimizationExemption() async {
+    if (_android == null) return; // iOS / not applicable
+    try {
+      await _native.invokeMethod<void>('requestIgnoreBatteryOptimizations');
     } catch (_) {}
   }
 
@@ -121,7 +143,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
         body: body,
         scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
         notificationDetails: _details(),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: await _scheduleMode(),
         payload: payload,
       );
     } catch (_) {}
@@ -144,7 +166,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
         body: body,
         scheduledDate: _nextInstanceOf(weekday, hour, minute),
         notificationDetails: _details(),
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: await _scheduleMode(),
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: payload,
       );
@@ -160,6 +182,19 @@ class LocalNotificationScheduler implements NotificationScheduler {
       }
     } catch (_) {}
     return null;
+  }
+
+  /// Exact alarms when the OS permits them (precise minute, survives Doze),
+  /// else inexact — so scheduling NEVER throws when exact isn't granted.
+  Future<AndroidScheduleMode> _scheduleMode() async {
+    try {
+      final exact = await _android?.canScheduleExactNotifications() ?? false;
+      return exact
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle;
+    } catch (_) {
+      return AndroidScheduleMode.inexactAllowWhileIdle;
+    }
   }
 
   NotificationDetails _details() => const NotificationDetails(

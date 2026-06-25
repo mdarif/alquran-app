@@ -56,6 +56,27 @@ class OccurrenceEngine {
     return out;
   }
 
+  /// The NEXT batch to surface: the soonest upcoming occurrence plus any others
+  /// firing the SAME evening (e.g. tonight could be Ashura + Al-Kahf together).
+  /// Empty when nothing is upcoming.
+  List<ReminderOccurrence> nextGroup(
+    DateTime now, {
+    int horizon = horizonDays,
+    List<SunnahEvent>? events,
+  }) {
+    final all = upcoming(now, horizon: horizon, events: events);
+    if (all.isEmpty) return const [];
+    final first = all.first.fireAt;
+    return all
+        .where(
+          (o) =>
+              o.fireAt.year == first.year &&
+              o.fireAt.month == first.month &&
+              o.fireAt.day == first.day,
+        )
+        .toList();
+  }
+
   static DateTime _evening(DateTime day) =>
       DateTime(day.year, day.month, day.day, fireHour, fireMinute);
 }

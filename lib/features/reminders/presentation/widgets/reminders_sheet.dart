@@ -67,21 +67,18 @@ class RemindersSheet extends StatelessWidget {
                   ),
                 ),
                 if (state.enabled && state.permissionGranted) ...[
-                  const SizedBox(height: 6),
-                  OutlinedButton.icon(
-                    key: WidgetKeys.testReminderButton,
-                    onPressed: cubit.sendTestReminder,
-                    icon: const Icon(Icons.notifications_outlined, size: 18),
-                    label: const Text('Send a test reminder'),
-                  ),
+                  if (state.batteryOptimized) ...[
+                    const SizedBox(height: 8),
+                    _ReliabilityHint(onFix: cubit.fixReliability),
+                  ],
                   if (state.upcoming.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     Text(
-                      'Upcoming',
+                      'Up next',
                       style: theme.textTheme.labelMedium
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
-                    for (final o in state.upcoming.take(5)) _Row(occurrence: o),
+                    for (final o in state.upcoming) _Row(occurrence: o),
                   ],
                 ],
               ],
@@ -147,6 +144,49 @@ class _Row extends StatelessWidget {
         routeFromPayload(openAlKahfPayload);
       },
       child: content,
+    );
+  }
+}
+
+/// Shown when the app isn't exempt from battery optimization — the OS may delay
+/// or drop reminders. Tapping re-runs the system exemption prompt.
+class _ReliabilityHint extends StatelessWidget {
+  const _ReliabilityHint({required this.onFix});
+
+  final VoidCallback onFix;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onFix,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Icon(Icons.battery_alert_rounded, size: 18, color: cs.tertiary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Your phone may delay reminders. Tap to allow background '
+                    'activity for reliable delivery.',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+                Icon(Icons.chevron_right, size: 16, color: cs.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

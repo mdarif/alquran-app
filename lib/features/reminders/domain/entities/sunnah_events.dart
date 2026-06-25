@@ -36,14 +36,25 @@ final List<SunnahEvent> sunnahEvents = [
     occursOn: (day, h) => h.day == 13,
     hijriLabel: (h) => '13 ${h.monthName}',
   ),
+  // Ashura is fasted on the 9th AND 10th of Muharram, so it gets TWO nudges — one
+  // the evening before each — instead of a single reminder for both.
   SunnahEvent(
     id: 'ashura',
     idBase: 3000,
-    title: 'Fast Ashura Tomorrow',
-    body: 'Tomorrow is the 9th of Muharram — fast Ashura (the 9th & 10th).',
-    shortLabel: 'Fast Ashura (9th & 10th)',
+    title: 'Ashura Fast Begins Tomorrow',
+    body: 'Tomorrow is the 9th of Muharram — fast the 9th and 10th (Ashura).',
+    shortLabel: 'Fast the 9th of Muharram',
     occursOn: (day, h) => h.month == 1 && h.day == 9,
     hijriLabel: (h) => '9 ${h.monthName}',
+  ),
+  SunnahEvent(
+    id: 'ashura_day',
+    idBase: 6000,
+    title: 'Ashura is Tomorrow',
+    body: 'Tomorrow is the 10th of Muharram (Ashura) — fast it.',
+    shortLabel: 'Fast Ashura (the 10th)',
+    occursOn: (day, h) => h.month == 1 && h.day == 10,
+    hijriLabel: (h) => '10 ${h.monthName}',
   ),
   SunnahEvent(
     id: 'arafah',

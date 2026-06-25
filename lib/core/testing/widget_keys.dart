@@ -37,5 +37,4 @@ class WidgetKeys {
   // Sunnah reminders
   static const remindersButton = Key('reminders-button');
   static const remindersSheet = Key('reminders-sheet');
-  static const testReminderButton = Key('test-reminder-button');
 }

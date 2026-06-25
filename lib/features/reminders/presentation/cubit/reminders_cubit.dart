@@ -37,19 +37,25 @@ class RemindersCubit extends Cubit<RemindersState> {
     final enabled = settings.enabled;
     return RemindersState(
       enabled: enabled,
-      upcoming: enabled ? _nextFew(clock()) : const [],
+      upcoming: enabled ? _nextGroup(clock()) : const [],
     );
   }
 
-  static List<ReminderOccurrence> _nextFew(DateTime now) =>
-      const OccurrenceEngine().upcoming(now).take(5).toList();
+  static List<ReminderOccurrence> _nextGroup(DateTime now) =>
+      const OccurrenceEngine().nextGroup(now);
 
-  /// Turn reminders on: request OS permission, persist, schedule the window.
+  /// Turn reminders on: request OS permission, then nudge toward RELIABLE
+  /// delivery (allow exact alarms + exempt from battery optimization — both
+  /// self-guarding, prompted only when missing), persist, schedule the window.
   Future<void> enable() async {
     final granted = await _scheduler.requestPermission();
     if (!granted) {
       emit(state.copyWith(permissionGranted: false));
       return;
+    }
+    await _scheduler.requestExactAlarmPermission();
+    if (!await _scheduler.isBatteryOptimizationExempt()) {
+      await _scheduler.requestBatteryOptimizationExemption();
     }
     await _settings.setEnabled(true);
     await _rescheduleAll();
@@ -62,20 +68,10 @@ class RemindersCubit extends Cubit<RemindersState> {
     emit(const RemindersState(enabled: false, permissionGranted: true));
   }
 
-  /// Fire a notification right now, so the user can see what a reminder looks
-  /// like (ensures permission first).
-  Future<void> sendTestReminder() async {
-    if (!await _scheduler.hasPermission()) {
-      final granted = await _scheduler.requestPermission();
-      if (!granted) {
-        emit(state.copyWith(permissionGranted: false));
-        return;
-      }
-    }
-    await _scheduler.showTest(
-      title: 'Sunnah Reminder',
-      body: 'This is how your Sunnah reminders will look.',
-    );
+  /// Re-run the battery-optimization prompt (from the sheet's reliability hint).
+  Future<void> fixReliability() async {
+    await _scheduler.requestBatteryOptimizationExemption();
+    await refresh();
   }
 
   /// Recompute + reschedule on app-resume (catches day/month rollover; reflects
@@ -91,7 +87,7 @@ class RemindersCubit extends Cubit<RemindersState> {
         RemindersState(
           enabled: true,
           permissionGranted: false,
-          upcoming: _nextFew(_clock()),
+          upcoming: _nextGroup(_clock()),
         ),
       );
       return;
@@ -131,11 +127,13 @@ class RemindersCubit extends Cubit<RemindersState> {
       );
     }
 
+    final exempt = await _scheduler.isBatteryOptimizationExempt();
     emit(
       RemindersState(
         enabled: true,
         permissionGranted: true,
-        upcoming: all.take(5).toList(),
+        batteryOptimized: !exempt,
+        upcoming: _engine.nextGroup(now),
       ),
     );
   }

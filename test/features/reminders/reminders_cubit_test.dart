@@ -5,9 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _FakeScheduler implements NotificationScheduler {
   bool granted = true;
+  bool batteryExempt = true;
   int cancelAllCalls = 0;
   int weeklyCalls = 0;
-  int testCalls = 0;
+  int exactAlarmCalls = 0;
+  int batteryExemptionCalls = 0;
   final List<int> oneShotIds = [];
 
   @override
@@ -17,10 +19,14 @@ class _FakeScheduler implements NotificationScheduler {
   @override
   Future<bool> hasPermission() async => granted;
   @override
-  Future<void> cancelAll() async => cancelAllCalls++;
+  Future<void> requestExactAlarmPermission() async => exactAlarmCalls++;
   @override
-  Future<void> showTest({required String title, required String body}) async =>
-      testCalls++;
+  Future<bool> isBatteryOptimizationExempt() async => batteryExempt;
+  @override
+  Future<void> requestBatteryOptimizationExemption() async =>
+      batteryExemptionCalls++;
+  @override
+  Future<void> cancelAll() async => cancelAllCalls++;
   @override
   Future<String?> consumeLaunchPayload() async => null;
 
@@ -137,15 +143,37 @@ void main() {
     expect(c.state.upcoming, isNotEmpty);
   });
 
-  test('sendTestReminder shows a notification when permitted', () async {
-    final sch = _FakeScheduler()..granted = true;
-    await build(_FakeSettings(), sch).sendTestReminder();
-    expect(sch.testCalls, 1);
+  test('enable nudges toward reliable delivery (exact alarms + exemption)',
+      () async {
+    final sch = _FakeScheduler()
+      ..granted = true
+      ..batteryExempt = false; // not yet exempt → should be prompted
+    await build(_FakeSettings(), sch).enable();
+    expect(sch.exactAlarmCalls, 1);
+    expect(sch.batteryExemptionCalls, 1);
   });
 
-  test('sendTestReminder is a no-op when permission is denied', () async {
-    final sch = _FakeScheduler()..granted = false;
-    await build(_FakeSettings(), sch).sendTestReminder();
-    expect(sch.testCalls, 0);
+  test('enable skips the exemption prompt when already exempt', () async {
+    final sch = _FakeScheduler()
+      ..granted = true
+      ..batteryExempt = true;
+    await build(_FakeSettings(), sch).enable();
+    expect(sch.exactAlarmCalls, 1);
+    expect(sch.batteryExemptionCalls, 0);
+  });
+
+  test('refresh surfaces the battery-optimization reliability flag', () async {
+    final sch = _FakeScheduler()
+      ..granted = true
+      ..batteryExempt = false;
+    final c = build(_FakeSettings(enabled: true), sch);
+    await c.refresh();
+    expect(c.state.batteryOptimized, isTrue);
+  });
+
+  test('fixReliability re-runs the exemption prompt', () async {
+    final sch = _FakeScheduler()..granted = true;
+    await build(_FakeSettings(enabled: true), sch).fixReliability();
+    expect(sch.batteryExemptionCalls, 1);
   });
 }

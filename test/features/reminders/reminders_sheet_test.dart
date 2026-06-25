@@ -9,7 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _FakeScheduler implements NotificationScheduler {
   bool granted = true;
-  int testCalls = 0;
+  bool batteryExempt = true;
+  int batteryExemptionCalls = 0;
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {}
   @override
@@ -17,10 +18,14 @@ class _FakeScheduler implements NotificationScheduler {
   @override
   Future<bool> hasPermission() async => granted;
   @override
-  Future<void> cancelAll() async {}
+  Future<void> requestExactAlarmPermission() async {}
   @override
-  Future<void> showTest({required String title, required String body}) async =>
-      testCalls++;
+  Future<bool> isBatteryOptimizationExempt() async => batteryExempt;
+  @override
+  Future<void> requestBatteryOptimizationExemption() async =>
+      batteryExemptionCalls++;
+  @override
+  Future<void> cancelAll() async {}
   @override
   Future<String?> consumeLaunchPayload() async => null;
   @override
@@ -67,7 +72,7 @@ Future<void> _pump(WidgetTester tester, RemindersCubit cubit) {
 }
 
 void main() {
-  testWidgets('disabled: toggle off, no test button', (tester) async {
+  testWidgets('disabled: toggle off, no up-next list', (tester) async {
     final cubit = RemindersCubit(
       _FakeSettings(),
       _FakeScheduler(),
@@ -77,11 +82,11 @@ void main() {
     await _pump(tester, cubit);
 
     expect(find.byKey(WidgetKeys.remindersSheet), findsOneWidget);
-    expect(find.byKey(WidgetKeys.testReminderButton), findsNothing);
+    expect(find.text('Up next'), findsNothing);
     expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
   });
 
-  testWidgets('enabled: shows the test button + upcoming list', (tester) async {
+  testWidgets('enabled: shows the up-next list', (tester) async {
     final cubit = RemindersCubit(
       _FakeSettings(enabled: true),
       _FakeScheduler()..granted = true,
@@ -92,14 +97,15 @@ void main() {
     await _pump(tester, cubit);
     await tester.pump();
 
-    expect(find.byKey(WidgetKeys.testReminderButton), findsOneWidget);
-    expect(find.text('Upcoming'), findsOneWidget);
+    expect(find.text('Up next'), findsOneWidget);
     expect(find.textContaining('Al-Kahf'), findsWidgets);
   });
 
-  testWidgets('tapping the test button fires a test notification',
+  testWidgets('battery-optimized: shows the reliability hint, tap re-prompts',
       (tester) async {
-    final sch = _FakeScheduler()..granted = true;
+    final sch = _FakeScheduler()
+      ..granted = true
+      ..batteryExempt = false; // not exempt → hint appears
     final cubit = RemindersCubit(
       _FakeSettings(enabled: true),
       sch,
@@ -110,8 +116,11 @@ void main() {
     await _pump(tester, cubit);
     await tester.pump();
 
-    await tester.tap(find.byKey(WidgetKeys.testReminderButton));
+    final hint = find.textContaining('may delay reminders');
+    expect(hint, findsOneWidget);
+
+    await tester.tap(hint);
     await tester.pump();
-    expect(sch.testCalls, 1);
+    expect(sch.batteryExemptionCalls, 1);
   });
 }
