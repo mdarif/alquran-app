@@ -1,3 +1,4 @@
+import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/core/theme/mushaf_palette.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
@@ -355,6 +356,38 @@ void main() {
       // Both languages are offered as multi-select chips (exact, not body text).
       expect(find.text('اردو'), findsOneWidget);
       expect(find.text('हिन्दी'), findsOneWidget);
+    });
+
+    testWidgets('‹/› step through verses and clamp at the section edges',
+        (tester) async {
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 3)));
+      await tester.pump();
+      await _tapText(tester); // open the peek on a verse
+
+      String ref() => tester
+          .widgetList<Text>(find.textContaining('Al-Fatihah · 1:'))
+          .first
+          .data!;
+      Future<void> step(Key k) async {
+        await tester.tap(find.byKey(k));
+        await tester.pumpAndSettle();
+      }
+
+      // Walk to the first verse; taps past the edge are no-ops (button disabled).
+      for (var i = 0; i < 3; i++) {
+        await step(WidgetKeys.peekPrevButton);
+      }
+      expect(ref(), 'Al-Fatihah · 1:1');
+
+      // Next advances the peeked verse (reference + its translation update).
+      await step(WidgetKeys.peekNextButton);
+      expect(ref(), 'Al-Fatihah · 1:2');
+
+      // Walk to the last verse; further next taps clamp at 1:3.
+      for (var i = 0; i < 3; i++) {
+        await step(WidgetKeys.peekNextButton);
+      }
+      expect(ref(), 'Al-Fatihah · 1:3');
     });
 
     testWidgets('shows multiple translations when multiple are selected',

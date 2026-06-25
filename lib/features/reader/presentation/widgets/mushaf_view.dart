@@ -204,12 +204,37 @@ class _MushafViewState extends State<MushafView>
       _dismissPeek();
       return;
     }
+    _selectVerse(tapped);
+  }
+
+  /// Select [ayah] as the peeked verse (highlight + slide the card up). When
+  /// [scroll] is set (stepping with ‹/›, not a direct tap) it also animates the
+  /// verse into view.
+  void _selectVerse(Ayah ayah, {bool scroll = false}) {
     setState(() {
-      _selectedAyah = tapped;
-      _shownAyah = tapped;
+      _selectedAyah = ayah;
+      _shownAyah = ayah;
     });
     _peekCtrl.forward();
+    if (scroll) _scrollToFocus(ayah.id);
   }
+
+  /// Step the peeked verse by [delta] (+1 next, -1 previous) within the loaded
+  /// section. No-op at the bounds (the ‹/› buttons are disabled there anyway).
+  void _step(int delta) {
+    final cur = _selectedAyah;
+    if (cur == null) return;
+    final i = widget.ayahs.indexWhere((a) => a.id == cur.id);
+    final j = i + delta;
+    if (i < 0 || j < 0 || j >= widget.ayahs.length) return;
+    _selectVerse(widget.ayahs[j], scroll: true);
+  }
+
+  /// Index of the peeked verse in the loaded section, or -1 if none. Drives the
+  /// ‹/› enable state (disabled at the first/last verse).
+  int get _selIdx => _selectedAyah == null
+      ? -1
+      : widget.ayahs.indexWhere((a) => a.id == _selectedAyah!.id);
 
   void _dismissPeek() {
     setState(() => _selectedAyah = null);
@@ -456,6 +481,10 @@ class _MushafViewState extends State<MushafView>
                 onDismiss: _dismissPeek,
                 audioState: widget.audioState,
                 onTogglePlay: widget.onTogglePlay,
+                onPrev: _selIdx > 0 ? () => _step(-1) : null,
+                onNext: _selIdx >= 0 && _selIdx < widget.ayahs.length - 1
+                    ? () => _step(1)
+                    : null,
               ),
             ),
           ),
@@ -911,6 +940,8 @@ class _MushafPeekCard extends StatelessWidget {
     required this.onDismiss,
     this.audioState,
     this.onTogglePlay,
+    this.onPrev,
+    this.onNext,
   });
 
   final Ayah? ayah;
@@ -920,6 +951,11 @@ class _MushafPeekCard extends StatelessWidget {
   final Set<String> selected;
   final ValueChanged<String>? onToggleLanguage;
   final VoidCallback onDismiss;
+
+  /// Step to the previous/next verse in the section. Null ⇒ at the edge (the
+  /// ‹/› control is shown disabled).
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
 
   /// Live recitation state + toggle for the tapped verse. Null when the audio
   /// feature is off → no play control (the card renders exactly as before).
@@ -1006,7 +1042,13 @@ class _MushafPeekCard extends StatelessWidget {
                           _peekPlayButton(context, current.id),
                           const SizedBox(width: 2),
                         ],
-                        Expanded(
+                        _PeekStepButton(
+                          key: WidgetKeys.peekPrevButton,
+                          icon: Icons.chevron_left,
+                          tooltip: 'Previous verse',
+                          onPressed: onPrev,
+                        ),
+                        Flexible(
                           child: Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
@@ -1019,6 +1061,13 @@ class _MushafPeekCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                        _PeekStepButton(
+                          key: WidgetKeys.peekNextButton,
+                          icon: Icons.chevron_right,
+                          tooltip: 'Next verse',
+                          onPressed: onNext,
+                        ),
+                        const SizedBox(width: 4),
                         if (available.length > 1)
                           Wrap(
                             spacing: 6,
@@ -1113,6 +1162,35 @@ class _MushafPeekCard extends StatelessWidget {
 }
 
 /// A small selectable language pill in the peek card's chip row.
+/// A compact ‹/› chevron that steps the peeked verse. Disabled (dimmed) at the
+/// section's first/last verse — [onPressed] is null there.
+class _PeekStepButton extends StatelessWidget {
+  const _PeekStepButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    super.key,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      iconSize: 24,
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
+  }
+}
+
 class _PeekLangChip extends StatelessWidget {
   const _PeekLangChip({
     required this.label,

@@ -22,6 +22,8 @@ class WidgetKeys {
 
   // Reader content
   static const peekCard = Key('reader-peek-card');
+  static const peekPrevButton = Key('reader-peek-prev-button');
+  static const peekNextButton = Key('reader-peek-next-button');
   static const langStripClose = Key('reader-lang-strip-close');
   static Key langChip(String languageCode) => Key('lang-chip-$languageCode');
 
