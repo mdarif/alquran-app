@@ -48,6 +48,32 @@ class _FakeAyahRepository implements AyahRepository {
   }
 }
 
+/// Records every getAyahs call and returns a distinct ayah per section, so a
+/// test can tell an on-demand fetch from a cache hit.
+class _CountingAyahRepository implements AyahRepository {
+  final List<int> fetched = [];
+
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async {
+    fetched.add(target.value);
+    return [
+      Ayah(
+        id: target.value,
+        surahId: target.value,
+        ayahNumber: 1,
+        textArabic: 'x',
+        isSajda: false,
+      ),
+    ];
+  }
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => const {};
+
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async => const [];
+}
+
 const _urdu = TranslationResource(id: 1, languageCode: 'ur', name: 'Junagarhi');
 const _ayah = Ayah(
   id: 1,
@@ -171,6 +197,38 @@ void main() {
       cubit.setViewportDetailed(true);
       expect(lastRead.saved?.ayahId, 262);
       expect(lastRead.saved?.detailed, isTrue);
+      await cubit.close();
+    });
+
+    test('prefetches neighbours so an adjacent load is served from cache',
+        () async {
+      final repo = _CountingAyahRepository();
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+
+      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+      // Let the background neighbour prefetch settle.
+      await Future<void>.delayed(Duration.zero);
+      // Surah 1 fetched on demand; surah 2 warmed in the background (surah 0 is
+      // out of bounds, so only the forward neighbour is fetched).
+      expect(repo.fetched, containsAll(<int>[1, 2]));
+
+      // Swiping to surah 2 is served from the warm cache: no loading flash (it
+      // emits loaded straight away) and no second fetch for surah 2.
+      final statuses = <ReaderStatus>[];
+      final sub = cubit.stream.listen((s) => statuses.add(s.status));
+      await cubit.load(const ReaderTarget.surah(2, 'Al-Baqarah'));
+      await Future<void>.delayed(Duration.zero);
+      await sub.cancel();
+
+      expect(statuses.first, ReaderStatus.loaded); // skipped the loading state
+      expect(
+        repo.fetched.where((v) => v == 2).length,
+        1,
+      ); // fetched once (warm)
+      expect(
+        repo.fetched,
+        contains(3),
+      ); // surah 3 now warmed for the next swipe
       await cubit.close();
     });
 

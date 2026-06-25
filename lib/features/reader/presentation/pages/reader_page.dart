@@ -144,20 +144,19 @@ class _ReaderViewState extends State<_ReaderView> {
   // pill). Session-level and survives section swipes; starts expanded.
   bool _langStripExpanded = true;
 
-  // Pinch + swipe are both handled through a raw Listener (not GestureDetector)
-  // so they do NOT enter the gesture arena. This matters because SelectionArea
-  // and the scroll view claim drags in the arena — a Listener still sees every
-  // pointer event, so pinch-zoom, vertical scroll, text selection, and the
-  // horizontal swipe all coexist.
+  // Section paging is a standard PageView (one page per section in the active
+  // dimension). It gives native finger-tracking, momentum and snap, and keeps
+  // the neighbours mounted — so swiping is smooth and nothing remounts.
+  late final PageController _pageController =
+      PageController(initialPage: widget.initialTarget.value - 1);
+
+  // Pinch-to-zoom rides on a raw Listener wrapping the PageView (it sees every
+  // pointer, even though the PageView claims horizontal drags in the arena).
+  // While two fingers are down the PageView is locked so a pinch never pans it.
   final Map<int, Offset> _pointers = {};
   double? _pinchBaseDistance;
   double _fontAtPinchStart = 28;
-
-  // Single-finger swipe tracking (distance-based; ignored once a 2nd finger
-  // joins, so a pinch is never mistaken for a swipe).
-  Offset? _swipeStart;
-  bool _multiTouch = false;
-  static const double _swipeDistance = 64;
+  bool _pageLocked = false;
 
   @override
   void initState() {
@@ -166,6 +165,12 @@ class _ReaderViewState extends State<_ReaderView> {
     // Tell the cubit which viewport we opened in, so Last Read records it (this
     // runs before the cubit's first progress save, which is async).
     _cubit.setViewportDetailed(_viewport == _Viewport.detailed);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   @override
@@ -211,62 +216,30 @@ class _ReaderViewState extends State<_ReaderView> {
                 if (state.status == ReaderStatus.error) {
                   return Center(child: Text(state.error ?? 'Failed to load'));
                 }
-                // Keep showing the previous section while the next one loads
-                // (no spinner flash on swipe); spinner only before first load.
+                // Spinner only before the very first section loads.
                 if (state.ayahs.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                // Key by the section's first ayah so a new section starts at the
-                // top, while a same-section rebuild preserves scroll position.
-                final sectionKey = ValueKey(state.ayahs.first.id);
-                if (isReading) {
-                  // No SelectionArea in Reading mode — it competes in the gesture
-                  // arena and swallows the taps needed for tap-to-peek translation.
-                  MushafView buildMushaf(AyahAudioState? audio) => MushafView(
-                        key: sectionKey,
-                        ayahs: state.ayahs,
-                        headings: state.headings,
-                        arabicFontSize: _arabicFont,
-                        arabicStyle: _arabicStyle,
-                        resources: state.resources,
-                        focusAyahId: _focusAyahId,
-                        onVisibleAyah: _onVisibleAyah,
-                        selectedLanguages: _activeLangs(state.resources),
-                        onToggleLanguage: (code) =>
-                            _toggleLang(code, state.resources),
-                        onRegisterFlush: (cb) => _flushCurrentPosition = cb,
-                        audioState: audio,
-                        onTogglePlay: audio == null
-                            ? null
-                            : (id) => context.read<AyahAudioCubit>().toggle(id),
-                      );
-                  // Rebuild only when the active verse changes (sticky highlight)
-                  // or its status flips — a handful of events, not per-frame.
-                  if (!FeatureFlags.audioRecitation) return buildMushaf(null);
-                  return BlocBuilder<AyahAudioCubit, AyahAudioState>(
-                    builder: (context, audio) => buildMushaf(audio),
-                  );
-                }
-                // Detailed view owns its own SelectionArea (around the verses)
-                // so the language chip strip above it stays tappable.
-                return _DetailedList(
-                  key: sectionKey,
-                  ayahs: state.ayahs,
-                  resources: state.resources,
-                  enabledLanguages: _activeLangs(state.resources),
-                  onToggleLanguage: (code) =>
-                      _toggleLang(code, state.resources),
-                  stripExpanded: _langStripExpanded,
-                  onToggleStrip: () => setState(
-                    () => _langStripExpanded = !_langStripExpanded,
-                  ),
-                  headings: state.headings,
-                  arabicFontSize: _arabicFont,
-                  arabicStyle: _arabicStyle,
-                  focusAyahId: _focusAyahId,
-                  onVisibleAyah: _onVisibleAyah,
-                  onRegisterFlush: (cb) => _flushCurrentPosition = cb,
-                );
+                // One page per section in the active dimension. In Reading mode
+                // the audio highlight rides on its own BlocBuilder so an audio
+                // tick repaints the active page without extra plumbing.
+                Widget pages(AyahAudioState? audio) => PageView.builder(
+                      controller: _pageController,
+                      physics: _pageLocked
+                          ? const NeverScrollableScrollPhysics()
+                          : null,
+                      // Keep the neighbours built so the first swipe is smooth.
+                      allowImplicitScrolling: true,
+                      itemCount: _target.dimension.count,
+                      onPageChanged: _onPageChanged,
+                      itemBuilder: (context, i) =>
+                          _sectionPage(i, state, audio),
+                    );
+                return isReading && FeatureFlags.audioRecitation
+                    ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
+                        builder: (context, audio) => pages(audio),
+                      )
+                    : pages(null);
               },
             ),
           ),
@@ -298,20 +271,121 @@ class _ReaderViewState extends State<_ReaderView> {
     );
   }
 
-  void _goToAdjacent(int delta) {
-    final cubit = _cubit;
-    final next = adjacentTarget(_target, delta, cubit.state.headings);
-    if (next == null) return; // at the first/last section — no wrap-around
-    // Swiping to another section: stop any verse playing here — it's no longer
-    // on screen, so leaving it sounding would be confusing.
+  /// Builds the section for the current viewport. [interactive] true is the live
+  /// page (wired to last-read, language toggles, audio); false is a peeking
+  /// neighbour — wired to last-read / language toggles / audio only when it is
+  /// the active page, so the off-screen pages stay inert and uniform (same
+  /// widget type ⇒ the element is reused, not remounted, when a page activates).
+  Widget _buildSection({
+    required List<Ayah> ayahs,
+    required Map<int, SurahHeading> headings,
+    required List<TranslationResource> resources,
+    required bool interactive,
+    AyahAudioState? audio,
+  }) {
+    // Key by the section's first ayah so a new section starts at the top, while
+    // a same-section rebuild preserves scroll position.
+    final key = ValueKey(ayahs.first.id);
+    final Widget view;
+    if (_viewport == _Viewport.reading) {
+      // No SelectionArea in Reading mode — it competes in the gesture arena and
+      // swallows the taps needed for tap-to-peek translation.
+      view = MushafView(
+        key: key,
+        ayahs: ayahs,
+        headings: headings,
+        arabicFontSize: _arabicFont,
+        arabicStyle: _arabicStyle,
+        resources: resources,
+        focusAyahId: interactive ? _focusAyahId : null,
+        onVisibleAyah: interactive ? _onVisibleAyah : null,
+        selectedLanguages: _activeLangs(resources),
+        onToggleLanguage:
+            interactive ? (code) => _toggleLang(code, resources) : null,
+        onRegisterFlush:
+            interactive ? (cb) => _flushCurrentPosition = cb : null,
+        audioState: audio,
+        onTogglePlay: interactive && audio != null
+            ? (id) => context.read<AyahAudioCubit>().toggle(id)
+            : null,
+      );
+    } else {
+      // Detailed view owns its own SelectionArea (around the verses) so the
+      // language chip strip above it stays tappable.
+      view = _DetailedList(
+        key: key,
+        ayahs: ayahs,
+        resources: resources,
+        enabledLanguages: _activeLangs(resources),
+        onToggleLanguage:
+            interactive ? (code) => _toggleLang(code, resources) : (_) {},
+        stripExpanded: _langStripExpanded,
+        onToggleStrip: interactive
+            ? () => setState(() => _langStripExpanded = !_langStripExpanded)
+            : () {},
+        headings: headings,
+        arabicFontSize: _arabicFont,
+        arabicStyle: _arabicStyle,
+        focusAyahId: interactive ? _focusAyahId : null,
+        onVisibleAyah: interactive ? _onVisibleAyah : null,
+        onRegisterFlush:
+            interactive ? (cb) => _flushCurrentPosition = cb : null,
+      );
+    }
+    return view;
+  }
+
+  /// Builds the PageView page for section index [i] (0-based; value = i + 1) in
+  /// the active dimension. Off-screen pages read their verses from the warm
+  /// cache (the active section + its neighbours are always cached); the rare
+  /// uncached page shows a spinner and warms itself for next time.
+  Widget _sectionPage(int i, ReaderState state, AyahAudioState? audio) {
+    final target = _targetForIndex(i);
+    final ayahs = _cubit.cachedAyahs(target);
+    if (ayahs == null || ayahs.isEmpty) {
+      _cubit.warm(target);
+      return const Center(child: CircularProgressIndicator());
+    }
+    final active = i == _target.value - 1;
+    return _buildSection(
+      ayahs: ayahs,
+      headings: state.headings,
+      resources: state.resources,
+      interactive: active,
+      audio: active ? audio : null,
+    );
+  }
+
+  /// The [ReaderTarget] for page index [i] in the open dimension.
+  ReaderTarget _targetForIndex(int i) {
+    final value = i + 1;
+    final headings = _cubit.state.headings;
+    return switch (_target.dimension) {
+      ReaderDimension.surah => ReaderTarget.surah(
+          value,
+          headings[value]?.nameEnglish ?? 'Surah $value',
+        ),
+      ReaderDimension.juz => ReaderTarget.juz(value),
+      ReaderDimension.hizb => ReaderTarget.hizb(value),
+      ReaderDimension.page => ReaderTarget.page(value),
+      ReaderDimension.ruku => ReaderTarget.ruku(value),
+    };
+  }
+
+  /// The PageView settled on a new section: retitle the bar, stop any audio from
+  /// the section we left, and load the new one (records Last Read + warms its
+  /// neighbours). A warm cache hit is synchronous, so there's no flash.
+  void _onPageChanged(int i) {
+    final next = _targetForIndex(i);
+    if (next == _target) return;
     if (FeatureFlags.audioRecitation) {
       context.read<AyahAudioCubit>().stopAll();
     }
     setState(() {
       _target = next;
-      _focusAyahId = null; // a swiped section opens at its top, not a resume
+      _focusAyahId = null; // a swiped-to section opens at its top, not a resume
     });
-    cubit.load(next);
+    _cubit.load(next);
   }
 
   /// The viewport reports its topmost-visible verse (on scroll-idle); record it
@@ -327,19 +401,17 @@ class _ReaderViewState extends State<_ReaderView> {
     _cubit.saveProgress(ayah);
   }
 
-  // --- Pinch-to-zoom (two-finger) + swipe (one-finger) ----------------------
+  // --- Pinch-to-zoom (two-finger) -------------------------------------------
+  // The PageView handles horizontal paging; this raw Listener handles only the
+  // two-finger pinch, and locks the PageView while two fingers are down so a
+  // pinch never doubles as a page swipe.
 
   void _onPointerDown(PointerDownEvent event) {
     _pointers[event.pointer] = event.position;
-    if (_pointers.length == 1) {
-      _swipeStart = event.position;
-      _multiTouch = false;
-    }
     if (_pointers.length == 2) {
-      // A pinch — disqualify this gesture from also being treated as a swipe.
-      _multiTouch = true;
       _pinchBaseDistance = _pointerDistance();
       _fontAtPinchStart = _arabicFont;
+      if (!_pageLocked) setState(() => _pageLocked = true);
     }
   }
 
@@ -353,29 +425,15 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _onPointerEnd(PointerEvent event) {
-    final endPosition = _pointers[event.pointer] ?? event.position;
+    final wasPinching = _pointers.length == 2;
     _pointers.remove(event.pointer);
     if (_pointers.length < 2) _pinchBaseDistance = null;
-    if (_pointers.isEmpty) {
-      final start = _swipeStart;
-      if (_multiTouch) {
-        // End of a pinch — persist the final zoom level.
-        unawaited(_settings.setFontSize(_arabicFont));
-      } else if (start != null) {
-        _maybeSwipe(start, endPosition);
-      }
-      _swipeStart = null;
-      _multiTouch = false;
+    if (wasPinching) {
+      // A finger lifted out of a pinch — persist the final zoom level.
+      unawaited(_settings.setFontSize(_arabicFont));
     }
-  }
-
-  /// A deliberate, mostly-horizontal one-finger drag moves to an adjacent
-  /// section: left → next, right → previous (no wrap at the bounds).
-  void _maybeSwipe(Offset start, Offset end) {
-    final dx = end.dx - start.dx;
-    final dy = end.dy - start.dy;
-    if (dx.abs() >= _swipeDistance && dx.abs() > dy.abs()) {
-      _goToAdjacent(dx < 0 ? 1 : -1);
+    if (_pointers.isEmpty && _pageLocked) {
+      setState(() => _pageLocked = false);
     }
   }
 
@@ -448,13 +506,14 @@ class _ReaderViewState extends State<_ReaderView> {
     unawaited(_settings.setFontSize(_arabicFont));
   }
 
-  // Switch the Arabic script: persist it, then reload the section so the repo
-  // re-reads the matching column. The current verse (_focusAyahId, tracked by
-  // _onVisibleAyah) is preserved when the section reopens.
+  // Switch the Arabic script: persist it, drop the cached sections (they hold
+  // the old column's text), then reload so the repo re-reads the matching
+  // column. The current verse (_focusAyahId) is preserved when it reopens.
   void _applyScript(ArabicScript value) {
     if (value == _script) return;
     setState(() => _script = value);
     unawaited(_settings.setScript(value));
+    _cubit.clearCache();
     _cubit.load(_target);
   }
 

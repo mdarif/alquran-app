@@ -246,6 +246,30 @@ void main() {
 
       expect(find.text('Chapter 2'), findsOneWidget);
     });
+
+    testWidgets('a drag past the half-way point advances (no fling needed)',
+        (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      expect(find.text('Chapter 2'), findsOneWidget);
+
+      // Past half the page width, with no fling, the PageView snaps forward.
+      await tester.drag(find.byType(MushafView), const Offset(-500, 0));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chapter 3'), findsWidgets);
+      expect(find.text('Chapter 2'), findsNothing);
+    });
+
+    testWidgets('swipe left on the last surah is a no-op (no wrap)',
+        (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(114, 'An-Nas'));
+      expect(find.text('Chapter 114'), findsOneWidget);
+
+      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chapter 114'), findsOneWidget); // unchanged
+    });
   });
 
   group('Reader default viewport', () {
