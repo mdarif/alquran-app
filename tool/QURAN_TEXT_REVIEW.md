@@ -116,5 +116,16 @@ Swept all 114 vs quran.com `text_indopak` (`tool/sweep_indopak.py`):
     Temp test DBs removed.
   - **Net result:** our Uthmani text now matches quran.com's clean QPC text
     everywhere EXCEPT the 628 elongated-madd carriers Flutter needs (a natural
-    elongation, not the objectionable stretch). The 2 notation spots (2:72,
-    11:41) remain as-is (match the KFGQPC source). IndoPak unchanged (was clean).
+    elongation, not the objectionable stretch). IndoPak unchanged (was clean).
+  - **2:72 / 11:41 reading-form aligned to quran.com** (owner wanted 2:72's hamza
+    to render like the site). Targeted per-ayah override (golden text, only the
+    one differing char changed): 2:72 combining hamza ٔ → standalone ءۡ
+    (`فَٱدَّٰرَٰءۡتُمۡ`); 11:41 dot-below ٜ → empty-circle ۪ (`مَجۡر۪ىٰهَا`).
+    Mechanism: `sources/qpc_hafs_overrides.json` + `reading_overrides` in
+    sources.yaml, applied pre-graft in build_db.py. Now **0 reading-level diffs
+    vs quran.com** in the whole Qur'an. Built `assets/quran-fixed.db`, staged at
+    `assets/db/quran-fixed.db`.
+  - **✅ SHIPPED (owner confirmed 2:72 on device).** Override wired into
+    `sources.yaml`; rebuilt canonical `quran.db` (2 overrides + 628 madd carriers,
+    1163 tatweels), copied to `assets/db/quran.db`, `make seed-version`, temp DBs
+    removed. **Whole-Qur'an result: 0 reading-level differences from quran.com.**
