@@ -102,5 +102,22 @@ void main() {
           LastReadRepositoryImpl(await SharedPreferences.getInstance());
       expect(await repo.load(), isNull);
     });
+
+    test('an out-of-range dimension index loads as null, not a crash',
+        () async {
+      // Corrupt or future-version prefs must degrade gracefully — without the
+      // bounds guard, ReaderDimension.values[99] would throw a RangeError.
+      SharedPreferences.setMockInitialValues(const {
+        'last_read_dimension': 99,
+        'last_read_value': 2,
+        'last_read_title': 'X',
+        'last_read_ayah_id': 1,
+        'last_read_surah_id': 1,
+        'last_read_ayah_number': 1,
+      });
+      final repo =
+          LastReadRepositoryImpl(await SharedPreferences.getInstance());
+      expect(await repo.load(), isNull);
+    });
   });
 }
