@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('AppBar back button uses the app icon family (not the platform '
+  testWidgets(
+      'AppBar back button uses the app icon family (not the platform '
       'default)', (tester) async {
     final nav = GlobalKey<NavigatorState>();
     await tester.pumpWidget(

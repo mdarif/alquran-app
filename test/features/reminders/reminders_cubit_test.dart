@@ -194,8 +194,8 @@ void main() {
 
   test('scheduleDeliveryTest queues a one-shot and reports success', () async {
     final sch = _FakeScheduler()..granted = true;
-    final report = await build(_FakeSettings(enabled: true), sch)
-        .scheduleDeliveryTest();
+    final report =
+        await build(_FakeSettings(enabled: true), sch).scheduleDeliveryTest();
     expect(sch.oneShotIds, contains(99));
     expect(report, contains('Scheduled'));
   });
