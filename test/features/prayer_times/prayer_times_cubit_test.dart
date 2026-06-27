@@ -144,4 +144,45 @@ void main() {
     expect(cubit.state.status, LocationStatus.deniedForever);
     expect(nudged, 0);
   });
+
+  // The Hijri (Islamic) day begins at sunset, so the date shown must roll to the
+  // next day once Maghrib passes — and stay rolled through the night. Fake
+  // Maghrib is 18:45.
+  group('hijriBaseDate rolls the Islamic date at Maghrib', () {
+    test('before Maghrib → the civil day', () {
+      final cubit =
+          PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(17));
+      addTearDown(cubit.close);
+      expect(cubit.hijriBaseDate, DateTime(2026, 6, 23));
+    });
+
+    test('after Maghrib → rolls to the next day', () {
+      final cubit =
+          PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(19));
+      addTearDown(cubit.close);
+      expect(cubit.hijriBaseDate, DateTime(2026, 6, 24));
+    });
+
+    test('after midnight, before that day Maghrib → still the rolled day', () {
+      // at(25) = 24 Jun 01:00 — past midnight but before 24 Jun Maghrib, so the
+      // rolled-forward date from the evening before must hold (no flip-back).
+      final cubit =
+          PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(25));
+      addTearDown(cubit.close);
+      expect(cubit.hijriBaseDate, DateTime(2026, 6, 24));
+    });
+
+    test('no location → the civil day, no rollover', () {
+      final cubit = PrayerTimesCubit(_FakeRepo(), clock: () => at(19));
+      addTearDown(cubit.close);
+      expect(cubit.hijriBaseDate, DateTime(2026, 6, 23));
+    });
+
+    test('gregorianDate is the civil day (time stripped)', () {
+      final cubit =
+          PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(19));
+      addTearDown(cubit.close);
+      expect(cubit.gregorianDate, DateTime(2026, 6, 23));
+    });
+  });
 }
