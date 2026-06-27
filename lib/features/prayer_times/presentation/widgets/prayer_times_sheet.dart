@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/hijri/hijri_date.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../../reminders/presentation/sunnah_occasion.dart';
 import '../../domain/entities/daily_prayer_times.dart';
@@ -162,7 +163,7 @@ class _PrayerRow extends StatelessWidget {
               ),
               const SizedBox(width: 11),
               if (muted) ...[
-                Icon(Icons.wb_twilight_rounded, size: 15, color: fg),
+                AppIcon(AppIcons.sunrise, size: AppIconSize.inline, color: fg),
                 const SizedBox(width: 8),
               ],
               Text(
@@ -207,7 +208,7 @@ class _ForbiddenNote extends StatelessWidget {
       padding: const EdgeInsets.only(top: 2, left: 14),
       child: Row(
         children: [
-          Icon(Icons.do_not_disturb_on_outlined, size: 11, color: gold),
+          AppIcon(AppIcons.forbidden, size: AppIconSize.dense, color: gold),
           const SizedBox(width: 5),
           Text(
             'No prayer · ${formatPrayerTime(window.start)}'

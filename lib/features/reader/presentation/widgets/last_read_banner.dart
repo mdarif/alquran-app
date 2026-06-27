@@ -3,6 +3,7 @@ import 'package:get_it/get_it.dart';
 
 import '../../../../core/navigation/route_observer.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../domain/entities/last_read.dart';
 import '../../domain/repositories/ayah_repository.dart';
 import '../../domain/repositories/last_read_repository.dart';
@@ -91,7 +92,12 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                Icon(Icons.bookmark_rounded, size: 18, color: onColor),
+                AppIcon(
+                  AppIcons.bookmark,
+                  filled: true,
+                  size: AppIconSize.label,
+                  color: onColor,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'Last Read',
@@ -114,7 +120,11 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
                     ),
                   ),
                 ),
-                Icon(Icons.chevron_right, size: 18, color: onColor),
+                AppIcon(
+                  AppIcons.chevronRight,
+                  size: AppIconSize.label,
+                  color: onColor,
+                ),
               ],
             ),
           ),

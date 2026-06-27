@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_icons.dart';
+
 /// A subtle "back to top" affordance for the reader. It fades and slides in
 /// once the user has scrolled down a long surah, and smoothly returns them to
 /// the top on tap. Visibility and action are owned by the host viewport (which
@@ -37,8 +39,8 @@ class ScrollToTopButton extends StatelessWidget {
               onTap: onPressed,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Icon(
-                  Icons.keyboard_arrow_up_rounded,
+                child: AppIcon(
+                  AppIcons.scrollTop,
                   color: cs.onSecondaryContainer,
                   semanticLabel: 'Scroll to top',
                 ),

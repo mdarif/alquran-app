@@ -7,6 +7,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/arabic_script.dart';
@@ -187,8 +188,8 @@ class _ReaderViewState extends State<_ReaderView> {
           IconButton(
             key: WidgetKeys.viewportToggle,
             tooltip: isReading ? 'Detailed view' : 'Reading view',
-            icon: Icon(
-              isReading ? Icons.subject_rounded : Icons.menu_book_rounded,
+            icon: AppIcon(
+              isReading ? AppIcons.viewDetailed : AppIcons.viewReading,
             ),
             onPressed: () => _setDetailed(isReading),
           ),
@@ -198,7 +199,7 @@ class _ReaderViewState extends State<_ReaderView> {
           IconButton(
             key: WidgetKeys.fontSizeButton,
             tooltip: 'Text size',
-            icon: const Icon(Icons.format_size_rounded),
+            icon: const AppIcon(AppIcons.textSize),
             onPressed: _toggleFontSlider,
           ),
           if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
@@ -1004,7 +1005,7 @@ class _DetailedLangStrip extends StatelessWidget {
         IconButton(
           tooltip: 'Hide languages',
           visualDensity: VisualDensity.compact,
-          icon: const Icon(Icons.close_rounded, size: 20),
+          icon: const AppIcon(AppIcons.close, size: AppIconSize.action),
           color: theme.colorScheme.onSurfaceVariant,
           onPressed: onToggleExpanded,
         ),
@@ -1033,7 +1034,11 @@ class _DetailedLangStrip extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.translate_rounded, size: 15, color: cs.primary),
+                AppIcon(
+                  AppIcons.translate,
+                  size: AppIconSize.inline,
+                  color: cs.primary,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   summary.isEmpty ? 'Translation' : summary,
@@ -1044,9 +1049,9 @@ class _DetailedLangStrip extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 2),
-                Icon(
-                  Icons.expand_more_rounded,
-                  size: 16,
+                AppIcon(
+                  AppIcons.expand,
+                  size: AppIconSize.inline,
                   color: cs.onSurfaceVariant,
                 ),
               ],
@@ -1085,9 +1090,9 @@ class _LangChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                selected ? Icons.check_rounded : Icons.add_rounded,
-                size: 15,
+              AppIcon(
+                selected ? AppIcons.chipSelected : AppIcons.chipAdd,
+                size: AppIconSize.inline,
                 color: fg,
               ),
               const SizedBox(width: 5),

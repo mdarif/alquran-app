@@ -1,3 +1,4 @@
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/core/theme/mushaf_palette.dart';
 import 'package:al_quran/core/theme/theme_cubit.dart';
 import 'package:al_quran/core/theme/theme_toggle_button.dart';
@@ -31,13 +32,13 @@ void main() {
 
   testWidgets('icon reflects the current light — sun by day', (tester) async {
     await _pump(tester, await _fixed(DayPhase.duha));
-    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.phaseDuha), findsOneWidget);
   });
 
   testWidgets('icon reflects the current light — moon at night',
       (tester) async {
     await _pump(tester, await _fixed(DayPhase.isha));
-    expect(find.byIcon(Icons.dark_mode_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.phaseIsha), findsOneWidget);
   });
 
   testWidgets('opens the light sheet with Light of Day + every phase',

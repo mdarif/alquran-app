@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/entities/forbidden_window.dart';
 import '../../domain/location/location_provider.dart';
@@ -40,7 +41,7 @@ class NextPrayerPill extends StatelessWidget {
           return IconButton(
             key: WidgetKeys.nextPrayerPill,
             tooltip: 'Prayer times — set location',
-            icon: const Icon(Icons.location_searching_rounded),
+            icon: const AppIcon(AppIcons.locationSearch),
             onPressed: () => _enable(context, bloc),
           );
         }
@@ -167,9 +168,9 @@ class _ForbiddenPill extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.do_not_disturb_on_outlined,
-                      size: 15,
+                    AppIcon(
+                      AppIcons.forbidden,
+                      size: AppIconSize.inline,
                       color: gold,
                     ),
                     const SizedBox(width: 6),

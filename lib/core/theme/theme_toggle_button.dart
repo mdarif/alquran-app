@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import 'app_icons.dart';
 import 'mushaf_palette.dart';
 import 'theme_cubit.dart';
 
 IconData _phaseIcon(DayPhase phase) => switch (phase) {
-      DayPhase.fajr => Icons.wb_twilight_outlined,
-      DayPhase.duha => Icons.light_mode_outlined,
-      DayPhase.asr => Icons.wb_sunny_outlined,
-      DayPhase.maghrib => Icons.wb_twilight,
-      DayPhase.isha => Icons.dark_mode_outlined,
+      DayPhase.fajr => AppIcons.phaseFajr,
+      DayPhase.duha => AppIcons.phaseDuha,
+      DayPhase.asr => AppIcons.phaseAsr,
+      DayPhase.maghrib => AppIcons.phaseMaghrib,
+      DayPhase.isha => AppIcons.phaseIsha,
     };
+
+/// Dusk (Maghrib) is the only phase rendered filled — the golden going-down
+/// light, distinct from the rising-dawn twilight it shares a glyph with.
+bool _phaseFilled(DayPhase phase) => phase == DayPhase.maghrib;
 
 /// App-bar entry to the **Light of Day** picker. The icon reflects the current
 /// light (dawn → sun → dusk → moon); tapping opens the reading-light sheet.
@@ -32,7 +37,10 @@ class ThemeToggleButton extends StatelessWidget {
     }
     return IconButton(
       tooltip: 'Reading light',
-      icon: Icon(_phaseIcon(cubit?.activePhase ?? DayPhase.duha)),
+      icon: AppIcon(
+        _phaseIcon(cubit?.activePhase ?? DayPhase.duha),
+        filled: _phaseFilled(cubit?.activePhase ?? DayPhase.duha),
+      ),
       onPressed: cubit == null ? null : () => _openSheet(context, cubit!),
     );
   }
@@ -138,8 +146,9 @@ class _AutoCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              Icon(
+              AppIcon(
                 _phaseIcon(currentPhase),
+                filled: _phaseFilled(currentPhase),
                 color: active ? cs.onPrimaryContainer : cs.onSurfaceVariant,
               ),
               const SizedBox(width: 12),
@@ -167,7 +176,8 @@ class _AutoCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (active) Icon(Icons.check_circle, color: cs.primary),
+              if (active)
+                AppIcon(AppIcons.autoSelected, filled: true, color: cs.primary),
             ],
           ),
         ),

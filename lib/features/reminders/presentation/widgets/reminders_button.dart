@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../cubit/reminders_cubit.dart';
 import '../cubit/reminders_state.dart';
 import 'reminders_sheet.dart';
@@ -29,11 +30,7 @@ class RemindersButton extends StatelessWidget {
         return IconButton(
           key: WidgetKeys.remindersButton,
           tooltip: 'Sunnah reminders',
-          icon: Icon(
-            state.enabled
-                ? Icons.notifications_active_rounded
-                : Icons.notifications_none_rounded,
-          ),
+          icon: AppIcon(AppIcons.reminders, filled: state.enabled),
           onPressed: () => _open(context, bloc),
         );
       },

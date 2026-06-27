@@ -557,6 +557,40 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   constant so it's swappable), and a muted "<revelation> · <n> verses" meta line.
   All the data (`name_arabic`, `revelation_place`, `total_ayahs`) was already in
   the `surahs` table — widen the `SurahHeading` entity, no schema/DB change.
+- **One icon family, one catalog — the "pro" iconography fix.** The grab-bag of
+  stock `Icons.*` variants (mixed `_rounded` / `_outlined` / filled / bare, sizes
+  11–30) is what reads as unpolished. Standardised on **Material Symbols Rounded**
+  (`material_symbols_icons`) behind a single `core/theme/app_icons.dart`:
+  `AppIcons` (semantic name → glyph), `AppIconSize` (a fixed 14/16/18/22/24/30
+  scale), and an `AppIcon` wrapper that bakes in one weight/grade and exposes
+  `filled`. Every call site goes through `AppIcon` — no raw `Icons.`/`Symbols.`
+  in feature code, so the look stays consistent and is changeable in one file.
+- **Material Symbols gotchas (package `material_symbols_icons` 4.x):**
+  `Symbols.name` (no suffix) is the *Outlined* face; the **Rounded** one is
+  `Symbols.name_rounded` — reference only `_rounded` so release builds tree-shake
+  the Outlined/Sharp fonts away entirely (the app stays light). Fill is the
+  variable-font **FILL axis**, applied at the *widget* (`Icon(fill: 1)`), NOT a
+  different IconData — so `find.byIcon(glyph)` matches regardless of fill, and the
+  `active=filled / inactive=outlined` convention (reminders bell, Last-Read
+  bookmark, status chips, Maghrib's golden dusk) is one glyph + a flag, not two
+  icon names. `Icon` also takes `weight`/`grade`/`opticalSize` (Flutter ≥3.16);
+  set `opticalSize ≈ size` (clamped to the 20–48 axis) for crisp small icons.
+- **Tests that assert on icons must move with the catalog.** `find.byIcon(...)`
+  pins the exact `IconData`, so swapping families breaks any test that named the
+  old glyph (we had 5: theme-toggle, ayah-tile, ayah-tile-audio, home-page,
+  next-prayer-pill). Point them at the `AppIcons.*` constant — one source of truth
+  for both app and tests.
+- **OPEN (paused 2026-06-27) — iOS renders some Material Symbols wrong, Android
+  fine.** On the iOS sim (Impeller OFF / Skia) the Light-of-Day phase icon and the
+  salat-row weather glyph look old/wrong while Android shows the new ones. Ruled
+  out: `flutter clean`, fresh pods, removed Xcode `DerivedData/Runner-*`,
+  delete-app + rerun; and debug `flutter run` doesn't tree-shake icons, so that's
+  not it either. Next to try: confirm it isn't just a *clock/phase* difference
+  (force the same phase on both via the reading-light sheet); check the
+  MaterialIcons↔MaterialSymbols **codepoint collision** for weather glyphs
+  (`wb_twilight`=0xe1c6, `light_mode`, `dark_mode`, `wb_sunny`); build a one-shot
+  on-device icon grid (§6 method) and test a **release** build. Full details in
+  Claude memory `ios-material-symbols-render-issue`.
 
 ---
 

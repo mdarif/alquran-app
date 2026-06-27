@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
@@ -1044,7 +1045,7 @@ class _MushafPeekCard extends StatelessWidget {
                         ],
                         _PeekStepButton(
                           key: WidgetKeys.peekPrevButton,
-                          icon: Icons.chevron_left,
+                          icon: AppIcons.chevronLeft,
                           tooltip: 'Previous verse',
                           onPressed: onPrev,
                         ),
@@ -1063,7 +1064,7 @@ class _MushafPeekCard extends StatelessWidget {
                         ),
                         _PeekStepButton(
                           key: WidgetKeys.peekNextButton,
-                          icon: Icons.chevron_right,
+                          icon: AppIcons.chevronRight,
                           tooltip: 'Next verse',
                           onPressed: onNext,
                         ),
@@ -1144,12 +1145,25 @@ class _MushafPeekCard extends StatelessWidget {
         child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
       );
     } else if (audio != null && audio.isPlaying(ayahId)) {
-      icon =
-          Icon(Icons.pause_circle_filled_rounded, color: cs.primary, size: 30);
+      icon = AppIcon(
+        AppIcons.pauseCircle,
+        filled: true,
+        color: cs.primary,
+        size: AppIconSize.prominent,
+      );
     } else if (audio != null && audio.hasError(ayahId)) {
-      icon = Icon(Icons.error_outline_rounded, color: cs.error, size: 28);
+      icon = AppIcon(
+        AppIcons.audioError,
+        color: cs.error,
+        size: AppIconSize.prominent,
+      );
     } else {
-      icon = Icon(Icons.play_circle_fill_rounded, color: cs.primary, size: 30);
+      icon = AppIcon(
+        AppIcons.playCircle,
+        filled: true,
+        color: cs.primary,
+        size: AppIconSize.prominent,
+      );
     }
     return IconButton(
       key: WidgetKeys.peekPlayButton,
@@ -1180,7 +1194,7 @@ class _PeekStepButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: onPressed,
-      icon: Icon(icon),
+      icon: AppIcon(icon),
       iconSize: 24,
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,

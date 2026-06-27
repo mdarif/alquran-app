@@ -1,3 +1,4 @@
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/presentation/widgets/ayah_tile.dart';
@@ -96,7 +97,7 @@ void main() {
           const AyahTile(ayah: base, resources: [], arabicFontSize: 24),
         ),
       );
-      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.byIcon(AppIcons.sajda), findsNothing);
 
       await tester.pumpWidget(
         _wrap(
@@ -113,7 +114,7 @@ void main() {
           ),
         ),
       );
-      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(find.byIcon(AppIcons.sajda), findsOneWidget);
     });
 
     testWidgets('omits a translation row when the ayah lacks that resource',
@@ -201,7 +202,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.more_horiz));
+      await tester.tap(find.byIcon(AppIcons.more));
       await tester.pumpAndSettle();
       expect(find.text('Copy'), findsOneWidget);
       expect(find.text('Share'), findsOneWidget);
@@ -244,7 +245,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.more_horiz));
+      await tester.tap(find.byIcon(AppIcons.more));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Copy'));
       await tester.pumpAndSettle();
@@ -281,7 +282,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.more_horiz));
+      await tester.tap(find.byIcon(AppIcons.more));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Share'));
       await tester.pumpAndSettle();

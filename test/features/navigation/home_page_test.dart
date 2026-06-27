@@ -1,3 +1,4 @@
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/core/theme/theme_cubit.dart';
 import 'package:al_quran/core/theme/theme_toggle_button.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_entry.dart';
@@ -99,7 +100,7 @@ void main() {
 
     testWidgets('the Jump-to sheet offers Page/Juz/Hizb/Ruku', (tester) async {
       await _pumpHome(tester);
-      await tester.tap(find.byIcon(Icons.format_list_numbered_rounded));
+      await tester.tap(find.byIcon(AppIcons.jumpMenu));
       await tester.pumpAndSettle();
 
       expect(find.text('Page'), findsOneWidget);
@@ -110,7 +111,7 @@ void main() {
 
     testWidgets('tapping a Jump option opens that index page', (tester) async {
       await _pumpHome(tester);
-      await tester.tap(find.byIcon(Icons.format_list_numbered_rounded));
+      await tester.tap(find.byIcon(AppIcons.jumpMenu));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Juz'));
       await tester.pumpAndSettle();
@@ -122,7 +123,7 @@ void main() {
     testWidgets('hides the Jump button when advanced nav is off',
         (tester) async {
       await _pumpHome(tester, advancedNavigation: false);
-      expect(find.byIcon(Icons.format_list_numbered_rounded), findsNothing);
+      expect(find.byIcon(AppIcons.jumpMenu), findsNothing);
       expect(find.byType(SurahListView), findsOneWidget);
     });
 

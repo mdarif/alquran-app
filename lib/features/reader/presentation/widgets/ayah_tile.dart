@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/ayah_share.dart';
 import '../../domain/entities/ayah.dart';
@@ -87,9 +88,10 @@ class AyahTile extends StatelessWidget {
               ),
               if (ayah.isSajda) ...[
                 const SizedBox(width: 8),
-                Icon(
-                  Icons.star,
-                  size: 16,
+                AppIcon(
+                  AppIcons.sajda,
+                  filled: true,
+                  size: AppIconSize.inline,
                   color: theme.colorScheme.tertiary,
                   // The star is the only signal that this is a prostration
                   // verse — give screen readers the meaning, not just a shape.
@@ -100,9 +102,9 @@ class AyahTile extends StatelessWidget {
               if (onTogglePlay != null) _playButton(theme),
               PopupMenuButton<_AyahAction>(
                 tooltip: 'Copy or share',
-                icon: Icon(
-                  Icons.more_horiz,
-                  size: 20,
+                icon: AppIcon(
+                  AppIcons.more,
+                  size: AppIconSize.action,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
                 onSelected: (action) => _onAction(context, action),
@@ -110,7 +112,7 @@ class AyahTile extends StatelessWidget {
                   PopupMenuItem(
                     value: _AyahAction.copy,
                     child: ListTile(
-                      leading: Icon(Icons.copy_rounded),
+                      leading: AppIcon(AppIcons.copy),
                       title: Text('Copy'),
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -118,7 +120,7 @@ class AyahTile extends StatelessWidget {
                   PopupMenuItem(
                     value: _AyahAction.share,
                     child: ListTile(
-                      leading: Icon(Icons.share_rounded),
+                      leading: AppIcon(AppIcons.share),
                       title: Text('Share'),
                       contentPadding: EdgeInsets.zero,
                     ),
@@ -165,14 +167,25 @@ class AyahTile extends StatelessWidget {
       );
       tooltip = 'Loading…';
     } else if (audio != null && audio.isPlaying(ayah.id)) {
-      icon = Icon(Icons.pause_rounded, size: 22, color: cs.primary);
+      icon = AppIcon(
+        AppIcons.pause,
+        size: AppIconSize.action,
+        color: cs.primary,
+      );
       tooltip = 'Pause';
     } else if (audio != null && audio.hasError(ayah.id)) {
-      icon = Icon(Icons.error_outline_rounded, size: 22, color: cs.error);
+      icon = AppIcon(
+        AppIcons.audioError,
+        size: AppIconSize.action,
+        color: cs.error,
+      );
       tooltip = 'Couldn\'t play — tap to retry';
     } else {
-      icon =
-          Icon(Icons.play_arrow_rounded, size: 22, color: cs.onSurfaceVariant);
+      icon = AppIcon(
+        AppIcons.play,
+        size: AppIconSize.action,
+        color: cs.onSurfaceVariant,
+      );
     }
     return IconButton(
       key: WidgetKeys.ayahPlayButton(ayah.id),

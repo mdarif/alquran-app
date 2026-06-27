@@ -1,5 +1,6 @@
 import 'package:al_quran/core/audio/ayah_recitation_player.dart';
 import 'package:al_quran/core/testing/widget_keys.dart';
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import 'package:al_quran/features/reader/presentation/widgets/ayah_tile.dart';
@@ -45,7 +46,7 @@ void main() {
     );
     final btn = find.byKey(WidgetKeys.ayahPlayButton(8));
     expect(btn, findsOneWidget);
-    expect(_iconIn(btn, Icons.play_arrow_rounded), findsOneWidget);
+    expect(_iconIn(btn, AppIcons.play), findsOneWidget);
 
     await tester.tap(btn);
     expect(taps, 1);
@@ -68,8 +69,8 @@ void main() {
       ),
     );
     final btn = find.byKey(WidgetKeys.ayahPlayButton(8));
-    expect(_iconIn(btn, Icons.pause_rounded), findsOneWidget);
-    expect(_iconIn(btn, Icons.play_arrow_rounded), findsNothing);
+    expect(_iconIn(btn, AppIcons.pause), findsOneWidget);
+    expect(_iconIn(btn, AppIcons.play), findsNothing);
   });
 
   testWidgets('a DIFFERENT verse playing leaves this tile showing play',
@@ -89,7 +90,7 @@ void main() {
       ),
     );
     final btn = find.byKey(WidgetKeys.ayahPlayButton(8));
-    expect(_iconIn(btn, Icons.play_arrow_rounded), findsOneWidget);
+    expect(_iconIn(btn, AppIcons.play), findsOneWidget);
   });
 
   testWidgets('an errored verse shows the retry/error glyph', (tester) async {
@@ -105,6 +106,6 @@ void main() {
       ),
     );
     final btn = find.byKey(WidgetKeys.ayahPlayButton(8));
-    expect(_iconIn(btn, Icons.error_outline_rounded), findsOneWidget);
+    expect(_iconIn(btn, AppIcons.audioError), findsOneWidget);
   });
 }

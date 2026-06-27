@@ -1,4 +1,5 @@
 import 'package:al_quran/core/testing/widget_keys.dart';
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
@@ -104,7 +105,7 @@ void main() {
   testWidgets('no location → a discreet enable affordance', (tester) async {
     await _pump(tester, _cubit(saved: null));
     expect(find.byKey(WidgetKeys.nextPrayerPill), findsOneWidget);
-    expect(find.byIcon(Icons.location_searching_rounded), findsOneWidget);
+    expect(find.byIcon(AppIcons.locationSearch), findsOneWidget);
   });
 
   testWidgets('renders nothing when no cubit is provided (defensive)',

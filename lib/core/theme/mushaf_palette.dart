@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'app_icons.dart';
+
 /// The five reading "lights" of the day — the heart of **Light of Day**, where
 /// the app's surface breathes with the rhythm of the day (and, later, the user's
 /// prayer times). Each phase is a complete, hand-tuned palette, not a brightness
@@ -94,6 +96,13 @@ class MushafPalette {
     final theme = ThemeData(useMaterial3: true, colorScheme: scheme);
     return theme.copyWith(
       scaffoldBackgroundColor: background,
+      // Route the auto-generated AppBar leading/close buttons through the app's
+      // icon family so they match the rest (the default is a platform glyph that
+      // never goes through AppIcon).
+      actionIconTheme: ActionIconThemeData(
+        backButtonIconBuilder: (_) => const AppIcon(AppIcons.back),
+        closeButtonIconBuilder: (_) => const AppIcon(AppIcons.close),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: background,
         surfaceTintColor: Colors.transparent,

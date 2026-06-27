@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
@@ -62,7 +63,7 @@ class HomePage extends StatelessWidget {
             IconButton(
               key: WidgetKeys.jumpButton,
               tooltip: 'Jump to (Page · Juz · Hizb · Ruku)',
-              icon: const Icon(Icons.format_list_numbered_rounded),
+              icon: const AppIcon(AppIcons.jumpMenu),
               onPressed: () => _openJumpSheet(context),
             ),
           if (sunnahReminders) const RemindersButton(),
@@ -101,25 +102,25 @@ class HomePage extends StatelessWidget {
               parentContext: context,
               kind: IndexKind.page,
               label: 'Page',
-              icon: Icons.auto_stories_outlined,
+              icon: AppIcons.page,
             ),
             _JumpTile(
               parentContext: context,
               kind: IndexKind.juz,
               label: 'Juz',
-              icon: Icons.view_agenda_outlined,
+              icon: AppIcons.juz,
             ),
             _JumpTile(
               parentContext: context,
               kind: IndexKind.hizb,
               label: 'Hizb',
-              icon: Icons.grid_view_outlined,
+              icon: AppIcons.hizb,
             ),
             _JumpTile(
               parentContext: context,
               kind: IndexKind.ruku,
               label: 'Ruku',
-              icon: Icons.segment_outlined,
+              icon: AppIcons.ruku,
             ),
           ],
         ),
@@ -145,7 +146,7 @@ class _JumpTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon),
+      leading: AppIcon(icon),
       title: Text(label),
       onTap: () {
         Navigator.of(context).pop(); // close the sheet

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../app_navigator.dart';
 import '../../../../core/hijri/hijri_date.dart';
 import '../../../../core/testing/widget_keys.dart';
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/entities/reminder_occurrence.dart';
 import '../../domain/scheduling/reminder_payload.dart';
@@ -84,7 +85,8 @@ class RemindersSheet extends StatelessWidget {
                     const SizedBox(height: 8),
                     _ReliabilityHint(onFix: cubit.fixReliability),
                   ],
-                  if (kDebugMode) _DebugDeliveryPanel(state: state, cubit: cubit),
+                  if (kDebugMode)
+                    _DebugDeliveryPanel(state: state, cubit: cubit),
                   if (state.upcoming.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     Text(
@@ -125,7 +127,7 @@ class _Row extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (isKahf)
-            Icon(Icons.menu_book_rounded, size: 18, color: cs.primary)
+            AppIcon(AppIcons.alKahf, size: AppIconSize.label, color: cs.primary)
           else
             Container(
               width: 8,
@@ -158,7 +160,11 @@ class _Row extends StatelessWidget {
           ),
           if (isKahf) ...[
             const SizedBox(width: 6),
-            Icon(Icons.chevron_right, size: 16, color: cs.onSurfaceVariant),
+            AppIcon(
+              AppIcons.chevronRight,
+              size: AppIconSize.inline,
+              color: cs.onSurfaceVariant,
+            ),
           ],
         ],
       ),
@@ -199,7 +205,11 @@ class _ReliabilityHint extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                Icon(Icons.battery_alert_rounded, size: 18, color: cs.tertiary),
+                AppIcon(
+                  AppIcons.batteryAlert,
+                  size: AppIconSize.label,
+                  color: cs.tertiary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -209,7 +219,11 @@ class _ReliabilityHint extends StatelessWidget {
                         ?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ),
-                Icon(Icons.chevron_right, size: 16, color: cs.onSurfaceVariant),
+                AppIcon(
+                  AppIcons.chevronRight,
+                  size: AppIconSize.inline,
+                  color: cs.onSurfaceVariant,
+                ),
               ],
             ),
           ),
@@ -279,7 +293,8 @@ class _DebugDeliveryPanelState extends State<_DebugDeliveryPanel> {
                 debugPrint('[reminders] delivery test: $report');
                 if (mounted) setState(() => _report = report);
               },
-              icon: const Icon(Icons.schedule_send_outlined, size: 18),
+              icon:
+                  const AppIcon(AppIcons.scheduleTest, size: AppIconSize.label),
               label: const Text('Schedule test in 2 min'),
             ),
           ),
@@ -306,9 +321,10 @@ class _DebugDeliveryPanelState extends State<_DebugDeliveryPanel> {
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Row(
             children: [
-              Icon(
-                ok ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                size: 16,
+              AppIcon(
+                ok ? AppIcons.statusPass : AppIcons.statusFail,
+                filled: true,
+                size: AppIconSize.inline,
                 color: ok ? Colors.green : cs.error,
               ),
               const SizedBox(width: 8),
