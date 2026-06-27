@@ -12,7 +12,6 @@ import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
-import '../../domain/reader_navigation.dart';
 import '../cubit/ayah_audio_cubit.dart';
 import 'scroll_to_top_button.dart';
 
@@ -121,6 +120,45 @@ class _MushafViewState extends State<MushafView>
   GlobalKey _groupKeyFor(int surahId) =>
       _groupKeys.putIfAbsent(surahId, GlobalKey.new);
 
+  // Derived from widget.ayahs and memoised — recomputed only when the ayah list
+  // changes, so build() and the scroll listener don't re-group or re-scan O(n)
+  // (and re-allocate) on every frame.
+  late List<List<Ayah>> _groups;
+  late List<int> _cumLen; // running total of textArabic length, per ayah index
+  late int _totalLen;
+
+  void _recomputeDerived() {
+    _groups = groupAyahsBySurah(widget.ayahs);
+    _cumLen = List<int>.filled(widget.ayahs.length, 0);
+    var acc = 0;
+    for (var i = 0; i < widget.ayahs.length; i++) {
+      acc += widget.ayahs[i].textArabic.length;
+      _cumLen[i] = acc;
+    }
+    _totalLen = acc;
+  }
+
+  /// The printed-Mushaf page at a vertical scroll [fraction] — O(log n) over the
+  /// memoised cumulative lengths, vs the old per-call O(n) + list allocation that
+  /// ran on every scroll frame. Same result: the page of the first ayah whose
+  /// cumulative length reaches the target offset.
+  int? _pageAt(double fraction) {
+    if (widget.ayahs.isEmpty) return null;
+    if (_totalLen == 0) return widget.ayahs.first.page;
+    final target = fraction.clamp(0.0, 1.0) * _totalLen;
+    var lo = 0;
+    var hi = _cumLen.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
+      if (_cumLen[mid] >= target) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    return widget.ayahs[lo].page;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -140,6 +178,7 @@ class _MushafViewState extends State<MushafView>
         setState(() => _shownAyah = null);
       }
     });
+    _recomputeDerived();
     _buildOffsets();
     _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
     _controller.addListener(_onScroll);
@@ -155,6 +194,7 @@ class _MushafViewState extends State<MushafView>
     super.didUpdateWidget(old);
     if (widget.ayahs != old.ayahs) {
       _groupKeys.clear();
+      _recomputeDerived();
       _buildOffsets();
     } else if (widget.arabicFontSize != old.arabicFontSize) {
       // A font-size change reflows the text but the ScrollController keeps the
@@ -248,7 +288,7 @@ class _MushafViewState extends State<MushafView>
   /// digits, a trailing space). Must be called whenever [widget.ayahs] changes.
   void _buildOffsets() {
     _verseStart.clear();
-    for (final group in groupAyahsBySurah(widget.ayahs)) {
+    for (final group in _groups) {
       int offset = 0;
       for (final ayah in group) {
         _verseStart[ayah.id] = offset;
@@ -262,7 +302,7 @@ class _MushafViewState extends State<MushafView>
     if (!_controller.hasClients) return;
     final max = _controller.position.maxScrollExtent;
     final fraction = max <= 0 ? 0.0 : _controller.offset / max;
-    final page = pageAtFraction(widget.ayahs, fraction);
+    final page = _pageAt(fraction);
     if (page != null && page != _currentPage) {
       setState(() => _currentPage = page);
     }
@@ -339,7 +379,7 @@ class _MushafViewState extends State<MushafView>
     final viewportTop = viewport.localToGlobal(Offset.zero).dy;
     Ayah? current;
     outer:
-    for (final group in groupAyahsBySurah(widget.ayahs)) {
+    for (final group in _groups) {
       final key = _groupKeys[group.first.surahId];
       if (key?.currentContext == null) continue;
       final obj = key!.currentContext!.findRenderObject();
@@ -411,7 +451,7 @@ class _MushafViewState extends State<MushafView>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final group in groupAyahsBySurah(widget.ayahs)) ...[
+                  for (final group in _groups) ...[
                     SurahHeaderCard(
                       heading: widget.headings[group.first.surahId],
                       fallbackNumber: group.first.surahId,
