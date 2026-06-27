@@ -232,6 +232,28 @@ void main() {
       await cubit.close();
     });
 
+    test('clearCache drops cached sections so a reload re-fetches', () async {
+      final repo = _CountingAyahRepository();
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+
+      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+      // Settle the neighbour prefetch.
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.fetched.where((v) => v == 1).length, 1);
+
+      // A script switch clears the cache so neighbours/sections re-read the new
+      // text column instead of serving the stale render.
+      cubit.clearCache();
+      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+      expect(
+        repo.fetched.where((v) => v == 1).length,
+        2,
+        reason:
+            'surah 1 should be re-fetched after clearCache, not served stale',
+      );
+      await cubit.close();
+    });
+
     test('load() emits loading then error when the repository throws',
         () async {
       final cubit = ReaderCubit(

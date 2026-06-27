@@ -22,6 +22,20 @@ List<Ayah> _ayahs(int surahId, int count) => [
         ),
     ];
 
+// Same verse ids as [_ayahs] but much longer Arabic text — simulates reloading
+// a section in a different script (e.g. IndoPak), where the verses are identical
+// but the glyph runs are longer.
+List<Ayah> _ayahsLongText(int surahId, int count) => [
+      for (var n = 1; n <= count; n++)
+        Ayah(
+          id: surahId * 1000 + n,
+          surahId: surahId,
+          ayahNumber: n,
+          textArabic: 'نص طويل جدا للآية رقم $n مع كلمات إضافية كثيرة هنا',
+          isSajda: false,
+        ),
+    ];
+
 List<Ayah> _ayahsWithTranslations(int surahId, int count) => [
       for (var n = 1; n <= count; n++)
         Ayah(
@@ -563,6 +577,59 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
 
       expect(reported.last, greaterThanOrEqualTo(before));
+    });
+
+    testWidgets('reloading the section in another script keeps the verse',
+        (tester) async {
+      // A script switch (Uthmani <-> IndoPak) reloads the SAME verses with
+      // different-length text. Without a re-anchor, the same pixel offset lands
+      // on an earlier verse and Last Read drifts back.
+      final reported = <int>[];
+      var ayahs = _ayahs(2, 60);
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: ayahs,
+                headings: _headings(2, 'Al-Baqarah', 286),
+                arabicFontSize: 24,
+                resources: const [],
+                onVisibleAyah: (a) => reported.add(a.ayahNumber),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -1500),
+      );
+      await tester.pump(const Duration(seconds: 2));
+      expect(reported, isNotEmpty);
+      final before = reported.last;
+      expect(before, greaterThan(1));
+
+      // Switch script: same verse ids, longer text — a same-section reload.
+      setOuter(() => ayahs = _ayahsLongText(2, 60));
+      await tester.pump(); // didUpdateWidget + relayout
+      await tester.pump(); // post-frame re-anchor
+
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -40),
+      );
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(
+        reported.last,
+        greaterThanOrEqualTo(before),
+        reason: 'script reload drifted from $before to ${reported.last}',
+      );
     });
 
     // Regression: deep in a long surah, BOTH enlarging and shrinking the font

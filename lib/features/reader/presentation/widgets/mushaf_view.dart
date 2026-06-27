@@ -192,22 +192,28 @@ class _MushafViewState extends State<MushafView>
   @override
   void didUpdateWidget(MushafView old) {
     super.didUpdateWidget(old);
-    if (widget.ayahs != old.ayahs) {
+    final ayahsChanged = widget.ayahs != old.ayahs;
+    final fontChanged = widget.arabicFontSize != old.arabicFontSize;
+    if (!ayahsChanged && !fontChanged) return;
+
+    // Both reflow the text while the ScrollController keeps the same pixel
+    // offset, so the reading position would drift to an earlier verse (and
+    // corrupt "Last Read"): a font-size change reflows it, and an ayah-list
+    // change is a *same-section reload* — only a script switch (Uthmani ⇄
+    // IndoPak) reloads identical verses in a longer/shorter face, since section
+    // navigation changes the widget key and rebuilds from scratch. Capture the
+    // verse at the top NOW (the render objects still hold the old layout), then
+    // re-anchor to it once the new layout is in.
+    final anchor = _topmostAyah();
+    if (ayahsChanged) {
       _groupKeys.clear();
       _recomputeDerived();
       _buildOffsets();
-    } else if (widget.arabicFontSize != old.arabicFontSize) {
-      // A font-size change reflows the text but the ScrollController keeps the
-      // same pixel offset, so the reading position would drift to an earlier
-      // verse (and corrupt "Last Read"). Capture the verse at the top NOW (the
-      // render objects still hold the pre-change layout) and re-anchor to it
-      // once the new layout is in.
-      final anchor = _topmostAyah();
-      if (anchor != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _anchorTo(anchor);
-        });
-      }
+    }
+    if (anchor != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _anchorTo(anchor);
+      });
     }
   }
 

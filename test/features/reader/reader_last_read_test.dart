@@ -11,6 +11,7 @@ import 'package:al_quran/features/reader/domain/repositories/reader_settings_rep
 import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
 import 'package:al_quran/features/reader/presentation/pages/reader_page.dart';
+import 'package:al_quran/features/reader/presentation/widgets/mushaf_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
@@ -184,5 +185,51 @@ void main() {
     expect(find.text('Al-Baqarah'), findsOneWidget);
     expect(find.text('Surah 1'), findsNothing);
     expect(find.text('Surah 3'), findsNothing);
+  });
+
+  testWidgets('viewport toggle after a zoom keeps your place', (tester) async {
+    await openAt(tester, detailed: false, ayahNumber: 25);
+    expect(find.byType(MushafView), findsOneWidget); // Reading
+    final before = lastRead.saved?.ayahNumber ?? 0;
+    expect(before, greaterThan(8));
+
+    // Zoom in, then switch Reading -> Detailed: _setDetailed flushes the live
+    // verse so the incoming viewport homes to it (a zoom must not corrupt that).
+    await _pinchOut(tester);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('Detailed view'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(MushafView), findsNothing); // now Detailed
+    expect(lastRead.saved?.detailed, isTrue);
+    // Your place is kept: Detailed homes to the same verse (a few earlier at the
+    // very top is just its focus-alignment showing some context above it) — it
+    // must not reset to the top, nor jump forward past where you were.
+    final after = lastRead.saved?.ayahNumber ?? 0;
+    expect(
+      after,
+      greaterThan(10),
+      reason: 'toggle reset to the top (was $before, now $after)',
+    );
+    expect(
+      after,
+      lessThanOrEqualTo(before + 2),
+      reason: 'toggle jumped forward (was $before, now $after)',
+    );
+  });
+
+  testWidgets('swiping to the next surah records Last Read for that surah',
+      (tester) async {
+    await openAt(tester, detailed: false, ayahNumber: 1);
+    expect(lastRead.saved?.surahId, 2); // started on surah 2
+
+    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1200);
+    await tester.pumpAndSettle();
+
+    // Last Read now points at the new section, opened at its first verse.
+    expect(lastRead.saved?.surahId, 3);
+    expect(lastRead.saved?.ayahNumber, 1);
+    expect(lastRead.saved?.target.value, 3);
   });
 }
