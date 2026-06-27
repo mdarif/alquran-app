@@ -614,6 +614,46 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   derived purely from `widget.ayahs` (the surah groups, cumulative text lengths)
   and recompute only when the list changes; the page readout then becomes an
   O(log n) binary search with no per-frame garbage.
+- **Measure on a physical device in profile, and beware the screen dozing.**
+  `flutter test --profile` doesn't exist; profile mode won't run on an iOS
+  *simulator* at all. Use `flutter drive --driver=test_driver/integration_test.dart
+  --target=test_perf/reader_perf_test.dart --profile -d <device>` (`make perf
+  DEVICE=<id>`). Collect frames with `SchedulerBinding.addTimingsCallback`
+  (raw `FrameTiming`, no VM service) — **not** `binding.watchPerformance`, whose
+  VM-service timeline can't connect under `flutter drive --profile` (SocketException).
+  Two days lost to a red herring: the run kept dying at `+0` with "Service has
+  disappeared" — it was the **device screen sleeping during the ~40s Gradle build**
+  (`adb logcat` showed `surface=NULL` / window `GONE` at launch), not a crash. Keep
+  it awake: `adb shell svc power stayon true` + periodic `input keyevent
+  KEYCODE_WAKEUP`; a secured keyguard can't be bypassed (`wm dismiss-keyguard`
+  only opens a non-secure lock). The benchmark lives in `test_perf/`, **not**
+  `integration_test/`: `patrol test` regenerates `test_bundle.dart` from every
+  `*_test.dart` there, and a plain `IntegrationTestWidgetsFlutterBinding` test
+  would clash with `PatrolBinding`. Target the **PageView** for gestures, not
+  `MushafView` — the PageView keeps neighbour sections built, so `find.byType
+  (MushafView)` is ambiguous.
+- **The reader's cost is all UI-thread *build*, never raster.** On a OnePlus
+  (120 Hz → 8.3 ms budget) over Al-Baqarah (286 verses), GPU raster stayed ~2–3 ms
+  everywhere; every spike was the build thread reshaping/​re-measuring the one
+  continuous-Mushaf paragraph. Three measured hot spots and what helped:
+  (1) **scroll** — the `_MarkedParagraph` re-measured all 286 verse-number
+  medallions (`getBoxesForSelection ×286`) after *every* build, incl. each
+  page-pill scroll tick. Gate it: cache the paragraph's `size` and skip the box
+  scan when it hasn't changed (boxes only move on a reflow, which changes the
+  size — covers rotation; reset the cache on a group change). Build p50 7.6→4.2 ms,
+  frames over-8 ms 38%→20%.
+  (2) **pinch** — `_setFont` took a *continuous* fractional size on every move, so
+  one pinch fired dozens of full 286-verse reshapes (build frames to ~390 ms).
+  Snap to whole points (`roundToDouble()`; the size slider was already 2 pt) — one
+  reshape per 1 pt crossing. Helps real, gradual pinches a lot; a synthetic
+  fast-zoom benchmark still reshapes each step.
+  (3) **swipe** — p50 0.4 ms when the neighbour is pre-built; a *cold* section
+  costs one ~148 ms first build. Inherent to constructing a surah.
+  Residual pinch/swipe cost is **architectural**: continuous flow = one *non-lazy*
+  paragraph, so every reshape lays out all 286 verses. The only true cure is not
+  reshaping during the gesture (`Transform.scale` the laid-out text, reshape on
+  release) — deferred, because text doesn't scale linearly with font size, so line
+  breaks "snap" on commit.
 
 ---
 

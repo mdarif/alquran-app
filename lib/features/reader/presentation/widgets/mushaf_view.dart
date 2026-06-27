@@ -596,6 +596,12 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
   // Measured medallion boxes (paragraph-local), one per ayah; empty until laid out.
   List<Rect> _rects = const [];
 
+  // Paragraph size at the last box measure. The medallion boxes only move when
+  // the paragraph reflows (which changes its size), so this lets _measure skip
+  // the O(n) box scan on plain rebuilds (e.g. every scroll frame). Reset on a
+  // group change so a same-size different-surah paragraph still re-measures.
+  Size? _lastMeasuredSize;
+
   @override
   void initState() {
     super.initState();
@@ -612,6 +618,8 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     _markerOffsets
       ..clear()
       ..addAll(_offsetsFor(widget.group));
+    // Force a re-measure: a new group may lay out to the same height as the old.
+    _lastMeasuredSize = null;
   }
 
   static List<int> _offsetsFor(List<Ayah> group) {
@@ -630,6 +638,14 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     if (!mounted) return;
     final obj = widget.paragraphKey.currentContext?.findRenderObject();
     if (obj is! RenderParagraph || !obj.attached) return;
+    // The medallion boxes only move when the paragraph REFLOWS — a font-size,
+    // width (rotation) or text change, each of which changes its size. On a plain
+    // rebuild (the scroll page-pill tick, a highlight toggle) the layout is
+    // identical, so skip the O(n) getBoxesForSelection scan that otherwise ran on
+    // every scroll frame of a 286-verse surah. (_rects empty ⇒ first measure, or
+    // boxes not ready yet — keep trying.)
+    if (obj.size == _lastMeasuredSize && _rects.isNotEmpty) return;
+    _lastMeasuredSize = obj.size;
     final rects = <Rect>[
       for (final off in _markerOffsets)
         () {

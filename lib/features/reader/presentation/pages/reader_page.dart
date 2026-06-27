@@ -519,7 +519,13 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _setFont(double value) {
-    final clamped = value.clamp(_minFont, _maxFont);
+    // Snap to whole points. Pinch-zoom feeds a *continuous* value on every
+    // pointer-move; without snapping, each fractional change reshaped the entire
+    // (up to 286-verse) Mushaf paragraph, so one pinch fired dozens of full
+    // re-layouts — measured at build frames up to ~390ms on a long surah. Rounding
+    // collapses those to a single reshape per 1pt crossing: imperceptible (the
+    // size slider already steps in 2pt) but it removes the pinch stutter.
+    final clamped = value.clamp(_minFont, _maxFont).roundToDouble();
     if (clamped != _arabicFont) setState(() => _arabicFont = clamped);
   }
 }
