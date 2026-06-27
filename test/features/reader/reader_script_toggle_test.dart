@@ -16,23 +16,31 @@ import 'package:al_quran/features/reader/domain/repositories/last_read_repositor
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
 import 'package:al_quran/features/reader/presentation/pages/reader_page.dart';
+import 'package:al_quran/features/reader/presentation/widgets/ayah_tile.dart';
 import 'package:al_quran/features/reader/presentation/widgets/mushaf_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
 class _Repo implements AyahRepository {
+  _Repo(this.settings);
+
+  // The real repository reads the chosen script to pick the text column, so the
+  // returned verse text differs per script — used to prove the view actually
+  // re-renders the new script's text (not just swaps the font).
+  final _Settings settings;
   int getAyahsCalls = 0;
   @override
   Future<List<Ayah>> getAyahs(ReaderTarget target) async {
     getAyahsCalls++;
     final s = target.value;
+    final txt = settings.script == ArabicScript.indopak ? 'IND' : 'UTH';
     return [
       Ayah(
         id: s * 100 + 1,
         surahId: s,
         ayahNumber: 1,
-        textArabic: 'نص',
+        textArabic: txt,
         isSajda: false,
       ),
     ];
@@ -105,8 +113,8 @@ void main() {
   late _Settings settings;
 
   setUp(() {
-    repo = _Repo();
     settings = _Settings();
+    repo = _Repo(settings);
     GetIt.I
       ..registerFactory<ReaderCubit>(() => ReaderCubit(repo, _LastRead()))
       ..registerLazySingleton<ReaderSettingsRepository>(() => settings)
@@ -130,6 +138,11 @@ void main() {
   // the MushafView's threaded style (unambiguous; the rendering uses it).
   String? readerFont(WidgetTester tester) =>
       tester.widget<MushafView>(find.byType(MushafView)).arabicStyle.fontFamily;
+
+  // The Arabic text the Detailed view is actually rendering — read off the first
+  // AyahTile's ayah, proving the verses re-render (not just the font swaps).
+  String detailedText(WidgetTester tester) =>
+      tester.widget<AyahTile>(find.byType(AyahTile).first).ayah.textArabic;
 
   const skip = !FeatureFlags.indopakScript; // feature shipped dark
 
@@ -231,6 +244,7 @@ void main() {
         // Switch to Detailed view.
         await tester.tap(find.byKey(WidgetKeys.viewportToggle));
         await tester.pumpAndSettle();
+        expect(detailedText(tester), 'UTH'); // Uthmani text initially
 
         await openPanel(tester);
         expect(find.byKey(WidgetKeys.scriptToggle), findsOneWidget);
@@ -238,6 +252,13 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(settings.script, ArabicScript.indopak);
+        // The verses themselves must re-render in the new script — not keep the
+        // stale text from before the reload.
+        expect(
+          detailedText(tester),
+          'IND',
+          reason: 'Detailed view kept stale text after the script switch',
+        );
       },
       skip: skip,
     );

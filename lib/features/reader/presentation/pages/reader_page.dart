@@ -589,7 +589,8 @@ class _DetailedListState extends State<_DetailedList> {
   final ItemScrollController _scrollController = ItemScrollController();
   final ItemPositionsListener _positions = ItemPositionsListener.create();
 
-  late final List<Object> _rows;
+  final List<Object> _rows =
+      []; // rebuilt on a same-section reload (script switch)
   final Map<int, int> _ayahRowIndex = {}; // ayah id -> row index
 
   Timer? _reportTimer;
@@ -612,6 +613,17 @@ class _DetailedListState extends State<_DetailedList> {
   }
 
   @override
+  void didUpdateWidget(_DetailedList old) {
+    super.didUpdateWidget(old);
+    // A same-section reload (a script switch reloads the SAME verses in a new
+    // face — same widget key, so didUpdateWidget fires rather than a fresh
+    // initState) must rebuild the flattened rows, or the tiles keep rendering
+    // the old script's text. The index map stays parallel, so the
+    // ScrollablePositionedList holds position across the reload.
+    if (widget.ayahs != old.ayahs) _buildRows();
+  }
+
+  @override
   void dispose() {
     widget.onRegisterFlush?.call(null);
     // Flush the resume point before tearing down: a pending debounce timer is
@@ -629,7 +641,8 @@ class _DetailedListState extends State<_DetailedList> {
     // Flatten into header/ayah rows so the list stays lazy. A header marks each
     // surah boundary, and notes whether the Basmala should precede it (shown for
     // every surah except Al-Fatihah — where it is ayah 1 — and At-Tawbah).
-    _rows = <Object>[];
+    _rows.clear();
+    _ayahRowIndex.clear();
     int? lastSurah;
     for (final ayah in widget.ayahs) {
       if (ayah.surahId != lastSurah) {
