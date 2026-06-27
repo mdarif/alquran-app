@@ -601,7 +601,12 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   always safe — `didUpdateWidget` fires only on a *reuse* (same widget key =
   `ValueKey(first ayah id)` = same section); real section nav changes the key →
   fresh `initState`. So "ayahs changed in `didUpdateWidget`" ⟹ same section
-  reloaded ⟹ re-anchoring is always correct.
+  reloaded ⟹ re-anchoring is always correct. The SAME class also bit the Detailed
+  view: `_DetailedList` built its flattened header/ayah rows only in `initState`
+  and had no `didUpdateWidget` at all, so a script switch left the rows — and the
+  rendered text — stale (old script's text in the new face). Lesson: **every
+  reader widget that derives state from `widget.ayahs` must handle a same-section
+  reload**, not just first build + section navigation.
 - **No O(n) + fresh allocation in a scroll listener or per build.** The Mushaf
   flow re-ran `groupAyahsBySurah` O(n) on every build and `pageAtFraction`
   allocated an n-length list + scanned it on *every scroll frame* (286-ayah
