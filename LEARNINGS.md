@@ -591,6 +591,24 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   (`wb_twilight`=0xe1c6, `light_mode`, `dark_mode`, `wb_sunny`); build a one-shot
   on-device icon grid (§6 method) and test a **release** build. Full details in
   Claude memory `ios-material-symbols-render-issue`.
+- **Reading position must survive any *same-section reload*, not just a font
+  change.** MushafView keeps your verse on a font change by capturing the topmost
+  ayah pre-relayout and re-anchoring after (`didUpdateWidget`). The trap: a
+  **script switch** (Uthmani⇄IndoPak) reloads the *same* verses in a
+  longer/shorter face — a new `ayahs` list, same ids — and that branch only
+  rebuilt, never re-anchored, so the reader drifted back ~15 verses (Last Read
+  too: repro 18→3). Fix: re-anchor on the ayah-list branch as well. Why it's
+  always safe — `didUpdateWidget` fires only on a *reuse* (same widget key =
+  `ValueKey(first ayah id)` = same section); real section nav changes the key →
+  fresh `initState`. So "ayahs changed in `didUpdateWidget`" ⟹ same section
+  reloaded ⟹ re-anchoring is always correct.
+- **No O(n) + fresh allocation in a scroll listener or per build.** The Mushaf
+  flow re-ran `groupAyahsBySurah` O(n) on every build and `pageAtFraction`
+  allocated an n-length list + scanned it on *every scroll frame* (286-ayah
+  surah × 120 fps = real CPU + GC churn on low-end devices). Memoise anything
+  derived purely from `widget.ayahs` (the surah groups, cumulative text lengths)
+  and recompute only when the list changes; the page readout then becomes an
+  O(log n) binary search with no per-frame garbage.
 
 ---
 
