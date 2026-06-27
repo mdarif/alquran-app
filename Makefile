@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -34,6 +34,11 @@ e2e: ## Run Patrol end-to-end tests on a device/emulator (see docs/E2E.md)
 
 e2e-setup: ## Reminder: re-apply Patrol native config after a platform regen
 	@echo "Patrol native setup is one-time per android/ios regen — see docs/E2E.md"
+
+perf: ## Profile the reader (build/raster frame timings) on a PHYSICAL device: make perf DEVICE=<id>
+	@test -n "$(DEVICE)" || { echo "usage: make perf DEVICE=<id>  (flutter devices to list; profile mode needs a physical device, not a simulator)"; exit 2; }
+	flutter drive --driver=test_driver/integration_test.dart \
+		--target=test_perf/reader_perf_test.dart --profile -d $(DEVICE)
 
 coverage: ## Run tests with coverage and print the lcov path
 	flutter test --coverage
