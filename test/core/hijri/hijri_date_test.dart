@@ -32,6 +32,47 @@ void main() {
         d = d.add(const Duration(days: 1));
       }
     });
+
+    test('a second anchor: 2026-06-25 → 9 Muharram 1448', () {
+      // Cross-checks the converter at a different point (used by the reminder /
+      // Sunnah-occasion tests: 9 Muharram = Ashura).
+      final h = HijriDate.fromGregorian(DateTime(2026, 6, 25));
+      expect((h.year, h.month, h.day), (1448, 1, 9));
+    });
+
+    test('consecutive Gregorian days advance the Hijri date by exactly one',
+        () {
+      // Stronger than the range check: every step must be CONTIGUOUS — +1 day,
+      // or a clean month roll (prev day 29/30 → day 1 of the next month), or a
+      // year roll (month 12 → month 1, year + 1). Catches any off-by-one or
+      // skipped/repeated day at a month/year boundary.
+      var d = DateTime(2026, 1, 1);
+      var prev = HijriDate.fromGregorian(d);
+      for (var i = 0; i < 400; i++) {
+        d = d.add(const Duration(days: 1));
+        final h = HijriDate.fromGregorian(d);
+        final sameMonth = h.year == prev.year &&
+            h.month == prev.month &&
+            h.day == prev.day + 1;
+        final monthRoll = h.year == prev.year &&
+            h.month == prev.month + 1 &&
+            h.day == 1 &&
+            (prev.day == 29 || prev.day == 30);
+        final yearRoll = h.year == prev.year + 1 &&
+            prev.month == 12 &&
+            h.month == 1 &&
+            h.day == 1 &&
+            (prev.day == 29 || prev.day == 30);
+        expect(
+          sameMonth || monthRoll || yearRoll,
+          isTrue,
+          reason: 'non-contiguous Hijri step on $d: '
+              '${prev.year}-${prev.month}-${prev.day} -> '
+              '${h.year}-${h.month}-${h.day}',
+        );
+        prev = h;
+      }
+    });
   });
 
   group('English rendering', () {
