@@ -272,6 +272,35 @@ green `CircleAvatar` badge is `ayah_tile`, the ornate rosette is the KFGQPC text
   circle) → ornate U+06DD medallion + Western digit overlay → **invisible U+06DD anchor + Flutter
   circle badge matching the Detailed view**.
 
+### Waqf/iqlāb marks "float" — it's the Ver18 font, not a bug; the fix is QCF (backlog)
+
+Owner flagged the small-high-jīm waqf mark (U+06DA `ۚ`) and the iqlāb meem (U+06ED `ۭ`)
+rendering high/detached above the word (seen on 18:48 `مَرَّةِۭۚ`), vs a tighter
+black-background reference. Ran it down headlessly and the verdict is: **nothing is
+broken — the text and the rendering are both correct.**
+- **Text is exact.** 18:48 is byte-for-byte identical to quran.com `text_qpc_hafs`
+  (verify against `text_qpc_hafs`, NOT `text_uthmani`; see §2). The kasratān collapses to
+  a single kasra + small meem because tanwīn-before-`ب` is **iqlāb**.
+- **Render is faithful.** `hb-shape` with our exact features (`calt,rlig,liga`) anchors the
+  marks correctly (non-zero `@x,y`); only forcing `-mark,-mkmk` collapses them to the origin.
+  `hb-view` of the word matches the device (Impeller is off both platforms, so Skia/HarfBuzz
+  == the headless render). So the float is **how UthmanicHafs1 Ver18 draws U+06DA**, app-wide:
+  the plain waqf jīm is in **1,570 ayahs (25%)** and floats the same in all of them (the
+  `ۭۚ` stack is only 7 ayahs: 16:28, 16:101, 18:48, 32:10, 39:49, 46:35, 59:14).
+- **Our font IS quran.com's.** `UthmanicHafs1-Ver18.ttf` is the same file quran.com's web
+  reader ships for its *Uthmanic Hafs* option (their CDN woff2→ttf, glyphs unchanged). So
+  quran.com's *Unicode* option looks identical to us. The tight reference is quran.com's
+  **default page-based QCF font** (printed-Madinah-page glyphs) = the PRD's backlogged
+  **exact-Mushaf rendering**.
+
+**Why there is no low-risk font fix:** the text (`uthmani.v2`) is a *matched pair* with Ver18 —
+the ayah-number rosette and madd/tanwīn render through *this font's* GSUB. Swap to a non-KFGQPC
+face → the rosette + madd break (high risk, different look). Other KFGQPC versions draw the waqf
+the same way (no gain), and the Foundation CDN exposes no newer single-Unicode Hafs (only Ver18;
+guessed newer names 404). The only path to the reference is the **QCF architecture** (PUA `code_v2`
+text + per-page fonts + page layout) — a deliberate future project, not a tweak. **Decision: keep
+Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is scheduled separately.**
+
 ---
 
 ## 2. QPC Quran text data specifics
