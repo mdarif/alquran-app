@@ -139,6 +139,22 @@ void main() {
     expect(c.state.upcoming, isEmpty);
   });
 
+  test('refresh detects OS-revoked permission (enabled but not granted)',
+      () async {
+    // Reminders were on, but the user revoked the notification permission in
+    // system settings — on resume, refresh must surface that and NOT silently
+    // reschedule, while still showing the upcoming list.
+    final sch = _FakeScheduler()..granted = false;
+    final c = build(_FakeSettings(enabled: true), sch);
+
+    await c.refresh();
+
+    expect(c.state.enabled, isTrue);
+    expect(c.state.permissionGranted, isFalse);
+    expect(sch.cancelAllCalls, 0); // no reschedule without permission
+    expect(c.state.upcoming, isNotEmpty); // the list still shows
+  });
+
   test('disable cancels everything and clears', () async {
     final s = _FakeSettings(enabled: true);
     final sch = _FakeScheduler()..granted = true;
