@@ -1,0 +1,9 @@
+# Copy this to android/key.properties (git-ignored) and fill it in for release
+# signing. Generate a keystore first:
+#   keytool -genkey -v -keystore ~/al-quran-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias al-quran
+# Keep the .jks and these passwords safe and OUT of version control.
+storeFile=/absolute/path/to/al-quran-release.jks
+storePassword=CHANGE_ME
+keyAlias=al-quran
+keyPassword=CHANGE_ME

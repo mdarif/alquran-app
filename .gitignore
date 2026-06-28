@@ -41,3 +41,8 @@ integration_test/test_bundle.dart
 
 tool/indopak_diff_*.html
 tool/uthmani_deltas.html
+
+# Release signing — owner-supplied, never commit
+android/key.properties
+*.jks
+*.keystore
