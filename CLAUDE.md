@@ -62,8 +62,11 @@ NOT done yet / next up:
   Build artifacts stay ignored via each folder's own `.gitignore`. The unused
   desktop/web runners (`linux/ macos/ windows/ web/`) are still generated-only.
 - Drift codegen (`*.g.dart`) is **not** committed — run `build_runner`.
-- Navigation UI for Page/Juz/Hizb/Ruku, the Reading↔Detailed toggle, and the
-  KFGQPC font are not done. The DB already carries all the indices for them.
+- The KFGQPC font, the Reading↔Detailed toggle, and the Page/Juz/Hizb/Ruku
+  navigation UI are all **done**. The Page/Juz/Hizb/Ruku "Jump to" lives behind
+  `FeatureFlags.advancedNavigation`, which is **off for the first release** — v1
+  ships **Surah-only** by owner decision (reading-first home); flip the flag to
+  resurface the rest. The DB carries all the indices.
 
 ## Run / build
 

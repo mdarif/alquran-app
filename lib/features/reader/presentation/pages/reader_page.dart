@@ -935,6 +935,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                       max: widget.maxFont,
                       divisions:
                           ((widget.maxFont - widget.minFont) / _step).round(),
+                      semanticFormatterCallback: (v) => '${v.round()} points',
                       onChanged: _setFont,
                     ),
                   ),
@@ -1030,29 +1031,32 @@ class _LangOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return InkWell(
-      key: WidgetKeys.langOption(code),
-      borderRadius: BorderRadius.circular(10),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Icon(
-              selected
-                  ? Icons.check_box_rounded
-                  : Icons.check_box_outline_blank_rounded,
-              color: selected ? cs.primary : cs.onSurfaceVariant,
-            ),
-            const SizedBox(width: 12),
-            Text(
-              nativeLanguageName(code),
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
+    return Semantics(
+      checked: selected,
+      child: InkWell(
+        key: WidgetKeys.langOption(code),
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.check_box_rounded
+                    : Icons.check_box_outline_blank_rounded,
+                color: selected ? cs.primary : cs.onSurfaceVariant,
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Text(
+                nativeLanguageName(code),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1121,75 +1125,79 @@ class _ScriptRow extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final onColor = selected ? cs.onPrimaryContainer : cs.onSurfaceVariant;
-    return Material(
-      key: WidgetKeys.scriptCard(script.name),
-      color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
+    return Semantics(
+      selected: selected,
+      child: Material(
+        key: WidgetKeys.scriptCard(script.name),
+        color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? cs.primary : Colors.transparent,
-              width: 1.5,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? cs.primary : Colors.transparent,
+                width: 1.5,
+              ),
             ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Align(
                         alignment: Alignment.centerRight,
-                        child: Text(
-                          sample,
-                          textDirection: TextDirection.rtl,
-                          locale: const Locale('ar'),
-                          style: sampleStyle.copyWith(
-                            fontSize: 26,
-                            color:
-                                selected ? cs.onPrimaryContainer : cs.onSurface,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            sample,
+                            textDirection: TextDirection.rtl,
+                            locale: const Locale('ar'),
+                            style: sampleStyle.copyWith(
+                              fontSize: 26,
+                              color: selected
+                                  ? cs.onPrimaryContainer
+                                  : cs.onSurface,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  // Fixed-width trailing slot so the sample doesn't shift when the
-                  // check appears/disappears.
-                  SizedBox(
-                    width: 24,
-                    child: selected
-                        ? Icon(
-                            Icons.check_rounded,
-                            size: 20,
-                            color: cs.onPrimaryContainer,
-                          )
-                        : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: label,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    // Fixed-width trailing slot so the sample doesn't shift when the
+                    // check appears/disappears.
+                    SizedBox(
+                      width: 24,
+                      child: selected
+                          ? Icon(
+                              Icons.check_rounded,
+                              size: 20,
+                              color: cs.onPrimaryContainer,
+                            )
+                          : null,
                     ),
-                    TextSpan(text: '  ·  $description'),
                   ],
                 ),
-                style: theme.textTheme.bodySmall?.copyWith(color: onColor),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: label,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      TextSpan(text: '  ·  $description'),
+                    ],
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(color: onColor),
+                ),
+              ],
+            ),
           ),
         ),
       ),

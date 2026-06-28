@@ -80,6 +80,7 @@ class AyahTile extends StatelessWidget {
                 backgroundColor: theme.colorScheme.primaryContainer,
                 child: Text(
                   '${ayah.ayahNumber}',
+                  semanticsLabel: 'Verse ${ayah.ayahNumber}',
                   style: TextStyle(
                     fontSize: 12,
                     color: theme.colorScheme.onPrimaryContainer,

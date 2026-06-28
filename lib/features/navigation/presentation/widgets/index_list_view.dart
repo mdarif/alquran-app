@@ -34,7 +34,20 @@ class IndexListView extends StatelessWidget {
             case IndexListStatus.loading:
               return const Center(child: CircularProgressIndicator());
             case IndexListStatus.error:
-              return Center(child: Text(state.error ?? 'Something went wrong'));
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(state.error ?? 'Something went wrong'),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: () =>
+                          context.read<IndexListCubit>().load(kind),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
             case IndexListStatus.loaded:
               return ListView.separated(
                 itemCount: state.entries.length,
