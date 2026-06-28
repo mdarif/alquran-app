@@ -138,10 +138,6 @@ class _ReaderViewState extends State<_ReaderView> {
   // to a sensible default. Restored from settings so it survives restarts.
   late Set<String>? _selected = _settings.selectedTranslations?.toSet();
 
-  // Whether the Detailed-view language strip is expanded (vs collapsed to a
-  // pill). Session-level and survives section swipes; starts expanded.
-  bool _langStripExpanded = true;
-
   // Section paging is a standard PageView (one page per section in the active
   // dimension). It gives native finger-tracking, momentum and snap, and keeps
   // the neighbours mounted — so swiping is smooth and nothing remounts.
@@ -180,8 +176,8 @@ class _ReaderViewState extends State<_ReaderView> {
         actions: [
           // Reading ⇄ Detailed in one tap (icon shows the view you'll switch to).
           // The app-bar action set stays identical in both views so positions
-          // never shift; the translation filter lives inside the Detailed view
-          // itself (a self-labeling chip strip), not here.
+          // never shift; translation languages live in the Display sheet (below),
+          // not here.
           IconButton(
             key: WidgetKeys.viewportToggle,
             tooltip: isReading ? 'Detailed view' : 'Reading view',
@@ -269,8 +265,6 @@ class _ReaderViewState extends State<_ReaderView> {
         focusAyahId: interactive ? _focusAyahId : null,
         onVisibleAyah: interactive ? _onVisibleAyah : null,
         selectedLanguages: _activeLangs(resources),
-        onToggleLanguage:
-            interactive ? (code) => _toggleLang(code, resources) : null,
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
         audioState: audio,
@@ -279,19 +273,13 @@ class _ReaderViewState extends State<_ReaderView> {
             : null,
       );
     } else {
-      // Detailed view owns its own SelectionArea (around the verses) so the
-      // language chip strip above it stays tappable.
+      // Detailed view owns its own SelectionArea (around the verses) for
+      // copy/share; translation languages are chosen in the Display sheet.
       view = _DetailedList(
         key: key,
         ayahs: ayahs,
         resources: resources,
         enabledLanguages: _activeLangs(resources),
-        onToggleLanguage:
-            interactive ? (code) => _toggleLang(code, resources) : (_) {},
-        stripExpanded: _langStripExpanded,
-        onToggleStrip: interactive
-            ? () => setState(() => _langStripExpanded = !_langStripExpanded)
-            : () {},
         headings: headings,
         arabicFontSize: _arabicFont,
         arabicStyle: _arabicStyle,
@@ -413,9 +401,11 @@ class _ReaderViewState extends State<_ReaderView> {
 
   // --------------------------------------------------------------------------
 
-  /// Opens the Display bottom sheet (reading size + Arabic font). Changes apply
-  /// live to the verses behind the sheet and persist, via _applyFont/_applyScript.
+  /// Opens the Display bottom sheet (reading size, Arabic font, translations).
+  /// Changes apply live to the verses behind the sheet and persist, via
+  /// _applyFont / _applyScript / _toggleLang.
   void _openDisplaySheet() {
+    final resources = _cubit.state.resources;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -427,6 +417,9 @@ class _ReaderViewState extends State<_ReaderView> {
         onFontChanged: _applyFont,
         script: _script,
         onScriptChanged: _applyScript,
+        resources: resources,
+        selectedLanguages: _activeLangs(resources),
+        onToggleLanguage: (code) => _toggleLang(code, resources),
       ),
     );
   }
@@ -518,9 +511,6 @@ class _DetailedList extends StatefulWidget {
     required this.ayahs,
     required this.resources,
     required this.enabledLanguages,
-    required this.onToggleLanguage,
-    required this.stripExpanded,
-    required this.onToggleStrip,
     required this.headings,
     required this.arabicFontSize,
     this.arabicStyle = QuranTextStyle.madani,
@@ -532,20 +522,12 @@ class _DetailedList extends StatefulWidget {
 
   final List<Ayah> ayahs;
 
-  /// All available translation editions (drives the chip strip).
+  /// All available translation editions.
   final List<TranslationResource> resources;
 
-  /// Which of [resources] are currently shown (the rest are filtered out).
+  /// Which of [resources] are currently shown (the rest are filtered out);
+  /// chosen in the Display sheet.
   final Set<String> enabledLanguages;
-
-  /// Toggle a language on/off in the filter strip.
-  final ValueChanged<String> onToggleLanguage;
-
-  /// Whether the language strip is expanded (chips) or collapsed (a pill).
-  final bool stripExpanded;
-
-  /// Expand/collapse the language strip.
-  final VoidCallback onToggleStrip;
 
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
@@ -725,43 +707,24 @@ class _DetailedListState extends State<_DetailedList> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Translation languages are chosen in the Display sheet now, so the view is
+    // just the verses — no top strip.
+    return Stack(
       children: [
-        // Self-labeling language filter, pinned at the top of the view (shown
-        // only when there's more than one edition to choose between). Lives here
-        // — not in the app bar — so the app bar never reflows between views and
-        // there's no icon to decode.
-        if (widget.resources.length > 1)
-          _DetailedLangStrip(
-            resources: widget.resources,
-            enabled: widget.enabledLanguages,
-            onToggle: widget.onToggleLanguage,
-            expanded: widget.stripExpanded,
-            onToggleExpanded: widget.onToggleStrip,
+        SelectionArea(
+          child: ScrollablePositionedList.builder(
+            itemScrollController: _scrollController,
+            itemPositionsListener: _positions,
+            itemCount: _rows.length,
+            itemBuilder: _buildRow,
           ),
-        Expanded(
-          child: Stack(
-            children: [
-              // SelectionArea wraps only the verses (copy/share), leaving the
-              // chip strip above it free to receive taps.
-              SelectionArea(
-                child: ScrollablePositionedList.builder(
-                  itemScrollController: _scrollController,
-                  itemPositionsListener: _positions,
-                  itemCount: _rows.length,
-                  itemBuilder: _buildRow,
-                ),
-              ),
-              Positioned(
-                right: 16,
-                bottom: 16,
-                child: ScrollToTopButton(
-                  visible: _showTop,
-                  onPressed: _scrollToTop,
-                ),
-              ),
-            ],
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: ScrollToTopButton(
+            visible: _showTop,
+            onPressed: _scrollToTop,
           ),
         ),
       ],
@@ -866,6 +829,9 @@ class _DisplaySheet extends StatefulWidget {
     required this.onFontChanged,
     required this.script,
     required this.onScriptChanged,
+    required this.resources,
+    required this.selectedLanguages,
+    required this.onToggleLanguage,
   });
 
   final double fontSize;
@@ -874,6 +840,9 @@ class _DisplaySheet extends StatefulWidget {
   final ValueChanged<double> onFontChanged;
   final ArabicScript script;
   final ValueChanged<ArabicScript> onScriptChanged;
+  final List<TranslationResource> resources;
+  final Set<String> selectedLanguages;
+  final ValueChanged<String> onToggleLanguage;
 
   @override
   State<_DisplaySheet> createState() => _DisplaySheetState();
@@ -885,6 +854,7 @@ class _DisplaySheetState extends State<_DisplaySheet> {
 
   late double _fontSize = widget.fontSize;
   late ArabicScript _script = widget.script;
+  late Set<String> _selectedLangs = {...widget.selectedLanguages};
 
   void _setFont(double value) {
     final v = value.clamp(widget.minFont, widget.maxFont).roundToDouble();
@@ -897,6 +867,19 @@ class _DisplaySheetState extends State<_DisplaySheet> {
     if (value == _script) return;
     setState(() => _script = value);
     widget.onScriptChanged(value); // reload behind the sheet + persist
+  }
+
+  void _toggleLang(String code) {
+    final next = {..._selectedLangs};
+    if (next.contains(code)) {
+      if (next.length <= 1) return; // never hide the last translation
+      next.remove(code);
+    } else {
+      next.add(code);
+    }
+    setState(() => _selectedLangs = next);
+    widget
+        .onToggleLanguage(code); // re-render verses behind the sheet + persist
   }
 
   @override
@@ -1002,8 +985,73 @@ class _DisplaySheetState extends State<_DisplaySheet> {
                   ],
                 ),
               ],
+              if (widget.resources.length > 1) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Translation',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                for (final r in widget.resources)
+                  _LangOption(
+                    code: r.languageCode,
+                    selected: _selectedLangs.contains(r.languageCode),
+                    onTap: () => _toggleLang(r.languageCode),
+                  ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the Display sheet's Translation checklist: a checkbox + the native
+/// language name. Tap to toggle; the parent enforces "at least one stays on".
+class _LangOption extends StatelessWidget {
+  const _LangOption({
+    required this.code,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String code;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return InkWell(
+      key: WidgetKeys.langOption(code),
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              color: selected ? cs.primary : cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              nativeLanguageName(code),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1139,176 +1187,6 @@ class _ScriptRow extends StatelessWidget {
                   ],
                 ),
                 style: theme.textTheme.bodySmall?.copyWith(color: onColor),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Detailed-view translation filter: a slim strip of language chips pinned at
-/// the top of the verses. Tap a chip to show/hide that edition; at least one
-/// always stays on. Self-labeling (اردو / हिन्दी / English) so there's no icon
-/// to decode, and it lives in the view — not the app bar — so the app bar never
-/// changes between Reading and Detailed.
-class _DetailedLangStrip extends StatelessWidget {
-  const _DetailedLangStrip({
-    required this.resources,
-    required this.enabled,
-    required this.onToggle,
-    required this.expanded,
-    required this.onToggleExpanded,
-  });
-
-  final List<TranslationResource> resources;
-  final Set<String> enabled;
-  final ValueChanged<String> onToggle;
-  final bool expanded;
-  final VoidCallback onToggleExpanded;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.scaffoldBackgroundColor,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: expanded ? _expanded(theme) : _collapsed(theme),
-      ),
-    );
-  }
-
-  // Expanded: the language chips + an × to collapse.
-  Widget _expanded(ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final r in resources) ...[
-                  _LangChip(
-                    label: nativeLanguageName(r.languageCode),
-                    selected: enabled.contains(r.languageCode),
-                    onTap: () => onToggle(r.languageCode),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ],
-            ),
-          ),
-        ),
-        IconButton(
-          tooltip: 'Hide languages',
-          visualDensity: VisualDensity.compact,
-          icon: const AppIcon(AppIcons.close, size: AppIconSize.action),
-          color: theme.colorScheme.onSurfaceVariant,
-          onPressed: onToggleExpanded,
-        ),
-      ],
-    );
-  }
-
-  // Collapsed: a small pill showing the current selection; tap to expand.
-  Widget _collapsed(ThemeData theme) {
-    final cs = theme.colorScheme;
-    final summary = [
-      for (final r in resources)
-        if (enabled.contains(r.languageCode))
-          nativeLanguageName(r.languageCode),
-    ].join(' · ');
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Material(
-        color: cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: onToggleExpanded,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppIcon(
-                  AppIcons.translate,
-                  size: AppIconSize.inline,
-                  color: cs.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  summary.isEmpty ? 'Translation' : summary,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                AppIcon(
-                  AppIcons.expand,
-                  size: AppIconSize.inline,
-                  color: cs.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A toggleable language pill in the Detailed-view filter strip.
-class _LangChip extends StatelessWidget {
-  const _LangChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final fg = selected ? cs.onPrimary : cs.onSurfaceVariant;
-    return Material(
-      color: selected ? cs.primary : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppIcon(
-                selected ? AppIcons.chipSelected : AppIcons.chipAdd,
-                size: AppIconSize.inline,
-                color: fg,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: fg,
-                ),
               ),
             ],
           ),

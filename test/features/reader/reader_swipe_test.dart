@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:al_quran/core/audio/ayah_recitation_player.dart';
+import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
@@ -292,7 +293,7 @@ void main() {
     });
   });
 
-  group('Detailed-view translation filter', () {
+  group('Translation languages (Display sheet)', () {
     // Register the translations repo + a settings fake with both editions
     // selected (the default is a single language), then open Detailed view.
     Future<void> openDetailed(
@@ -316,16 +317,27 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('toggling a language chip hides that translation',
-        (tester) async {
+    // Open the Display sheet, tap each given language row, then close the sheet.
+    Future<void> toggleLanguages(
+      WidgetTester tester,
+      List<String> codes,
+    ) async {
+      await tester.tap(find.byKey(WidgetKeys.fontSizeButton)); // open Display
+      await tester.pumpAndSettle();
+      for (final code in codes) {
+        await tester.tap(find.byKey(WidgetKeys.langOption(code)));
+        await tester.pumpAndSettle();
+      }
+      await tester.tapAt(const Offset(400, 20)); // tap the scrim to close
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('unticking a language hides that translation', (tester) async {
       await openDetailed(tester);
-      // Both selected → both show, with the chip strip in the view.
       expect(find.text('اردو متن'), findsOneWidget);
       expect(find.text('english body'), findsOneWidget);
 
-      // Turn English off via its chip in the strip.
-      await tester.tap(find.text('English'));
-      await tester.pumpAndSettle();
+      await toggleLanguages(tester, ['en']); // turn English off
 
       expect(find.text('english body'), findsNothing);
       expect(find.text('اردو متن'), findsOneWidget); // Urdu stays
@@ -335,42 +347,20 @@ void main() {
         (tester) async {
       await openDetailed(tester);
 
-      // Turn English off, then try to turn Urdu off too — it must stay.
-      await tester.tap(find.text('English'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('اردو'));
-      await tester.pumpAndSettle();
+      // Turn English off, then try Urdu too — the last one must stay on.
+      await toggleLanguages(tester, ['en', 'ur']);
 
       expect(find.text('اردو متن'), findsOneWidget);
     });
 
-    testWidgets('× collapses the strip to a pill, tapping it expands again',
-        (tester) async {
-      await openDetailed(tester);
-      expect(find.text('English'), findsOneWidget); // chip visible
-
-      // Collapse via the × — chips hide, a summary pill appears.
-      await tester.tap(find.byTooltip('Hide languages'));
-      await tester.pumpAndSettle();
-      expect(find.text('English'), findsNothing);
-      expect(find.text('اردو · English'), findsOneWidget); // pill summary
-
-      // Tap the pill to expand again.
-      await tester.tap(find.text('اردو · English'));
-      await tester.pumpAndSettle();
-      expect(find.text('English'), findsOneWidget);
-    });
-
-    testWidgets('the selection carries over to the Reading peek card',
+    testWidgets('the selection is shared with the Reading peek card',
         (tester) async {
       await openDetailed(tester);
 
-      // Narrow to Urdu only in Detailed.
-      await tester.tap(find.text('English'));
-      await tester.pumpAndSettle();
+      await toggleLanguages(tester, ['en']); // Urdu only
       expect(find.text('english body'), findsNothing);
 
-      // Back to Reading, tap the verse — the peek shows Urdu only (carried).
+      // Back to Reading, tap the verse — the peek shows Urdu only (shared).
       await tester.tap(find.byTooltip('Reading view'));
       await tester.pumpAndSettle();
       final flow = find.byWidgetPredicate(

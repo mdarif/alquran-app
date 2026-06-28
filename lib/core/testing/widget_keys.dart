@@ -30,8 +30,9 @@ class WidgetKeys {
   static const peekCard = Key('reader-peek-card');
   static const peekPrevButton = Key('reader-peek-prev-button');
   static const peekNextButton = Key('reader-peek-next-button');
-  static const langStripClose = Key('reader-lang-strip-close');
-  static Key langChip(String languageCode) => Key('lang-chip-$languageCode');
+  // Translation language rows in the Display sheet ('ur' | 'hi' | 'en').
+  static Key langOption(String languageCode) =>
+      Key('lang-option-$languageCode');
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');

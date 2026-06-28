@@ -367,9 +367,6 @@ void main() {
       expect(find.text('हिंदी अनुवाद'), findsNothing);
       expect(find.text('Junagarhi'), findsOneWidget);
       expect(find.text('al-Umari'), findsNothing);
-      // Both languages are offered as multi-select chips (exact, not body text).
-      expect(find.text('اردو'), findsOneWidget);
-      expect(find.text('हिन्दी'), findsOneWidget);
     });
 
     testWidgets('‹/› step through verses and clamp at the section edges',
@@ -414,41 +411,6 @@ void main() {
 
       expect(find.text('اردو ترجمہ'), findsOneWidget);
       expect(find.text('हिंदी अनुवाद'), findsOneWidget);
-    });
-
-    testWidgets('tapping a chip toggles that language into the card',
-        (tester) async {
-      // A stateful wrapper mirrors how the page persists the shared selection.
-      final selected = <String>{'ur'};
-      await tester.pumpWidget(
-        _wrap(
-          StatefulBuilder(
-            builder: (context, setState) => MushafView(
-              ayahs: _ayahsWithTranslations(1, 1),
-              headings: _headings(1, 'Al-Fatihah', 7),
-              arabicFontSize: 28,
-              resources: _kResources,
-              selectedLanguages: selected,
-              onToggleLanguage: (code) => setState(() {
-                selected.contains(code)
-                    ? selected.remove(code)
-                    : selected.add(code);
-              }),
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await _tapText(tester);
-      expect(find.text('اردو ترجمہ'), findsOneWidget);
-      expect(find.text('हिंदी अनुवाद'), findsNothing);
-
-      // Tap the Hindi chip → it's added (multi-select), so both now show.
-      await tester.tap(find.text('हिन्दी'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('हिंदी अनुवाद'), findsOneWidget);
-      expect(find.text('اردو ترجمہ'), findsOneWidget); // Urdu stays
     });
 
     testWidgets('tapping the handle dismisses the card', (tester) async {

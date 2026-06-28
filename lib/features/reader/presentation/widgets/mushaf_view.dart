@@ -8,7 +8,6 @@ import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
-import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
@@ -42,7 +41,6 @@ class MushafView extends StatefulWidget {
     this.focusAyahId,
     this.onVisibleAyah,
     this.selectedLanguages = const {},
-    this.onToggleLanguage,
     this.onRegisterFlush,
     this.audioState,
     this.onTogglePlay,
@@ -66,12 +64,9 @@ class MushafView extends StatefulWidget {
   /// Read"), so the resume point reflects where the reader actually stopped.
   final ValueChanged<Ayah>? onVisibleAyah;
 
-  /// The reader's selected translation editions (shared with Detailed view).
-  /// The peek card shows these and offers them as multi-select chips.
+  /// The reader's selected translation editions (shared with the Detailed view);
+  /// the peek card displays these. Chosen in the Display sheet.
   final Set<String> selectedLanguages;
-
-  /// Toggle a language in the shared selection (from the peek card's chips).
-  final ValueChanged<String>? onToggleLanguage;
 
   /// Called once in initState with a flush callback, and again with null on
   /// dispose. The parent stores the callback and invokes it before switching
@@ -524,7 +519,6 @@ class _MushafViewState extends State<MushafView>
                     : widget.headings[_shownAyah!.surahId]?.nameEnglish,
                 fontSize: fontSize,
                 selected: widget.selectedLanguages,
-                onToggleLanguage: widget.onToggleLanguage,
                 onDismiss: _dismissPeek,
                 audioState: widget.audioState,
                 onTogglePlay: widget.onTogglePlay,
@@ -999,7 +993,6 @@ class _MushafPeekCard extends StatelessWidget {
     required this.surahName,
     required this.fontSize,
     required this.selected,
-    required this.onToggleLanguage,
     required this.onDismiss,
     this.audioState,
     this.onTogglePlay,
@@ -1012,7 +1005,6 @@ class _MushafPeekCard extends StatelessWidget {
   final String? surahName;
   final double fontSize;
   final Set<String> selected;
-  final ValueChanged<String>? onToggleLanguage;
   final VoidCallback onDismiss;
 
   /// Step to the previous/next verse in the section. Null ⇒ at the edge (the
@@ -1130,20 +1122,6 @@ class _MushafPeekCard extends StatelessWidget {
                           tooltip: 'Next verse',
                           onPressed: onNext,
                         ),
-                        const SizedBox(width: 4),
-                        if (available.length > 1)
-                          Wrap(
-                            spacing: 6,
-                            children: [
-                              for (final r in available)
-                                _PeekLangChip(
-                                  label: nativeLanguageName(r.languageCode),
-                                  selected: selected.contains(r.languageCode),
-                                  onTap: () =>
-                                      onToggleLanguage?.call(r.languageCode),
-                                ),
-                            ],
-                          ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -1237,7 +1215,6 @@ class _MushafPeekCard extends StatelessWidget {
   }
 }
 
-/// A small selectable language pill in the peek card's chip row.
 /// A compact ‹/› chevron that steps the peeked verse. Disabled (dimmed) at the
 /// section's first/last verse — [onPressed] is null there.
 class _PeekStepButton extends StatelessWidget {
@@ -1263,42 +1240,6 @@ class _PeekStepButton extends StatelessWidget {
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
       color: Theme.of(context).colorScheme.onSurfaceVariant,
-    );
-  }
-}
-
-class _PeekLangChip extends StatelessWidget {
-  const _PeekLangChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: selected ? cs.primary : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: selected ? cs.onPrimary : cs.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
