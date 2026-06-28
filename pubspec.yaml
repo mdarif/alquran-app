@@ -27,6 +27,8 @@ dependencies:
   path: ^1.9.0
   shared_preferences: ^2.5.5
   share_plus: ^13.1.0
+  # Open the developer website (almarfa.co) from the About screen.
+  url_launcher: ^6.3.1
 
   # Iconography — Material Symbols (Rounded), the single in-app icon family
   # (wired through core/theme/app_icons.dart). We ship our OWN tiny subset font
@@ -125,6 +127,8 @@ flutter:
 
   assets:
     - assets/db/quran.db
+    # Brand mark used by About and other in-app identity moments.
+    - assets/icon/icon.png
     # Version marker (db_meta.built_at) used to re-seed the bundled DB on update.
     # Regenerate after replacing quran.db: `make seed-version`.
     - assets/db/quran.db.version

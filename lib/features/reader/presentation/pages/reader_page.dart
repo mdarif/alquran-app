@@ -15,6 +15,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
+import '../../../about/presentation/pages/about_page.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
@@ -998,62 +999,42 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                for (final r in widget.resources)
-                  _LangOption(
-                    code: r.languageCode,
-                    selected: _selectedLangs.contains(r.languageCode),
-                    onTap: () => _toggleLang(r.languageCode),
-                  ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One row of the Settings sheet's Translation checklist: a checkbox + the native
-/// language name. Tap to toggle; the parent enforces "at least one stays on".
-class _LangOption extends StatelessWidget {
-  const _LangOption({
-    required this.code,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String code;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Semantics(
-      checked: selected,
-      child: InkWell(
-        key: WidgetKeys.langOption(code),
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? Icons.check_box_rounded
-                    : Icons.check_box_outline_blank_rounded,
-                color: selected ? cs.primary : cs.onSurfaceVariant,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                nativeLanguageName(code),
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurface,
+                const SizedBox(height: 8),
+                // Compact selectable chips (one wrap row) instead of a stacked
+                // checklist. The parent keeps at least one translation on.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final r in widget.resources)
+                      FilterChip(
+                        key: WidgetKeys.langOption(r.languageCode),
+                        label: Text(nativeLanguageName(r.languageCode)),
+                        selected: _selectedLangs.contains(r.languageCode),
+                        onSelected: (_) => _toggleLang(r.languageCode),
+                      ),
+                  ],
                 ),
+              ],
+              // About — the credits/attributions screen, at the very bottom.
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              ListTile(
+                key: WidgetKeys.aboutButton,
+                contentPadding: EdgeInsets.zero,
+                leading: const AppIcon(AppIcons.about),
+                title: const Text('About Al Quran'),
+                trailing: const AppIcon(
+                  AppIcons.chevronRight,
+                  size: AppIconSize.inline,
+                ),
+                onTap: () {
+                  final nav = Navigator.of(context);
+                  nav.pop();
+                  nav.push(
+                    MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+                  );
+                },
               ),
             ],
           ),

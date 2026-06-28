@@ -4,7 +4,6 @@ import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
-import '../../../about/presentation/pages/about_page.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
@@ -70,17 +69,6 @@ class HomePage extends StatelessWidget {
           if (sunnahReminders) const RemindersButton(),
           if (prayerTimes) const NextPrayerPill(),
           if (lightOfDay) const ThemeToggleButton(),
-          PopupMenuButton<String>(
-            key: WidgetKeys.aboutButton,
-            icon: const AppIcon(AppIcons.overflow),
-            tooltip: 'More',
-            onSelected: (_) => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const AboutPage()),
-            ),
-            itemBuilder: (_) => const [
-              PopupMenuItem<String>(value: 'about', child: Text('About')),
-            ],
-          ),
         ],
       ),
       body: Column(

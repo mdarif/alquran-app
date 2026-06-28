@@ -300,6 +300,11 @@ void main() {
       WidgetTester tester, {
       List<String> selected = const ['ur', 'en'],
     }) async {
+      // A phone-height surface so the (now taller, with About at the bottom)
+      // Settings sheet doesn't fill the screen — keeps the scrim tappable to
+      // close it, as on a real device.
+      await tester.binding.setSurfaceSize(const Size(800, 1400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       GetIt.I
         ..unregister<ReaderCubit>()
         ..registerFactory<ReaderCubit>(
