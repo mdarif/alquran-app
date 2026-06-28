@@ -38,4 +38,12 @@ jobs:
         run: flutter analyze --fatal-warnings
 
       - name: Test
-        run: flutter test
+        run: flutter test --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage/lcov.info
+          # Public repo → tokenless upload works; the secret is used when set.
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

@@ -1,0 +1,21 @@
+# Codecov configuration for Al Quran.
+# Uploaded from the Flutter CI workflow (flutter test --coverage → coverage/lcov.info).
+coverage:
+  status:
+    project:
+      default:
+        target: auto        # never regress vs the base commit…
+        threshold: 1%        # …but tolerate a 1% wobble (flaky line hits)
+    patch:
+      default:
+        target: 50%          # new/changed lines should be at least half-covered
+
+# Exclude generated + entrypoint code that carries no meaningful test value.
+ignore:
+  - "**/*.g.dart"                       # Drift / build_runner output
+  - "lib/main_*.dart"                   # app + diagnostic entrypoints
+  - "lib/firebase_options.dart"         # (if ever generated)
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: true

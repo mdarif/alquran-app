@@ -1,0 +1,360 @@
+# Release — one-click CD for Al Quran (single `main` branch).
+#
+# Manually dispatched (Actions → Release → Run workflow, or `make release
+# BUMP=<current|patch|minor|major>`). On a real run it: bumps the version in
+# pubspec.yaml (unless bump=current), runs the full quality gate
+# (codegen → format → analyze → test), builds a production-signed APK + AAB,
+# generates a changelog from the commit history, tags the commit, pushes the
+# bump + tag to `main`, creates a GitHub Release with the artifacts attached,
+# and — only if the Play Store service account is configured — uploads the AAB
+# to the Play internal track.
+#
+# bump=current releases the version already in pubspec.yaml as-is (no bump, no
+# pubspec commit) — use it for the very first release (v1.0.0). For every
+# release after that use patch/minor/major so the versionCode keeps climbing
+# (Play requires a strictly increasing build number per upload).
+#
+# dry_run=true runs codegen/format/analyze/test/build only — nothing is
+# committed, tagged, pushed, released, or uploaded. Use it to validate the
+# pipeline (and the signing secrets) before a real cut.
+#
+# One-time setup (see docs/release.md):
+#   - Repo secrets for signing (required): KEYSTORE_BASE64, KEY_ALIAS,
+#     KEY_PASSWORD, STORE_PASSWORD — these mirror android/key.properties.
+#   - Repo secret for Play upload (optional): GOOGLE_PLAY_SERVICE_ACCOUNT —
+#     the AAB upload is skipped (not failed) when this is absent, so the
+#     pipeline is fully usable before the app exists on the Play Console.
+#   - If `main` is a protected branch, add github-actions[bot] to its bypass
+#     list, or the version-bump push will be rejected.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'current = release pubspec version as-is (first release) · patch = bug fix · minor = new feature · major = breaking change'
+        required: true
+        default: patch
+        type: choice
+        options:
+          - current
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Run codegen/analyze/test/build only — skip tag, release, push, and Play upload.'
+        required: false
+        default: false
+        type: boolean
+
+# GITHUB_TOKEN needs write access to push the version-bump commit + tag and to
+# create the GitHub Release.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    # Releases are cut from main only. The Makefile target enforces this too;
+    # this guard backstops a manual dispatch from the Actions UI on another ref.
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      # ------------------------------------------------------------------ #
+      # 1. Full checkout — fetch-depth 0 so git-cliff can read every tag for
+      #    changelog generation.
+      # ------------------------------------------------------------------ #
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ------------------------------------------------------------------ #
+      # Free disk space — ubuntu-latest ships large unused toolchains (.NET,
+      # GHC, CodeQL) that leave little headroom for the Android SDK + Gradle
+      # cache + AAB build, which can fail with "No space left on device".
+      # ------------------------------------------------------------------ #
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/.ghcup
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # ------------------------------------------------------------------ #
+      # 2. Compute the release version + tag from pubspec.yaml + bump type.
+      #    pubspec format: version: X.Y.Z+BUILD ; tag format: vX.Y.Z.
+      #    bump=current keeps the version untouched (bumped=false) so the very
+      #    first release ships exactly what is in pubspec.yaml.
+      # ------------------------------------------------------------------ #
+      - name: Compute release version
+        id: version
+        run: |
+          CURRENT=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          SEMVER=${CURRENT%+*}
+          BUILD=${CURRENT#*+}
+          MAJOR=$(echo "$SEMVER" | cut -d'.' -f1)
+          MINOR=$(echo "$SEMVER" | cut -d'.' -f2)
+          PATCH=$(echo "$SEMVER" | cut -d'.' -f3)
+
+          BUMPED=true
+          case "${{ inputs.bump }}" in
+            major)   MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0; BUILD=$((BUILD+1)) ;;
+            minor)   MINOR=$((MINOR+1)); PATCH=0; BUILD=$((BUILD+1)) ;;
+            patch)   PATCH=$((PATCH+1)); BUILD=$((BUILD+1)) ;;
+            current) BUMPED=false ;;
+          esac
+
+          NEW_SEMVER="${MAJOR}.${MINOR}.${PATCH}"
+          NEW_VERSION="${NEW_SEMVER}+${BUILD}"
+          TAG="v${NEW_SEMVER}"
+
+          if [ "$BUMPED" = "true" ]; then
+            echo "Bumping ${CURRENT} → ${NEW_VERSION}  (tag ${TAG})"
+            sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
+          else
+            echo "Releasing current version ${CURRENT} as-is  (tag ${TAG})"
+          fi
+
+          if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} already exists. Is this version already released? For a new release pick patch/minor/major."
+            exit 1
+          fi
+
+          echo "bumped=${BUMPED}"           >> "$GITHUB_OUTPUT"
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"                 >> "$GITHUB_OUTPUT"
+          echo "apk=al-quran-${TAG}.apk"    >> "$GITHUB_OUTPUT"
+          echo "aab=al-quran-${TAG}.aab"    >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------ #
+      # 3. Java 21 — matches android/app/build.gradle.kts compileOptions.
+      # ------------------------------------------------------------------ #
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # ------------------------------------------------------------------ #
+      # 4. Flutter (pinned to match CI).
+      # ------------------------------------------------------------------ #
+      - name: Set up Flutter (pinned)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.1
+          channel: stable
+          cache: true
+
+      # ------------------------------------------------------------------ #
+      # 5. Cache Gradle.
+      # ------------------------------------------------------------------ #
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle.kts', 'android/app/build.gradle.kts', 'android/settings.gradle.kts', 'android/gradle.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # ------------------------------------------------------------------ #
+      # 6. Cap Gradle JVM heap so the runner does not OOM.
+      # ------------------------------------------------------------------ #
+      - name: Override Gradle JVM args
+        run: |
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=512m -Dkotlin.daemon.jvm.options=-Xmx1g" >> android/gradle.properties
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # *.g.dart (Drift) is gitignored — generate it before analyze/test/build.
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      # ------------------------------------------------------------------ #
+      # 7. Quality gate — refuse to cut a release that fails format/analyze/test.
+      # ------------------------------------------------------------------ #
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: flutter analyze --fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+      # ------------------------------------------------------------------ #
+      # 8. Configure production signing (required).
+      #    Decodes KEYSTORE_BASE64 into android/app/upload-keystore.jks and
+      #    writes android/key.properties from the signing secrets, matching
+      #    signingConfigs.release in android/app/build.gradle.kts. Without
+      #    these the build would fall back to debug signing — not releasable —
+      #    so fail early with a clear message.
+      # ------------------------------------------------------------------ #
+      - name: Configure release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ] || [ -z "$STORE_PASSWORD" ]; then
+            echo "::error::Signing secrets (KEYSTORE_BASE64, KEY_ALIAS, KEY_PASSWORD, STORE_PASSWORD) are not all set. See docs/release.md -> 'One-time setup'."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      # ------------------------------------------------------------------ #
+      # 9. Build the signed release artifacts.
+      # ------------------------------------------------------------------ #
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Build release AAB
+        run: flutter build appbundle --release
+
+      - name: Rename artifacts
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk "${{ steps.version.outputs.apk }}"
+          cp build/app/outputs/bundle/release/app-release.aab "${{ steps.version.outputs.aab }}"
+
+      # ------------------------------------------------------------------ #
+      # 10. Changelog — git-cliff turns the commit history since the last tag
+      #     into grouped Markdown for the GitHub Release body.
+      # ------------------------------------------------------------------ #
+      - name: Generate changelog
+        id: cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --unreleased --strip header
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+
+      # ------------------------------------------------------------------ #
+      # 11. Play Store "What's new" — strip Markdown + truncate to 480 chars
+      #     (the field caps at 500). Attached to the Release as a copy-ready
+      #     artifact even when the automated upload is skipped.
+      # ------------------------------------------------------------------ #
+      - name: Generate Play Store release notes
+        run: |
+          MARKDOWN="${{ steps.cliff.outputs.content }}"
+          PLAIN=$(echo "$MARKDOWN" \
+            | sed 's/^### //g' \
+            | sed 's/\*\*//g' \
+            | sed 's/^- /• /g' \
+            | sed '/^$/d')
+          [ -z "$PLAIN" ] && PLAIN="• Maintenance release"
+          TRUNCATED=$(echo "$PLAIN" | head -c 480)
+          FULL_LEN=$(echo "$PLAIN" | wc -c | tr -d ' ')
+          if [ "$FULL_LEN" -gt 480 ]; then
+            echo "::warning::Play Store notes truncated to 480 chars (was ${FULL_LEN}). Review before submitting."
+          fi
+          echo "$TRUNCATED" > play-store-notes.txt
+          echo "Play Store notes:"; cat play-store-notes.txt
+
+      # ------------------------------------------------------------------ #
+      # 12. Play Store upload is OPTIONAL — gated on the service-account
+      #     secret. Absent (app not on Play yet) → skip, don't fail; the
+      #     signed AAB is still attached to the GitHub Release.
+      # ------------------------------------------------------------------ #
+      - name: Check Play Store availability
+        id: play
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+        run: |
+          if [ -n "$GOOGLE_PLAY_SERVICE_ACCOUNT" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Play Store service account present — will upload the AAB to the internal track."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GOOGLE_PLAY_SERVICE_ACCOUNT not set — skipping Play upload. The signed AAB is attached to the GitHub Release. Set the secret to enable internal-track upload (docs/release.md)."
+          fi
+
+      - name: Prepare Play Store release notes for upload
+        if: steps.play.outputs.enabled == 'true' && inputs.dry_run != true
+        run: |
+          mkdir -p distribution/whatsnew
+          cp play-store-notes.txt distribution/whatsnew/whatsnew-en-US
+
+      - name: Upload to Play Store (internal track)
+        if: steps.play.outputs.enabled == 'true' && inputs.dry_run != true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          packageName: com.almarfa.al_quran
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+          whatsNewDirectory: distribution/whatsnew
+
+      # ------------------------------------------------------------------ #
+      # 13. Commit the version bump (only when bumped), tag, and push.
+      #     Skipped entirely for dry runs.
+      # ------------------------------------------------------------------ #
+      - name: Configure git identity
+        if: inputs.dry_run != true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit, tag, and push
+        if: inputs.dry_run != true
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if [ "${{ steps.version.outputs.bumped }}" = "true" ]; then
+            git add pubspec.yaml
+            git commit -m "chore: release ${TAG}"
+            git push origin main
+          fi
+          git tag "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+      # ------------------------------------------------------------------ #
+      # 14. GitHub Release — attach the signed APK + AAB + Play notes.
+      #     Skipped for dry runs.
+      # ------------------------------------------------------------------ #
+      - name: Create GitHub Release
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          APK="${{ steps.version.outputs.apk }}"
+          AAB="${{ steps.version.outputs.aab }}"
+          NEW_VERSION="${{ steps.version.outputs.new_version }}"
+          CHANGELOG="${{ steps.cliff.outputs.content }}"
+          [ -z "$CHANGELOG" ] && CHANGELOG="- Maintenance release"
+          PLAY_NOTE="Play upload: skipped (no service account configured) — upload the AAB manually, or set GOOGLE_PLAY_SERVICE_ACCOUNT to automate it."
+          [ "${{ steps.play.outputs.enabled }}" = "true" ] && PLAY_NOTE="Play upload: AAB pushed to the Play internal track."
+
+          gh release create "${TAG}" \
+            "${APK}#Al Quran Android APK (release, signed)" \
+            "${AAB}#Al Quran Android App Bundle (release, signed — Play upload)" \
+            "play-store-notes.txt#Play Store release notes (plain text)" \
+            --title "Al Quran ${TAG}" \
+            --notes "## What's changed
+
+          ${CHANGELOG}
+
+          ---
+          **Build:** \`${NEW_VERSION}\`
+          **APK:** release build, signed with the production upload key — install via \`adb install ${APK}\`
+          **AAB:** release bundle for the Play Store.
+          **${PLAY_NOTE}**"
+
+      - name: Dry run summary
+        if: inputs.dry_run == true
+        run: |
+          echo "::notice::Dry run complete — codegen, format, analyze, test, and the signed APK/AAB build all succeeded. Nothing was committed, tagged, pushed, released, or uploaded."

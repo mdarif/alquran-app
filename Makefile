@@ -1,6 +1,10 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-dry ci-logs version
+
+# Release defaults — override on the command line, e.g. `make release BUMP=minor`.
+REPO ?= mdarif/alquran-app
+BUMP ?= patch
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -78,3 +82,27 @@ diag-prayer: ## Preview every prayer-times indicator state + sheet (dev-only scr
 
 diag-arabic: ## Arabic mark-rendering matrix in both fonts (dev-only screen)
 	flutter run -t lib/main_arabic_diag.dart
+
+# ---- Release / CD (see docs/release.md) ------------------------------------
+
+release: ## Cut a release via CD: make release BUMP=<current|patch|minor|major>
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" != "main" ]; then \
+	  echo "Error: releases are cut from main (you are on $$BRANCH)"; exit 1; \
+	fi
+	@echo "Triggering Release workflow on main (bump=$(BUMP))…"
+	gh workflow run flutter-release.yml --repo $(REPO) --ref main --field bump=$(BUMP)
+	@echo "✓ Triggered — watch: https://github.com/$(REPO)/actions/workflows/flutter-release.yml"
+
+release-dry: ## Validate the release pipeline without tagging/releasing: make release-dry BUMP=patch
+	gh workflow run flutter-release.yml --repo $(REPO) --ref main --field bump=$(BUMP) --field dry_run=true
+	@echo "✓ Dry run triggered — watch: https://github.com/$(REPO)/actions/workflows/flutter-release.yml"
+
+ci-logs: ## Show the failed-step logs of the most recent workflow run
+	@RUN_ID=$$(gh run list --repo $(REPO) --limit 1 --json databaseId --jq '.[0].databaseId'); \
+	echo "Fetching failed logs for run $$RUN_ID…"; \
+	gh run view $$RUN_ID --repo $(REPO) --log-failed
+
+version: ## Print the app + Flutter version
+	@grep "^version:" pubspec.yaml
+	@flutter --version

@@ -1,5 +1,13 @@
-# git-cliff — generate CHANGELOG.md from Conventional Commits.
-# Usage: `git cliff -o CHANGELOG.md` (install: brew install git-cliff).
+# git-cliff — generate release notes / CHANGELOG.md from the commit history.
+# Usage:   git cliff -o CHANGELOG.md        (install: brew install git-cliff)
+# Release: the flutter-release.yml workflow runs `git cliff --unreleased
+#          --strip header` to build the GitHub Release body.
+#
+# This repo's commits are descriptive ("Reader: …", "Reminders: …") rather than
+# strict Conventional Commits, so `filter_unconventional` is OFF — meaningful
+# commits land under "Changes", while obvious noise (docs/test/chore/ci/build/
+# style/refactor/tooling, and the bot's "release vX" commit) is skipped. If we
+# adopt feat:/fix:/perf: prefixes later they group automatically.
 [changelog]
 header = "# Changelog\n\nAll notable changes to Al Quran are documented here.\n"
 body = """
@@ -14,18 +22,16 @@ trim = true
 
 [git]
 conventional_commits = true
-filter_unconventional = true
-commit_parsers = [
-  { message = "^feat", group = "Features" },
-  { message = "^fix", group = "Bug Fixes" },
-  { message = "^perf", group = "Performance" },
-  { message = "^refactor", group = "Refactor" },
-  { message = "^docs", skip = true },
-  { message = "^test", skip = true },
-  { message = "^chore", skip = true },
-  { message = "^ci", skip = true },
-  { message = "^build", skip = true },
-  { message = "^style", skip = true },
-]
-filter_commits = false
+filter_unconventional = false
+filter_commits = true
 tag_pattern = "v[0-9]*"
+sort_commits = "oldest"
+commit_parsers = [
+  { message = "(?i)^feat", group = "Features" },
+  { message = "(?i)^fix", group = "Bug Fixes" },
+  { message = "(?i)^perf", group = "Performance" },
+  { message = "(?i)^(docs|test|chore|ci|build|style|refactor|tooling)[:(/ ]", skip = true },
+  { message = "(?i)^release prep", skip = true },
+  { message = "(?i)^chore: release", skip = true },
+  { message = ".*", group = "Changes" },
+]
