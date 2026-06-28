@@ -17,6 +17,10 @@
 	<string>Al Quran uses your location to calculate accurate prayer times for where you are.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<!-- Export compliance: the app uses only standard HTTPS (audio CDN) — exempt
+	     encryption. Declaring this skips the per-upload export prompt. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

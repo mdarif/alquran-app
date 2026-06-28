@@ -41,6 +41,8 @@ class AppIcons {
   /// Prostration-verse marker (rendered filled).
   static const IconData sajda = Symbols.star_rounded;
   static const IconData more = Symbols.more_horiz_rounded;
+  static const IconData overflow = Symbols.more_vert_rounded;
+  static const IconData about = Symbols.info_rounded;
   static const IconData copy = Symbols.content_copy_rounded;
   static const IconData share = Symbols.share_rounded;
 
