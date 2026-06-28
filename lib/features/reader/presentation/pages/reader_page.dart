@@ -126,9 +126,6 @@ class _ReaderViewState extends State<_ReaderView> {
   late _Viewport _viewport =
       widget.initialDetailed ? _Viewport.detailed : _Viewport.reading;
 
-  // Whether the inline text-size slider is revealed (toggled by the "Aa" button).
-  bool _showFontSlider = false;
-
   // The Arabic script the reader renders the ayah text in. The toggle only
   // appears while FeatureFlags.indopakScript is on; persisted across launches.
   late ArabicScript _script = _settings.script;
@@ -193,81 +190,52 @@ class _ReaderViewState extends State<_ReaderView> {
             ),
             onPressed: () => _setDetailed(isReading),
           ),
-          // Text size: reveals the inline slider below the bar. (Prayer times
+          // Display: reading size + Arabic font, in a bottom sheet. (Prayer times
           // live on the Home bar, so there's no indicator here — keeps the
           // reader calm and leaves room for the reading controls.)
           IconButton(
             key: WidgetKeys.fontSizeButton,
-            tooltip: 'Text size',
+            tooltip: 'Display',
             icon: const AppIcon(AppIcons.textSize),
-            onPressed: _toggleFontSlider,
+            onPressed: _openDisplaySheet,
           ),
           if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
         ],
       ),
-      body: Stack(
-        children: [
-          Listener(
-            onPointerDown: _onPointerDown,
-            onPointerMove: _onPointerMove,
-            onPointerUp: _onPointerEnd,
-            onPointerCancel: _onPointerEnd,
-            child: BlocBuilder<ReaderCubit, ReaderState>(
-              builder: (context, state) {
-                if (state.status == ReaderStatus.error) {
-                  return Center(child: Text(state.error ?? 'Failed to load'));
-                }
-                // Spinner only before the very first section loads.
-                if (state.ayahs.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                // One page per section in the active dimension. In Reading mode
-                // the audio highlight rides on its own BlocBuilder so an audio
-                // tick repaints the active page without extra plumbing.
-                Widget pages(AyahAudioState? audio) => PageView.builder(
-                      controller: _pageController,
-                      physics: _pageLocked
-                          ? const NeverScrollableScrollPhysics()
-                          : null,
-                      // Keep the neighbours built so the first swipe is smooth.
-                      allowImplicitScrolling: true,
-                      itemCount: _target.dimension.count,
-                      onPageChanged: _onPageChanged,
-                      itemBuilder: (context, i) =>
-                          _sectionPage(i, state, audio),
-                    );
-                return isReading && FeatureFlags.audioRecitation
-                    ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
-                        builder: (context, audio) => pages(audio),
-                      )
-                    : pages(null);
-              },
-            ),
-          ),
-          // Tap-away barrier: dismiss the size slider by tapping the page.
-          if (_showFontSlider)
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _hideFontSlider,
-              ),
-            ),
-          // The inline text-size slider, anchored under the app bar.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: _FontSizeBar(
-              visible: _showFontSlider,
-              fontSize: _arabicFont,
-              minFont: _minFont,
-              maxFont: _maxFont,
-              onChanged: _applyFont,
-              script: _script,
-              onScriptChanged: _applyScript,
-            ),
-          ),
-        ],
+      body: Listener(
+        onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
+        onPointerUp: _onPointerEnd,
+        onPointerCancel: _onPointerEnd,
+        child: BlocBuilder<ReaderCubit, ReaderState>(
+          builder: (context, state) {
+            if (state.status == ReaderStatus.error) {
+              return Center(child: Text(state.error ?? 'Failed to load'));
+            }
+            // Spinner only before the very first section loads.
+            if (state.ayahs.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            // One page per section in the active dimension. In Reading mode
+            // the audio highlight rides on its own BlocBuilder so an audio
+            // tick repaints the active page without extra plumbing.
+            Widget pages(AyahAudioState? audio) => PageView.builder(
+                  controller: _pageController,
+                  physics:
+                      _pageLocked ? const NeverScrollableScrollPhysics() : null,
+                  // Keep the neighbours built so the first swipe is smooth.
+                  allowImplicitScrolling: true,
+                  itemCount: _target.dimension.count,
+                  onPageChanged: _onPageChanged,
+                  itemBuilder: (context, i) => _sectionPage(i, state, audio),
+                );
+            return isReading && FeatureFlags.audioRecitation
+                ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
+                    builder: (context, audio) => pages(audio),
+                  )
+                : pages(null);
+          },
+        ),
       ),
     );
   }
@@ -445,11 +413,21 @@ class _ReaderViewState extends State<_ReaderView> {
 
   // --------------------------------------------------------------------------
 
-  void _toggleFontSlider() =>
-      setState(() => _showFontSlider = !_showFontSlider);
-
-  void _hideFontSlider() {
-    if (_showFontSlider) setState(() => _showFontSlider = false);
+  /// Opens the Display bottom sheet (reading size + Arabic font). Changes apply
+  /// live to the verses behind the sheet and persist, via _applyFont/_applyScript.
+  void _openDisplaySheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => _DisplaySheet(
+        fontSize: _arabicFont,
+        minFont: _minFont,
+        maxFont: _maxFont,
+        onFontChanged: _applyFont,
+        script: _script,
+        onScriptChanged: _applyScript,
+      ),
+    );
   }
 
   void _setDetailed(bool detailed) {
@@ -866,94 +844,279 @@ class _HeaderMarker {
   final bool showBismillah;
 }
 
-/// Inline text-size control: a slim bar that slides down from under the app bar
-/// with a small "A" → slider → large "A". Hidden (slid up + faded) when not
-/// [visible]. Pinch-to-zoom stays the primary gesture; this is the discoverable,
-/// precise one. The parent anchors it at the top of the reader Stack.
-class _FontSizeBar extends StatelessWidget {
-  const _FontSizeBar({
-    required this.visible,
+// Script preview samples — the word "ar-Raḥmān" in each script's own encoding,
+// copied verbatim from Al-Fatihah:1 in the bundled quran.db (text_arabic_uthmani
+// / text_arabic_indopak) rather than hand-typed, so the IndoPak form renders
+// cleanly in Noorehuda (the shipped text was validated to 0 .notdef). They differ
+// by design: Uthmani opens with the waṣla alif (U+0671), IndoPak a plain alif
+// (U+0627).
+const String _uthmaniSample = 'ٱلرَّحۡمَٰنِ';
+const String _indopakSample = 'الرَّحۡمٰنِ';
+
+/// The reader's "Display" bottom sheet: reading size + Arabic font. Stateful so
+/// the slider thumb and selected card update instantly; every change is also
+/// forwarded to the reader (onFontChanged / onScriptChanged) so the verses reflow
+/// live behind the sheet and the choice persists. Matches the app's other modal
+/// sheets (drag handle + SafeArea + titleMedium header).
+class _DisplaySheet extends StatefulWidget {
+  const _DisplaySheet({
     required this.fontSize,
     required this.minFont,
     required this.maxFont,
-    required this.onChanged,
+    required this.onFontChanged,
     required this.script,
     required this.onScriptChanged,
   });
 
-  final bool visible;
   final double fontSize;
   final double minFont;
   final double maxFont;
-  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onFontChanged;
   final ArabicScript script;
   final ValueChanged<ArabicScript> onScriptChanged;
 
   @override
+  State<_DisplaySheet> createState() => _DisplaySheetState();
+}
+
+class _DisplaySheetState extends State<_DisplaySheet> {
+  // One size step — matches the slider's 2pt divisions and the size grid.
+  static const double _step = 2;
+
+  late double _fontSize = widget.fontSize;
+  late ArabicScript _script = widget.script;
+
+  void _setFont(double value) {
+    final v = value.clamp(widget.minFont, widget.maxFont).roundToDouble();
+    if (v == _fontSize) return;
+    setState(() => _fontSize = v);
+    widget.onFontChanged(v); // reflow the verses behind the sheet + persist
+  }
+
+  void _setScript(ArabicScript value) {
+    if (value == _script) return;
+    setState(() => _script = value);
+    widget.onScriptChanged(value); // reload behind the sheet + persist
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return IgnorePointer(
-      ignoring: !visible,
-      child: AnimatedSlide(
-        offset: visible ? Offset.zero : const Offset(0, -1),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
-          duration: const Duration(milliseconds: 160),
-          child: Material(
-            color: theme.colorScheme.surface,
-            elevation: 3,
-            shadowColor: Colors.black.withValues(alpha: 0.2),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Text('A', style: TextStyle(fontSize: 13)),
-                      Expanded(
-                        child: Slider(
-                          value: fontSize.clamp(minFont, maxFont),
-                          min: minFont,
-                          max: maxFont,
-                          divisions: ((maxFont - minFont) / 2).round(),
-                          label: '${fontSize.round()}',
-                          onChanged: onChanged,
-                        ),
-                      ),
-                      const Text('A', style: TextStyle(fontSize: 22)),
-                    ],
+    final cs = theme.colorScheme;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Display', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 16),
+            // Text size: label + live point readout.
+            Row(
+              children: [
+                Text(
+                  'Text size',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
-                  // Script switch — only while the IndoPak feature is enabled.
-                  if (FeatureFlags.indopakScript)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: SegmentedButton<ArabicScript>(
-                        key: WidgetKeys.scriptToggle,
-                        showSelectedIcon: false,
-                        style: SegmentedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          textStyle: const TextStyle(fontSize: 12),
-                        ),
-                        segments: const [
-                          ButtonSegment(
-                            value: ArabicScript.uthmani,
-                            label: Text('Uthmani'),
-                          ),
-                          ButtonSegment(
-                            value: ArabicScript.indopak,
-                            label: Text('IndoPak'),
-                          ),
-                        ],
-                        selected: {script},
-                        onSelectionChanged: (s) => onScriptChanged(s.first),
-                      ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_fontSize.round()}',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            // A− / A+ steppers flank the slider (each nudges one grid step).
+            Row(
+              children: [
+                _StepButton(
+                  key: WidgetKeys.fontDecrease,
+                  glyphSize: 14,
+                  tooltip: 'Smaller text',
+                  onPressed: _fontSize > widget.minFont
+                      ? () => _setFont(_fontSize - _step)
+                      : null,
+                ),
+                Expanded(
+                  child: Slider(
+                    value: _fontSize.clamp(widget.minFont, widget.maxFont),
+                    min: widget.minFont,
+                    max: widget.maxFont,
+                    divisions:
+                        ((widget.maxFont - widget.minFont) / _step).round(),
+                    onChanged: _setFont,
+                  ),
+                ),
+                _StepButton(
+                  key: WidgetKeys.fontIncrease,
+                  glyphSize: 22,
+                  tooltip: 'Larger text',
+                  onPressed: _fontSize < widget.maxFont
+                      ? () => _setFont(_fontSize + _step)
+                      : null,
+                ),
+              ],
+            ),
+            // Arabic font — only while the IndoPak feature is enabled.
+            if (FeatureFlags.indopakScript) ...[
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Arabic Font',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                key: WidgetKeys.scriptToggle,
+                children: [
+                  Expanded(
+                    child: _ScriptCard(
+                      script: ArabicScript.uthmani,
+                      label: 'Uthmani/Madani',
+                      sample: _uthmaniSample,
+                      sampleStyle: QuranTextStyle.madani,
+                      selected: _script == ArabicScript.uthmani,
+                      onTap: () => _setScript(ArabicScript.uthmani),
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ScriptCard(
+                      script: ArabicScript.indopak,
+                      label: 'IndoPak/Asian',
+                      sample: _indopakSample,
+                      sampleStyle: QuranTextStyle.indopak,
+                      selected: _script == ArabicScript.indopak,
+                      onTap: () => _setScript(ArabicScript.indopak),
+                    ),
+                  ),
                 ],
               ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A round tap target showing a small/large "A" — the size-step affordance beside
+/// the slider. Dimmed and inert at the size bounds ([onPressed] null).
+class _StepButton extends StatelessWidget {
+  const _StepButton({
+    required this.glyphSize,
+    required this.tooltip,
+    required this.onPressed,
+    super.key,
+  });
+
+  final double glyphSize;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      icon: Text(
+        'A',
+        style: TextStyle(
+          fontSize: glyphSize,
+          fontWeight: FontWeight.w600,
+          color: onPressed == null
+              ? cs.onSurface.withValues(alpha: 0.3)
+              : cs.onSurface,
+        ),
+      ),
+    );
+  }
+}
+
+/// A selectable card previewing an Arabic [script] in its real font, so the
+/// Uthmani↔IndoPak difference is visible without reading the label.
+class _ScriptCard extends StatelessWidget {
+  const _ScriptCard({
+    required this.script,
+    required this.label,
+    required this.sample,
+    required this.sampleStyle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ArabicScript script;
+  final String label;
+  final String sample;
+  final TextStyle sampleStyle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      key: WidgetKeys.scriptCard(script.name),
+      color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? cs.primary : Colors.transparent,
+              width: 1.5,
             ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                height: 32,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    sample,
+                    textDirection: TextDirection.rtl,
+                    locale: const Locale('ar'),
+                    style: sampleStyle.copyWith(
+                      fontSize: 24,
+                      color: selected ? cs.onPrimaryContainer : cs.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              // scaleDown keeps the (longer) two-part labels on one line.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color:
+                        selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

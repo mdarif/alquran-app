@@ -144,6 +144,16 @@ void main() {
   String detailedText(WidgetTester tester) =>
       tester.widget<AyahTile>(find.byType(AyahTile).first).ayah.textArabic;
 
+  // The Arabic reading size the reader is currently driving the Mushaf with.
+  double readerFontSize(WidgetTester tester) =>
+      tester.widget<MushafView>(find.byType(MushafView)).arabicFontSize;
+
+  // Tap one of the two script preview cards (Uthmani / IndoPak).
+  Future<void> tapScript(WidgetTester tester, ArabicScript script) async {
+    await tester.tap(find.byKey(WidgetKeys.scriptCard(script.name)));
+    await tester.pumpAndSettle();
+  }
+
   const skip = !FeatureFlags.indopakScript; // feature shipped dark
 
   group('IndoPak script toggle', () {
@@ -165,8 +175,7 @@ void main() {
         await pump(tester);
         await openPanel(tester);
 
-        await tester.tap(find.text('IndoPak'));
-        await tester.pumpAndSettle();
+        await tapScript(tester, ArabicScript.indopak);
 
         expect(settings.script, ArabicScript.indopak);
         expect(settings.setScriptCalls, 1);
@@ -181,10 +190,8 @@ void main() {
         await pump(tester);
         await openPanel(tester);
 
-        await tester.tap(find.text('IndoPak'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Uthmani'));
-        await tester.pumpAndSettle();
+        await tapScript(tester, ArabicScript.indopak);
+        await tapScript(tester, ArabicScript.uthmani);
 
         expect(settings.script, ArabicScript.uthmani);
         expect(readerFont(tester), AppTheme.arabicFontFamily);
@@ -197,15 +204,13 @@ void main() {
       (tester) async {
         await pump(tester);
         await openPanel(tester);
-        await tester.tap(find.text('IndoPak'));
-        await tester.pumpAndSettle();
+        await tapScript(tester, ArabicScript.indopak);
 
         final callsAfterSwitch = repo.getAyahsCalls;
         final setScriptAfterSwitch = settings.setScriptCalls;
 
         // Tap the already-selected segment again.
-        await tester.tap(find.text('IndoPak'));
-        await tester.pumpAndSettle();
+        await tapScript(tester, ArabicScript.indopak);
 
         // No extra fetch or persist for re-selecting the active script.
         expect(repo.getAyahsCalls, callsAfterSwitch);
@@ -219,10 +224,9 @@ void main() {
       (tester) async {
         await pump(tester, 2);
         await openPanel(tester);
-        await tester.tap(find.text('IndoPak'));
-        await tester.pumpAndSettle();
-        // dismiss the panel by tapping away, then swipe to the next surah
-        await tester.tapAt(const Offset(200, 500));
+        await tapScript(tester, ArabicScript.indopak);
+        // close the Display sheet (tap the scrim above it), then swipe
+        await tester.tapAt(const Offset(400, 100));
         await tester.pumpAndSettle();
         await tester.fling(
           find.byType(MushafView),
@@ -248,8 +252,7 @@ void main() {
 
         await openPanel(tester);
         expect(find.byKey(WidgetKeys.scriptToggle), findsOneWidget);
-        await tester.tap(find.text('IndoPak'));
-        await tester.pumpAndSettle();
+        await tapScript(tester, ArabicScript.indopak);
 
         expect(settings.script, ArabicScript.indopak);
         // The verses themselves must re-render in the new script — not keep the
@@ -263,4 +266,55 @@ void main() {
       skip: skip,
     );
   });
+
+  group('font size steppers', () {
+    testWidgets('A+ / A− nudge the reading size by one 2pt step',
+        (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      expect(readerFontSize(tester), 28); // default
+
+      await tester.tap(find.byKey(WidgetKeys.fontIncrease));
+      await tester.pumpAndSettle();
+      expect(readerFontSize(tester), 30);
+
+      await tester.tap(find.byKey(WidgetKeys.fontDecrease));
+      await tester.pumpAndSettle();
+      expect(readerFontSize(tester), 28);
+    });
+
+    testWidgets('A+ clamps at the maximum size', (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      // More taps than steps to the max — must clamp, never overshoot.
+      for (var i = 0; i < 14; i++) {
+        await tester.tap(
+          find.byKey(WidgetKeys.fontIncrease),
+          warnIfMissed: false,
+        );
+        await tester.pump();
+      }
+      await tester.pumpAndSettle();
+      expect(readerFontSize(tester), 48); // _maxFont
+    });
+  });
+
+  testWidgets(
+    'both script cards render with their labels',
+    (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      expect(
+        find.byKey(WidgetKeys.scriptCard(ArabicScript.uthmani.name)),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(WidgetKeys.scriptCard(ArabicScript.indopak.name)),
+        findsOneWidget,
+      );
+      expect(find.text('Uthmani/Madani'), findsOneWidget);
+      expect(find.text('IndoPak/Asian'), findsOneWidget);
+    },
+    skip: skip,
+  );
 }

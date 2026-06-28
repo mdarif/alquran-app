@@ -17,8 +17,14 @@ class WidgetKeys {
   static const fontSizeButton = Key('reader-font-size-button');
   static const themeToggle = Key('reader-theme-toggle');
   // Uthmani/IndoPak script switch, inside the text-size panel (only rendered
-  // while FeatureFlags.indopakScript is on).
+  // while FeatureFlags.indopakScript is on) — this keys the two-card row.
   static const scriptToggle = Key('reader-script-toggle');
+  // The individual script preview cards; pass the ArabicScript.name
+  // ('uthmani' | 'indopak').
+  static Key scriptCard(String script) => Key('reader-script-card-$script');
+  // The A−/A+ size steppers flanking the slider in the text-size panel.
+  static const fontDecrease = Key('reader-font-decrease');
+  static const fontIncrease = Key('reader-font-increase');
 
   // Reader content
   static const peekCard = Key('reader-peek-card');
