@@ -741,6 +741,34 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   stricter `analysis_options` (`strict-inference`, `unawaited_futures`), and
   `cliff.toml` for changelog-from-conventional-commits. All architecture-agnostic.
 
+### Release icon tree-shaking CORRUPTS the Material Symbols variable font (2026-06-28)
+
+- **Symptom:** in **release** builds (only), many in-app icons render **blank** —
+  specifically every `filled` icon and any icon at a non-default optical size.
+  Debug is fine. With `material_symbols_icons`, ~all icons go through non-default
+  axes (`AppIcon` sets `fill`/`opticalSize`), so this hits most of them.
+- **Root cause:** Flutter's `--tree-shake-icons` (ON by default in release)
+  subsets the icon font, but **mangles Material Symbols' 4-axis variable-font
+  `gvar` table**. The default-axis outline (`glyf`) still renders, so icons at
+  FILL=0 / opsz=24 look fine — but any axis that needs a `gvar` delta renders
+  empty. Proved with fontTools: the tree-shaken subset **can't even decompile its
+  `gvar`** (`IndexError` in `sharedTuples`), while the untouched full font (and a
+  *correct* fontTools subset) instance cleanly at FILL=1.
+- **Don't be fooled:** the subset is *detection*-correct (the right codepoints,
+  `fvar` present) — only the *variation data* is broken. So it's not "missing
+  glyphs"; the icons present are simply un-renderable at non-default axes.
+- **Fix (keeps the app light — 62 MB vs 80.7 MB for a bare flag):** ship our OWN
+  fontTools subset (`tools/icon/subset_symbols.py` → `assets/fonts/
+  MaterialSymbolsRounded.ttf`, ~115 KB, axes intact), reference it as a bundled
+  app font (`app_icons.dart` uses `IconData(0x.., fontFamily: …)` codepoints),
+  move `material_symbols_icons` to **dev_dependencies** (so its 14 MB font — and
+  the 18 MB of unused Outlined/Sharp — never bundle), and build release with
+  **`--no-tree-shake-icons`** (baked into `make apk`/`aab`/`ipa` + the release
+  workflow) so Flutter leaves the subset alone. A bare `--no-tree-shake-icons`
+  *without* the dev-dep move bundles all 3 families full (+16 MB).
+- **Verify the artifact, not just the source:** unzip the release APK, pull the
+  bundled `.ttf`, confirm `fvar` + all codepoints + that it instances at FILL=1.
+
 ---
 
 ## 5. Prayer times — offline calc + a prayer-aware theme

@@ -93,6 +93,14 @@ Commands:
   logo are derived from it by `python3 tools/icon/derive_adaptive.py`, then
   `dart run flutter_launcher_icons` + `dart run flutter_native_splash:create`.
   Naming: app name **"Al Quran"**, the book in prose **"Qur'an"**.
+- **In-app icons + `--no-tree-shake-icons` (don't drop this flag):** Material
+  Symbols Rounded via `core/theme/app_icons.dart`, rendered from a bundled ~115 KB
+  subset (`assets/fonts/MaterialSymbolsRounded.ttf`), NOT the `material_symbols_icons`
+  package (a dev-dependency). Flutter's release icon tree-shaking **corrupts** that
+  4-axis variable font → filled/non-default-size icons render blank. So **every
+  release build MUST pass `--no-tree-shake-icons`** (baked into `make apk`/`aab`/`ipa`
+  + the release workflow). Add/remove an icon → edit `app_icons.dart`, then
+  `python3 tools/icon/subset_symbols.py`. See LEARNINGS.md §4 + docs/brand.md.
 - **Package id:** `com.almarfa.alquran` — the **published** app id on both
   stores (unified 2026-06-28). Internally the Android Kotlin `namespace` stays
   `com.almarfa.al_quran` (the package for `MainActivity`, the widget providers,
