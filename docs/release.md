@@ -5,6 +5,10 @@ quality gate, builds a **production-signed** APK + AAB, generates a changelog,
 tags the commit, publishes a GitHub Release with the artifacts attached, and
 (optionally) uploads the AAB to the Play Store internal track.
 
+> Looking for the full ship-it playbook (preflight checklist, iOS, store
+> submission, post-release)? See **[docs/release-runbook.md](release-runbook.md)**.
+> This doc is the CD *mechanics*; that one is the *sequence you follow*.
+
 - Workflow: [.github/workflows/flutter-release.yml](../.github/workflows/flutter-release.yml)
 - Trigger: `make release BUMP=<current|patch|minor|major>` (or Actions →
   **Release** → *Run workflow*).
