@@ -84,7 +84,13 @@ Commands:
 
 ## Key decisions & gotchas
 
-- **Package id:** `com.almarfa.alquran` (org `com.almarfa`, project `al_quran`).
+- **Package id:** `com.almarfa.alquran` — the **published** app id on both
+  stores (unified 2026-06-28). Internally the Android Kotlin `namespace` stays
+  `com.almarfa.al_quran` (the package for `MainActivity`, the widget providers,
+  and the reminders MethodChannel) and the iOS App Group stays
+  `group.com.almarfa.alQuran` — both invisible to users; `applicationId` !=
+  `namespace` is valid. Don't "align" them without moving the Kotlin sources +
+  updating the Dart FQNs/channel/appGroupId that reference them.
 - **Drift column mapping:** `build.yaml` sets `case_from_dart_to_sql: snake_case`
   so camelCase getters (e.g. `nameArabic`) map to the DB's snake_case columns
   (`name_arabic`). Keep that, or queries break against the prepopulated DB.

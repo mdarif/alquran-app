@@ -6,8 +6,11 @@
 require 'xcodeproj'
 
 WIDGET = 'PrayerWidget'
+# App Group is a shared-container id, independent of the bundle id — it keeps its
+# original spelling (matches Runner/PrayerWidget.entitlements + WidgetPublisher
+# in Dart). The bundle id was unified to com.almarfa.alquran.
 APP_GROUP = 'group.com.almarfa.alQuran'
-BUNDLE_ID = 'com.almarfa.alQuran.PrayerWidget'
+BUNDLE_ID = 'com.almarfa.alquran.PrayerWidget'
 
 project_path = File.expand_path('../../Runner.xcodeproj', __FILE__)
 project = Xcodeproj::Project.open(project_path)

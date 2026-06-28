@@ -293,7 +293,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
-          packageName: com.almarfa.al_quran
+          packageName: com.almarfa.alquran
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: internal
           status: completed

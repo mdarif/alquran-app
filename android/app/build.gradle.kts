@@ -34,8 +34,13 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.almarfa.al_quran"
+        // Published app id (what Play + users see). The `namespace` above
+        // intentionally stays `com.almarfa.al_quran` — it's the internal Kotlin
+        // package for MainActivity, the widget providers, and the reminders
+        // MethodChannel, all keyed to that name. applicationId != namespace is
+        // valid and supported; do NOT "align" the namespace without moving the
+        // Kotlin sources + updating the Dart FQNs/channel that reference it.
+        applicationId = "com.almarfa.alquran"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

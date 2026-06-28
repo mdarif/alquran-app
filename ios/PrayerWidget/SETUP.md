@@ -1,7 +1,8 @@
 # iOS home-screen widgets — setup
 
-App Group used everywhere: **`group.com.almarfa.alQuran`** (matches the
-`com.almarfa.alQuran` bundle id and `WidgetPublisher.appGroupId` in Dart).
+App Group used everywhere: **`group.com.almarfa.alQuran`** — a shared-container
+id, independent of the bundle id (`com.almarfa.alquran`), so it keeps its
+original `alQuran` spelling; it must match `WidgetPublisher.appGroupId` in Dart.
 
 ## Automated (done)
 
@@ -13,7 +14,7 @@ ruby ios/PrayerWidget/add_target.rb   # idempotent; re-run if ios/ is regenerate
 ```
 
 It adds the `PrayerWidget` app-extension target (bundle id
-`com.almarfa.alQuran.PrayerWidget`), compiles `PrayerWidget.swift`, embeds it in
+`com.almarfa.alquran.PrayerWidget`), compiles `PrayerWidget.swift`, embeds it in
 Runner, and sets the App Group entitlement on both targets.
 
 - **Simulator:** no code signing needed — just `flutter run`.

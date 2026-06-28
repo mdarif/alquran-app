@@ -75,9 +75,9 @@ patrol:
   # otherwise defaults to patrol_test/ and would mis-bundle the imports.
   test_directory: integration_test
   android:
-    package_name: com.almarfa.al_quran
+    package_name: com.almarfa.alquran
   ios:
-    bundle_id: com.almarfa.alQuran
+    bundle_id: com.almarfa.alquran
 
 # App launcher icon — اقرأ ("Read", the first revealed word) in the bundled
 # KFGQPC Uthmanic Hafs face, gold on deep green. Master art lives in

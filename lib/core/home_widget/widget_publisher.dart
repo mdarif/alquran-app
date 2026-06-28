@@ -55,8 +55,10 @@ class WidgetPublisher {
   /// Key the native widgets read the JSON payload from.
   static const String payloadKey = 'prayer_widget_payload';
 
-  /// iOS App Group shared by the app + widget extension (matches the
-  /// `com.almarfa.alQuran` bundle id). iOS-only; ignored on Android.
+  /// iOS App Group shared by the app + widget extension. A shared-container id,
+  /// independent of the bundle id (which is `com.almarfa.alquran`) — it keeps
+  /// its original `alQuran` spelling, matching the entitlements + the widget's
+  /// Swift. iOS-only; ignored on Android.
   static const String appGroupId = 'group.com.almarfa.alQuran';
 
   /// Fully-qualified Android receivers — both read the same payload.

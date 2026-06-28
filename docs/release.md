@@ -59,7 +59,7 @@ gh secret set GOOGLE_PLAY_SERVICE_ACCOUNT --repo mdarif/alquran-app < service-ac
 
 Until this secret exists the workflow logs a notice and skips the upload — the
 signed AAB is still attached to the GitHub Release for a manual upload. Package
-name on Play: `com.almarfa.al_quran`. The workflow uploads to the **internal**
+name on Play: `com.almarfa.alquran`. The workflow uploads to the **internal**
 track with status *completed*; promoting internal → production stays a manual
 Play Console step (a deliberate human gate).
 
@@ -126,7 +126,7 @@ the release build succeeds.
   higher bump.
 - **Play upload failed** — the service account needs Release Manager access and
   the app must already be created in the Play Console with package
-  `com.almarfa.al_quran` and at least one manual upload on the internal track.
+  `com.almarfa.alquran` and at least one manual upload on the internal track.
 - **Owner pre-submission gates** (not CI): translation/font/audio licensing,
   privacy-policy URL, `SCHEDULE_EXACT_ALARM` Play declaration, store assets.
   See the v1 readiness notes.

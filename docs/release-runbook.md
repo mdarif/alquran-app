@@ -6,8 +6,10 @@ the stores." For the CI/CD mechanics it leans on — secrets, the workflow, the
 *sequence you follow*; that doc is *how the machine works*.
 
 > **Identity at a glance**
-> · App name: **Al Quran** · Android `com.almarfa.al_quran` · iOS
-> `com.almarfa.alQuran` (note: Android uses `al_quran`, iOS uses `alQuran`)
+> · App name: **Al Quran** · published id **`com.almarfa.alquran`** on both
+> stores. (Internally, the Android Kotlin `namespace` stays `com.almarfa.al_quran`
+> and the iOS App Group stays `group.com.almarfa.alQuran` — both invisible to
+> users and intentionally left as-is.)
 > · Version lives in `pubspec.yaml` as `X.Y.Z+BUILD` (today: `1.0.0+1`).
 
 ---
@@ -143,7 +145,7 @@ Then upload the `.ipa`:
 
 Notes:
 - Signing uses your Apple Developer account / provisioning for
-  `com.almarfa.alQuran`. First time: create the App ID + app record in App Store
+  `com.almarfa.alquran`. First time: create the App ID + app record in App Store
   Connect.
 - Keep the iOS build number in step with `pubspec.yaml` (`flutter build ipa`
   reads it). Each upload needs a higher build number.
@@ -204,8 +206,8 @@ Notes:
 - [ ] Signing secrets added — [docs/release.md → One-time setup](release.md#one-time-setup).
 - [ ] (Optional) `GOOGLE_PLAY_SERVICE_ACCOUNT` added to automate Play upload;
       skip it and upload the `.aab` by hand the first time if Play isn't set up.
-- [ ] Play Console: create the app `com.almarfa.al_quran`, first manual internal
+- [ ] Play Console: create the app `com.almarfa.alquran`, first manual internal
       upload (a service account can't create the very first release).
-- [ ] App Store Connect: create the app record `com.almarfa.alQuran`.
+- [ ] App Store Connect: create the app record `com.almarfa.alquran`.
 - [ ] All Section 1B/1C legal + store gates cleared.
 - [ ] `make release BUMP=current` → ship v1.0.0. 🎉
