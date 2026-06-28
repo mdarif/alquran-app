@@ -46,3 +46,6 @@ tool/uthmani_deltas.html
 android/key.properties
 *.jks
 *.keystore
+
+# Scratch / working art (brand previews, masks, rasterized PDFs)
+tmp/
