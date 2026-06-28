@@ -65,6 +65,7 @@ dev_dependencies:
   build_runner: ^2.4.11
   flutter_launcher_icons: ^0.14.1
   patrol: ^4.6.1
+  flutter_native_splash: ^2.4.7
 
 # Patrol end-to-end tests (integration_test/). Run with the patrol CLI on a
 # device/emulator: `patrol test` (one-time native setup — see Makefile
@@ -79,19 +80,39 @@ patrol:
   ios:
     bundle_id: com.almarfa.alquran
 
-# App launcher icon — اقرأ ("Read", the first revealed word) in the bundled
-# KFGQPC Uthmanic Hafs face, gold on deep green. Master art lives in
-# assets/icon/. Regenerate after editing: `dart run flutter_launcher_icons`.
+# App launcher icon — the calligraphic gold "Al Quran" Q mark on deep green.
+# Master art (owner-approved raster) is assets/icon/icon.png; the editable brand
+# kit lives in assets/brand/ (al-quran-mark.svg + studio). NOTE: per the brand
+# guardrail, the launcher deliberately carries NO Quranic text (the earlier اقرأ
+# wordmark was retired). The Android adaptive foreground/background are derived
+# from icon.png by `python3 tools/icon/derive_adaptive.py` (keeps the Q inside the
+# mask safe zone). Regenerate after editing: rerun that, then
+# `dart run flutter_launcher_icons`.
 flutter_launcher_icons:
   image_path: "assets/icon/icon.png"
   android: true
   ios: true
   remove_alpha_ios: true
-  # Android adaptive icon: gradient green ground + the gold wordmark, each kept
-  # within the central safe zone so launcher masks (circle/squircle) don't clip.
+  # Safety: if icon.png ever has transparent edges, flatten onto the brand green
+  # (not white) so iOS never shows a white field.
+  background_color_ios: "#093E26"
+  # Android adaptive icon: flat green ground + the gold Q, kept within the central
+  # safe zone so launcher masks (circle/squircle) don't clip the tail.
   adaptive_icon_background: "assets/icon/icon_background.png"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
   min_sdk_android: 21
+
+# Splash screen — deep-green field + the gold Q, matching the launcher icon (no
+# Quranic text, per the brand guardrail). One config covers iOS, Android, and the
+# Android 12+ splash API. The logo (assets/icon/splash_logo.png) is the Q on
+# transparent, derived from icon.png by tools/icon/derive_adaptive.py and sized to
+# read modestly full-screen. Regenerate: `dart run flutter_native_splash:create`.
+flutter_native_splash:
+  color: "#093E26"
+  image: assets/icon/splash_logo.png
+  android_12:
+    color: "#093E26"
+    image: assets/icon/splash_logo.png
 
 flutter:
   uses-material-design: true

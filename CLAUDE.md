@@ -84,6 +84,15 @@ Commands:
 
 ## Key decisions & gotchas
 
+- **Brand / app icon + splash:** the mark is the calligraphic gold **"Q"** on deep
+  green (`#093E26`); brand kit + tokens + a browser "Brand Studio" live in
+  `assets/brand/`, full reference in [docs/brand.md](docs/brand.md). **Guardrail:**
+  the launcher/splash carry **no Quranic text** (the earlier اقرأ wordmark icon was
+  retired — `tools/icon/make_icon.sh` that built it is deprecated). Launcher master
+  is the raster `assets/icon/icon.png`; the adaptive foreground/background + splash
+  logo are derived from it by `python3 tools/icon/derive_adaptive.py`, then
+  `dart run flutter_launcher_icons` + `dart run flutter_native_splash:create`.
+  Naming: app name **"Al Quran"**, the book in prose **"Qur'an"**.
 - **Package id:** `com.almarfa.alquran` — the **published** app id on both
   stores (unified 2026-06-28). Internally the Android Kotlin `namespace` stays
   `com.almarfa.al_quran` (the package for `MainActivity`, the widget providers,

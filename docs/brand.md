@@ -1,0 +1,67 @@
+# Al Quran — brand
+
+The single reference for the app's identity: the mark, colours, naming, store
+copy, and how the launcher icon + splash are produced. The editable brand kit
+(master SVG, tokens, browser "Brand Studio") lives in
+[assets/brand/](../assets/brand/).
+
+## The mark
+
+A calligraphic gold **"Q"** — a continuous brushstroke whose tail flourishes into
+a leaf in the negative space (growth / the living word), on a deep-green field.
+"Q" for Qur'an; the leaf + brushstroke nod to Islamic calligraphy.
+
+> **Guardrail (from the brand kit README):** the launcher icon and splash carry
+> **no Quranic text and not the word Allah** — Arabic scripture is kept off a
+> surface that gets masked, scaled, and discarded. (The earlier اقرأ wordmark icon
+> was retired for this reason.) If اقرأ is ever wanted, it belongs *in-app*, not
+> on the icon.
+
+## Colours
+
+| Token | Value | Use |
+|---|---|---|
+| Deep green (field) | `#093E26` | Icon + splash background; primary brand ground |
+| Green (brand gradient center / edge) | `#176646` / `#0A3A25` | Optional radial ground (brand kit) |
+| Gold (mark) | `#E1A222` (flat) · `#F6E6AC→#D9A62E→#C68F1E` (gradient) | The Q |
+
+## Naming & spelling (be consistent)
+
+- **App / brand name:** **"Al Quran"** (no apostrophe) — app title, store name, labels.
+- **The book, in prose/taglines:** **"Qur'an"** (with apostrophe).
+- **Developer:** **Al Marfa Technologies**.
+- **Package id (both stores):** `com.almarfa.alquran`.
+
+## Store + web copy
+
+- **Store name:** Al Quran — Read Simply  *(Play title ≤30 chars ✓)*
+- **Tagline / subtitle:** The Qur'an, beautifully simple.
+- **Website H1:** Read the Qur'an without distractions.  *(for the future companion site)*
+- **Positioning:** offline reading + optional audio recitation; ultra-light, distraction-free.
+
+## Icon & splash — how they're generated
+
+Master art (owner-approved raster) is [assets/icon/icon.png](../assets/icon/icon.png):
+the gold Q on a flat `#093E26` field. The brand SVG ([assets/brand/al-quran-mark.svg](../assets/brand/al-quran-mark.svg))
+is the editable companion (a cleaner geometric reconstruction) — not the launcher
+master, by owner decision.
+
+Derived assets come from the master via Pillow (no SVG renderer needed):
+
+```bash
+python3 tools/icon/derive_adaptive.py     # → icon_foreground.png, icon_background.png, splash_logo.png
+dart run flutter_launcher_icons           # → Android mipmaps/drawables + iOS AppIcon
+dart run flutter_native_splash:create     # → iOS LaunchScreen + Android (incl. 12+) splash
+```
+
+- `icon_foreground.png` — the Q on transparent, scaled to the Android adaptive
+  **safe zone** (~50% of the icon after the generator's 16% inset) so launcher
+  masks never clip the tail.
+- `icon_background.png` — the flat green field.
+- `splash_logo.png` — the Q on transparent, more padded so it reads at ~30% of
+  screen width on the splash.
+
+`tools/icon/make_icon.sh` (the old اقرأ wordmark generator) is **deprecated** — do
+not run it; it would overwrite the Q master.
+
+See [docs/release-runbook.md](release-runbook.md) for store submission.

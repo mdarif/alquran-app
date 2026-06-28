@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Al Quran brand mark</title>
+  <desc id="desc">A continuous Q-inspired ribbon with a page fold and rising tail.</desc>
+  <defs>
+    <radialGradient id="background" cx="50%" cy="44%" r="72%">
+      <stop offset="0" stop-color="#176646"/>
+      <stop offset="1" stop-color="#0A3A25"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="18%" y1="12%" x2="82%" y2="88%">
+      <stop offset="0" stop-color="#F6E6AC"/>
+      <stop offset="0.55" stop-color="#D9A62E"/>
+      <stop offset="1" stop-color="#C68F1E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Every visual element is a named layer for easy editing. -->
+  <g id="background-layer">
+    <rect id="background-shape" width="1024" height="1024" fill="url(#background)"/>
+  </g>
+
+  <g id="mark-layer" fill="url(#gold)">
+    <!-- Smooth Bézier master redrawn against the approved PNG silhouette. -->
+    <path id="approved-q-mark" fill-rule="evenodd" d="M776 470 C768 540 740 610 682 652 C654 672 625 668 600 650 C570 628 550 580 516 548 C490 524 460 505 424 492 C414 545 420 594 450 626 C475 653 520 656 580 654 C560 675 510 692 468 692 C370 690 294 610 294 494 C294 384 370 294 484 294 C596 294 674 380 674 496 C674 540 660 580 634 616 L594 590 C614 558 624 526 624 488 C624 404 560 338 478 338 C394 338 342 402 342 490 C342 578 400 646 496 648 C462 634 438 614 428 584 C420 560 420 526 424 492 C470 496 514 518 548 548 C580 576 598 616 626 628 C650 638 676 622 696 594 C714 568 714 536 718 520 C740 510 760 490 776 470 Z"/>
+  </g>
+</svg>

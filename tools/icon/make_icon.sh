@@ -1,4 +1,15 @@
 #!/usr/bin/env bash
+# ⚠️ DEPRECATED / DO NOT RUN — generates the RETIRED اقرأ wordmark icon and would
+# overwrite the current calligraphic "Q" master in assets/icon/icon.png.
+#
+# The launcher mark is now the calligraphic gold "Al Quran" Q (brand kit in
+# assets/brand/); per the brand guardrail the launcher carries NO Quranic text.
+# The adaptive foreground/background are now derived from icon.png by
+# `python3 tools/icon/derive_adaptive.py`. This script is kept only as reference
+# (e.g. if اقرأ ever returns as an *in-app* wordmark, where masking/discard
+# concerns don't apply).
+#
+# --- original (اقرأ wordmark generator) ---------------------------------------
 # Build the Al Quran launcher-icon masters in assets/icon/ from scratch.
 #
 # The icon is a wordmark: اقرأ ("Read" — the first revealed word, Surah

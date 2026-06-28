@@ -75,7 +75,8 @@ These are **not** enforced by CI. Tick each before going public:
       declaration, or accept the scheduler's inexact fallback. Decide and record.
 - [ ] **Store assets** ready: icon, screenshots (phone + tablet), feature
       graphic, listing copy ("offline reading + optional audio recitation"),
-      content rating questionnaire (expect Everyone / 4+).
+      content rating questionnaire (expect Everyone / 4+). Store name, tagline,
+      colours, and naming are in [docs/brand.md](brand.md).
 - [ ] **Data-safety (Play) / privacy-nutrition (App Store)** forms filled —
       declare Location; declare *no* tracking.
 

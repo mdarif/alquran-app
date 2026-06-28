@@ -1,0 +1,27 @@
+{
+  "name": "Al Quran",
+  "tagline": "The Qur’an, beautifully simple.",
+  "canvas": {
+    "size": 1024,
+    "safeArea": 0.72
+  },
+  "background": {
+    "center": "#176646",
+    "edge": "#0A3A25",
+    "centerX": 50,
+    "centerY": 44,
+    "radius": 72
+  },
+  "mark": {
+    "gradientStart": "#F6E6AC",
+    "gradientMiddle": "#D9A62E",
+    "gradientEnd": "#C68F1E",
+    "gradientAngle": 45,
+    "scale": 1,
+    "rotation": 0,
+    "offsetX": 0,
+    "offsetY": 0,
+    "opacity": 1,
+    "sourceGeometry": "approved-png-trace"
+  }
+}
