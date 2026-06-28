@@ -176,7 +176,7 @@ class _ReaderViewState extends State<_ReaderView> {
         actions: [
           // Reading ⇄ Detailed in one tap (icon shows the view you'll switch to).
           // The app-bar action set stays identical in both views so positions
-          // never shift; translation languages live in the Display sheet (below),
+          // never shift; translation languages live in the Settings sheet (below),
           // not here.
           IconButton(
             key: WidgetKeys.viewportToggle,
@@ -186,16 +186,16 @@ class _ReaderViewState extends State<_ReaderView> {
             ),
             onPressed: () => _setDetailed(isReading),
           ),
-          // Display: reading size + Arabic font, in a bottom sheet. (Prayer times
-          // live on the Home bar, so there's no indicator here — keeps the
-          // reader calm and leaves room for the reading controls.)
-          IconButton(
-            key: WidgetKeys.fontSizeButton,
-            tooltip: 'Display',
-            icon: const AppIcon(AppIcons.textSize),
-            onPressed: _openDisplaySheet,
-          ),
           if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
+          // Settings sits last (rightmost): reading size, Arabic font +
+          // translation, in a bottom sheet. (Prayer times live on the Home bar,
+          // so there's no indicator here — keeps the reader calm.)
+          IconButton(
+            key: WidgetKeys.settingsButton,
+            tooltip: 'Settings',
+            icon: const AppIcon(AppIcons.settings),
+            onPressed: _openSettingsSheet,
+          ),
         ],
       ),
       body: Listener(
@@ -274,7 +274,7 @@ class _ReaderViewState extends State<_ReaderView> {
       );
     } else {
       // Detailed view owns its own SelectionArea (around the verses) for
-      // copy/share; translation languages are chosen in the Display sheet.
+      // copy/share; translation languages are chosen in the Settings sheet.
       view = _DetailedList(
         key: key,
         ayahs: ayahs,
@@ -401,16 +401,16 @@ class _ReaderViewState extends State<_ReaderView> {
 
   // --------------------------------------------------------------------------
 
-  /// Opens the Display bottom sheet (reading size, Arabic font, translations).
+  /// Opens the Settings bottom sheet (reading size, Arabic font, translations).
   /// Changes apply live to the verses behind the sheet and persist, via
   /// _applyFont / _applyScript / _toggleLang.
-  void _openDisplaySheet() {
+  void _openSettingsSheet() {
     final resources = _cubit.state.resources;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _DisplaySheet(
+      builder: (_) => _SettingsSheet(
         fontSize: _arabicFont,
         minFont: _minFont,
         maxFont: _maxFont,
@@ -526,7 +526,7 @@ class _DetailedList extends StatefulWidget {
   final List<TranslationResource> resources;
 
   /// Which of [resources] are currently shown (the rest are filtered out);
-  /// chosen in the Display sheet.
+  /// chosen in the Settings sheet.
   final Set<String> enabledLanguages;
 
   final Map<int, SurahHeading> headings;
@@ -707,7 +707,7 @@ class _DetailedListState extends State<_DetailedList> {
 
   @override
   Widget build(BuildContext context) {
-    // Translation languages are chosen in the Display sheet now, so the view is
+    // Translation languages are chosen in the Settings sheet now, so the view is
     // just the verses — no top strip.
     return Stack(
       children: [
@@ -816,13 +816,14 @@ class _HeaderMarker {
 const String _uthmaniSample = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ';
 const String _indopakSample = 'بِسۡمِ اللهِ الرَّحۡمٰنِ الرَّحِيۡمِ';
 
-/// The reader's "Display" bottom sheet: reading size + Arabic font. Stateful so
+/// The reader's "Settings" bottom sheet: reading size, Arabic font + translation.
+/// Stateful so
 /// the slider thumb and selected card update instantly; every change is also
 /// forwarded to the reader (onFontChanged / onScriptChanged) so the verses reflow
 /// live behind the sheet and the choice persists. Matches the app's other modal
 /// sheets (drag handle + SafeArea + titleMedium header).
-class _DisplaySheet extends StatefulWidget {
-  const _DisplaySheet({
+class _SettingsSheet extends StatefulWidget {
+  const _SettingsSheet({
     required this.fontSize,
     required this.minFont,
     required this.maxFont,
@@ -845,10 +846,10 @@ class _DisplaySheet extends StatefulWidget {
   final ValueChanged<String> onToggleLanguage;
 
   @override
-  State<_DisplaySheet> createState() => _DisplaySheetState();
+  State<_SettingsSheet> createState() => _SettingsSheetState();
 }
 
-class _DisplaySheetState extends State<_DisplaySheet> {
+class _SettingsSheetState extends State<_SettingsSheet> {
   // One size step — matches the slider's 2pt divisions and the size grid.
   static const double _step = 2;
 
@@ -895,7 +896,7 @@ class _DisplaySheetState extends State<_DisplaySheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Display', style: theme.textTheme.titleMedium),
+              Text('Settings', style: theme.textTheme.titleMedium),
               const SizedBox(height: 16),
               // Text size: label + live point readout.
               Row(
@@ -1012,7 +1013,7 @@ class _DisplaySheetState extends State<_DisplaySheet> {
   }
 }
 
-/// One row of the Display sheet's Translation checklist: a checkbox + the native
+/// One row of the Settings sheet's Translation checklist: a checkbox + the native
 /// language name. Tap to toggle; the parent enforces "at least one stays on".
 class _LangOption extends StatelessWidget {
   const _LangOption({

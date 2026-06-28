@@ -130,7 +130,7 @@ void main() {
   }
 
   Future<void> openPanel(WidgetTester tester) async {
-    await tester.tap(find.byKey(WidgetKeys.fontSizeButton));
+    await tester.tap(find.byKey(WidgetKeys.settingsButton));
     await tester.pumpAndSettle();
   }
 

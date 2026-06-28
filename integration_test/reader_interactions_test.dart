@@ -49,8 +49,8 @@ void main() {
     await $(WidgetKeys.surahTile(2)).tap(); // Al-Baqarah
     expect($(MushafView), findsOneWidget);
 
-    // The script switch lives inside the text-size ("Aa") panel.
-    await $(WidgetKeys.fontSizeButton).tap();
+    // The script switch lives inside the Settings sheet.
+    await $(WidgetKeys.settingsButton).tap();
     expect($(WidgetKeys.scriptToggle), findsOneWidget);
 
     // Switch to IndoPak, then back to Uthmani — the reader stays stable and the

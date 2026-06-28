@@ -14,7 +14,7 @@ class WidgetKeys {
 
   // Reader chrome
   static const viewportToggle = Key('reader-viewport-toggle');
-  static const fontSizeButton = Key('reader-font-size-button');
+  static const settingsButton = Key('reader-settings-button');
   static const themeToggle = Key('reader-theme-toggle');
   // Uthmani/IndoPak script switch, inside the text-size panel (only rendered
   // while FeatureFlags.indopakScript is on) — this keys the two-card row.

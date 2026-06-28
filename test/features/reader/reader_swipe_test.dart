@@ -322,7 +322,7 @@ void main() {
       WidgetTester tester,
       List<String> codes,
     ) async {
-      await tester.tap(find.byKey(WidgetKeys.fontSizeButton)); // open Display
+      await tester.tap(find.byKey(WidgetKeys.settingsButton)); // open Settings
       await tester.pumpAndSettle();
       for (final code in codes) {
         await tester.tap(find.byKey(WidgetKeys.langOption(code)));

@@ -28,6 +28,7 @@ class AppIcons {
   static const IconData viewReading = Symbols.import_contacts_rounded;
   static const IconData viewDetailed = Symbols.list_rounded;
   static const IconData textSize = Symbols.text_increase_rounded;
+  static const IconData settings = Symbols.settings_rounded;
   static const IconData close = Symbols.close_rounded;
 
   // ── Translation filter (Detailed view) ────────────────────────────────────
