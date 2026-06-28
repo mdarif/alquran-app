@@ -136,9 +136,14 @@ This is the one-click path. Full detail in
 iOS isn't in the pipeline (no Apple credentials wired up). Do it by hand:
 
 ```bash
-flutter build ipa --release
+make ipa            # = flutter build ipa --release --no-tree-shake-icons
 # → build/ios/ipa/*.ipa
 ```
+
+> `--no-tree-shake-icons` is required on every release build (it's baked into the
+> `make apk`/`aab`/`ipa` targets and the release workflow) — we bundle a correct
+> Material Symbols subset that Flutter's icon tree-shaking would otherwise corrupt.
+> See [docs/brand.md](brand.md).
 
 Then upload the `.ipa`:
 - **Transporter** app (App Store → Transporter, simplest), **or**

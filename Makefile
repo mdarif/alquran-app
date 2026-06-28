@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-dry ci-logs version
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-dry ci-logs version apk aab ipa
 
 # Release defaults — override on the command line, e.g. `make release BUMP=minor`.
 REPO ?= mdarif/alquran-app
@@ -50,6 +50,18 @@ coverage: ## Run tests with coverage and print the lcov path
 
 run: ## Run the app (pick a device when prompted)
 	flutter run
+
+# Release artifact builds. --no-tree-shake-icons is REQUIRED: we bundle our own
+# correct Material Symbols subset (assets/fonts/), and Flutter's icon tree-shaking
+# corrupts that variable font (blanks filled/non-default-size icons). See docs/brand.md.
+apk: ## Build a release APK (correct icons — keeps --no-tree-shake-icons)
+	flutter build apk --release --no-tree-shake-icons
+
+aab: ## Build a release App Bundle for the Play Store
+	flutter build appbundle --release --no-tree-shake-icons
+
+ipa: ## Build a release iOS archive (run on macOS with Xcode)
+	flutter build ipa --release --no-tree-shake-icons
 
 clean: ## Remove build artifacts
 	flutter clean

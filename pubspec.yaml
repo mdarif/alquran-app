@@ -28,12 +28,14 @@ dependencies:
   shared_preferences: ^2.5.5
   share_plus: ^13.1.0
 
-  # Iconography — Material Symbols (Rounded) as the single in-app icon family
-  # (wired through core/theme/app_icons.dart). We reference only Symbols.* and
-  # control fill/weight via the Icon axes, so release builds tree-shake the icon
-  # font down to used glyphs and drop the unused Outlined/Sharp faces entirely —
-  # the app stays light. Pinned to the 4.x line that resolves on the SDK floor.
-  material_symbols_icons: ^4.2951.0
+  # Iconography — Material Symbols (Rounded), the single in-app icon family
+  # (wired through core/theme/app_icons.dart). We ship our OWN tiny subset font
+  # (assets/fonts/MaterialSymbolsRounded.ttf, ~115 KB) instead of the package's
+  # 14 MB variable font: Flutter's release icon tree-shaking corrupts that 4-axis
+  # variable font (blanking filled / non-default-size icons), so the package is a
+  # dev-only dependency used at build time by tools/icon/subset_symbols.py. See
+  # the fonts: block below and docs/brand.md. (Build release with
+  # --no-tree-shake-icons so the bundled subset is left intact.)
 
   # Scroll-to-verse in the Detailed (lazy) list — resumes at the exact last-read
   # ayah even when its tile isn't built yet (Last Read resume).
@@ -66,6 +68,10 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.1
   patrol: ^4.6.1
   flutter_native_splash: ^2.4.7
+  # Build-time only — the source of the Material Symbols Rounded variable font +
+  # codepoints for tools/icon/subset_symbols.py. NOT bundled into the app (a
+  # dev_dependency); the app uses our subset under assets/fonts/ instead.
+  material_symbols_icons: ^4.2951.0
 
 # Patrol end-to-end tests (integration_test/). Run with the patrol CLI on a
 # device/emulator: `patrol test` (one-time native setup — see Makefile
@@ -157,3 +163,11 @@ flutter:
     - family: PlayfairDisplay
       fonts:
         - asset: assets/fonts/PlayfairDisplay-SemiBold.ttf
+    # In-app iconography — a correct ~115 KB subset of Material Symbols Rounded
+    # (the variable axes FILL/wght/GRAD/opsz are preserved, unlike Flutter's
+    # release tree-shaking). Referenced by core/theme/app_icons.dart; regenerate
+    # with `python3 tools/icon/subset_symbols.py`. Release builds MUST pass
+    # --no-tree-shake-icons (see Makefile `apk`/`aab` + the release workflow).
+    - family: MaterialSymbolsRounded
+      fonts:
+        - asset: assets/fonts/MaterialSymbolsRounded.ttf

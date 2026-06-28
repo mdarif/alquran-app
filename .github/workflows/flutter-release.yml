@@ -218,11 +218,14 @@ jobs:
       # ------------------------------------------------------------------ #
       # 9. Build the signed release artifacts.
       # ------------------------------------------------------------------ #
+      # --no-tree-shake-icons: we bundle our own correct Material Symbols subset
+      # (assets/fonts/MaterialSymbolsRounded.ttf); Flutter's icon tree-shaking
+      # corrupts that variable font, so it must stay off (see docs/brand.md).
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Build release AAB
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --no-tree-shake-icons
 
       - name: Rename artifacts
         run: |
