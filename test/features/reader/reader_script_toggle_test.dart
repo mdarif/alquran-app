@@ -312,8 +312,10 @@ void main() {
         find.byKey(WidgetKeys.scriptCard(ArabicScript.indopak.name)),
         findsOneWidget,
       );
-      expect(find.text('Uthmani/Madani'), findsOneWidget);
-      expect(find.text('IndoPak/Asian'), findsOneWidget);
+      expect(find.textContaining('Uthmani/Madani'), findsOneWidget);
+      expect(find.textContaining('IndoPak/Asian'), findsOneWidget);
+      expect(find.textContaining('Madinah Mushaf'), findsOneWidget);
+      expect(find.textContaining('South-Asian Naskh'), findsOneWidget);
     },
     skip: skip,
   );

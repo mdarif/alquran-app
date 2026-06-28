@@ -418,6 +418,7 @@ class _ReaderViewState extends State<_ReaderView> {
   void _openDisplaySheet() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => _DisplaySheet(
         fontSize: _arabicFont,
@@ -844,14 +845,13 @@ class _HeaderMarker {
   final bool showBismillah;
 }
 
-// Script preview samples — the word "ar-Raḥmān" in each script's own encoding,
-// copied verbatim from Al-Fatihah:1 in the bundled quran.db (text_arabic_uthmani
-// / text_arabic_indopak) rather than hand-typed, so the IndoPak form renders
-// cleanly in Noorehuda (the shipped text was validated to 0 .notdef). They differ
-// by design: Uthmani opens with the waṣla alif (U+0671), IndoPak a plain alif
-// (U+0627).
-const String _uthmaniSample = 'ٱلرَّحۡمَٰنِ';
-const String _indopakSample = 'الرَّحۡمٰنِ';
+// Script preview samples — the Bismillah in each script's own encoding, copied
+// verbatim from Al-Fatihah:1 in the bundled quran.db (text_arabic_uthmani /
+// text_arabic_indopak) rather than hand-typed, so the IndoPak form renders cleanly
+// in Noorehuda (validated to 0 .notdef). They differ by design — e.g. Uthmani
+// writes "ٱللَّه" with the waṣla alif (U+0671), IndoPak "الله" with a plain alif.
+const String _uthmaniSample = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ';
+const String _indopakSample = 'بِسۡمِ اللهِ الرَّحۡمٰنِ الرَّحِيۡمِ';
 
 /// The reader's "Display" bottom sheet: reading size + Arabic font. Stateful so
 /// the slider thumb and selected card update instantly; every change is also
@@ -905,105 +905,105 @@ class _DisplaySheetState extends State<_DisplaySheet> {
     final cs = theme.colorScheme;
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Display', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 16),
-            // Text size: label + live point readout.
-            Row(
-              children: [
-                Text(
-                  'Text size',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '${_fontSize.round()}',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            // A− / A+ steppers flank the slider (each nudges one grid step).
-            Row(
-              children: [
-                _StepButton(
-                  key: WidgetKeys.fontDecrease,
-                  glyphSize: 14,
-                  tooltip: 'Smaller text',
-                  onPressed: _fontSize > widget.minFont
-                      ? () => _setFont(_fontSize - _step)
-                      : null,
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _fontSize.clamp(widget.minFont, widget.maxFont),
-                    min: widget.minFont,
-                    max: widget.maxFont,
-                    divisions:
-                        ((widget.maxFont - widget.minFont) / _step).round(),
-                    onChanged: _setFont,
-                  ),
-                ),
-                _StepButton(
-                  key: WidgetKeys.fontIncrease,
-                  glyphSize: 22,
-                  tooltip: 'Larger text',
-                  onPressed: _fontSize < widget.maxFont
-                      ? () => _setFont(_fontSize + _step)
-                      : null,
-                ),
-              ],
-            ),
-            // Arabic font — only while the IndoPak feature is enabled.
-            if (FeatureFlags.indopakScript) ...[
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Display', style: theme.textTheme.titleMedium),
               const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Arabic Font',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: cs.onSurfaceVariant,
+              // Text size: label + live point readout.
+              Row(
+                children: [
+                  Text(
+                    'Text size',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_fontSize.round()}',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              // A− / A+ steppers flank the slider (each nudges one grid step).
+              Row(
+                children: [
+                  _StepButton(
+                    key: WidgetKeys.fontDecrease,
+                    glyphSize: 14,
+                    tooltip: 'Smaller text',
+                    onPressed: _fontSize > widget.minFont
+                        ? () => _setFont(_fontSize - _step)
+                        : null,
+                  ),
+                  Expanded(
+                    child: Slider(
+                      value: _fontSize.clamp(widget.minFont, widget.maxFont),
+                      min: widget.minFont,
+                      max: widget.maxFont,
+                      divisions:
+                          ((widget.maxFont - widget.minFont) / _step).round(),
+                      onChanged: _setFont,
+                    ),
+                  ),
+                  _StepButton(
+                    key: WidgetKeys.fontIncrease,
+                    glyphSize: 22,
+                    tooltip: 'Larger text',
+                    onPressed: _fontSize < widget.maxFont
+                        ? () => _setFont(_fontSize + _step)
+                        : null,
+                  ),
+                ],
+              ),
+              // Arabic font — only while the IndoPak feature is enabled.
+              if (FeatureFlags.indopakScript) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Arabic Font',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                key: WidgetKeys.scriptToggle,
-                children: [
-                  Expanded(
-                    child: _ScriptCard(
+                const SizedBox(height: 10),
+                Column(
+                  key: WidgetKeys.scriptToggle,
+                  children: [
+                    _ScriptRow(
                       script: ArabicScript.uthmani,
                       label: 'Uthmani/Madani',
+                      description: 'Madinah Mushaf',
                       sample: _uthmaniSample,
                       sampleStyle: QuranTextStyle.madani,
                       selected: _script == ArabicScript.uthmani,
                       onTap: () => _setScript(ArabicScript.uthmani),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ScriptCard(
+                    const SizedBox(height: 10),
+                    _ScriptRow(
                       script: ArabicScript.indopak,
                       label: 'IndoPak/Asian',
+                      description: 'South-Asian Naskh',
                       sample: _indopakSample,
                       sampleStyle: QuranTextStyle.indopak,
                       selected: _script == ArabicScript.indopak,
                       onTap: () => _setScript(ArabicScript.indopak),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1045,12 +1045,14 @@ class _StepButton extends StatelessWidget {
   }
 }
 
-/// A selectable card previewing an Arabic [script] in its real font, so the
-/// Uthmani↔IndoPak difference is visible without reading the label.
-class _ScriptCard extends StatelessWidget {
-  const _ScriptCard({
+/// A full-width selectable row previewing an Arabic [script] in its real font
+/// (the Bismillah) with the name + a one-line [description], so the
+/// Uthmani↔IndoPak difference is large and each option explains itself.
+class _ScriptRow extends StatelessWidget {
+  const _ScriptRow({
     required this.script,
     required this.label,
+    required this.description,
     required this.sample,
     required this.sampleStyle,
     required this.selected,
@@ -1059,6 +1061,7 @@ class _ScriptCard extends StatelessWidget {
 
   final ArabicScript script;
   final String label;
+  final String description;
   final String sample;
   final TextStyle sampleStyle;
   final bool selected;
@@ -1066,55 +1069,76 @@ class _ScriptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final onColor = selected ? cs.onPrimaryContainer : cs.onSurfaceVariant;
     return Material(
       key: WidgetKeys.scriptCard(script.name),
       color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected ? cs.primary : Colors.transparent,
               width: 1.5,
             ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                height: 32,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    sample,
-                    textDirection: TextDirection.rtl,
-                    locale: const Locale('ar'),
-                    style: sampleStyle.copyWith(
-                      fontSize: 24,
-                      color: selected ? cs.onPrimaryContainer : cs.onSurface,
+              Row(
+                children: [
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          sample,
+                          textDirection: TextDirection.rtl,
+                          locale: const Locale('ar'),
+                          style: sampleStyle.copyWith(
+                            fontSize: 26,
+                            color:
+                                selected ? cs.onPrimaryContainer : cs.onSurface,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              // scaleDown keeps the (longer) two-part labels on one line.
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  // Fixed-width trailing slot so the sample doesn't shift when the
+                  // check appears/disappears.
+                  SizedBox(
+                    width: 24,
+                    child: selected
+                        ? Icon(
+                            Icons.check_rounded,
+                            size: 20,
+                            color: cs.onPrimaryContainer,
+                          )
+                        : null,
                   ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: label,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    TextSpan(text: '  ·  $description'),
+                  ],
                 ),
+                style: theme.textTheme.bodySmall?.copyWith(color: onColor),
               ),
             ],
           ),
