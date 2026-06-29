@@ -298,6 +298,7 @@ void main() {
       List<Ayah> ayahs, {
       List<TranslationResource> resources = _kResources,
       Set<String> selected = const {'ur'},
+      ValueChanged<String>? onToggleLanguage,
     }) =>
         _wrap(
           MushafView(
@@ -306,6 +307,7 @@ void main() {
             arabicFontSize: 28,
             resources: resources,
             selectedLanguages: selected,
+            onToggleLanguage: onToggleLanguage,
           ),
         );
 
@@ -355,6 +357,32 @@ void main() {
       // The flow renders Arabic via Text.rich (which find.text ignores); the card
       // no longer adds a plain Arabic Text, so this exact string is nowhere.
       expect(find.text('بِسْمِ اللَّهِ'), findsNothing);
+    });
+
+    testWidgets('inline language chips report toggles to the parent',
+        (tester) async {
+      final toggled = <String>[];
+      await tester.pumpWidget(
+        reader(_ayahsWithTranslations(1, 1), onToggleLanguage: toggled.add),
+      );
+      await tester.pump();
+      await _tapText(tester);
+
+      // Both available editions appear as inline chips in the peek card.
+      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsOneWidget);
+      expect(find.byKey(WidgetKeys.peekLangOption('hi')), findsOneWidget);
+
+      // Tapping one reports it up (the reader persists the shared selection).
+      await tester.tap(find.byKey(WidgetKeys.peekLangOption('hi')));
+      await tester.pump();
+      expect(toggled, ['hi']);
+    });
+
+    testWidgets('no inline chips when the toggle is not wired', (tester) async {
+      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 1)));
+      await tester.pump();
+      await _tapText(tester);
+      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsNothing);
     });
 
     testWidgets('shows only the selected translation(s)', (tester) async {

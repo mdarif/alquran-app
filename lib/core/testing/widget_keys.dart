@@ -33,6 +33,9 @@ class WidgetKeys {
   // Translation language rows in the Display sheet ('ur' | 'hi' | 'en').
   static Key langOption(String languageCode) =>
       Key('lang-option-$languageCode');
+  // Inline translation chips in the Reading peek card ('ur' | 'hi' | 'en').
+  static Key peekLangOption(String languageCode) =>
+      Key('peek-lang-option-$languageCode');
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');

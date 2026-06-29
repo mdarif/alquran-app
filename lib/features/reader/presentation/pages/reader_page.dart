@@ -271,6 +271,8 @@ class _ReaderViewState extends State<_ReaderView> {
         onTogglePlay: interactive && audio != null
             ? (id) => context.read<AyahAudioCubit>().toggle(id)
             : null,
+        onToggleLanguage:
+            interactive ? (code) => _toggleLang(code, resources) : null,
       );
     } else {
       // Detailed view owns its own SelectionArea (around the verses) for

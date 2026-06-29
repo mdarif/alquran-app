@@ -8,6 +8,7 @@ import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
+import '../../domain/ayah_share.dart' show nativeLanguageName;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
@@ -44,6 +45,7 @@ class MushafView extends StatefulWidget {
     this.onRegisterFlush,
     this.audioState,
     this.onTogglePlay,
+    this.onToggleLanguage,
     super.key,
   });
 
@@ -81,6 +83,10 @@ class MushafView extends StatefulWidget {
   /// Toggle recitation for the given global ayah id. Null hides the peek card's
   /// play control (the flag-off path renders exactly as before).
   final ValueChanged<int>? onTogglePlay;
+
+  /// Toggle a translation edition in the shared selection (from the peek card's
+  /// inline language chips, which also drive Detailed view). Null hides them.
+  final ValueChanged<String>? onToggleLanguage;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -522,6 +528,7 @@ class _MushafViewState extends State<MushafView>
                 onDismiss: _dismissPeek,
                 audioState: widget.audioState,
                 onTogglePlay: widget.onTogglePlay,
+                onToggleLanguage: widget.onToggleLanguage,
                 onPrev: _selIdx > 0 ? () => _step(-1) : null,
                 onNext: _selIdx >= 0 && _selIdx < widget.ayahs.length - 1
                     ? () => _step(1)
@@ -998,6 +1005,7 @@ class _MushafPeekCard extends StatelessWidget {
     this.onTogglePlay,
     this.onPrev,
     this.onNext,
+    this.onToggleLanguage,
   });
 
   final Ayah? ayah;
@@ -1006,6 +1014,10 @@ class _MushafPeekCard extends StatelessWidget {
   final double fontSize;
   final Set<String> selected;
   final VoidCallback onDismiss;
+
+  /// Toggle a translation edition in the shared selection (the inline chips).
+  /// Null hides the chips.
+  final ValueChanged<String>? onToggleLanguage;
 
   /// Step to the previous/next verse in the section. Null ⇒ at the edge (the
   /// ‹/› control is shown disabled).
@@ -1088,8 +1100,8 @@ class _MushafPeekCard extends StatelessWidget {
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
                   children: [
-                    // Reference + multi-select language chips (the shared
-                    // selection, also reflected in Detailed view).
+                    // Play · ‹ reference › verse stepper (the inline language
+                    // chips sit just below this row).
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -1124,6 +1136,28 @@ class _MushafPeekCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    // Inline translation selector — toggles the shared selection
+                    // (also drives Detailed view). Same picker as the Settings
+                    // sheet, here at hand while reading.
+                    if (onToggleLanguage != null && available.length > 1) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final r in available)
+                              _PeekLangChip(
+                                key: WidgetKeys.peekLangOption(r.languageCode),
+                                label: nativeLanguageName(r.languageCode),
+                                selected: selected.contains(r.languageCode),
+                                onTap: () => onToggleLanguage!(r.languageCode),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     if (shown.isEmpty)
                       Text(
@@ -1211,6 +1245,44 @@ class _MushafPeekCard extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       onPressed: () => onTogglePlay!(ayahId),
       icon: icon,
+    );
+  }
+}
+
+/// A small selectable language pill in the peek card's inline chip row.
+class _PeekLangChip extends StatelessWidget {
+  const _PeekLangChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: selected ? cs.primary : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
