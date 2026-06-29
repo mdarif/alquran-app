@@ -36,7 +36,7 @@ class ThemeToggleButton extends StatelessWidget {
       cubit = null;
     }
     return IconButton(
-      tooltip: 'Reading light',
+      tooltip: 'Reading Light',
       icon: AppIcon(
         _phaseIcon(cubit?.activePhase ?? DayPhase.duha),
         filled: _phaseFilled(cubit?.activePhase ?? DayPhase.duha),
@@ -57,7 +57,7 @@ class ThemeToggleButton extends StatelessWidget {
   }
 }
 
-/// The "Reading light" picker: choose **Light of Day** (auto) or hold a single
+/// The "Reading Light" picker: choose **Light of Day** (auto) or hold a single
 /// phase. Reusable — the app-bar button shows it as a sheet; a settings screen
 /// could embed it inline.
 class ReadingLightSheet extends StatelessWidget {
@@ -77,7 +77,7 @@ class ReadingLightSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Reading light', style: theme.textTheme.titleMedium),
+                Text('Reading Light', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
                   'Light of Day lets the page follow the rhythm of the day.',
