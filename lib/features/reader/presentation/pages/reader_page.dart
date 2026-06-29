@@ -912,7 +912,37 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 10),
+              // Live preview (above the slider) — the current Arabic face at the
+              // chosen size. Fixed height so dragging the slider never reflows the
+              // sheet; the line is RTL-aligned and clips on the left at the largest
+              // sizes (you still see the true size, not a scaled-to-fit one).
+              Container(
+                key: WidgetKeys.textSizePreview,
+                height: 72,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _script == ArabicScript.indopak
+                      ? _indopakSample
+                      : _uthmaniSample,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.clip,
+                  textDirection: TextDirection.rtl,
+                  locale: const Locale('ar'),
+                  style: (_script == ArabicScript.indopak
+                          ? QuranTextStyle.indopak
+                          : QuranTextStyle.madani)
+                      .copyWith(fontSize: _fontSize),
+                ),
+              ),
+              const SizedBox(height: 10),
               // A− / A+ steppers flank the slider (each nudges one grid step).
               Row(
                 children: [
@@ -945,40 +975,10 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Live preview — the current Arabic face at the chosen size. Fixed
-              // height so dragging the slider never reflows the sheet; the line is
-              // RTL-aligned and clips on the left at the largest sizes (you still
-              // see the true size, not a scaled-to-fit one).
-              Container(
-                key: WidgetKeys.textSizePreview,
-                height: 72,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                clipBehavior: Clip.hardEdge,
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _script == ArabicScript.indopak
-                      ? _indopakSample
-                      : _uthmaniSample,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.clip,
-                  textDirection: TextDirection.rtl,
-                  locale: const Locale('ar'),
-                  style: (_script == ArabicScript.indopak
-                          ? QuranTextStyle.indopak
-                          : QuranTextStyle.madani)
-                      .copyWith(fontSize: _fontSize),
-                ),
-              ),
-              // Arabic font — only while the IndoPak feature is enabled.
+              // Arabic script — only while the IndoPak feature is enabled.
               if (FeatureFlags.indopakScript) ...[
                 const SizedBox(height: 18),
-                const _SectionLabel('Arabic Font'),
+                const _SectionLabel('Arabic Script'),
                 const SizedBox(height: 2),
                 Column(
                   key: WidgetKeys.scriptToggle,
