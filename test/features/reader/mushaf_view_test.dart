@@ -490,9 +490,10 @@ void main() {
           find.descendant(of: find.byKey(k), matching: find.byType(IconButton)),
         );
 
-    testWidgets('arrows disable while playing, re-enable when stopped',
+    testWidgets(
+        'arrows lock while sounding, but free up when paused or stopped',
         (tester) async {
-      var playing = true;
+      var status = RecitationStatus.playing;
       late StateSetter setOuter;
       await tester.pumpWidget(
         _wrap(
@@ -507,12 +508,9 @@ void main() {
                 selectedLanguages: const {'ur'},
                 onToggleLanguage: (_) {},
                 onTogglePlay: (_) {},
-                audioState: playing
-                    ? const AyahAudioState(
-                        playingAyahId: 1001,
-                        status: RecitationStatus.playing,
-                      )
-                    : const AyahAudioState(), // idle
+                audioState: status == RecitationStatus.idle
+                    ? const AyahAudioState() // stopped/finished
+                    : AyahAudioState(playingAyahId: 1001, status: status),
               );
             },
           ),
@@ -521,19 +519,23 @@ void main() {
       await tester.pump();
       await _tapText(tester); // open the peek
 
-      // Playing → both arrows disabled (the card follows the reciter instead).
+      bool anyStepEnabled() =>
+          stepButton(tester, WidgetKeys.peekPrevButton).onPressed != null ||
+          stepButton(tester, WidgetKeys.peekNextButton).onPressed != null;
+
+      // Playing → both arrows locked (the card follows the reciter instead).
       expect(stepButton(tester, WidgetKeys.peekPrevButton).onPressed, isNull);
       expect(stepButton(tester, WidgetKeys.peekNextButton).onPressed, isNull);
 
-      // Stopped (idle) → stepping is usable again (at least one neighbour exists
-      // for any of the 3 verses).
-      setOuter(() => playing = false);
+      // Paused → free to step through and read individual translations.
+      setOuter(() => status = RecitationStatus.paused);
       await tester.pumpAndSettle();
-      final prevOn =
-          stepButton(tester, WidgetKeys.peekPrevButton).onPressed != null;
-      final nextOn =
-          stepButton(tester, WidgetKeys.peekNextButton).onPressed != null;
-      expect(prevOn || nextOn, isTrue);
+      expect(anyStepEnabled(), isTrue);
+
+      // Stopped / finished (idle) → also free.
+      setOuter(() => status = RecitationStatus.idle);
+      await tester.pumpAndSettle();
+      expect(anyStepEnabled(), isTrue);
     });
   });
 

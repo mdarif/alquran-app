@@ -29,6 +29,12 @@ class AyahAudioState extends Equatable {
   /// This verse is the active one (used to drive the now-playing tint).
   bool isActive(int ayahId) => playingAyahId == ayahId;
 
+  /// A verse is actively sounding (playing) or about to (buffering). Paused,
+  /// idle/stopped, completed and error do NOT count — so the Reading peek can
+  /// free its ‹/› stepper for browsing translations whenever audio isn't running.
+  bool get isSounding =>
+      status == RecitationStatus.playing || status == RecitationStatus.loading;
+
   /// The last play attempt for this verse failed.
   bool hasError(int ayahId) => errorAyahId == ayahId;
 
