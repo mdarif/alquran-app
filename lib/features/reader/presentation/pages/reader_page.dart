@@ -590,6 +590,11 @@ class _DetailedListState extends State<_DetailedList> {
   Timer? _highlightTimer;
   int? _highlightAyahId;
 
+  // The verse we resumed to (Last Read). While set, Last Read stays pinned here
+  // so the post-scroll report never drifts it to the verse that ended up at the
+  // top. Cleared the moment the reader scrolls (see the NotificationListener).
+  int? _heldFocusId;
+
   // "Back to top" appears once the list is roughly a screen deep.
   bool _showTop = false;
 
@@ -600,7 +605,8 @@ class _DetailedListState extends State<_DetailedList> {
     _positions.itemPositions.addListener(_onPositions);
     final id = widget.focusAyahId;
     if (id != null && _ayahRowIndex.containsKey(id)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToFocus(id, resume: true));
     }
     widget.onRegisterFlush?.call(_reportTopmost);
   }
@@ -653,7 +659,22 @@ class _DetailedListState extends State<_DetailedList> {
     }
   }
 
-  void _scrollToFocus(int ayahId) {
+  void _scrollToFocus(int ayahId, {bool resume = false}) {
+    // A resume pins Last Read to this verse and records it now (so it holds even
+    // if the list can't scroll there); the reciter-follow scroll releases it.
+    if (resume) {
+      _heldFocusId = ayahId;
+      final onVisible = widget.onVisibleAyah;
+      if (onVisible != null) {
+        final ayah = widget.ayahs.firstWhere(
+          (a) => a.id == ayahId,
+          orElse: () => widget.ayahs.first,
+        );
+        onVisible(ayah);
+      }
+    } else {
+      _heldFocusId = null;
+    }
     if (!mounted || !_scrollController.isAttached) return;
     final idx = _ayahRowIndex[ayahId];
     if (idx == null) return;
@@ -715,6 +736,18 @@ class _DetailedListState extends State<_DetailedList> {
   void _reportTopmost() {
     final onVisible = widget.onVisibleAyah;
     if (onVisible == null) return;
+    // While a resume verse is pinned, keep Last Read there (don't drift to the
+    // verse that happened to land at the top after the programmatic scroll).
+    final held = _heldFocusId;
+    if (held != null) {
+      onVisible(
+        widget.ayahs.firstWhere(
+          (a) => a.id == held,
+          orElse: () => widget.ayahs.first,
+        ),
+      );
+      return;
+    }
     final visible = _positions.itemPositions.value
         .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1);
     if (visible.isEmpty) return;
@@ -737,12 +770,23 @@ class _DetailedListState extends State<_DetailedList> {
     // just the verses — no top strip.
     final content = Stack(
       children: [
-        SelectionArea(
-          child: ScrollablePositionedList.builder(
-            itemScrollController: _scrollController,
-            itemPositionsListener: _positions,
-            itemCount: _rows.length,
-            itemBuilder: _buildRow,
+        // A finger-driven scroll (dragDetails set) releases the resume pin so
+        // reporting tracks the top again; the programmatic scroll-to-focus and
+        // reciter-follow scrolls carry no dragDetails.
+        NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            if (n is ScrollStartNotification && n.dragDetails != null) {
+              _heldFocusId = null;
+            }
+            return false;
+          },
+          child: SelectionArea(
+            child: ScrollablePositionedList.builder(
+              itemScrollController: _scrollController,
+              itemPositionsListener: _positions,
+              itemCount: _rows.length,
+              itemBuilder: _buildRow,
+            ),
           ),
         ),
         Positioned(

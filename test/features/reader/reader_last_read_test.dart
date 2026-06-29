@@ -239,4 +239,40 @@ void main() {
     expect(lastRead.saved?.ayahNumber, 1);
     expect(lastRead.saved?.target.value, 3);
   });
+
+  // Resume must land EXACTLY on the saved verse — not the verse that happens to
+  // end up at the top after the scroll (which, deep in a surah where the scroll
+  // can't reach the usual offset, drifted by many verses before the pin fix).
+  for (final detailed in const [false, true]) {
+    final view = detailed ? 'Detailed' : 'Reading';
+    for (final n in const [15, 50]) {
+      testWidgets('$view: resumes exactly at verse $n (no drift)',
+          (tester) async {
+        await openAt(tester, detailed: detailed, ayahNumber: n);
+        expect(
+          lastRead.saved?.ayahNumber,
+          n,
+          reason: '$view resume drifted off verse $n',
+        );
+      });
+    }
+  }
+
+  testWidgets('a finger scroll after resume releases the pin (tracks the top)',
+      (tester) async {
+    await openAt(tester, detailed: false, ayahNumber: 50);
+    expect(lastRead.saved?.ayahNumber, 50); // pinned to the resume verse
+
+    // A real finger drag DOWN reveals earlier verses; it must unpin Last Read so
+    // it follows the new top instead of staying frozen on verse 50.
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, 600));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 1300));
+
+    expect(
+      lastRead.saved?.ayahNumber,
+      lessThan(50),
+      reason: 'after scrolling, Last Read should track the top, not the pin',
+    );
+  });
 }

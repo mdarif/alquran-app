@@ -111,6 +111,13 @@ class _MushafViewState extends State<MushafView>
   Timer? _highlightTimer;
   int? _highlightAyahId;
 
+  // The verse we resumed to (Last Read). While set, Last Read stays pinned here
+  // so the post-scroll "topmost" report — which lands on whatever ended up at
+  // the top (especially near a surah's end, where the scroll can't place the
+  // verse at the usual offset) — never drifts the saved position. Cleared the
+  // moment the reader actually scrolls, after which reporting tracks the top.
+  int? _heldFocusId;
+
   // Tap-to-peek translation card.
   Ayah? _selectedAyah; // highlighted verse (null = none)
   Ayah? _shownAyah; // kept during slide-out so card doesn't blink
@@ -197,7 +204,8 @@ class _MushafViewState extends State<MushafView>
     _controller.addListener(_onScroll);
     final id = widget.focusAyahId;
     if (id != null && widget.ayahs.any((a) => a.id == id)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFocus(id));
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _scrollToFocus(id, resume: true));
     }
     widget.onRegisterFlush?.call(_reportTopmost);
   }
@@ -232,8 +240,9 @@ class _MushafViewState extends State<MushafView>
     // IndoPak) reloads identical verses in a longer/shorter face, since section
     // navigation changes the widget key and rebuilds from scratch. Capture the
     // verse at the top NOW (the render objects still hold the old layout), then
-    // re-anchor to it once the new layout is in.
-    final anchor = _topmostAyah();
+    // re-anchor to it once the new layout is in. While a resume verse is pinned,
+    // re-anchor to THAT (a zoom must not unpin or drift the resume point).
+    final anchor = _heldFocusId != null ? _heldOrTopmost() : _topmostAyah();
     if (ayahsChanged) {
       _groupKeys.clear();
       _recomputeDerived();
@@ -388,14 +397,22 @@ class _MushafViewState extends State<MushafView>
     return obj.getOffsetForCaret(TextPosition(offset: offset), Rect.zero).dy;
   }
 
-  void _scrollToFocus(int ayahId) {
+  void _scrollToFocus(int ayahId, {bool resume = false}) {
     if (!mounted) return;
-    final surahId = widget.ayahs
-        .firstWhere(
-          (a) => a.id == ayahId,
-          orElse: () => widget.ayahs.first,
-        )
-        .surahId;
+    // A resume pins Last Read to this verse and records it straight away (so it
+    // holds even if the scroll can't land it at the usual offset); a deliberate
+    // move (verse stepper / reciter follow) releases the pin instead.
+    final focus = widget.ayahs.firstWhere(
+      (a) => a.id == ayahId,
+      orElse: () => widget.ayahs.first,
+    );
+    if (resume) {
+      _heldFocusId = ayahId;
+      widget.onVisibleAyah?.call(focus);
+    } else {
+      _heldFocusId = null;
+    }
+    final surahId = focus.surahId;
     final key = _groupKeys[surahId];
     if (key?.currentContext == null) return;
     final obj = key!.currentContext!.findRenderObject();
@@ -446,11 +463,24 @@ class _MushafViewState extends State<MushafView>
     return current;
   }
 
-  /// Reports the topmost verse (drives "Last Read") on scroll-idle.
+  /// Reports the topmost verse (drives "Last Read") on scroll-idle — or the
+  /// pinned resume verse, while one is held (before the reader has scrolled).
   void _reportTopmost() {
     final onVisible = widget.onVisibleAyah;
     if (onVisible == null) return;
-    onVisible(_topmostAyah() ?? widget.ayahs.first);
+    onVisible(_heldOrTopmost());
+  }
+
+  /// The pinned resume verse if one is held, else the topmost-visible verse.
+  Ayah _heldOrTopmost() {
+    final held = _heldFocusId;
+    if (held != null) {
+      return widget.ayahs.firstWhere(
+        (a) => a.id == held,
+        orElse: () => widget.ayahs.first,
+      );
+    }
+    return _topmostAyah() ?? widget.ayahs.first;
   }
 
   /// Scroll offset that puts [ayahId]'s top just under the viewport top, using
@@ -483,9 +513,15 @@ class _MushafViewState extends State<MushafView>
         // still saves where you actually are. (The 1200ms timer below only drives
         // the page pill; on its own it loses the final position when you pop the
         // route before it fires.)
-        NotificationListener<ScrollEndNotification>(
-          onNotification: (_) {
-            _reportTopmost();
+        NotificationListener<ScrollNotification>(
+          onNotification: (n) {
+            // A finger-driven scroll (dragDetails set) means the reader took
+            // over — release the resume pin so reporting tracks the top again.
+            // The programmatic resume/anchor scrolls carry no dragDetails.
+            if (n is ScrollStartNotification && n.dragDetails != null) {
+              _heldFocusId = null;
+            }
+            if (n is ScrollEndNotification) _reportTopmost();
             return false;
           },
           // SizedBox.expand forces the inner Stack to fill the full Scaffold body
