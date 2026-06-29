@@ -482,6 +482,81 @@ void main() {
 
   // -------------------------------------------------------------------------
 
+  group('MushafView — render settles with audio active (no loop)', () {
+    // Guards against a real render/animation/timer LOOP: at a real 60fps the
+    // reader must stop scheduling frames after audio starts. (We assert at the
+    // real ~16ms frame cadence on purpose — pumpAndSettle's coarse 100ms fake
+    // time-steps mis-settle the scroll/peek animation and can false-time-out
+    // even though nothing actually loops; that's why audio tests pump manually.)
+    testWidgets('reader stops scheduling frames after stepping then playing',
+        (tester) async {
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahsWithTranslations(1, 3),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                onTogglePlay: (_) {},
+                onVisibleAyah: (_) {},
+                audioState: audio,
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester); // open the peek
+
+      // Browse with the ‹/› stepper first — the exact path that exposed the
+      // (benign) pumpAndSettle non-settling.
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(
+          find.byKey(WidgetKeys.peekPrevButton),
+          warnIfMissed: false,
+        );
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.byKey(WidgetKeys.peekNextButton));
+      await tester.pumpAndSettle();
+
+      // Now start playback → now-playing tint + the audio-follow scroll.
+      setOuter(
+        () => audio = const AyahAudioState(
+          playingAyahId: 1002,
+          status: RecitationStatus.playing,
+        ),
+      );
+
+      // At a real frame cadence the reader must settle (stop scheduling frames)
+      // well within ~3s. A perpetual scheduler (render loop) never would.
+      var settled = false;
+      for (var i = 0; i < 200; i++) {
+        if (!tester.binding.hasScheduledFrame) {
+          settled = true;
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(
+        settled,
+        isTrue,
+        reason:
+            'reader kept scheduling frames with audio active — a render loop',
+      );
+
+      // Drain the one-shot highlight-flash timer so teardown is clean.
+      await tester.pump(const Duration(seconds: 2));
+    });
+  });
+
   group('MushafView — verse stepping during recitation', () {
     // The ‹/› buttons are _PeekStepButtons keyed by peekPrev/NextButton, each
     // wrapping an IconButton whose onPressed is null when disabled.
@@ -531,10 +606,9 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.peekNextButton));
       await tester.pumpAndSettle();
 
-      // NOT pumpAndSettle: a now-playing verse triggers the card's auto-follow
-      // scroll + an 1800ms highlight flash that never "settle". The arrow state
-      // is synchronous from audioState, so two frames (rebuild + the follow's
-      // post-frame) is enough to assert it.
+      // pump (not pumpAndSettle): after stepping the peek, starting audio leaves
+      // a scroll/animation in flight that doesn't settle under fake-async here.
+      // The arrow state is synchronous from audioState, so two frames suffice.
       Future<void> setAudio(AyahAudioState s) async {
         setOuter(() => audio = s);
         await tester.pump();

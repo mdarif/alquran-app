@@ -769,6 +769,24 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 - **Verify the artifact, not just the source:** unzip the release APK, pull the
   bundled `.ttf`, confirm `fvar` + all codepoints + that it instances at FILL=1.
 
+### `pumpAndSettle` is unreliable for the audio-active reader (2026-06-29)
+- A loop sweep was prompted by `pumpAndSettle timed out` when a now-playing tint
+  + auto-follow scroll were active in the reader. **Verdict: NOT a loop.** Pumping
+  the SAME scenario at a real **16 ms cadence settles every time (~frame 14,
+  ≈224 ms)**; it only "hangs" under `pumpAndSettle`, whose coarse **100 ms** fake
+  time-steps mis-settle the scroll/peek animation (worse after a prior `‹/›`
+  stepper navigation). On a real 60 fps device the reader settles fine.
+- **So: don't `pumpAndSettle` the reader with audio playing.** Pump manually
+  (`await tester.pump()` ×N) or loop `pump(Duration(milliseconds: 16))` until
+  `tester.binding.hasScheduledFrame` is false. The "render settles with audio
+  active" test in `mushaf_view_test.dart` does the latter as a real loop guard.
+- The `_MarkedParagraph` `addPostFrameCallback((_) => _measure())`-in-`build()` is
+  **provably non-looping**: `_measure` sets `_lastMeasuredSize = obj.size` before
+  measuring, so the frame after any `setState(_rects=…)` early-returns on the
+  `obj.size == _lastMeasuredSize` guard. Leave it (it's how the medallion overlay
+  re-measures on zoom/reflow/rotation). The rest of the repo (logic, streams,
+  timers, audio advance chain, native widget providers) is bounded/async-safe.
+
 ---
 
 ## 5. Prayer times — offline calc + a prayer-aware theme
