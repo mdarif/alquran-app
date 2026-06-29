@@ -49,6 +49,13 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
       }
       return;
     }
+    // While a verse plays, warm the NEXT one into the cache so "play from here"
+    // rolls on without the per-verse network gap. Best-effort + idempotent in
+    // the player (no-op when already cached / in flight / at the surah end).
+    if (p.status == RecitationStatus.playing) {
+      final next = _nextAfter(p.ayahId);
+      if (next != null) _player.prefetch(next);
+    }
     final isError = p.status == RecitationStatus.error;
     emit(
       AyahAudioState(

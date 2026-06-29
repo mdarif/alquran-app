@@ -103,6 +103,8 @@ class _SilentPlayer implements AyahRecitationPlayer {
   @override
   Future<void> resume() async {}
   @override
+  Future<void> prefetch(int ayahId) async {}
+  @override
   Future<void> stop() async {}
   @override
   Future<void> dispose() async {}

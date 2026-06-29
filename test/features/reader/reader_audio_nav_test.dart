@@ -41,6 +41,9 @@ class _RecordingPlayer implements AyahRecitationPlayer {
       );
 
   @override
+  Future<void> prefetch(int ayahId) async {}
+
+  @override
   Future<void> pause() async {}
 
   @override

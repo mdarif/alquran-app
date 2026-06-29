@@ -44,6 +44,12 @@ abstract interface class AyahRecitationPlayer {
   Future<void> pause();
   Future<void> resume();
 
+  /// Warm [ayahId] into the on-disk cache in the background (best-effort), so a
+  /// later [play] of it starts without the per-verse network gap. No playback
+  /// and no status events; safe to call repeatedly (a no-op when already cached
+  /// or in flight). Used by continuous playback to pre-fetch the next verse.
+  Future<void> prefetch(int ayahId);
+
   /// Stop and clear the current verse.
   Future<void> stop();
 
@@ -77,8 +83,19 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
   int? _currentAyahId;
   bool _loading = false;
 
+  // Verses being warmed in the background (prefetch), so we never double-fetch.
+  final Set<int> _prefetching = {};
+
   @override
   Stream<RecitationPlayback> get playbackStream => _controller.stream;
+
+  /// The deterministic on-disk cache file for [ayahId] — the SAME path both
+  /// [play] (via [LockCachingAudioSource]) and [prefetch] write, so a warmed
+  /// file is served straight from disk on the next play.
+  Future<File> _cacheFileFor(int ayahId) async {
+    final cacheRoot = await getApplicationCacheDirectory();
+    return File(p.join(cacheRoot.path, recitationCacheRelativePath(ayahId)));
+  }
 
   void _emit(RecitationStatus status) {
     if (_controller.isClosed) return;
@@ -113,9 +130,7 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
     File? cacheFile;
     try {
       await _player.stop(); // stop any previous verse (suppressed by _loading)
-      final cacheRoot = await getApplicationCacheDirectory();
-      cacheFile =
-          File(p.join(cacheRoot.path, recitationCacheRelativePath(ayahId)));
+      cacheFile = await _cacheFileFor(ayahId);
       await cacheFile.parent.create(recursive: true);
       final source = LockCachingAudioSource(
         Uri.parse(alafasyUrl(ayahId)),
@@ -135,6 +150,39 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
         } catch (_) {/* best-effort */}
       }
       _emit(RecitationStatus.error);
+    }
+  }
+
+  @override
+  Future<void> prefetch(int ayahId) async {
+    if (_prefetching.contains(ayahId)) return;
+    final cacheFile = await _cacheFileFor(ayahId);
+    if (await cacheFile.exists()) return; // already fully cached
+    _prefetching.add(ayahId);
+    // Download to a temp sibling and publish with an ATOMIC rename only on
+    // success — an interrupted prefetch must never leave a truncated file at
+    // cacheFile, which LockCachingAudioSource would then serve as if complete.
+    final tmp = File('${cacheFile.path}.prefetch');
+    HttpClient? client;
+    try {
+      await cacheFile.parent.create(recursive: true);
+      client = HttpClient();
+      final request = await client.getUrl(Uri.parse(alafasyUrl(ayahId)));
+      final response = await request.close();
+      if (response.statusCode != 200) return;
+      await response.pipe(tmp.openWrite()); // writes the body + closes the sink
+      if (await cacheFile.exists()) {
+        await tmp.delete(); // someone (a manual tap) beat us to it
+      } else {
+        await tmp.rename(cacheFile.path);
+      }
+    } catch (_) {
+      try {
+        if (await tmp.exists()) await tmp.delete();
+      } catch (_) {/* best-effort */}
+    } finally {
+      client?.close();
+      _prefetching.remove(ayahId);
     }
   }
 

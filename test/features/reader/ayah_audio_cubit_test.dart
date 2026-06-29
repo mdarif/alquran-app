@@ -21,6 +21,8 @@ class _FakePlayer implements AyahRecitationPlayer {
   @override
   Future<void> play(int ayahId) async => calls.add('play($ayahId)');
   @override
+  Future<void> prefetch(int ayahId) async => calls.add('prefetch($ayahId)');
+  @override
   Future<void> pause() async => calls.add('pause');
   @override
   Future<void> resume() async => calls.add('resume');
@@ -174,6 +176,26 @@ void main() {
 
       expect(player.calls, ['play(1)']); // no play(2)
       expect(cubit.state.hasError(1), true);
+    });
+
+    test('a playing verse warms the next one (prefetch)', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(1);
+
+      player.push(1, RecitationStatus.playing);
+      await pumpEventQueue();
+
+      expect(player.calls, contains('prefetch(2)'));
+    });
+
+    test('the last verse warms nothing (no prefetch past the end)', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(3);
+
+      player.push(3, RecitationStatus.playing);
+      await pumpEventQueue();
+
+      expect(player.calls.any((c) => c.startsWith('prefetch')), isFalse);
     });
 
     test('completed status never surfaces in the cubit state', () async {
