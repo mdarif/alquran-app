@@ -94,7 +94,7 @@ void main() {
       (tester) async {
     // 18:30 is within the before-sunset window (18:27–18:42, lifts at Maghrib).
     await _pump(tester, _cubit(saved: _loc, hour: 18, minute: 30));
-    expect(find.textContaining('Forbidden'), findsOneWidget);
+    expect(find.byIcon(AppIcons.forbidden), findsOneWidget); // gold ⊖ caution
     expect(find.textContaining('6:42'), findsOneWidget); // lifts at Maghrib
 
     await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));

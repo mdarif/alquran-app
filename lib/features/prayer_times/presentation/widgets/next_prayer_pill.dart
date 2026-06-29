@@ -151,7 +151,8 @@ class _ForbiddenPill extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Tooltip(
-          message: 'Prayer is not offered now (${window.reason.label})',
+          message:
+              'No prayer now (${window.reason.label}) — until ${formatPrayerTime(window.end)}',
           child: Material(
             key: WidgetKeys.nextPrayerPill,
             color: gold.withValues(alpha: 0.18),
@@ -164,18 +165,21 @@ class _ForbiddenPill extends StatelessWidget {
               onTap: onTap,
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // The gold ⊖ caution IS the "no prayer" cue; the time is when
+                    // it lifts. Compact so it never squeezes the AppBar title
+                    // (the full reason is in the tooltip + the sheet on tap).
                     AppIcon(
                       AppIcons.forbidden,
                       size: AppIconSize.inline,
                       color: gold,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(
-                      'Forbidden until ${formatPrayerTime(window.end)}',
+                      formatPrayerTime(window.end),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
                             color: gold,
                             fontWeight: FontWeight.w600,
