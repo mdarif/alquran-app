@@ -54,14 +54,19 @@ class AppIcons {
   ); // close_rounded
 
   // ── Translation ───────────────────────────────────────────────────────────
-  /// Reading peek card's show/hide-translation toggle — the "captions" (CC)
-  /// metaphor (translation text shown alongside, esp. while listening). Rendered
-  /// filled when the translation is shown, muted when hidden. (Avoids the
-  /// `translate` 文/A glyph, which reads as "Chinese" — see LEARNINGS.md §3.)
-  static const IconData subtitles = IconData(
-    0xe048,
+  /// Reading peek card's show/hide-translation toggle: an open eye when the
+  /// translation is shown, the slashed eye ([visibilityOff]) when hidden — the
+  /// universal, unambiguous "hide" affordance. (Avoids the `translate` 文/A glyph,
+  /// which reads as "Chinese", and the `subtitles` glyph, which reads as a note —
+  /// see LEARNINGS.md §3.)
+  static const IconData visibility = IconData(
+    0xe8f4,
     fontFamily: _kSymbolFamily,
-  ); // subtitles_rounded
+  ); // visibility_rounded
+  static const IconData visibilityOff = IconData(
+    0xe8f5,
+    fontFamily: _kSymbolFamily,
+  ); // visibility_off_rounded
   static const IconData expand = IconData(
     0xe5cf,
     fontFamily: _kSymbolFamily,

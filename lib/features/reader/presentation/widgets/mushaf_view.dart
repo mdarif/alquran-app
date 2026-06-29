@@ -1304,9 +1304,9 @@ class _MushafPeekCard extends StatelessWidget {
     );
   }
 
-  /// Collapse/expand the translation: the translate glyph, filled (primary) when
-  /// shown, muted when hidden. Lets the reader read/listen to the Arabic alone
-  /// without losing the play controls.
+  /// Collapse/expand the translation: an open eye (primary) when shown, a slashed
+  /// eye (muted) when hidden — the unambiguous "hide" affordance. Lets the reader
+  /// read/listen to the Arabic alone without losing the play controls.
   Widget _translationToggle(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return IconButton(
@@ -1315,9 +1315,8 @@ class _MushafPeekCard extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       onPressed: onToggleTranslation,
       icon: AppIcon(
-        AppIcons.subtitles,
+        showTranslation ? AppIcons.visibility : AppIcons.visibilityOff,
         size: AppIconSize.action,
-        filled: showTranslation,
         color: showTranslation ? cs.primary : cs.onSurfaceVariant,
       ),
     );
