@@ -35,9 +35,13 @@ a leaf in the negative space (growth / the living word), on a deep-green field.
 ## Store + web copy
 
 - **Store name:** Al Quran — Read Simply  *(Play title ≤30 chars ✓)*
-- **Tagline / subtitle:** The Qur'an, beautifully simple.
+- **Tagline / subtitle:** Read. Reflect. Remember.  *(the About screen's voice)*
+- **Developer line:** Building simple, beautiful apps that benefit Muslims.
 - **Website H1:** Read the Qur'an without distractions.  *(for the future companion site)*
-- **Positioning:** offline reading + optional audio recitation; ultra-light, distraction-free.
+- **Positioning:** offline reading + optional audio recitation; Arabic with Urdu,
+  Hindi & English translations; ultra-light, distraction-free.
+- **Promise pillars (About):** Fully offline (reading) · Arabic, Urdu, Hindi & English
+  · Designed for comfort.
 
 ## Icon & splash — how they're generated
 

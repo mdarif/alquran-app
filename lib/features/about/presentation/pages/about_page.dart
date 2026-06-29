@@ -44,7 +44,7 @@ class AboutPage extends StatelessWidget {
           const _BrandHeader(version: _version),
           const SizedBox(height: 20),
           Text(
-            'Made for reading',
+            'Built for Reading',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),
@@ -81,7 +81,7 @@ class AboutPage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Read simply. Stay connected.',
+            'Building simple, beautiful apps that benefit Muslims.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
@@ -102,7 +102,7 @@ class AboutPage extends StatelessWidget {
                 foregroundColor: cs.onSurfaceVariant,
                 textStyle: theme.textTheme.bodySmall,
               ),
-              child: const Text('Licenses & credits'),
+              child: const Text('Credits & Licenses'),
             ),
           ),
         ],
@@ -125,7 +125,7 @@ class _BrandHeader extends StatelessWidget {
     return Semantics(
       container: true,
       label:
-          'Al Quran. The Qur’an, beautifully simple. Version $version by Al Marfa Technologies.',
+          'Al Quran. Read. Reflect. Remember. Version $version by Al Marfa Technologies.',
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
         decoration: BoxDecoration(
@@ -155,7 +155,7 @@ class _BrandHeader extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              'The Qur’an, beautifully simple.',
+              'Read. Reflect. Remember.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: cs.onSurfaceVariant,
@@ -249,21 +249,20 @@ class _PromiseGrid extends StatelessWidget {
       children: [
         _Promise(
           icon: Icons.offline_bolt_rounded,
-          title: 'Fully offline',
-          detail: 'Read wherever you are, without an account or connection.',
+          title: 'Fully Offline',
+          detail: 'No internet. No sign-up. Just read.',
         ),
         SizedBox(height: 8),
         _Promise(
           icon: Icons.translate_rounded,
-          title: 'Arabic, Urdu & Hindi',
-          detail: 'Clear Quran text with translations for South Asian readers.',
+          title: 'Arabic, Urdu, Hindi & English',
+          detail: 'Beautiful Arabic text with carefully selected translations.',
         ),
         SizedBox(height: 8),
         _Promise(
           icon: Icons.visibility_rounded,
-          title: 'Comfortable by design',
-          detail:
-              'Pinch to zoom, calm surfaces, and no complicated navigation.',
+          title: 'Designed for Comfort',
+          detail: 'Designed for long, comfortable reading sessions.',
         ),
       ],
     );
