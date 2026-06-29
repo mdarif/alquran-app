@@ -114,4 +114,78 @@ void main() {
     await cubit.close();
     expect(player.calls, contains('stop'));
   });
+
+  group('continuous "play from here" auto-advance', () {
+    test('a finished verse rolls into the next one in the sequence', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(1); // play(1)
+
+      player.push(1, RecitationStatus.completed);
+      await pumpEventQueue();
+      expect(player.calls, ['play(1)', 'play(2)']);
+
+      player.push(2, RecitationStatus.completed);
+      await pumpEventQueue();
+      expect(player.calls, ['play(1)', 'play(2)', 'play(3)']);
+    });
+
+    test('the last verse stops (no advance, idle state)', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(3); // jump straight to the last verse
+      player.push(3, RecitationStatus.playing);
+      await pumpEventQueue();
+
+      player.push(3, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      expect(player.calls, ['play(3)']); // nothing after the last verse
+      expect(cubit.state.playingAyahId, isNull); // highlight cleared
+      expect(cubit.state.status, RecitationStatus.idle);
+    });
+
+    test('completion of an unknown verse stops (no sequence match)', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(1);
+
+      player.push(99, RecitationStatus.completed); // not in the sequence
+      await pumpEventQueue();
+
+      expect(player.calls, ['play(1)']);
+      expect(cubit.state.playingAyahId, isNull);
+    });
+
+    test('pause does NOT auto-advance', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(1);
+
+      player.push(1, RecitationStatus.paused);
+      await pumpEventQueue();
+
+      expect(player.calls, ['play(1)']); // no play(2)
+      expect(cubit.state.isPaused(1), true);
+    });
+
+    test('an error does NOT auto-advance past the failed verse', () async {
+      cubit.setSequence([1, 2, 3]);
+      await cubit.toggle(1);
+
+      player.push(1, RecitationStatus.error);
+      await pumpEventQueue();
+
+      expect(player.calls, ['play(1)']); // no play(2)
+      expect(cubit.state.hasError(1), true);
+    });
+
+    test('completed status never surfaces in the cubit state', () async {
+      cubit.setSequence([1, 2]);
+      await cubit.toggle(1);
+
+      player.push(1, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      // The cubit acted on it (play(2)); the UI only ever sees the next verse
+      // loading/playing — never a lingering `completed`.
+      expect(cubit.state.status, isNot(RecitationStatus.completed));
+    });
+  });
 }

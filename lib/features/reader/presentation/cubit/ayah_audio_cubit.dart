@@ -19,7 +19,36 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   final AyahRecitationPlayer _player;
   StreamSubscription<RecitationPlayback>? _sub;
 
+  // The active section's verse ids in reading order. Set by the reader whenever
+  // the section loads/changes; drives continuous "play from here" advance.
+  List<int> _sequence = const [];
+
+  /// Teach the cubit the order of the verses on screen, so that when one finishes
+  /// it can roll into the next. Idempotent; the reader re-pushes on load/swipe.
+  void setSequence(List<int> ayahIds) => _sequence = ayahIds;
+
+  /// The verse after [id] in the current sequence, or null at the end / when [id]
+  /// isn't in the sequence (→ playback stops at the surah end).
+  int? _nextAfter(int? id) {
+    if (id == null) return null;
+    final i = _sequence.indexOf(id);
+    if (i < 0 || i + 1 >= _sequence.length) return null;
+    return _sequence[i + 1];
+  }
+
   void _onPlayback(RecitationPlayback p) {
+    // A verse finished on its own: roll into the next one ("play from here"), or
+    // stop at the surah end. Intercepted here so the UI never sees `completed`.
+    if (p.status == RecitationStatus.completed) {
+      final next = _nextAfter(p.ayahId);
+      if (next != null) {
+        _player.play(next); // continues: emits loading→playing for `next`
+      } else {
+        // End of surah → idle, clears the now-playing highlight.
+        emit(const AyahAudioState());
+      }
+      return;
+    }
     final isError = p.status == RecitationStatus.error;
     emit(
       AyahAudioState(
@@ -43,6 +72,8 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
         case RecitationStatus.loading:
           break; // already loading this verse — ignore the tap
         case RecitationStatus.idle:
+        case RecitationStatus
+              .completed: // never actually held in state; for exhaustiveness
         case RecitationStatus.error:
           await _player.play(ayahId);
       }

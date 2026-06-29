@@ -204,7 +204,15 @@ class _ReaderViewState extends State<_ReaderView> {
         onPointerMove: _onPointerMove,
         onPointerUp: _onPointerEnd,
         onPointerCancel: _onPointerEnd,
-        child: BlocBuilder<ReaderCubit, ReaderState>(
+        child: BlocConsumer<ReaderCubit, ReaderState>(
+          // Keep the audio cubit's verse order in sync with the section on
+          // screen, so "play from here" can roll verse→verse to the surah end.
+          // Guarded by the flag (the cubit only exists when audio is on).
+          listenWhen: (a, b) =>
+              FeatureFlags.audioRecitation && a.ayahs != b.ayahs,
+          listener: (context, state) => context
+              .read<AyahAudioCubit>()
+              .setSequence([for (final a in state.ayahs) a.id]),
           builder: (context, state) {
             if (state.status == ReaderStatus.error) {
               return Center(child: Text(state.error ?? 'Failed to load'));
@@ -712,7 +720,7 @@ class _DetailedListState extends State<_DetailedList> {
   Widget build(BuildContext context) {
     // Translation languages are chosen in the Settings sheet now, so the view is
     // just the verses — no top strip.
-    return Stack(
+    final content = Stack(
       children: [
         SelectionArea(
           child: ScrollablePositionedList.builder(
@@ -731,6 +739,18 @@ class _DetailedListState extends State<_DetailedList> {
           ),
         ),
       ],
+    );
+    // During continuous recitation, keep the now-playing verse in view as it
+    // advances (the tile self-tints via `isActive`; this just scrolls). Listen
+    // only — no list rebuild. Off-flag the cubit isn't provided, so skip it.
+    if (!FeatureFlags.audioRecitation) return content;
+    return BlocListener<AyahAudioCubit, AyahAudioState>(
+      listenWhen: (a, b) => a.playingAyahId != b.playingAyahId,
+      listener: (_, state) {
+        final id = state.playingAyahId;
+        if (id != null) _scrollToFocus(id);
+      },
+      child: content,
     );
   }
 

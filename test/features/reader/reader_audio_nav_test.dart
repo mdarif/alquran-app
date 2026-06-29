@@ -22,13 +22,22 @@ import 'package:get_it/get_it.dart';
 class _RecordingPlayer implements AyahRecitationPlayer {
   final controller = StreamController<RecitationPlayback>.broadcast();
   int stopCalls = 0;
+  int? lastPlayed;
 
   @override
   Stream<RecitationPlayback> get playbackStream => controller.stream;
 
   @override
-  Future<void> play(int ayahId) async => controller.add(
-        RecitationPlayback(ayahId: ayahId, status: RecitationStatus.playing),
+  Future<void> play(int ayahId) async {
+    lastPlayed = ayahId;
+    controller.add(
+      RecitationPlayback(ayahId: ayahId, status: RecitationStatus.playing),
+    );
+  }
+
+  /// Signal that [ayahId] finished on its own — drives continuous auto-advance.
+  void complete(int ayahId) => controller.add(
+        RecitationPlayback(ayahId: ayahId, status: RecitationStatus.completed),
       );
 
   @override
@@ -145,5 +154,54 @@ void main() {
     );
     // (Stopping on *leaving* the reader is covered by ayah_audio_cubit_test's
     // "close stops playback" — the per-screen cubit calls player.stop() on close.)
+  });
+
+  testWidgets(
+      'a finished verse auto-advances to the next (reader fed the order)',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ReaderPage(target: ReaderTarget.surah(2, 'Al-Baqarah')),
+      ),
+    );
+    await tester.pumpAndSettle(); // load → the reader pushes the verse order
+
+    // Verse 2001 is playing; let it finish → it should roll into 2002, then 2003.
+    player.controller.add(
+      const RecitationPlayback(ayahId: 2001, status: RecitationStatus.playing),
+    );
+    await tester.pump();
+
+    player.complete(2001);
+    await tester.pumpAndSettle();
+    expect(
+      player.lastPlayed,
+      2002,
+      reason: 'should continue to the next verse',
+    );
+
+    player.complete(2002);
+    await tester.pumpAndSettle();
+    expect(player.lastPlayed, 2003);
+  });
+
+  testWidgets('the last verse stops — no advance past the surah end',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ReaderPage(target: ReaderTarget.surah(2, 'Al-Baqarah')),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The fake surah has 5 verses (2001..2005); finishing the last one must NOT
+    // start anything new.
+    player.complete(2005);
+    await tester.pumpAndSettle();
+    expect(
+      player.lastPlayed,
+      isNull,
+      reason: 'nothing plays after the last verse',
+    );
   });
 }

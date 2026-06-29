@@ -12,8 +12,10 @@ import 'package:path_provider/path_provider.dart';
 
 import 'recitation_source.dart';
 
-/// Playback lifecycle for a single verse.
-enum RecitationStatus { idle, loading, playing, paused, error }
+/// Playback lifecycle for a single verse. `completed` is a one-shot signal the
+/// track ended on its own (vs. `idle`, which `stop()` emits) — it carries the
+/// finished verse id so continuous playback can advance to the next verse.
+enum RecitationStatus { idle, loading, playing, paused, completed, error }
 
 /// What the player is doing, and to which verse. `ayahId` is the global 1..6236
 /// id; null when idle/stopped. Emitted on [AyahRecitationPlayer.playbackStream].
@@ -94,8 +96,12 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
       case ProcessingState.ready:
         _emit(s.playing ? RecitationStatus.playing : RecitationStatus.paused);
       case ProcessingState.completed:
+        // Emit BEFORE clearing so the event carries the verse that just ended —
+        // that's what the cubit needs to advance to the next one. Distinct from
+        // the `idle` that stop() emits, so a natural end and a user stop don't
+        // look the same.
+        _emit(RecitationStatus.completed);
         _currentAyahId = null;
-        _emit(RecitationStatus.idle);
     }
   }
 

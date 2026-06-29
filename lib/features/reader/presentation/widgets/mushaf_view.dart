@@ -194,6 +194,22 @@ class _MushafViewState extends State<MushafView>
   @override
   void didUpdateWidget(MushafView old) {
     super.didUpdateWidget(old);
+
+    // Follow the reciter: when the now-playing verse advances (continuous
+    // playback), bring it into view and advance the peek card to it — the peek
+    // is the now-playing control in Reading. Only on a real verse change, not a
+    // play/pause status tick on the same verse. Deferred a frame so the scroll
+    // measures the settled layout.
+    final playing = widget.audioState?.playingAyahId;
+    if (playing != null && playing != old.audioState?.playingAyahId) {
+      final ayah = _ayahById(playing);
+      if (ayah != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _selectVerse(ayah, scroll: true);
+        });
+      }
+    }
+
     final ayahsChanged = widget.ayahs != old.ayahs;
     final fontChanged = widget.arabicFontSize != old.arabicFontSize;
     if (!ayahsChanged && !fontChanged) return;
@@ -254,6 +270,15 @@ class _MushafViewState extends State<MushafView>
       return;
     }
     _selectVerse(tapped);
+  }
+
+  /// The verse with [id] in the loaded section, or null if it isn't here (e.g.
+  /// an off-screen neighbour page never carries the active audio state anyway).
+  Ayah? _ayahById(int id) {
+    for (final ayah in widget.ayahs) {
+      if (ayah.id == id) return ayah;
+    }
+    return null;
   }
 
   /// Select [ayah] as the peeked verse (highlight + slide the card up). When
