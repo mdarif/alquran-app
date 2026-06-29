@@ -491,9 +491,11 @@ void main() {
         );
 
     testWidgets(
-        'arrows lock while sounding, but free up when paused or stopped',
-        (tester) async {
-      var status = RecitationStatus.playing;
+        'arrows lock ONLY while sounding (playing/loading); paused, idle, '
+        'finished and error all free them', (tester) async {
+      // On a middle verse both ‹ and › have neighbours, so "free" must enable
+      // BOTH — distinguishing the audio gate from the first/last boundary.
+      var audio = const AyahAudioState(); // start idle
       late StateSetter setOuter;
       await tester.pumpWidget(
         _wrap(
@@ -508,9 +510,7 @@ void main() {
                 selectedLanguages: const {'ur'},
                 onToggleLanguage: (_) {},
                 onTogglePlay: (_) {},
-                audioState: status == RecitationStatus.idle
-                    ? const AyahAudioState() // stopped/finished
-                    : AyahAudioState(playingAyahId: 1001, status: status),
+                audioState: audio,
               );
             },
           ),
@@ -519,23 +519,88 @@ void main() {
       await tester.pump();
       await _tapText(tester); // open the peek
 
-      bool anyStepEnabled() =>
-          stepButton(tester, WidgetKeys.peekPrevButton).onPressed != null ||
-          stepButton(tester, WidgetKeys.peekNextButton).onPressed != null;
-
-      // Playing → both arrows locked (the card follows the reciter instead).
-      expect(stepButton(tester, WidgetKeys.peekPrevButton).onPressed, isNull);
-      expect(stepButton(tester, WidgetKeys.peekNextButton).onPressed, isNull);
-
-      // Paused → free to step through and read individual translations.
-      setOuter(() => status = RecitationStatus.paused);
+      // Walk to the first verse, then one forward → the middle verse (1:2), so
+      // both neighbours exist. (Stepping works because audio is idle here.)
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(
+          find.byKey(WidgetKeys.peekPrevButton),
+          warnIfMissed: false,
+        );
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.byKey(WidgetKeys.peekNextButton));
       await tester.pumpAndSettle();
-      expect(anyStepEnabled(), isTrue);
 
-      // Stopped / finished (idle) → also free.
-      setOuter(() => status = RecitationStatus.idle);
-      await tester.pumpAndSettle();
-      expect(anyStepEnabled(), isTrue);
+      // NOT pumpAndSettle: a now-playing verse triggers the card's auto-follow
+      // scroll + an 1800ms highlight flash that never "settle". The arrow state
+      // is synchronous from audioState, so two frames (rebuild + the follow's
+      // post-frame) is enough to assert it.
+      Future<void> setAudio(AyahAudioState s) async {
+        setOuter(() => audio = s);
+        await tester.pump();
+        await tester.pump();
+      }
+
+      void expectLocked(String label) {
+        expect(
+          stepButton(tester, WidgetKeys.peekPrevButton).onPressed,
+          isNull,
+          reason: '$label: ‹ should be locked',
+        );
+        expect(
+          stepButton(tester, WidgetKeys.peekNextButton).onPressed,
+          isNull,
+          reason: '$label: › should be locked',
+        );
+      }
+
+      void expectFree(String label) {
+        expect(
+          stepButton(tester, WidgetKeys.peekPrevButton).onPressed,
+          isNotNull,
+          reason: '$label: ‹ should be enabled',
+        );
+        expect(
+          stepButton(tester, WidgetKeys.peekNextButton).onPressed,
+          isNotNull,
+          reason: '$label: › should be enabled',
+        );
+      }
+
+      expectFree('idle baseline');
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1002,
+          status: RecitationStatus.playing,
+        ),
+      );
+      expectLocked('playing');
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1002,
+          status: RecitationStatus.loading,
+        ),
+      );
+      expectLocked('loading');
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1002,
+          status: RecitationStatus.paused,
+        ),
+      );
+      expectFree('paused');
+      await setAudio(
+        const AyahAudioState(
+          status: RecitationStatus.error,
+          errorAyahId: 1002,
+        ),
+      );
+      expectFree('error');
+      await setAudio(const AyahAudioState());
+      expectFree('stopped/finished');
+
+      // Drain the pending highlight-flash timer + scroll so teardown is clean.
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 
