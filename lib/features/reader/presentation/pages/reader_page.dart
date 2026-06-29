@@ -899,26 +899,19 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text('Settings', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 16),
-              // Text size: label + live point readout.
-              Row(
-                children: [
-                  Text(
-                    'Text size',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+              const SizedBox(height: 18),
+              // Text size — header with a live point readout on the right.
+              _SectionLabel(
+                'Text size',
+                trailing: Text(
+                  '${_fontSize.round()}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const Spacer(),
-                  Text(
-                    '${_fontSize.round()}',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: cs.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                ),
               ),
+              const SizedBox(height: 4),
               // A− / A+ steppers flank the slider (each nudges one grid step).
               Row(
                 children: [
@@ -953,21 +946,13 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               ),
               // Arabic font — only while the IndoPak feature is enabled.
               if (FeatureFlags.indopakScript) ...[
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Arabic Font',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 18),
+                const _SectionLabel('Arabic Font'),
+                const SizedBox(height: 2),
                 Column(
                   key: WidgetKeys.scriptToggle,
                   children: [
-                    _ScriptRow(
+                    _ScriptPreview(
                       script: ArabicScript.uthmani,
                       label: 'Uthmani/Madani',
                       description: 'Madinah Mushaf',
@@ -976,8 +961,8 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                       selected: _script == ArabicScript.uthmani,
                       onTap: () => _setScript(ArabicScript.uthmani),
                     ),
-                    const SizedBox(height: 10),
-                    _ScriptRow(
+                    const Divider(height: 1),
+                    _ScriptPreview(
                       script: ArabicScript.indopak,
                       label: 'IndoPak/Asian',
                       description: 'South-Asian Naskh',
@@ -990,17 +975,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 ),
               ],
               if (widget.resources.length > 1) ...[
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Translation',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 18),
+                const _SectionLabel('Translation'),
+                const SizedBox(height: 10),
                 // Compact selectable chips (one wrap row) instead of a stacked
                 // checklist. The parent keeps at least one translation on.
                 Wrap(
@@ -1063,8 +1040,38 @@ class _StepButton extends StatelessWidget {
 /// A full-width selectable row previewing an Arabic [script] in its real font
 /// (the Bismillah) with the name + a one-line [description], so the
 /// Uthmani↔IndoPak difference is large and each option explains itself.
-class _ScriptRow extends StatelessWidget {
-  const _ScriptRow({
+/// Apple-style settings section header: small, UPPERCASE, muted, letter-spaced,
+/// with an optional trailing widget (e.g. the live text-size readout).
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text, {this.trailing});
+
+  final String text;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Text(
+          text.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.8,
+          ),
+        ),
+        if (trailing != null) ...[const Spacer(), trailing!],
+      ],
+    );
+  }
+}
+
+/// A typography preview of one Arabic face: the Bismillah specimen is the hero,
+/// the face's name a quiet caption, and a checkmark marks the active one — no
+/// card fill or border (Apple font-picker style).
+class _ScriptPreview extends StatelessWidget {
+  const _ScriptPreview({
     required this.script,
     required this.label,
     required this.description,
@@ -1086,80 +1093,65 @@ class _ScriptRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final onColor = selected ? cs.onPrimaryContainer : cs.onSurfaceVariant;
     return Semantics(
       selected: selected,
-      child: Material(
+      child: InkWell(
         key: WidgetKeys.scriptCard(script.name),
-        color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selected ? cs.primary : Colors.transparent,
-                width: 1.5,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Align(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  // The specimen — full-strength, the hero of the row.
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            sample,
-                            textDirection: TextDirection.rtl,
-                            locale: const Locale('ar'),
-                            style: sampleStyle.copyWith(
-                              fontSize: 26,
-                              color: selected
-                                  ? cs.onPrimaryContainer
-                                  : cs.onSurface,
-                            ),
+                        child: Text(
+                          sample,
+                          textDirection: TextDirection.rtl,
+                          locale: const Locale('ar'),
+                          style: sampleStyle.copyWith(
+                            fontSize: 28,
+                            color: cs.onSurface,
                           ),
                         ),
                       ),
                     ),
-                    // Fixed-width trailing slot so the sample doesn't shift when the
-                    // check appears/disappears.
-                    SizedBox(
-                      width: 24,
-                      child: selected
-                          ? Icon(
-                              Icons.check_rounded,
-                              size: 20,
-                              color: cs.onPrimaryContainer,
-                            )
-                          : null,
+                  ),
+                  const SizedBox(width: 10),
+                  // Fixed-width slot so the specimen never shifts.
+                  SizedBox(
+                    width: 22,
+                    child: selected
+                        ? Icon(Icons.check_rounded, size: 20, color: cs.primary)
+                        : null,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: label,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
+                    TextSpan(text: '  ·  $description'),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: label,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      TextSpan(text: '  ·  $description'),
-                    ],
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(color: onColor),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: selected ? cs.onSurface : cs.onSurfaceVariant,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
