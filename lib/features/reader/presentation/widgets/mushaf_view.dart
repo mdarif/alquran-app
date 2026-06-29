@@ -47,6 +47,8 @@ class MushafView extends StatefulWidget {
     this.audioState,
     this.onTogglePlay,
     this.onToggleLanguage,
+    this.showTranslation = true,
+    this.onToggleTranslation,
     super.key,
   });
 
@@ -88,6 +90,15 @@ class MushafView extends StatefulWidget {
   /// Toggle a translation edition in the shared selection (from the peek card's
   /// inline language chips, which also drive Detailed view). Null hides them.
   final ValueChanged<String>? onToggleLanguage;
+
+  /// Whether the peek card shows the translation text (and its language chips).
+  /// False → a slim play/stepper-only peek, so the reader can read/listen to the
+  /// Arabic alone. The verse page itself is Arabic-only either way.
+  final bool showTranslation;
+
+  /// Collapse/expand the peek's translation (the in-card toggle). Null hides the
+  /// toggle (e.g. on the inert off-screen pages).
+  final VoidCallback? onToggleTranslation;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -555,6 +566,8 @@ class _MushafViewState extends State<MushafView>
                 audioState: widget.audioState,
                 onTogglePlay: widget.onTogglePlay,
                 onToggleLanguage: widget.onToggleLanguage,
+                showTranslation: widget.showTranslation,
+                onToggleTranslation: widget.onToggleTranslation,
                 onPrev: _selIdx > 0 ? () => _step(-1) : null,
                 onNext: _selIdx >= 0 && _selIdx < widget.ayahs.length - 1
                     ? () => _step(1)
@@ -1032,6 +1045,8 @@ class _MushafPeekCard extends StatelessWidget {
     this.onPrev,
     this.onNext,
     this.onToggleLanguage,
+    this.showTranslation = true,
+    this.onToggleTranslation,
   });
 
   final Ayah? ayah;
@@ -1054,6 +1069,13 @@ class _MushafPeekCard extends StatelessWidget {
   /// feature is off → no play control (the card renders exactly as before).
   final AyahAudioState? audioState;
   final ValueChanged<int>? onTogglePlay;
+
+  /// Whether to show the translation text + language chips. False collapses the
+  /// card to just its control row (read/listen to the Arabic alone).
+  final bool showTranslation;
+
+  /// Collapse/expand the translation (the inline ⓣ toggle). Null hides it.
+  final VoidCallback? onToggleTranslation;
 
   @override
   Widget build(BuildContext context) {
@@ -1160,68 +1182,76 @@ class _MushafPeekCard extends StatelessWidget {
                           tooltip: 'Next verse',
                           onPressed: onNext,
                         ),
+                        // Collapse/expand the translation (read/listen to the
+                        // Arabic alone) — only when there's a translation to hide.
+                        if (onToggleTranslation != null && available.isNotEmpty)
+                          _translationToggle(context),
                       ],
                     ),
-                    // Inline translation selector — toggles the shared selection
-                    // (also drives Detailed view). Same picker as the Settings
-                    // sheet, here at hand while reading.
-                    if (onToggleLanguage != null && available.length > 1) ...[
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            for (final r in available)
-                              TranslationChip(
-                                key: WidgetKeys.peekLangOption(r.languageCode),
-                                label: nativeLanguageName(r.languageCode),
-                                selected: selected.contains(r.languageCode),
-                                onTap: () => onToggleLanguage!(r.languageCode),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    if (shown.isEmpty)
-                      Text(
-                        'No translation available',
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant),
-                      )
-                    else
-                      for (var i = 0; i < shown.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 18),
-                        Text(
-                          current.translations[shown[i].id]!,
-                          textAlign: shown[i].languageCode == 'ur'
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          textDirection: shown[i].languageCode == 'ur'
-                              ? TextDirection.rtl
-                              : TextDirection.ltr,
-                          locale: Locale(shown[i].languageCode),
-                          style: shown[i].languageCode.scriptStyle(
-                                theme.textTheme.bodyLarge!.copyWith(
-                                  height: 1.5,
-                                  fontSize: translationSize,
+                    // Translation — the text + inline language picker. Hidden
+                    // when collapsed (the translate toggle) so the card is just
+                    // controls over the Arabic. Same picker as the Settings sheet.
+                    if (showTranslation) ...[
+                      if (onToggleLanguage != null && available.length > 1) ...[
+                        const SizedBox(height: 12),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (final r in available)
+                                TranslationChip(
+                                  key:
+                                      WidgetKeys.peekLangOption(r.languageCode),
+                                  label: nativeLanguageName(r.languageCode),
+                                  selected: selected.contains(r.languageCode),
+                                  onTap: () =>
+                                      onToggleLanguage!(r.languageCode),
                                 ),
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          shown[i].attribution,
-                          textAlign: shown[i].languageCode == 'ur'
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w600,
+                            ],
                           ),
                         ),
                       ],
+                      const SizedBox(height: 14),
+                      if (shown.isEmpty)
+                        Text(
+                          'No translation available',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        )
+                      else
+                        for (var i = 0; i < shown.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 18),
+                          Text(
+                            current.translations[shown[i].id]!,
+                            textAlign: shown[i].languageCode == 'ur'
+                                ? TextAlign.right
+                                : TextAlign.left,
+                            textDirection: shown[i].languageCode == 'ur'
+                                ? TextDirection.rtl
+                                : TextDirection.ltr,
+                            locale: Locale(shown[i].languageCode),
+                            style: shown[i].languageCode.scriptStyle(
+                                  theme.textTheme.bodyLarge!.copyWith(
+                                    height: 1.5,
+                                    fontSize: translationSize,
+                                  ),
+                                ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            shown[i].attribution,
+                            textAlign: shown[i].languageCode == 'ur'
+                                ? TextAlign.right
+                                : TextAlign.left,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                    ],
                   ],
                 ),
               ),
@@ -1271,6 +1301,25 @@ class _MushafPeekCard extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       onPressed: () => onTogglePlay!(ayahId),
       icon: icon,
+    );
+  }
+
+  /// Collapse/expand the translation: the translate glyph, filled (primary) when
+  /// shown, muted when hidden. Lets the reader read/listen to the Arabic alone
+  /// without losing the play controls.
+  Widget _translationToggle(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton(
+      key: WidgetKeys.peekTranslationToggle,
+      tooltip: showTranslation ? 'Hide translation' : 'Show translation',
+      visualDensity: VisualDensity.compact,
+      onPressed: onToggleTranslation,
+      icon: AppIcon(
+        AppIcons.translate,
+        size: AppIconSize.action,
+        filled: showTranslation,
+        color: showTranslation ? cs.primary : cs.onSurfaceVariant,
+      ),
     );
   }
 }

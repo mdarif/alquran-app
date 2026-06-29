@@ -75,6 +75,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setSelectedTranslations(List<String> codes) async =>
       selectedTranslations = codes;
+  @override
+  bool readingTranslationVisible = true;
+  @override
+  Future<void> setReadingTranslationVisible(bool value) async =>
+      readingTranslationVisible = value;
 }
 
 class _SilentPlayer implements AyahRecitationPlayer {

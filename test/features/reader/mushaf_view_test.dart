@@ -480,6 +480,98 @@ void main() {
 
   // -------------------------------------------------------------------------
 
+  group('MushafView — translation collapse toggle', () {
+    bool cardVisible(WidgetTester tester) => tester
+        .widgetList<Material>(find.byType(Material))
+        .any((m) => m.elevation == 12);
+
+    testWidgets('toggle hides the translation (text + chips), then restores',
+        (tester) async {
+      var show = true;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) => MushafView(
+              ayahs: _ayahsWithTranslations(1, 1),
+              headings: _headings(1, 'Al-Fatihah', 7),
+              arabicFontSize: 28,
+              resources: _kResources,
+              selectedLanguages: const {'ur'},
+              onToggleLanguage: (_) {},
+              showTranslation: show,
+              onToggleTranslation: () => setState(() => show = !show),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester);
+
+      // Expanded: the translation text + a language chip are visible.
+      expect(find.text('اردو ترجمہ'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsOneWidget);
+
+      // Collapse → translation text + chips gone; the card stays open (controls).
+      await tester.tap(find.byKey(WidgetKeys.peekTranslationToggle));
+      await tester.pumpAndSettle();
+      expect(cardVisible(tester), isTrue);
+      expect(find.text('اردو ترجمہ'), findsNothing);
+      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsNothing);
+
+      // Expand again → translation back.
+      await tester.tap(find.byKey(WidgetKeys.peekTranslationToggle));
+      await tester.pumpAndSettle();
+      expect(find.text('اردو ترجمہ'), findsOneWidget);
+    });
+
+    testWidgets('opens collapsed when showTranslation is false',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahsWithTranslations(1, 1),
+            headings: _headings(1, 'Al-Fatihah', 7),
+            arabicFontSize: 28,
+            resources: _kResources,
+            selectedLanguages: const {'ur'},
+            onToggleLanguage: (_) {},
+            showTranslation: false,
+            onToggleTranslation: () {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester);
+
+      // The card opens (you can drive audio), but with no translation/chips —
+      // and the toggle is present so you can bring it back.
+      expect(cardVisible(tester), isTrue);
+      expect(find.text('اردو ترجمہ'), findsNothing);
+      expect(find.byKey(WidgetKeys.peekTranslationToggle), findsOneWidget);
+    });
+
+    testWidgets('no toggle when onToggleTranslation is unwired',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahsWithTranslations(1, 1),
+            headings: _headings(1, 'Al-Fatihah', 7),
+            arabicFontSize: 28,
+            resources: _kResources,
+            selectedLanguages: const {'ur'},
+            onToggleLanguage: (_) {},
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester);
+      expect(find.byKey(WidgetKeys.peekTranslationToggle), findsNothing);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
   group('MushafView — resume-point reporting (Last Read)', () {
     testWidgets('reports the topmost verse as soon as scrolling settles',
         (tester) async {

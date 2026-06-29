@@ -38,6 +38,8 @@ class WidgetKeys {
   // Inline translation chips in the Reading peek card ('ur' | 'hi' | 'en').
   static Key peekLangOption(String languageCode) =>
       Key('peek-lang-option-$languageCode');
+  // Collapse/expand the peek card's translation (read/listen to Arabic alone).
+  static const peekTranslationToggle = Key('reader-peek-translation-toggle');
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');

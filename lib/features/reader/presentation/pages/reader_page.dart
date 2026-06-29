@@ -139,6 +139,12 @@ class _ReaderViewState extends State<_ReaderView> {
   // to a sensible default. Restored from settings so it survives restarts.
   late Set<String>? _selected = _settings.selectedTranslations?.toSet();
 
+  // Whether the Reading peek card shows the translation (+ its language chips).
+  // Collapsible from the peek so the reader can read/listen to the Arabic alone;
+  // persisted like the other reading prefs, so it holds across verses + launches.
+  // Reading-only — Detailed is the translation view and ignores this.
+  late bool _readingTranslation = _settings.readingTranslationVisible;
+
   // Section paging is a standard PageView (one page per section in the active
   // dimension). It gives native finger-tracking, momentum and snap, and keeps
   // the neighbours mounted — so swiping is smooth and nothing remounts.
@@ -282,6 +288,8 @@ class _ReaderViewState extends State<_ReaderView> {
             : null,
         onToggleLanguage:
             interactive ? (code) => _toggleLang(code, resources) : null,
+        showTranslation: _readingTranslation,
+        onToggleTranslation: interactive ? _toggleReadingTranslation : null,
       );
     } else {
       // Detailed view owns its own SelectionArea (around the verses) for
@@ -482,6 +490,13 @@ class _ReaderViewState extends State<_ReaderView> {
     }
     setState(() => _selected = current);
     unawaited(_settings.setSelectedTranslations(current.toList()));
+  }
+
+  /// Show/hide the Reading peek card's translation (collapse to read/listen to
+  /// the Arabic alone); persisted so it holds across verses and launches.
+  void _toggleReadingTranslation() {
+    setState(() => _readingTranslation = !_readingTranslation);
+    unawaited(_settings.setReadingTranslationVisible(_readingTranslation));
   }
 
   /// Slider: set the zoom to an absolute value and persist it.

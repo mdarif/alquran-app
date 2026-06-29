@@ -12,6 +12,8 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   static const String _kDetailed = 'reader_detailed';
   static const String _kSelectedLangs = 'reader_selected_translations';
   static const String _kScript = 'reader_script';
+  static const String _kReadingTranslation =
+      'reader_reading_translation_visible';
 
   @override
   ArabicScript get script => _prefs.getString(_kScript) == 'indopak'
@@ -34,6 +36,10 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
       _prefs.getStringList(_kSelectedLangs);
 
   @override
+  bool get readingTranslationVisible =>
+      _prefs.getBool(_kReadingTranslation) ?? true;
+
+  @override
   Future<void> setFontSize(double value) => _prefs.setDouble(_kFontSize, value);
 
   @override
@@ -42,4 +48,8 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   @override
   Future<void> setSelectedTranslations(List<String> languageCodes) =>
       _prefs.setStringList(_kSelectedLangs, languageCodes);
+
+  @override
+  Future<void> setReadingTranslationVisible(bool value) =>
+      _prefs.setBool(_kReadingTranslation, value);
 }

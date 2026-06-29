@@ -22,11 +22,15 @@ class _Settings implements ReaderSettingsRepository {
   @override
   List<String>? get selectedTranslations => null;
   @override
+  bool get readingTranslationVisible => true;
+  @override
   Future<void> setFontSize(double value) async {}
   @override
   Future<void> setDetailed(bool value) async {}
   @override
   Future<void> setSelectedTranslations(List<String> codes) async {}
+  @override
+  Future<void> setReadingTranslationVisible(bool value) async {}
 }
 
 void main() {

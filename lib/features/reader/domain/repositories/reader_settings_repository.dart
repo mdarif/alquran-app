@@ -19,9 +19,15 @@ abstract interface class ReaderSettingsRepository {
   /// honoured everywhere. null until the reader picks (then seeded from locale).
   List<String>? get selectedTranslations;
 
+  /// Whether the Reading-view peek card shows the translation text (and its
+  /// language chips). Defaults to true; the reader can collapse it from the peek
+  /// to read/listen to the Arabic alone. Reading-only — Detailed is unaffected.
+  bool get readingTranslationVisible;
+
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setSelectedTranslations(List<String> languageCodes);
+  Future<void> setReadingTranslationVisible(bool value);
 
   static const double defaultFontSize = 28;
 }
