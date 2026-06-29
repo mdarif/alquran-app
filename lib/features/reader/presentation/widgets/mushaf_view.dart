@@ -522,7 +522,13 @@ class _MushafViewState extends State<MushafView>
                       paragraphKey: _groupKeyFor(group.first.surahId),
                       highlightAyahId: _highlightAyahId,
                       selectedAyahId: _selectedAyah?.id,
-                      playingAyahId: widget.audioState?.playingAyahId,
+                      // The sticky now-playing tint applies ONLY while audio is
+                      // sounding. When paused/idle the highlight follows the
+                      // peek selection, so stepping verses (now allowed while
+                      // paused) never leaves the paused verse double-highlighted.
+                      playingAyahId: (widget.audioState?.isSounding ?? false)
+                          ? widget.audioState!.playingAyahId
+                          : null,
                       onTap: (d) => _onGroupTap(d, group),
                     ),
                     const SizedBox(height: 28),

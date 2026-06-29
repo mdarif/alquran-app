@@ -602,6 +602,91 @@ void main() {
       // Drain the pending highlight-flash timer + scroll so teardown is clean.
       await tester.pump(const Duration(seconds: 2));
     });
+
+    // The verse texts that carry the highlight backgroundColor in the Mushaf
+    // paragraph (selected / now-playing / flash all paint the same tint).
+    Set<String> highlightedTexts(WidgetTester tester) {
+      final paragraph = tester
+          .widgetList<Text>(find.byType(Text))
+          .firstWhere((t) => t.textSpan != null);
+      final out = <String>{};
+      void walk(InlineSpan span) {
+        if (span is TextSpan) {
+          if (span.text != null && span.style?.backgroundColor != null) {
+            out.add(span.text!);
+          }
+          span.children?.forEach(walk);
+        }
+      }
+
+      walk(paragraph.textSpan!);
+      return out;
+    }
+
+    testWidgets(
+        'now-playing tint shows only while sounding — browsing while paused '
+        'never leaves the paused verse highlighted', (tester) async {
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahsWithTranslations(1, 3),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                onTogglePlay: (_) {},
+                audioState: audio,
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester); // open the peek
+
+      Future<void> setAudio(AyahAudioState s) async {
+        setOuter(() => audio = s);
+        await tester.pump(); // rebuild
+        await tester.pump(); // run the audio-follow post-frame
+      }
+
+      // Play verse 1 → the card follows to it and it's tinted (sounding).
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1001,
+          status: RecitationStatus.playing,
+        ),
+      );
+      expect(highlightedTexts(tester), contains('نص1'));
+
+      // Pause there, then browse forward two verses (allowed while paused).
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1001,
+          status: RecitationStatus.paused,
+        ),
+      );
+      await tester.tap(find.byKey(WidgetKeys.peekNextButton)); // 1 → 2
+      await tester.pump();
+      await tester.tap(find.byKey(WidgetKeys.peekNextButton)); // 2 → 3
+      await tester.pump();
+
+      final hl = highlightedTexts(tester);
+      expect(hl, contains('نص3'), reason: 'the verse you browsed to is tinted');
+      expect(
+        hl,
+        isNot(contains('نص1')),
+        reason: 'the paused verse must NOT stay tinted once you browse away',
+      );
+
+      await tester.pump(const Duration(seconds: 2)); // drain timers
+    });
   });
 
   // -------------------------------------------------------------------------
