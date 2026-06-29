@@ -23,6 +23,7 @@ import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
 import '../widgets/scroll_to_top_button.dart';
+import '../widgets/translation_chip.dart';
 
 class ReaderPage extends StatelessWidget {
   const ReaderPage({
@@ -944,6 +945,36 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ),
                 ],
               ),
+              const SizedBox(height: 10),
+              // Live preview — the current Arabic face at the chosen size. Fixed
+              // height so dragging the slider never reflows the sheet; the line is
+              // RTL-aligned and clips on the left at the largest sizes (you still
+              // see the true size, not a scaled-to-fit one).
+              Container(
+                key: WidgetKeys.textSizePreview,
+                height: 72,
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                clipBehavior: Clip.hardEdge,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _script == ArabicScript.indopak
+                      ? _indopakSample
+                      : _uthmaniSample,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.clip,
+                  textDirection: TextDirection.rtl,
+                  locale: const Locale('ar'),
+                  style: (_script == ArabicScript.indopak
+                          ? QuranTextStyle.indopak
+                          : QuranTextStyle.madani)
+                      .copyWith(fontSize: _fontSize),
+                ),
+              ),
               // Arabic font — only while the IndoPak feature is enabled.
               if (FeatureFlags.indopakScript) ...[
                 const SizedBox(height: 18),
@@ -978,18 +1009,19 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 const SizedBox(height: 18),
                 const _SectionLabel('Translation'),
                 const SizedBox(height: 10),
-                // Compact selectable chips (one wrap row) instead of a stacked
-                // checklist. The parent keeps at least one translation on.
+                // The same constant-width pills as the Reading peek card, so the
+                // row never reflows ("jumps") when you toggle a language. The
+                // parent keeps at least one translation on.
                 Wrap(
                   spacing: 8,
-                  runSpacing: 4,
+                  runSpacing: 8,
                   children: [
                     for (final r in widget.resources)
-                      FilterChip(
+                      TranslationChip(
                         key: WidgetKeys.langOption(r.languageCode),
-                        label: Text(nativeLanguageName(r.languageCode)),
+                        label: nativeLanguageName(r.languageCode),
                         selected: _selectedLangs.contains(r.languageCode),
-                        onSelected: (_) => _toggleLang(r.languageCode),
+                        onTap: () => _toggleLang(r.languageCode),
                       ),
                   ],
                 ),

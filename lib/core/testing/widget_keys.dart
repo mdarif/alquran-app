@@ -25,6 +25,8 @@ class WidgetKeys {
   // The A−/A+ size steppers flanking the slider in the text-size panel.
   static const fontDecrease = Key('reader-font-decrease');
   static const fontIncrease = Key('reader-font-increase');
+  // Live sample text that resizes with the slider in the text-size panel.
+  static const textSizePreview = Key('reader-text-size-preview');
 
   // Reader content
   static const peekCard = Key('reader-peek-card');

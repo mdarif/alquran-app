@@ -154,6 +154,27 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('the text-size preview resizes with the size controls',
+      (tester) async {
+    await pump(tester);
+    await openPanel(tester);
+
+    double previewSize() => tester
+        .widget<Text>(
+          find.descendant(
+            of: find.byKey(WidgetKeys.textSizePreview),
+            matching: find.byType(Text),
+          ),
+        )
+        .style!
+        .fontSize!;
+
+    final before = previewSize();
+    await tester.tap(find.byKey(WidgetKeys.fontIncrease));
+    await tester.pumpAndSettle();
+    expect(previewSize(), greaterThan(before));
+  });
+
   const skip = !FeatureFlags.indopakScript; // feature shipped dark
 
   group('IndoPak script toggle', () {

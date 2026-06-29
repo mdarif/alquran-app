@@ -14,6 +14,7 @@ import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../cubit/ayah_audio_cubit.dart';
 import 'scroll_to_top_button.dart';
+import 'translation_chip.dart';
 
 /// The Basmala, in the exact QPC Uthmanic encoding (matches the bundled font and
 /// quran.db). Shown before every surah except Al-Fatihah (where it is ayah 1)
@@ -1148,7 +1149,7 @@ class _MushafPeekCard extends StatelessWidget {
                           runSpacing: 6,
                           children: [
                             for (final r in available)
-                              _PeekLangChip(
+                              TranslationChip(
                                 key: WidgetKeys.peekLangOption(r.languageCode),
                                 label: nativeLanguageName(r.languageCode),
                                 selected: selected.contains(r.languageCode),
@@ -1245,44 +1246,6 @@ class _MushafPeekCard extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       onPressed: () => onTogglePlay!(ayahId),
       icon: icon,
-    );
-  }
-}
-
-/// A small selectable language pill in the peek card's inline chip row.
-class _PeekLangChip extends StatelessWidget {
-  const _PeekLangChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    super.key,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Material(
-      color: selected ? cs.primary : cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: selected ? cs.onPrimary : cs.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
