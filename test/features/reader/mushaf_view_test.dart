@@ -1,5 +1,7 @@
+import 'package:al_quran/core/audio/ayah_recitation_player.dart';
 import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/core/theme/mushaf_palette.dart';
+import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
@@ -475,6 +477,63 @@ void main() {
       expect(cardVisible(tester), isTrue);
       expect(find.text('No translation available'), findsOneWidget);
       expect(find.textContaining('Junagarhi'), findsNothing);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
+  group('MushafView — verse stepping during recitation', () {
+    // The ‹/› buttons are _PeekStepButtons keyed by peekPrev/NextButton, each
+    // wrapping an IconButton whose onPressed is null when disabled.
+    IconButton stepButton(WidgetTester tester, Key k) =>
+        tester.widget<IconButton>(
+          find.descendant(of: find.byKey(k), matching: find.byType(IconButton)),
+        );
+
+    testWidgets('arrows disable while playing, re-enable when stopped',
+        (tester) async {
+      var playing = true;
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahsWithTranslations(1, 3),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                onTogglePlay: (_) {},
+                audioState: playing
+                    ? const AyahAudioState(
+                        playingAyahId: 1001,
+                        status: RecitationStatus.playing,
+                      )
+                    : const AyahAudioState(), // idle
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester); // open the peek
+
+      // Playing → both arrows disabled (the card follows the reciter instead).
+      expect(stepButton(tester, WidgetKeys.peekPrevButton).onPressed, isNull);
+      expect(stepButton(tester, WidgetKeys.peekNextButton).onPressed, isNull);
+
+      // Stopped (idle) → stepping is usable again (at least one neighbour exists
+      // for any of the 3 verses).
+      setOuter(() => playing = false);
+      await tester.pumpAndSettle();
+      final prevOn =
+          stepButton(tester, WidgetKeys.peekPrevButton).onPressed != null;
+      final nextOn =
+          stepButton(tester, WidgetKeys.peekNextButton).onPressed != null;
+      expect(prevOn || nextOn, isTrue);
     });
   });
 

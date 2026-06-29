@@ -321,6 +321,12 @@ class _MushafViewState extends State<MushafView>
       ? -1
       : widget.ayahs.indexWhere((a) => a.id == _selectedAyah!.id);
 
+  /// The ‹/› stepper browses verses while idle, but is disabled during an active
+  /// recitation (playing / paused / loading — i.e. a verse is loaded) so manual
+  /// stepping never competes with the card auto-following the reciter. Re-enables
+  /// once playback fully stops.
+  bool get _canStep => widget.audioState?.playingAyahId == null;
+
   void _dismissPeek() {
     setState(() => _selectedAyah = null);
     _peekCtrl.reverse();
@@ -568,8 +574,10 @@ class _MushafViewState extends State<MushafView>
                 onToggleLanguage: widget.onToggleLanguage,
                 showTranslation: widget.showTranslation,
                 onToggleTranslation: widget.onToggleTranslation,
-                onPrev: _selIdx > 0 ? () => _step(-1) : null,
-                onNext: _selIdx >= 0 && _selIdx < widget.ayahs.length - 1
+                onPrev: _canStep && _selIdx > 0 ? () => _step(-1) : null,
+                onNext: _canStep &&
+                        _selIdx >= 0 &&
+                        _selIdx < widget.ayahs.length - 1
                     ? () => _step(1)
                     : null,
               ),
