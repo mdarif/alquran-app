@@ -48,7 +48,11 @@ class WidgetKeys {
   static const remindersSheet = Key('reminders-sheet');
 
   // About / credits
-  static const aboutButton = Key('home-about-button');
+  static const aboutButton =
+      Key('home-about-button'); // invisible home-title tap
   static const aboutPage = Key('about-page');
+  static const aboutCredits =
+      Key('about-credits-link'); // About → Credits screen
+  static const creditsPage = Key('credits-page');
   static const aboutLicenses = Key('about-licenses');
 }

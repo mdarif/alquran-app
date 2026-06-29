@@ -15,7 +15,6 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
-import '../../../about/presentation/pages/about_page.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
@@ -1016,26 +1015,6 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ],
                 ),
               ],
-              // About — the credits/attributions screen, at the very bottom.
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              ListTile(
-                key: WidgetKeys.aboutButton,
-                contentPadding: EdgeInsets.zero,
-                leading: const AppIcon(AppIcons.about),
-                title: const Text('About Al Quran'),
-                trailing: const AppIcon(
-                  AppIcons.chevronRight,
-                  size: AppIconSize.inline,
-                ),
-                onTap: () {
-                  final nav = Navigator.of(context);
-                  nav.pop();
-                  nav.push(
-                    MaterialPageRoute<void>(builder: (_) => const AboutPage()),
-                  );
-                },
-              ),
             ],
           ),
         ),

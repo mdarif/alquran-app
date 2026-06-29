@@ -4,6 +4,7 @@ import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
+import '../../../about/presentation/pages/about_page.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
@@ -50,13 +51,22 @@ class HomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Al Quran'),
-            if (hijriDate) const HijriDateLine(),
-          ],
+        // The title doubles as a discreet, unlabelled entry to the About screen
+        // (an intentional easter-egg tap — no visible affordance).
+        title: GestureDetector(
+          key: WidgetKeys.aboutButton,
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Al Quran'),
+              if (hijriDate) const HijriDateLine(),
+            ],
+          ),
         ),
         actions: [
           if (advancedNavigation)

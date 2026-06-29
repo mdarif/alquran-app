@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('About surfaces the required attributions', (tester) async {
-    // Tall surface so the lazy ListView builds every credit row.
-    await tester.binding.setSurfaceSize(const Size(800, 2000));
+  // Phone-height surface so the whole (short) About builds, incl. the bottom link.
+  setUp(() => TestWidgetsFlutterBinding.ensureInitialized());
+
+  testWidgets('About is brand-forward; attributions are NOT inlined here',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const MaterialApp(home: AboutPage()));
     await tester.pumpAndSettle();
@@ -14,17 +17,26 @@ void main() {
     expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
     expect(find.text('Al Quran'), findsOneWidget);
     expect(find.textContaining('Version 1.0.0'), findsOneWidget);
+    expect(find.text('Al Marfa Technologies'), findsWidgets); // header + footer
 
-    // Qur'an text + translations.
-    expect(find.textContaining('KFGQPC'), findsWidgets);
-    expect(find.textContaining('Junagarhi'), findsOneWidget);
-    expect(find.textContaining('Suhel Farooq Khan'), findsOneWidget);
-    expect(find.textContaining('Hilali'), findsOneWidget);
+    // The credits + open-source licenses now live one tap deeper, on Credits.
+    expect(find.byKey(WidgetKeys.aboutCredits), findsOneWidget);
+    expect(find.byKey(WidgetKeys.aboutLicenses), findsNothing);
+    expect(find.textContaining('tanzil.net'), findsNothing);
+    expect(find.textContaining('Junagarhi'), findsNothing);
+  });
+
+  testWidgets('the Licenses & credits link opens the Credits screen',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const MaterialApp(home: AboutPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(WidgetKeys.aboutCredits));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(WidgetKeys.creditsPage), findsOneWidget);
     expect(find.textContaining('tanzil.net'), findsWidgets);
-
-    // Fonts + the OSS-licenses entry point.
-    expect(find.text('Noorehuda (IndoPak)'), findsOneWidget);
-    expect(find.textContaining('Open Font License'), findsWidgets);
-    expect(find.byKey(WidgetKeys.aboutLicenses), findsOneWidget);
   });
 }

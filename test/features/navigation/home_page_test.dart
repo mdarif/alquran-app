@@ -1,3 +1,4 @@
+import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/core/theme/theme_cubit.dart';
 import 'package:al_quran/core/theme/theme_toggle_button.dart';
@@ -118,6 +119,15 @@ void main() {
 
       // The sheet is gone; the Juz index page is shown with its app-bar title.
       expect(find.widgetWithText(AppBar, 'Juz'), findsOneWidget);
+    });
+
+    testWidgets('the title is an invisible tap that opens About',
+        (tester) async {
+      await _pumpHome(tester);
+      // No visible affordance — the title text itself is the tap target.
+      await tester.tap(find.byKey(WidgetKeys.aboutButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
     });
 
     testWidgets('hides the Jump button when advanced nav is off',
