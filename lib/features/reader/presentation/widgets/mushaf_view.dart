@@ -1315,7 +1315,7 @@ class _MushafPeekCard extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       onPressed: onToggleTranslation,
       icon: AppIcon(
-        AppIcons.translate,
+        AppIcons.subtitles,
         size: AppIconSize.action,
         filled: showTranslation,
         color: showTranslation ? cs.primary : cs.onSurfaceVariant,

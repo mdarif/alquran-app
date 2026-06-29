@@ -53,11 +53,15 @@ class AppIcons {
     fontFamily: _kSymbolFamily,
   ); // close_rounded
 
-  // ── Translation filter (Detailed view) ────────────────────────────────────
-  static const IconData translate = IconData(
-    0xe8e2,
+  // ── Translation ───────────────────────────────────────────────────────────
+  /// Reading peek card's show/hide-translation toggle — the "captions" (CC)
+  /// metaphor (translation text shown alongside, esp. while listening). Rendered
+  /// filled when the translation is shown, muted when hidden. (Avoids the
+  /// `translate` 文/A glyph, which reads as "Chinese" — see LEARNINGS.md §3.)
+  static const IconData subtitles = IconData(
+    0xe048,
     fontFamily: _kSymbolFamily,
-  ); // translate_rounded
+  ); // subtitles_rounded
   static const IconData expand = IconData(
     0xe5cf,
     fontFamily: _kSymbolFamily,
