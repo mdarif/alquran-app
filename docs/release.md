@@ -1,19 +1,36 @@
 # Release runbook — Al Quran
 
-One-click CD from the single `main` branch. Cutting a release runs the full
-quality gate, builds a **production-signed** APK + AAB, generates a changelog,
-tags the commit, publishes a GitHub Release with the artifacts attached, and
-(optionally) uploads the AAB to the Play Store internal track.
+One-click CD on a **develop → main promote flow**. Day-to-day work lands on
+`develop` (the default branch); `main` always sits at the last release.
+Cutting a release fast-forwards develop into main, runs the full quality gate,
+builds a **production-signed** APK + AAB, generates a changelog, tags the
+commit, publishes a GitHub Release with the artifacts attached, (optionally)
+uploads the AAB to the Play Store internal track — and fast-forwards `develop`
+back so the version-bump commit lands on both branches.
 
 > Looking for the full ship-it playbook (preflight checklist, iOS, store
 > submission, post-release)? See **[docs/release-runbook.md](release-runbook.md)**.
 > This doc is the CD *mechanics*; that one is the *sequence you follow*.
 
 - Workflow: [.github/workflows/flutter-release.yml](../.github/workflows/flutter-release.yml)
-- Trigger: `make release BUMP=<current|patch|minor|major>` (or Actions →
-  **Release** → *Run workflow*).
-- CI (every push/PR to `main`): [.github/workflows/flutter-ci.yml](../.github/workflows/flutter-ci.yml)
+- Trigger: `make release-auto BUMP=<current|patch|minor|major>` from `develop`
+  (or Actions → **Release** → *Run workflow* on develop with
+  `confirm_promote` ticked). Escape hatch: `make release BUMP=…` from `main`.
+- CI (every push/PR to `main`/`develop`): [.github/workflows/flutter-ci.yml](../.github/workflows/flutter-ci.yml)
   — codegen → format → analyze → test (+ Codecov).
+
+## Branch model
+
+- **`develop`** (default) — all day-to-day commits. CI gates every push.
+- **`main`** — release-only. Nothing is pushed here by hand; the release
+  workflow's `promote` job fast-forwards it to develop, the release lands the
+  version bump + tag on it, and `sync-develop` fast-forwards develop back.
+  With `bump=current` (no bump commit) the sync is a no-op.
+- Both merges are **fast-forward only** — a diverged branch fails the job with
+  a recovery pointer instead of guessing at a merge.
+- Protection is **convention-only**: neither branch has GitHub protection
+  rules, so the workflow's default `GITHUB_TOKEN` can push both. The only
+  writer to `main` is the release workflow — keep it that way.
 
 ## One-time setup
 
@@ -68,21 +85,28 @@ Play Console step (a deliberate human gate).
 Public-repo coverage uploads are tokenless. If the repo is private, add
 `CODECOV_TOKEN` (from codecov.io) the same way.
 
-### 4. Branch protection
+### 4. Branch protection (none, by design)
 
-If `main` is protected, add `github-actions[bot]` to its **bypass list**
-(Settings → Branches), or the version-bump push will be rejected.
+Neither `main` nor `develop` carries GitHub protection rules — the promote /
+bump / sync pushes all run on the default `GITHUB_TOKEN`. If you ever protect
+either branch, add `github-actions[bot]` to its **bypass list** (Settings →
+Branches); a *required status check* on develop would additionally need a PAT
+for the sync push (Al-Tawheed's `DEVELOP_SYNC_TOKEN` pattern), because
+bot-token pushes can't satisfy required checks.
 
 ## Cutting a release
 
-From `main`, clean working tree:
+From `develop`, clean working tree, CI green:
 
 ```bash
-make release BUMP=current   # FIRST release — ships pubspec's 1.0.0+1 as-is, tags v1.0.0
-make release BUMP=patch     # bug-fix release  → 1.0.1+2, tag v1.0.1
-make release BUMP=minor     # feature release  → 1.1.0+…
-make release BUMP=major     # breaking release → 2.0.0+…
+make release-auto BUMP=current   # FIRST release — ships pubspec's 1.0.0+1 as-is, tags v1.0.0
+make release-auto BUMP=patch     # bug-fix release  → 1.0.1+2, tag v1.0.1
+make release-auto BUMP=minor     # feature release  → 1.1.0+…
+make release-auto BUMP=major     # breaking release → 2.0.0+…
 ```
+
+Escape hatch — release exactly what's already on `main` (skips the promote;
+develop is still synced afterwards): `make release BUMP=…` from `main`.
 
 - **`current`** releases the version already in `pubspec.yaml` without bumping —
   use it once, for the first cut. Every release after that must use
@@ -93,8 +117,9 @@ make release BUMP=major     # breaking release → 2.0.0+…
 
 ### Dry run
 
-Validate the whole pipeline — including signing and the AAB build — without
-tagging, releasing, pushing, or uploading:
+Validate the whole pipeline — including signing and the AAB build — against
+`develop`'s code, without promoting, tagging, releasing, pushing, or uploading
+(the promote and sync jobs skip themselves; `confirm_promote` isn't needed):
 
 ```bash
 make release-dry BUMP=patch
@@ -105,6 +130,8 @@ the release build succeeds.
 
 ## What a real run does
 
+0. **Promote** (develop dispatch only): fast-forwards `main` to `develop` and
+   hands the promoted SHA to the release job.
 1. Bumps `pubspec.yaml` (unless `current`).
 2. Quality gate: `build_runner` codegen → `dart format` check → `flutter
    analyze --fatal-warnings` → `flutter test`.
@@ -115,13 +142,27 @@ the release build succeeds.
 6. Creates the GitHub Release with the APK, AAB, and Play notes attached.
 7. If `GOOGLE_PLAY_SERVICE_ACCOUNT` is set: uploads the AAB to the Play internal
    track.
+8. **Sync**: fast-forwards `develop` back to `main` so the bump commit exists
+   on both branches (no-op for `bump=current`).
 
 ## Troubleshooting
 
 - **"Signing secrets … are not all set"** — finish step 1 above. Run
   `gh secret list --repo mdarif/alquran-app` to confirm all four are present.
-- **Version-bump push rejected** — `main` is protected; add
-  `github-actions[bot]` to the bypass list (step 4).
+- **promote: "Refusing to promote develop -> main"** — dispatched from develop
+  without `confirm_promote=true`. `make release-auto` always sets it; from the
+  Actions UI, tick the checkbox.
+- **promote: "not possible to fast-forward"** — `main` has a commit develop
+  lacks (escape-hatch release or manual push). On develop:
+  `git fetch && git merge origin/main` (if `pubspec.yaml` conflicts, keep the
+  **higher** version), push develop, re-run.
+- **sync-develop: "not possible to fast-forward"** — develop picked up commits
+  mid-release. **The release itself already shipped — do not re-run the
+  workflow.** On develop: `git fetch && git merge origin/main`, resolve
+  `pubspec.yaml` keeping the **higher** version, push.
+- **Version-bump push rejected** — `main` gained protection; add
+  `github-actions[bot]` to the bypass list (step 4). (The push itself uses
+  `HEAD:main` because the release job runs on a detached-HEAD SHA checkout.)
 - **"Tag vX.Y.Z already exists"** — that version was already released; pick a
   higher bump.
 - **Play upload failed** — the service account needs Release Manager access and

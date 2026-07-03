@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-dry ci-logs version apk aab ipa
+.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry ci-logs version apk aab ipa
 
 # Release defaults — override on the command line, e.g. `make release BUMP=minor`.
 REPO ?= mdarif/alquran-app
@@ -97,17 +97,26 @@ diag-arabic: ## Arabic mark-rendering matrix in both fonts (dev-only screen)
 
 # ---- Release / CD (see docs/release.md) ------------------------------------
 
-release: ## Cut a release via CD: make release BUMP=<current|patch|minor|major>
+release-auto: ## Cut a release from develop (promote → release → sync): make release-auto BUMP=<current|patch|minor|major>
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	if [ "$$BRANCH" != "develop" ]; then \
+	  echo "Error: release-auto is dispatched from develop (you are on $$BRANCH)"; exit 1; \
+	fi
+	@echo "Triggering one-click Release from develop (bump=$(BUMP))…"
+	gh workflow run flutter-release.yml --repo $(REPO) --ref develop --field bump=$(BUMP) --field confirm_promote=true
+	@echo "✓ Triggered — watch: https://github.com/$(REPO)/actions/workflows/flutter-release.yml"
+
+release: ## Escape hatch: cut a release directly from main (no develop promote): make release BUMP=…
 	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
 	if [ "$$BRANCH" != "main" ]; then \
-	  echo "Error: releases are cut from main (you are on $$BRANCH)"; exit 1; \
+	  echo "Error: 'make release' dispatches from main (you are on $$BRANCH). Day-to-day releases: make release-auto from develop."; exit 1; \
 	fi
 	@echo "Triggering Release workflow on main (bump=$(BUMP))…"
 	gh workflow run flutter-release.yml --repo $(REPO) --ref main --field bump=$(BUMP)
 	@echo "✓ Triggered — watch: https://github.com/$(REPO)/actions/workflows/flutter-release.yml"
 
-release-dry: ## Validate the release pipeline without tagging/releasing: make release-dry BUMP=patch
-	gh workflow run flutter-release.yml --repo $(REPO) --ref main --field bump=$(BUMP) --field dry_run=true
+release-dry: ## Validate the pipeline from develop (no promote/tag/release/push): make release-dry BUMP=patch
+	gh workflow run flutter-release.yml --repo $(REPO) --ref develop --field bump=$(BUMP) --field dry_run=true
 	@echo "✓ Dry run triggered — watch: https://github.com/$(REPO)/actions/workflows/flutter-release.yml"
 
 ci-logs: ## Show the failed-step logs of the most recent workflow run

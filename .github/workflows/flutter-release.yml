@@ -1,13 +1,19 @@
-# Release — one-click CD for Al Quran (single `main` branch).
+# Release — one-click CD for Al Quran (develop → main promote flow).
 #
-# Manually dispatched (Actions → Release → Run workflow, or `make release
-# BUMP=<current|patch|minor|major>`). On a real run it: bumps the version in
-# pubspec.yaml (unless bump=current), runs the full quality gate
+# Primary path: dispatch from `develop` with confirm_promote=true
+# (`make release-auto BUMP=<current|patch|minor|major>`). That fast-forwards
+# develop into main (promote job), then from the promoted main SHA: bumps the
+# version in pubspec.yaml (unless bump=current), runs the full quality gate
 # (codegen → format → analyze → test), builds a production-signed APK + AAB,
 # generates a changelog from the commit history, tags the commit, pushes the
 # bump + tag to `main`, creates a GitHub Release with the artifacts attached,
-# and — only if the Play Store service account is configured — uploads the AAB
-# to the Play internal track.
+# uploads the AAB to the Play internal track when the service account is
+# configured — and finally fast-forwards `develop` back to `main` so the
+# version-bump commit lands on both branches (sync-develop job).
+#
+# Escape hatch: dispatch from `main` (`make release`) — promote is skipped and
+# the run behaves like the original single-branch flow; sync-develop still
+# fast-forwards develop afterwards.
 #
 # bump=current releases the version already in pubspec.yaml as-is (no bump, no
 # pubspec commit) — use it for the very first release (v1.0.0). For every
@@ -24,8 +30,11 @@
 #   - Repo secret for Play upload (optional): GOOGLE_PLAY_SERVICE_ACCOUNT —
 #     the AAB upload is skipped (not failed) when this is absent, so the
 #     pipeline is fully usable before the app exists on the Play Console.
-#   - If `main` is a protected branch, add github-actions[bot] to its bypass
-#     list, or the version-bump push will be rejected.
+#   - Branching is convention-only: neither main nor develop is protected, so
+#     the default GITHUB_TOKEN (permissions: contents: write) can push both.
+#     If either branch is ever protected, add github-actions[bot] to its
+#     bypass list — and a *required status check* on develop would need a PAT
+#     for the sync push (see Al-Tawheed's DEVELOP_SYNC_TOKEN pattern).
 
 name: Release
 
@@ -42,34 +51,102 @@ on:
           - patch
           - minor
           - major
+      confirm_promote:
+        description: 'Required (true) to promote develop → main when dispatched from develop. Ignored when dispatched from main.'
+        required: false
+        default: false
+        type: boolean
       dry_run:
-        description: 'Run codegen/analyze/test/build only — skip tag, release, push, and Play upload.'
+        description: 'Run codegen/analyze/test/build only — skip promote, tag, release, push, Play upload, and the develop sync.'
         required: false
         default: false
         type: boolean
 
-# GITHUB_TOKEN needs write access to push the version-bump commit + tag and to
-# create the GitHub Release.
+# GITHUB_TOKEN needs write access to push the promote merge, the version-bump
+# commit + tag, the develop sync, and to create the GitHub Release.
 permissions:
   contents: write
 
+# One release at a time — overlapping dispatches must not interleave the
+# promote → release → sync-develop branch pushes.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  # ------------------------------------------------------------------ #
+  # Promote develop → main. Only runs when dispatched from develop on a
+  # real (non-dry) run. Fast-forward only: if main has diverged from
+  # develop (an escape-hatch release or a manual push to main), this
+  # fails rather than guessing at a merge — see docs/release-runbook.md
+  # → Troubleshooting for the recovery.
+  # ------------------------------------------------------------------ #
+  promote:
+    name: Promote develop to main
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && inputs.dry_run != true
+    outputs:
+      sha: ${{ steps.merge.outputs.sha }}
+
+    steps:
+      # Guards against accidentally shipping whatever happens to be on
+      # develop: a develop dispatch must state the intent explicitly
+      # (make release-auto always does).
+      - name: Require confirm_promote
+        if: inputs.confirm_promote != true
+        run: |
+          echo "::error::Dispatched from develop without confirm_promote=true. Refusing to promote develop -> main. Re-run with confirm_promote: true (make release-auto sets it), or dispatch from main for the escape-hatch flow."
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fast-forward main to develop
+        id: merge
+        run: |
+          git fetch origin develop main
+          git checkout -B main origin/main
+          git merge --ff-only origin/develop || {
+            echo "::error::main has diverged from develop and cannot be fast-forwarded (something was pushed to main since the last sync). See docs/release-runbook.md -> Troubleshooting -> promote fast-forward failure."
+            exit 1
+          }
+          git push origin main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   release:
     name: Release
     runs-on: ubuntu-latest
-    # Releases are cut from main only. The Makefile target enforces this too;
-    # this guard backstops a manual dispatch from the Actions UI on another ref.
-    if: github.ref == 'refs/heads/main'
+    needs: [promote]
+    # Runs when dispatched from main (promote skipped — escape hatch) or from
+    # develop after a successful promote (or a skipped one: dry runs). The
+    # always() is load-bearing — without it a skipped promote would auto-skip
+    # this job too. A failed/cancelled promote, or any other ref, skips it.
+    if: |
+      always() &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') &&
+      (needs.promote.result == 'success' || needs.promote.result == 'skipped')
 
     steps:
       # ------------------------------------------------------------------ #
       # 1. Full checkout — fetch-depth 0 so git-cliff can read every tag for
-      #    changelog generation.
+      #    changelog generation. Checks out the SHA promote just pushed to
+      #    main, falling back to the dispatching ref (main for the escape
+      #    hatch, develop for a develop-dispatched dry run). NOTE: a SHA
+      #    checkout is detached HEAD — the push in step 13 must use an
+      #    explicit HEAD:main refspec.
       # ------------------------------------------------------------------ #
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ needs.promote.outputs.sha || github.ref_name }}
 
       # ------------------------------------------------------------------ #
       # Free disk space — ubuntu-latest ships large unused toolchains (.NET,
@@ -124,11 +201,13 @@ jobs:
             exit 1
           fi
 
-          echo "bumped=${BUMPED}"           >> "$GITHUB_OUTPUT"
-          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}"                 >> "$GITHUB_OUTPUT"
-          echo "apk=al-quran-${TAG}.apk"    >> "$GITHUB_OUTPUT"
-          echo "aab=al-quran-${TAG}.aab"    >> "$GITHUB_OUTPUT"
+          {
+            echo "bumped=${BUMPED}"
+            echo "new_version=${NEW_VERSION}"
+            echo "tag=${TAG}"
+            echo "apk=al-quran-${TAG}.apk"
+            echo "aab=al-quran-${TAG}.aab"
+          } >> "$GITHUB_OUTPUT"
 
       # ------------------------------------------------------------------ #
       # 3. Java 21 — matches android/app/build.gradle.kts compileOptions.
@@ -251,8 +330,11 @@ jobs:
       #     artifact even when the automated upload is skipped.
       # ------------------------------------------------------------------ #
       - name: Generate Play Store release notes
+        env:
+          # Via env, not inline interpolation — a quote/backtick in a commit
+          # subject would otherwise break this script (Al-Tawheed hit this).
+          MARKDOWN: ${{ steps.cliff.outputs.content }}
         run: |
-          MARKDOWN="${{ steps.cliff.outputs.content }}"
           PLAIN=$(echo "$MARKDOWN" \
             | sed 's/^### //g' \
             | sed 's/\*\*//g' \
@@ -319,7 +401,10 @@ jobs:
           if [ "${{ steps.version.outputs.bumped }}" = "true" ]; then
             git add pubspec.yaml
             git commit -m "chore: release ${TAG}"
-            git push origin main
+            # HEAD:main (not "main") — when dispatched from develop this job
+            # checked out the promote SHA in detached-HEAD state, so no local
+            # "main" branch exists ("src refspec main does not match any").
+            git push origin HEAD:main
           fi
           git tag "${TAG}" -m "Release ${TAG}"
           git push origin "${TAG}"
@@ -332,32 +417,77 @@ jobs:
         if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Via env + --notes-file, not inline interpolation — a quote or
+          # backtick in a commit subject would otherwise break this script.
+          CHANGELOG: ${{ steps.cliff.outputs.content }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           APK="${{ steps.version.outputs.apk }}"
           AAB="${{ steps.version.outputs.aab }}"
           NEW_VERSION="${{ steps.version.outputs.new_version }}"
-          CHANGELOG="${{ steps.cliff.outputs.content }}"
           [ -z "$CHANGELOG" ] && CHANGELOG="- Maintenance release"
           PLAY_NOTE="Play upload: skipped (no service account configured) — upload the AAB manually, or set GOOGLE_PLAY_SERVICE_ACCOUNT to automate it."
           [ "${{ steps.play.outputs.enabled }}" = "true" ] && PLAY_NOTE="Play upload: AAB pushed to the Play internal track."
+
+          {
+            echo "## What's changed"
+            echo
+            echo "${CHANGELOG}"
+            echo
+            echo "---"
+            echo "**Build:** \`${NEW_VERSION}\`"
+            echo "**APK:** release build, signed with the production upload key — install via \`adb install ${APK}\`"
+            echo "**AAB:** release bundle for the Play Store."
+            echo "**${PLAY_NOTE}**"
+          } > release-notes.md
 
           gh release create "${TAG}" \
             "${APK}#Al Quran Android APK (release, signed)" \
             "${AAB}#Al Quran Android App Bundle (release, signed — Play upload)" \
             "play-store-notes.txt#Play Store release notes (plain text)" \
             --title "Al Quran ${TAG}" \
-            --notes "## What's changed
-
-          ${CHANGELOG}
-
-          ---
-          **Build:** \`${NEW_VERSION}\`
-          **APK:** release build, signed with the production upload key — install via \`adb install ${APK}\`
-          **AAB:** release bundle for the Play Store.
-          **${PLAY_NOTE}**"
+            --notes-file release-notes.md
 
       - name: Dry run summary
         if: inputs.dry_run == true
         run: |
           echo "::notice::Dry run complete — codegen, format, analyze, test, and the signed APK/AAB build all succeeded. Nothing was committed, tagged, pushed, released, or uploaded."
+
+  # ------------------------------------------------------------------ #
+  # Sync develop with main. The release job commits the version bump +
+  # tag directly to main; fast-forward that into develop so the next
+  # promote doesn't hit a pubspec.yaml version conflict. For bump=current
+  # (no bump commit) this is a no-op — develop already equals main after
+  # promote. Fast-forward only: if develop picked up its own commits
+  # mid-release, this fails rather than guessing at a merge. NOTE: if
+  # only this job fails, the release itself already SHIPPED — recover per
+  # the runbook, do not re-run the whole workflow.
+  # ------------------------------------------------------------------ #
+  sync-develop:
+    name: Sync develop with main
+    runs-on: ubuntu-latest
+    needs: [release]
+    if: always() && needs.release.result == 'success' && inputs.dry_run != true
+
+    steps:
+      # Convention-only branches: the default GITHUB_TOKEN (contents: write)
+      # persisted by checkout is enough to push develop — no PAT needed.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fast-forward develop to main
+        run: |
+          git fetch origin develop main
+          git checkout -B develop origin/develop
+          git merge --ff-only origin/main || {
+            echo "::error::develop has diverged from main and cannot be fast-forwarded (develop likely picked up commits during the release). The release itself SUCCEEDED - do not re-run it. See docs/release-runbook.md -> Troubleshooting -> sync-develop fast-forward failure (merge main into develop, resolve pubspec.yaml keeping the HIGHER version, push)."
+            exit 1
+          }
+          git push origin develop

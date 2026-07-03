@@ -1,10 +1,14 @@
 name: Flutter CI
 
+# Runs on develop (day-to-day work) and main (escape-hatch/manual pushes).
+# Note: the release workflow's own bot-token pushes (promote, version bump,
+# sync) do NOT trigger CI — GitHub suppresses workflow runs for GITHUB_TOKEN
+# pushes — so main won't show a fresh CI run right after a release.
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Cancel superseded runs on the same ref to save runner minutes.
 concurrency:

@@ -17,12 +17,12 @@ the stores." For the CI/CD mechanics it leans on — secrets, the workflow, the
 ## TL;DR — the happy path
 
 ```bash
-# 0. on main, clean tree, everything green
+# 0. on develop, clean tree, everything green
 make ci
 
-# 1. (Android) cut the release through CD
-make release-dry BUMP=current      # rehearse: signs + builds, releases nothing
-make release     BUMP=current      # FIRST release → tag v1.0.0, signed APK+AAB, GitHub Release
+# 1. (Android) cut the release through CD (promote → release → sync back)
+make release-dry  BUMP=current     # rehearse: signs + builds develop's code, releases nothing
+make release-auto BUMP=current     # FIRST release → promotes develop→main, tag v1.0.0, signed APK+AAB, GitHub Release
 #   …later releases: BUMP=patch | minor | major
 
 # 2. (iOS) build + upload manually (no CD yet)
@@ -40,8 +40,9 @@ First time only: add the signing secrets once — see
 ## 1. Preflight — before you cut anything
 
 ### A. Code is ready (mostly automated — just confirm)
-- [ ] On `main`, working tree clean, pulled latest.
-- [ ] `make ci` green (format + analyze + 283 tests). CI on `main` is green too.
+- [ ] On `develop`, working tree clean, pulled latest. (`main` is release-only —
+      the workflow promotes develop→main for you.)
+- [ ] `make ci` green (format + analyze + tests). CI on `develop` is green too.
 - [ ] `make version` shows the version you intend to ship.
 - [ ] **On-device smoke test** (the real gate): install a release build on a
       physical phone — reader scrolls smoothly, Arabic + translations render,
@@ -120,16 +121,21 @@ This is the one-click path. Full detail in
    ```bash
    make release-dry BUMP=current
    ```
-   Runs the whole pipeline — codegen, format, analyze, test, **and the signed
-   APK + AAB build** — but tags/releases/uploads nothing. Confirms the signing
-   secrets decode and the release build is healthy.
-2. **Cut it:**
+   Runs the whole pipeline against `develop`'s code — codegen, format, analyze,
+   test, **and the signed APK + AAB build** — but promotes/tags/releases/uploads
+   nothing. Confirms the signing secrets decode and the release build is healthy.
+2. **Cut it** (from `develop`):
    ```bash
-   make release BUMP=current      # or patch/minor/major
+   make release-auto BUMP=current      # or patch/minor/major
    ```
+   The run is three jobs: **promote** (fast-forward develop→main) →
+   **release** (gate, build, tag, GitHub Release, Play) → **sync-develop**
+   (fast-forward the bump commit back into develop). Escape hatch if you ever
+   need to re-ship exactly what's on `main`: `make release BUMP=…` from main.
 3. Watch it: `make ci-logs` (failed-step logs of the latest run) or the Actions
    tab. On success you get:
-   - the version bumped + committed to `main` (skipped for `current`),
+   - the version bumped + committed to `main` **and synced back to `develop`**
+     (both skipped for `current`),
    - tag `vX.Y.Z` pushed,
    - a **GitHub Release** with the signed `.apk`, `.aab`, and Play "What's new"
      text attached,
@@ -194,6 +200,8 @@ Notes:
 
 - [ ] GitHub Release exists for `vX.Y.Z` with `.apk` + `.aab` attached.
 - [ ] `git tag` is on `main`; `pubspec.yaml` version matches (for bumped releases).
+- [ ] `develop` is in sync: `git fetch && git log origin/develop..origin/main`
+      prints nothing (the sync-develop job fast-forwarded the bump commit back).
 - [ ] Install the **store build** (internal track / TestFlight) on a real device
       and re-run the smoke test — fonts, translations, audio, prayer times,
       reminders.
@@ -207,11 +215,36 @@ Notes:
 - **Not yet promoted to production?** Easiest — halt the internal/TestFlight
   release; nothing public shipped.
 - **Already in production?** You can't un-publish a build, only ship a higher
-  one. Fix forward: `make release BUMP=patch`, then promote. On Play you can also
-  **halt the rollout** of a staged release.
+  one. Fix forward: land the fix on `develop`, then `make release-auto
+  BUMP=patch` and promote in the console. On Play you can also **halt the
+  rollout** of a staged release.
 - **Bad tag/Release on GitHub?** `git push --delete origin vX.Y.Z` + delete the
   Release in the UI, fix, re-cut. (Don't reuse a build number already accepted by
   a store.)
+
+### Branch-flow troubleshooting
+
+- **promote failed: "Refusing to promote… confirm_promote"** — dispatched from
+  develop without the flag. `make release-auto` sets it; in the Actions UI tick
+  the `confirm_promote` checkbox. Nothing was pushed.
+- **promote failed: "not possible to fast-forward"** — `main` has a commit that
+  develop lacks (an escape-hatch release, or someone pushed to main by hand).
+  Recover on develop: `git fetch && git merge origin/main` — if `pubspec.yaml`
+  conflicts, keep the **higher** version — push develop, re-run the release.
+- **sync-develop failed: "not possible to fast-forward"** — develop picked up
+  its own commits while the release was building. **The release itself already
+  shipped — do not re-run the workflow** (the versionCode is consumed on Play).
+  Recover on develop: `git fetch && git merge origin/main`, resolve
+  `pubspec.yaml` keeping the **higher** version, push. Done — no new release
+  needed.
+- **release failed after the Play upload but before the tag/Release** (rare —
+  the upload step runs first): the internal track already holds that
+  versionCode. Don't re-run with the same version; finish by hand — tag the
+  built SHA (`git tag vX.Y.Z <sha> && git push origin vX.Y.Z`) and
+  `gh release create` with the artifacts, or cut a fresh `BUMP=patch`.
+- **"src refspec main does not match any"** — shouldn't recur (the workflow
+  pushes `HEAD:main` precisely because the release job runs on a detached-HEAD
+  SHA checkout); if it appears, someone edited the push refspec.
 
 ---
 
@@ -224,4 +257,4 @@ Notes:
       upload (a service account can't create the very first release).
 - [ ] App Store Connect: create the app record `com.almarfa.alquran`.
 - [ ] All Section 1B/1C legal + store gates cleared.
-- [ ] `make release BUMP=current` → ship v1.0.0. 🎉
+- [ ] From `develop`: `make release-auto BUMP=current` → ship v1.0.0. 🎉
