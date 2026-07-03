@@ -183,6 +183,11 @@ Notes:
 
 ## 5. Submit in the consoles
 
+> Full Play Console task-by-task walkthrough (App content declarations, Data
+> safety, content rating, staged rollout) — reusable across apps — is in
+> **[play-store-launch-playbook.md](play-store-launch-playbook.md)**. The steps
+> below are the Al Quran v1.0.0 summary.
+
 ### Play Console (Android) — first release, straight to production (staged)
 
 > **Account gate — cleared.** Play's "closed test with ~12–20 testers for 14
