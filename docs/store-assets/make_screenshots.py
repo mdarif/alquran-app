@@ -37,11 +37,12 @@ DEV_H, DEV_TOP = int(1560 * K), int(440 * K)
 SHOTS = [
     ("01-home.png",      "Every surah, a tap away"),
     ("02-reading.png",   "Read in authentic Uthmani script"),
-    ("03-detailed.png",  "Urdu, Hindi & English translations"),
-    ("04-indopak.png",   "Prefer IndoPak? One tap."),
-    ("05-audio.png",     "Listen — verse by verse"),
-    ("06-prayer.png",    "Prayer times, fully on-device"),
-    ("07-customize.png", "Make it yours"),
+    ("03-peek.png",      "Tap a verse — translation & audio"),
+    ("04-detailed.png",  "Urdu, Hindi & English, together"),
+    ("05-indopak.png",   "Prefer IndoPak? One tap."),
+    ("06-light.png",     "Light of Day — dawn to dusk"),
+    ("07-prayer.png",    "Prayer times, fully on-device"),
+    ("08-reminders.png", "Gentle Sunnah reminders"),
 ]
 
 
