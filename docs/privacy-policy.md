@@ -2,6 +2,12 @@
 
 **Al Marfa Technologies** · Effective 3 July 2026
 
+> **Published (canonical) version:** the live policy — shared by Al Quran and
+> Sharah Kitab al-Tawheed — is hosted at <https://kitabattawheed.com/privacy/>
+> (source: `Al-Tawheed-Web/src/pages/privacy.astro`). **That is the URL to enter
+> in the app stores.** This file is the Al-Quran-specific working draft, kept for
+> reference; keep the two in sync if either changes.
+
 Al Quran is an offline Qur'an reading app. It was built so that **your reading
 stays private**: there are no accounts, no analytics, no advertising, no
 trackers, and no servers of ours that your data could be sent to.
@@ -82,11 +88,4 @@ before that version ships.
 
 ## Contact
 
-**Al Marfa Technologies** · <https://almarfa.co>
-
-<!-- OWNER TODO before hosting: add a support email address here (Play Console
-     also requires a developer contact email in the store listing), and host
-     this page at a stable public URL — e.g. almarfa.co/alquran/privacy, or
-     this file's rendered GitHub URL as a stopgap. Enter that URL in
-     Play Console → Store presence → Privacy policy, and App Store Connect →
-     App Privacy → Privacy Policy URL. -->
+**Al Marfa Technologies** · <https://almarfa.co> · <hello@almarfa.co>

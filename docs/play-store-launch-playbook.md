@@ -25,7 +25,7 @@ screenshots), [play-store-service-account-setup.md](play-store-service-account-s
 | Collects/transmits user data off-device | No (see Data safety below) |
 | Requests location | Yes — on-device only (prayer times) |
 | Exact alarms (`SCHEDULE_EXACT_ALARM`) | Yes (Sunnah reminders) — declare or accept inexact |
-| Privacy policy URL | host [privacy-policy.md](privacy-policy.md) + add support email |
+| Privacy policy URL | <https://kitabattawheed.com/privacy/> (live; shared w/ Tawheed) · support email hello@almarfa.co |
 
 ---
 
@@ -38,7 +38,8 @@ screenshots), [play-store-service-account-setup.md](play-store-service-account-s
       [release.md → One-time setup](release.md#one-time-setup).
 - [ ] A signed `.aab` exists to upload (from the CD's GitHub Release, or
       `make aab` locally).
-- [ ] Privacy policy hosted at a public URL + a support email chosen.
+- [x] Privacy policy hosted at a public URL + a support email chosen —
+      <https://kitabattawheed.com/privacy/> · hello@almarfa.co.
 
 ## Phase 1 — Create app
 

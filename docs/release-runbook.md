@@ -67,12 +67,11 @@ These are **not** enforced by CI. Tick each before going public:
 - [ ] **IndoPak text (Quran.com) + QUL metadata** — freely redistributable.
 - [ ] **Fonts** — Noto* + Playfair (OFL) and Noorehuda (CC BY-NC) notices appear
       on the About / licenses screen.
-- [ ] **Privacy policy URL** is live and covers: location (prayer times, on-device
-      only), local notifications, audio streaming + caching, **no analytics /
-      tracking**. Required by both stores. The policy is drafted at
-      [docs/privacy-policy.md](privacy-policy.md) — add a support email and host
-      it (almarfa.co or the rendered GitHub URL), then paste the URL in both
-      consoles.
+- [x] **Privacy policy URL** — **live** at <https://kitabattawheed.com/privacy/>
+      (shared with Sharah Kitab al-Tawheed; source in `Al-Tawheed-Web`). Covers
+      on-device location, local notifications, audio streaming + caching, and
+      **no analytics / tracking**. Support email: hello@almarfa.co. Paste the URL
+      into Play Console + App Store Connect.
 
 ### C. Store-config gates
 - [ ] **Play account can publish to production** — confirmed: this personal
