@@ -127,6 +127,12 @@ Follow Al-Tawheed's `docs/store-assets/feature-graphic-spec.md` approach:
 
 ## 4. Play Console — first-submission checklist (in order)
 
+> **Straight to production (staged).** The dev account (Al Marfa, personal)
+> already has Sharah Kitab at-Tawheed live in production, so it's exempt from
+> Play's new-personal-account closed-testing gate — Al Quran goes direct to the
+> Production track, no closed test required. Tawheed's existing listing is a
+> working precedent for every form below.
+
 1. Create app (`com.almarfa.alquran`, App, Free) in the Play Console.
 2. **Store presence → Main store listing:** copy from §1, screenshots from §2,
    feature graphic from §3, app icon 512×512 (export from
@@ -149,11 +155,18 @@ Follow Al-Tawheed's `docs/store-assets/feature-graphic-spec.md` approach:
      precise times). Alternative: accept the inexact fallback and drop the
      permission (owner decision, see v1 readiness notes).
    - **App access:** all functionality available without credentials.
-5. **Release → Internal testing:** upload the signed AAB (the CD attaches it
-   to the GitHub Release, or uploads directly once
-   `GOOGLE_PLAY_SERVICE_ACCOUNT` is set), add yourself as tester, install via
-   the opt-in link, sanity-check on-device.
-6. Promote internal → production (manual gate, per the runbook).
+5. **Release → Production:** upload the signed AAB (grab it from the GitHub
+   Release the CD created; the pipeline skips the direct Play upload until
+   `GOOGLE_PLAY_SERVICE_ACCOUNT` is set). Set the rollout to **~20%** and submit
+   for review.
+   - Optional sanity step first: drop the same AAB on the **Internal testing**
+     track, install via the opt-in link, smoke-test on-device — then promote /
+     re-upload to Production. Fast (no review) but not required.
+6. **Staged ramp:** once live, watch the crash-free rate + reviews in *Android
+   vitals* for a couple of days, then ramp 20 → 50 → 100%. Halt the rollout on
+   any crash spike or text-fidelity report. (On a first release from ~0 users
+   the % mostly throttles new installs — the crash-free rate is the real signal;
+   staged rollout earns its keep on later *updates*, protecting existing users.)
 
 ## 5. App Store (iOS) copy
 

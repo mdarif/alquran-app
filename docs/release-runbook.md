@@ -28,7 +28,7 @@ make release-auto BUMP=current     # FIRST release → promotes develop→main, 
 # 2. (iOS) build + upload manually (no CD yet)
 flutter build ipa --release        # then upload the .ipa via Transporter / Xcode Organizer
 
-# 3. submit in the consoles (Play internal→production, App Store TestFlight→review)
+# 3. submit in the consoles (Play → Production, staged ~20%; App Store TestFlight→review)
 # 4. verify (below), then celebrate ☕
 ```
 
@@ -75,6 +75,11 @@ These are **not** enforced by CI. Tick each before going public:
       consoles.
 
 ### C. Store-config gates
+- [ ] **Play account can publish to production** — confirmed: this personal
+      account already has Sharah Kitab at-Tawheed live in production, so it's
+      exempt from Play's new-personal-account closed-testing gate (~12–20
+      testers / 14 days). Al Quran goes straight to production. (A fresh
+      personal account would need the closed test first.)
 - [ ] **Android `SCHEDULE_EXACT_ALARM`** — either file the Play Console
       declaration, or accept the scheduler's inexact fallback. Decide and record.
 - [ ] **Store assets** ready: icon, screenshots (phone + tablet), feature
@@ -178,14 +183,33 @@ Notes:
 
 ## 5. Submit in the consoles
 
-### Play Console (Android)
-1. App bundle is on the **internal** track (auto-uploaded, or upload the `.aab`
-   manually).
-2. Add testers / verify the internal release installs.
-3. Complete the store listing, data-safety form, content rating, and the
-   exact-alarm declaration if you chose to file it.
-4. Promote **internal → production** when ready — this stays a deliberate manual
-   step (human gate). Roll out staged (e.g. 20% → 100%) if you like.
+### Play Console (Android) — first release, straight to production (staged)
+
+> **Account gate — cleared.** Play's "closed test with ~12–20 testers for 14
+> days before production" rule applies to *new personal accounts*. This account
+> (Al Marfa Technologies, personal) already has **Sharah Kitab at-Tawheed live
+> in production**, so it's exempt — Al Quran can publish straight to production.
+> A brand-new personal account would have to run a closed test first; this one
+> doesn't. (Kept here for future reference.)
+
+1. **Create the app** — Play Console → *Create app* → `com.almarfa.alquran`,
+   Free. (Al Quran isn't on Play yet; only Tawheed is.) A service account can't
+   create the first release, so this and the first upload are manual.
+2. **Complete the listing + declarations** — store listing (copy/assets from
+   [docs/play-store-listing.md](play-store-listing.md)), privacy-policy URL,
+   **Data safety = no data collected / no tracking**, content rating (expect
+   Everyone), and the `SCHEDULE_EXACT_ALARM` declaration (or accept the inexact
+   fallback). Tawheed's existing listing is a working precedent for each form.
+3. **Upload the AAB** — grab the signed `.aab` from the GitHub Release the CD
+   just created (the pipeline skips the Play upload until
+   `GOOGLE_PLAY_SERVICE_ACCOUNT` is set). Put it on the **Production** track.
+4. **Staged rollout** — start the production rollout **sub-100% (e.g. 20%)** and
+   submit for review. Once live, watch the **crash-free rate + reviews** in
+   *Play Console → Android vitals* for a couple of days, then ramp 20 → 50 →
+   100%. **Halt the rollout** at the first crash spike or text-fidelity report.
+   (Staged rollout mostly protects *existing* users on *updates*; on a first
+   release from ~0 users it just throttles new installs while you watch vitals —
+   so the crash-free rate matters more than the percentage.)
 
 ### App Store Connect (iOS)
 1. The build appears under **TestFlight** after processing (minutes).
@@ -250,11 +274,17 @@ Notes:
 
 ## 8. First-release checklist (v1.0.0) — do these once
 
-- [ ] Signing secrets added — [docs/release.md → One-time setup](release.md#one-time-setup).
+- [x] Signing secrets added — [docs/release.md → One-time setup](release.md#one-time-setup).
+      (Done 2026-07-03; dry run from develop went green through the signed build.)
 - [ ] (Optional) `GOOGLE_PLAY_SERVICE_ACCOUNT` added to automate Play upload;
-      skip it and upload the `.aab` by hand the first time if Play isn't set up.
-- [ ] Play Console: create the app `com.almarfa.alquran`, first manual internal
-      upload (a service account can't create the very first release).
-- [ ] App Store Connect: create the app record `com.almarfa.alquran`.
-- [ ] All Section 1B/1C legal + store gates cleared.
-- [ ] From `develop`: `make release-auto BUMP=current` → ship v1.0.0. 🎉
+      skip it and upload the `.aab` by hand the first time (that's the plan for v1).
+- [ ] Play account exempt from the closed-testing gate — confirmed (Tawheed is
+      live in production on the same personal account).
+- [ ] Play Console: **create the app** `com.almarfa.alquran`, then the first
+      manual upload straight to **Production** (a service account can't create
+      the very first release).
+- [ ] App Store Connect: create the app record `com.almarfa.alquran` (iOS later).
+- [ ] All Section 1B/1C legal + store gates cleared (licensing, privacy-policy
+      URL hosted, Data safety, content rating, exact-alarm).
+- [ ] From `develop`: `make release-auto BUMP=current` → v1.0.0 tag + GitHub
+      Release with the signed AAB → upload to **Production at ~20%** → ramp. 🎉
