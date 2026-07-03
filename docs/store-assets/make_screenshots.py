@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""Frame raw device screenshots into a premium, on-brand Play screenshot set.
+"""Frame raw device screenshots into premium, on-brand Play screenshot sets.
 
 Brand-green radial (matches the feature graphic) + a Playfair caption + the
 screenshot as a floating, rounded, soft-shadowed device. Output 1242x2208 (9:16)
-— a Play-safe ratio whose sides satisfy the phone, 7-inch AND 10-inch screenshot
-rules, so the same set uploads to all three slots.
+— a Play-safe ratio whose sides satisfy the phone, 7-inch AND 10-inch slots.
 
-Capture the raws first (real device, app installed), e.g. on Android:
+Play gives THREE separate screenshot slots (phone / 7-inch / 10-inch), up to 8
+each. Rather than duplicate one set everywhere, we split a 12-screen pool: the
+PHONE set carries the headline features; the TABLET set (used for BOTH 7-inch
+and 10-inch) surfaces the extras (audio, reminders, About, large-text), so a
+browser sees more of the app. Outputs land in screenshots/phone/ and
+screenshots/tablet/ in display order.
+
+Capture raws first (real device, app installed), e.g. on Android:
     adb exec-out screencap -p > docs/store-assets/screenshots/raw/01-home.png
-…navigating the app to each screen. Then run this from the repo root:
-    python3 docs/store-assets/make_screenshots.py
-Output framed PNGs land in docs/store-assets/screenshots/ ready to upload.
-Needs Pillow. (The reminders screen is intentionally omitted here: a *debug*
-build injects a dev-only diagnostics card; recapture it from a release build.)
+Then run from the repo root:  python3 docs/store-assets/make_screenshots.py
+Needs Pillow. (Reminders is de-debugged separately — see 08-reminders in raw/.)
 """
 import math
 import os
@@ -20,30 +23,39 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 RAW = os.path.join(ROOT, "docs/store-assets/screenshots/raw")
-OUT = os.path.join(ROOT, "docs/store-assets/screenshots")
+BASE = os.path.join(ROOT, "docs/store-assets/screenshots")
 FONT = os.path.join(ROOT, "assets/fonts/PlayfairDisplay-SemiBold.ttf")
 
-# 1242x2208 (9:16) — accepted by the phone, 7-inch and 10-inch slots, so one set
-# uploads to all three. (If Play ever rejects a source as "too small to crop",
-# scale W/H up proportionally — still 9:16, <= 3840px/side — and rerun.)
 W, H = 1242, 2208
-K = W / 1242                # layout scale (1.0 here; keep for easy resizing)
-CENTER, EDGE = (0x17, 0x66, 0x46), (0x0A, 0x3A, 0x25)
+K = W / 1242               # layout scale (bump W/H proportionally if Play ever
+CENTER, EDGE = (0x17, 0x66, 0x46), (0x0A, 0x3A, 0x25)   # rejects "too small to crop")
 CREAM, GOLD = (245, 235, 210), (216, 166, 46)
-STATUS_CROP = 122         # drop the OS status bar (on the raw, in raw px)
+STATUS_CROP = 122          # drop the OS status bar (on the raw, in raw px)
 DEV_H, DEV_TOP = int(1560 * K), int(440 * K)
 
-# raw filename (in raw/) -> caption. Output keeps the same filename in OUT.
-SHOTS = [
-    ("01-home.png",      "Every surah, a tap away"),
-    ("02-reading.png",   "Read in authentic Uthmani script"),
-    ("03-peek.png",      "Tap a verse — translation & audio"),
-    ("04-detailed.png",  "Urdu, Hindi & English, together"),
-    ("05-indopak.png",   "Prefer IndoPak? One tap."),
-    ("06-light.png",     "Light of Day — dawn to dusk"),
-    ("07-prayer.png",    "Prayer times, fully on-device"),
-    ("08-reminders.png", "Gentle Sunnah reminders"),
-]
+# caption per raw screen (in raw/)
+CAPTIONS = {
+    "01-home.png":      "Every surah, a tap away",
+    "02-reading.png":   "Read in authentic Uthmani script",
+    "03-peek.png":      "Tap a verse — translation & audio",
+    "04-detailed.png":  "Urdu, Hindi & English, together",
+    "05-indopak.png":   "Prefer IndoPak? One tap.",
+    "06-light.png":     "Light of Day — dawn to dusk",
+    "07-prayer.png":    "Prayer times, fully on-device",
+    "08-reminders.png": "Gentle Sunnah reminders",
+    "09-settings.png":  "Script, size & language",
+    "10-audio.png":     "Listen — verse-by-verse recitation",
+    "11-about.png":     "Offline, private — no sign-up",
+    "12-fontzoom.png":  "Pinch to zoom — read at any size",
+}
+
+# PHONE slot (up to 8) — headline features, in display order.
+PHONE = ["01-home.png", "02-reading.png", "03-peek.png", "04-detailed.png",
+         "05-indopak.png", "06-light.png", "07-prayer.png", "09-settings.png"]
+
+# TABLET slot (7-inch AND 10-inch, up to 8) — surfaces the extras + anchors.
+TABLET = ["01-home.png", "02-reading.png", "04-detailed.png", "10-audio.png",
+          "08-reminders.png", "12-fontzoom.png", "11-about.png", "07-prayer.png"]
 
 
 def brand_bg():
@@ -106,10 +118,21 @@ def frame(src, caption):
     return bg.convert("RGB")
 
 
+def build(slot, names):
+    out = os.path.join(BASE, slot)
+    os.makedirs(out, exist_ok=True)
+    for f in os.listdir(out):
+        if f.endswith(".png"):
+            os.remove(os.path.join(out, f))
+    for pos, raw in enumerate(names, 1):
+        stem = raw.split("-", 1)[1].replace(".png", "")
+        frame(os.path.join(RAW, raw), CAPTIONS[raw]).save(
+            os.path.join(out, f"{pos}-{stem}.png"))
+        print(f"  {slot}/{pos}-{stem}.png  -  {CAPTIONS[raw]}")
+
+
 if __name__ == "__main__":
-    for name, cap in SHOTS:
-        src = os.path.join(RAW, name)
-        if not os.path.exists(src):
-            print("skip (missing raw):", name); continue
-        frame(src, cap).save(os.path.join(OUT, name))
-        print("framed", name, "-", cap)
+    print("PHONE slot (upload to Phone screenshots):")
+    build("phone", PHONE)
+    print("TABLET slot (upload to BOTH 7-inch and 10-inch):")
+    build("tablet", TABLET)
