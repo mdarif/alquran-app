@@ -1,9 +1,9 @@
 # Release — one-click CD for Al Quran (develop → main promote flow).
 #
 # Primary path: dispatch from `develop` with confirm_promote=true
-# (`make release-auto BUMP=<current|patch|minor|major>`). That fast-forwards
+# (`make release-auto BUMP=<patch|minor|major>`). That fast-forwards
 # develop into main (promote job), then from the promoted main SHA: bumps the
-# version in pubspec.yaml (unless bump=current), runs the full quality gate
+# version in pubspec.yaml, runs the full quality gate
 # (codegen → format → analyze → test), builds a production-signed APK + AAB,
 # generates a changelog from the commit history, tags the commit, pushes the
 # bump + tag to `main`, creates a GitHub Release with the artifacts attached,
@@ -15,10 +15,9 @@
 # the run behaves like the original single-branch flow; sync-develop still
 # fast-forwards develop afterwards.
 #
-# bump=current releases the version already in pubspec.yaml as-is (no bump, no
-# pubspec commit) — use it for the very first release (v1.0.0). For every
-# release after that use patch/minor/major so the versionCode keeps climbing
-# (Play requires a strictly increasing build number per upload).
+# Every release bumps the version in pubspec.yaml — use patch/minor/major so the
+# versionCode keeps climbing (Play requires a strictly increasing build number
+# per upload).
 #
 # dry_run=true runs codegen/format/analyze/test/build only — nothing is
 # committed, tagged, pushed, released, or uploaded. Use it to validate the
@@ -42,12 +41,11 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: 'current = release pubspec version as-is (first release) · patch = bug fix · minor = new feature · major = breaking change'
+        description: 'patch = bug fix · minor = new feature · major = breaking change'
         required: true
         default: patch
         type: choice
         options:
-          - current
           - patch
           - minor
           - major
@@ -99,7 +97,7 @@ jobs:
           exit 1
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -143,7 +141,7 @@ jobs:
       #    explicit HEAD:main refspec.
       # ------------------------------------------------------------------ #
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.promote.outputs.sha || github.ref_name }}
@@ -164,8 +162,6 @@ jobs:
       # ------------------------------------------------------------------ #
       # 2. Compute the release version + tag from pubspec.yaml + bump type.
       #    pubspec format: version: X.Y.Z+BUILD ; tag format: vX.Y.Z.
-      #    bump=current keeps the version untouched (bumped=false) so the very
-      #    first release ships exactly what is in pubspec.yaml.
       # ------------------------------------------------------------------ #
       - name: Compute release version
         id: version
@@ -177,32 +173,25 @@ jobs:
           MINOR=$(echo "$SEMVER" | cut -d'.' -f2)
           PATCH=$(echo "$SEMVER" | cut -d'.' -f3)
 
-          BUMPED=true
           case "${{ inputs.bump }}" in
             major)   MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0; BUILD=$((BUILD+1)) ;;
             minor)   MINOR=$((MINOR+1)); PATCH=0; BUILD=$((BUILD+1)) ;;
             patch)   PATCH=$((PATCH+1)); BUILD=$((BUILD+1)) ;;
-            current) BUMPED=false ;;
           esac
 
           NEW_SEMVER="${MAJOR}.${MINOR}.${PATCH}"
           NEW_VERSION="${NEW_SEMVER}+${BUILD}"
           TAG="v${NEW_SEMVER}"
 
-          if [ "$BUMPED" = "true" ]; then
-            echo "Bumping ${CURRENT} → ${NEW_VERSION}  (tag ${TAG})"
-            sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
-          else
-            echo "Releasing current version ${CURRENT} as-is  (tag ${TAG})"
-          fi
+          echo "Bumping ${CURRENT} → ${NEW_VERSION}  (tag ${TAG})"
+          sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
 
           if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "::error::Tag ${TAG} already exists. Is this version already released? For a new release pick patch/minor/major."
+            echo "::error::Tag ${TAG} already exists. Is this version already released? For a new release pick a higher bump."
             exit 1
           fi
 
           {
-            echo "bumped=${BUMPED}"
             echo "new_version=${NEW_VERSION}"
             echo "tag=${TAG}"
             echo "apk=al-quran-${TAG}.apk"
@@ -385,8 +374,7 @@ jobs:
           whatsNewDirectory: distribution/whatsnew
 
       # ------------------------------------------------------------------ #
-      # 13. Commit the version bump (only when bumped), tag, and push.
-      #     Skipped entirely for dry runs.
+      # 13. Commit the version bump, tag, and push. Skipped for dry runs.
       # ------------------------------------------------------------------ #
       - name: Configure git identity
         if: inputs.dry_run != true
@@ -398,14 +386,12 @@ jobs:
         if: inputs.dry_run != true
         run: |
           TAG="${{ steps.version.outputs.tag }}"
-          if [ "${{ steps.version.outputs.bumped }}" = "true" ]; then
-            git add pubspec.yaml
-            git commit -m "chore: release ${TAG}"
-            # HEAD:main (not "main") — when dispatched from develop this job
-            # checked out the promote SHA in detached-HEAD state, so no local
-            # "main" branch exists ("src refspec main does not match any").
-            git push origin HEAD:main
-          fi
+          git add pubspec.yaml
+          git commit -m "chore: release ${TAG}"
+          # HEAD:main (not "main") — when dispatched from develop this job
+          # checked out the promote SHA in detached-HEAD state, so no local
+          # "main" branch exists ("src refspec main does not match any").
+          git push origin HEAD:main
           git tag "${TAG}" -m "Release ${TAG}"
           git push origin "${TAG}"
 
@@ -456,9 +442,8 @@ jobs:
   # ------------------------------------------------------------------ #
   # Sync develop with main. The release job commits the version bump +
   # tag directly to main; fast-forward that into develop so the next
-  # promote doesn't hit a pubspec.yaml version conflict. For bump=current
-  # (no bump commit) this is a no-op — develop already equals main after
-  # promote. Fast-forward only: if develop picked up its own commits
+  # promote doesn't hit a pubspec.yaml version conflict.
+  # Fast-forward only: if develop picked up its own commits
   # mid-release, this fails rather than guessing at a merge. NOTE: if
   # only this job fails, the release itself already SHIPPED — recover per
   # the runbook, do not re-run the whole workflow.
@@ -473,7 +458,7 @@ jobs:
       # Convention-only branches: the default GITHUB_TOKEN (contents: write)
       # persisted by checkout is enough to push develop — no PAT needed.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

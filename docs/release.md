@@ -13,7 +13,7 @@ back so the version-bump commit lands on both branches.
 > This doc is the CD *mechanics*; that one is the *sequence you follow*.
 
 - Workflow: [.github/workflows/flutter-release.yml](../.github/workflows/flutter-release.yml)
-- Trigger: `make release-auto BUMP=<current|patch|minor|major>` from `develop`
+- Trigger: `make release-auto BUMP=<patch|minor|major>` from `develop`
   (or Actions → **Release** → *Run workflow* on develop with
   `confirm_promote` ticked). Escape hatch: `make release BUMP=…` from `main`.
 - CI (every push/PR to `main`/`develop`): [.github/workflows/flutter-ci.yml](../.github/workflows/flutter-ci.yml)
@@ -25,7 +25,6 @@ back so the version-bump commit lands on both branches.
 - **`main`** — release-only. Nothing is pushed here by hand; the release
   workflow's `promote` job fast-forwards it to develop, the release lands the
   version bump + tag on it, and `sync-develop` fast-forwards develop back.
-  With `bump=current` (no bump commit) the sync is a no-op.
 - Both merges are **fast-forward only** — a diverged branch fails the job with
   a recovery pointer instead of guessing at a merge.
 - Protection is **convention-only**: neither branch has GitHub protection
@@ -106,7 +105,6 @@ bot-token pushes can't satisfy required checks.
 From `develop`, clean working tree, CI green:
 
 ```bash
-make release-auto BUMP=current   # FIRST release — ships pubspec's 1.0.0+1 as-is, tags v1.0.0
 make release-auto BUMP=patch     # bug-fix release  → 1.0.1+2, tag v1.0.1
 make release-auto BUMP=minor     # feature release  → 1.1.0+…
 make release-auto BUMP=major     # breaking release → 2.0.0+…
@@ -115,10 +113,8 @@ make release-auto BUMP=major     # breaking release → 2.0.0+…
 Escape hatch — release exactly what's already on `main` (skips the promote;
 develop is still synced afterwards): `make release BUMP=…` from `main`.
 
-- **`current`** releases the version already in `pubspec.yaml` without bumping —
-  use it once, for the first cut. Every release after that must use
-  patch/minor/major so the build number (`+N` / Android versionCode) keeps
-  increasing, which the Play Store requires for each upload.
+- Every release bumps the version so the build number (`+N` / Android
+  versionCode) keeps climbing, which the Play Store requires for each upload.
 - Watch the run: `make ci-logs` (failed-step logs of the latest run), or the
   Actions tab.
 
@@ -139,18 +135,18 @@ the release build succeeds.
 
 0. **Promote** (develop dispatch only): fast-forwards `main` to `develop` and
    hands the promoted SHA to the release job.
-1. Bumps `pubspec.yaml` (unless `current`).
+1. Bumps `pubspec.yaml` per the chosen bump.
 2. Quality gate: `build_runner` codegen → `dart format` check → `flutter
    analyze --fatal-warnings` → `flutter test`.
 3. Decodes the keystore from secrets and builds a signed APK + AAB.
 4. Generates the changelog (git-cliff, [cliff.toml](../cliff.toml)) and Play
    "What's new" text.
-5. Commits the bump (if any), tags `vX.Y.Z`, pushes both to `main`.
+5. Commits the bump, tags `vX.Y.Z`, pushes both to `main`.
 6. Creates the GitHub Release with the APK, AAB, and Play notes attached.
 7. If `GOOGLE_PLAY_SERVICE_ACCOUNT` is set: uploads the AAB to the Play internal
    track.
 8. **Sync**: fast-forwards `develop` back to `main` so the bump commit exists
-   on both branches (no-op for `bump=current`).
+   on both branches.
 
 ## Troubleshooting
 

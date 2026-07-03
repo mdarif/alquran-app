@@ -21,9 +21,9 @@ the stores." For the CI/CD mechanics it leans on — secrets, the workflow, the
 make ci
 
 # 1. (Android) cut the release through CD (promote → release → sync back)
-make release-dry  BUMP=current     # rehearse: signs + builds develop's code, releases nothing
-make release-auto BUMP=current     # FIRST release → promotes develop→main, tag v1.0.0, signed APK+AAB, GitHub Release
-#   …later releases: BUMP=patch | minor | major
+make release-dry  BUMP=patch       # rehearse: signs + builds develop's code, releases nothing
+make release-auto BUMP=patch       # cut it → promotes develop→main, bumps + tags, signed APK+AAB, GitHub Release
+#   BUMP = patch (bug fix) | minor (feature) | major (breaking)
 
 # 2. (iOS) build + upload manually (no CD yet)
 flutter build ipa --release        # then upload the .ipa via Transporter / Xcode Organizer
@@ -121,16 +121,16 @@ the build number climbs.
 This is the one-click path. Full detail in
 [docs/release.md](release.md#cutting-a-release).
 
-1. **Rehearse** (recommended before the first real cut):
+1. **Rehearse** (recommended before a real cut):
    ```bash
-   make release-dry BUMP=current
+   make release-dry BUMP=patch
    ```
    Runs the whole pipeline against `develop`'s code — codegen, format, analyze,
    test, **and the signed APK + AAB build** — but promotes/tags/releases/uploads
    nothing. Confirms the signing secrets decode and the release build is healthy.
 2. **Cut it** (from `develop`):
    ```bash
-   make release-auto BUMP=current      # or patch/minor/major
+   make release-auto BUMP=patch        # or minor / major
    ```
    The run is three jobs: **promote** (fast-forward develop→main) →
    **release** (gate, build, tag, GitHub Release, Play) → **sync-develop**
@@ -293,5 +293,7 @@ Notes:
 - [ ] App Store Connect: create the app record `com.almarfa.alquran` (iOS later).
 - [ ] All Section 1B/1C legal + store gates cleared (licensing, privacy-policy
       URL hosted, Data safety, content rating, exact-alarm).
-- [ ] From `develop`: `make release-auto BUMP=current` → v1.0.0 tag + GitHub
-      Release with the signed AAB → upload to **Production at ~20%** → ramp. 🎉
+- [x] From `develop`: **v1.0.0 cut 2026-07-03** (run 28673198027) → tag + GitHub
+      Release with the signed AAB. The first cut used a one-time `BUMP=current`
+      option that has since been **removed** — every release from here uses
+      `BUMP=patch|minor|major`. Upload the AAB to **Production at ~20%** → ramp. 🎉

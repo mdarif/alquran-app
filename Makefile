@@ -97,7 +97,7 @@ diag-arabic: ## Arabic mark-rendering matrix in both fonts (dev-only screen)
 
 # ---- Release / CD (see docs/release.md) ------------------------------------
 
-release-auto: ## Cut a release from develop (promote → release → sync): make release-auto BUMP=<current|patch|minor|major>
+release-auto: ## Cut a release from develop (promote → release → sync): make release-auto BUMP=<patch|minor|major>
 	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
 	if [ "$$BRANCH" != "develop" ]; then \
 	  echo "Error: release-auto is dispatched from develop (you are on $$BRANCH)"; exit 1; \
