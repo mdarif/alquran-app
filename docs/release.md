@@ -74,42 +74,18 @@ secret — set it once and every future release auto-uploads the signed AAB to
 the **internal** track. Until then the workflow logs a notice and skips (the
 signed AAB is still attached to the GitHub Release for a manual upload).
 
-> **Two hard prerequisites:**
-> 1. The app must **already exist on Play** and have had **at least one AAB
->    uploaded manually** — a service account **cannot create the first
->    release**. So v1.0.0 is a manual upload; automation kicks in from v1.0.1.
-> 2. The service account needs **release** permission on this app, or uploads
->    fail with a Play 403.
+**Two hard prerequisites:** the app must already exist on Play with at least one
+**manual** AAB upload (a service account can't create the first release), and the
+account needs **app-level "Manage testing tracks"** permission on Al Quran —
+account-level release alone 403s.
 
-**a. Create the service account + JSON key**
-1. Play Console → **Setup → API access**. If prompted, create/link a Google
-   Cloud project (the streamlined flow makes one for you).
-2. Under *Service accounts* → **Create new service account** → follow the link
-   to the **Google Cloud Console**.
-3. In GCP: **Create service account** (e.g. `play-publisher-alquran`); no
-   project-level roles are needed for publishing. Open it → **Keys → Add key →
-   Create new key → JSON** → download the `.json` (keep it out of git).
-
-**b. Grant it access to the app**
-4. Back in Play Console → **Users and permissions → Invite new user**, using the
-   service account's email (`…@…​.iam.gserviceaccount.com`).
-5. Grant it **Release manager** (or app-scoped *Release* permissions) on **Al
-   Quran** (`com.almarfa.alquran`), then send. Allow a few minutes to
-   propagate.
-
-**c. Store the key as a repo secret** (raw JSON — the workflow reads it via
-`serviceAccountJsonPlainText`):
-
-```bash
-gh secret set GOOGLE_PLAY_SERVICE_ACCOUNT --repo mdarif/alquran-app < /path/to/service-account.json
-```
-
-The workflow uploads to the **internal** track with status *completed*;
+**Full step-by-step** — reuse Al-Tawheed's existing service account
+(recommended, ~5 min) or create a dedicated one — is in
+**[docs/play-store-service-account-setup.md](play-store-service-account-setup.md)**.
+The secret is the raw JSON (the workflow reads it via
+`serviceAccountJsonPlainText`); it uploads to the **internal** track, and
 promoting internal → **production** (with the staged rollout) stays a manual
-Play Console step — the deliberate human gate for a Qur'an app. (To auto-upload
-straight to production instead, change `track: internal` → `track: production`
-and add `userFraction`/`status: inProgress` in the "Upload to Play Store" step
-— not recommended for v1; keep the human gate.)
+Play Console gate.
 
 ### 3. Codecov token (optional)
 

@@ -278,6 +278,9 @@ Notes:
       (Done 2026-07-03; dry run from develop went green through the signed build.)
 - [ ] (Optional) `GOOGLE_PLAY_SERVICE_ACCOUNT` added to automate Play upload;
       skip it and upload the `.aab` by hand the first time (that's the plan for v1).
+      Full setup (create/reuse the service account + JSON key on
+      console.cloud.google.com, grant app-level "Manage testing tracks", set the
+      secret): [play-store-service-account-setup.md](play-store-service-account-setup.md).
 - [ ] Play account exempt from the closed-testing gate — confirmed (Tawheed is
       live in production on the same personal account).
 - [ ] Play Console: **create the app** `com.almarfa.alquran`, then the first
