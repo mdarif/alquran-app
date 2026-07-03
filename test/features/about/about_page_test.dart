@@ -2,10 +2,22 @@ import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/features/about/presentation/pages/about_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 void main() {
   // Phone-height surface so the whole (short) About builds, incl. the bottom link.
-  setUp(() => TestWidgetsFlutterBinding.ensureInitialized());
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    // About reads the real version off the platform; mock it for the test env.
+    PackageInfo.setMockInitialValues(
+      appName: 'Al Quran',
+      packageName: 'com.almarfa.alquran',
+      version: '1.0.0',
+      buildNumber: '1',
+      buildSignature: '',
+      installerStore: null,
+    );
+  });
 
   testWidgets('About is brand-forward; attributions are NOT inlined here',
       (tester) async {

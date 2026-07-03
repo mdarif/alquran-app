@@ -29,6 +29,8 @@ dependencies:
   share_plus: ^13.1.0
   # Open the developer website (almarfa.co) from the About screen.
   url_launcher: ^6.3.1
+  # Real app version on the About screen (always matches pubspec — no manual sync).
+  package_info_plus: ^10.1.0
 
   # Iconography — Material Symbols (Rounded), the single in-app icon family
   # (wired through core/theme/app_icons.dart). We ship our OWN tiny subset font

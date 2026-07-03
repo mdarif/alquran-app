@@ -27,5 +27,8 @@ void main() {
     expect(find.text('Noorehuda (IndoPak)'), findsOneWidget);
     expect(find.textContaining('Open Font License'), findsWidgets);
     expect(find.byKey(WidgetKeys.aboutLicenses), findsOneWidget);
+
+    // Attributions link out to their sources (external-link affordance).
+    expect(find.byIcon(Icons.open_in_new_rounded), findsWidgets);
   });
 }

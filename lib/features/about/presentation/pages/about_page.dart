@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/testing/widget_keys.dart';
@@ -25,11 +26,24 @@ Future<void> _openAlMarfa(BuildContext context) async {
 /// the Qur'an text + page layout (KFGQPC), the translations (Tanzil / King Fahd),
 /// the bundled fonts (KFGQPC / CC-BY-NC / OFL), and the recitation source — plus
 /// a link to the bundled open-source package licenses. Static content.
-class AboutPage extends StatelessWidget {
+class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
 
-  // Keep in sync with pubspec.yaml `version` (shown to users; rarely changes).
-  static const String _version = '1.0.0';
+  @override
+  State<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<AboutPage> {
+  // Read from the platform so it always matches pubspec.yaml — no manual sync.
+  String? _version;
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _version = info.version);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +55,7 @@ class AboutPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          const _BrandHeader(version: _version),
+          _BrandHeader(version: _version),
           const SizedBox(height: 20),
           Text(
             'Built for Reading',
@@ -95,7 +109,7 @@ class AboutPage extends StatelessWidget {
               key: WidgetKeys.aboutCredits,
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const CreditsPage(version: _version),
+                  builder: (_) => CreditsPage(version: _version ?? ''),
                 ),
               ),
               style: TextButton.styleFrom(
@@ -114,7 +128,9 @@ class AboutPage extends StatelessWidget {
 class _BrandHeader extends StatelessWidget {
   const _BrandHeader({required this.version});
 
-  final String version;
+  /// Null while the platform lookup is in flight — the version pill is hidden
+  /// rather than showing an empty "Version ".
+  final String? version;
 
   @override
   Widget build(BuildContext context) {
@@ -122,10 +138,12 @@ class _BrandHeader extends StatelessWidget {
     final cs = theme.colorScheme;
     final gold =
         theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
+    final version = this.version;
     return Semantics(
       container: true,
-      label:
-          'Al Quran. Read. Reflect. Remember. Version $version by Al Marfa Technologies.',
+      label: 'Al Quran. Read. Reflect. Remember.'
+          '${version == null ? '' : ' Version $version'}'
+          ' By Al Marfa Technologies.',
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
         decoration: BoxDecoration(
@@ -167,7 +185,7 @@ class _BrandHeader extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _MetaPill(label: 'Version $version'),
+                if (version != null) _MetaPill(label: 'Version $version'),
                 _MetaPill(
                   label: 'Al Marfa Technologies',
                   onTap: () => _openAlMarfa(context),

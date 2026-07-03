@@ -9,20 +9,19 @@ abstract final class FeatureFlags {
 
   /// IndoPak (South-Asian Naskh) script option in the reader — the standard-
   /// Unicode `text_arabic_indopak` column rendered in the Noorehuda font,
-  /// alongside the default KFGQPC Uthmani. Shipped DARK: while false the reader
-  /// is Uthmani-only and every path resolves exactly as before (the DB column
-  /// just sits unused). Flip to true to surface the Uthmani/IndoPak toggle once
-  /// the font + UX are signed off on device.
+  /// alongside the default KFGQPC Uthmani. ON for v1 (font + text signed off
+  /// on device). While false the reader is Uthmani-only and every path
+  /// resolves exactly as before (the DB column just sits unused).
   static const bool indopakScript = true;
 
   /// Prayer times across the app: the Home app-bar next-prayer pill, the all-five
   /// times sheet, the forbidden-window caution, and the prayer-AWARE tint of
   /// "Light of Day" (the surface snaps to your real Fajr/Sunrise/Asr/Maghrib/Isha
-  /// boundaries). Shipped DARK for v1: while false the pill never appears, no
-  /// location is ever requested, and the theme falls back to clock-hour phases
-  /// (Light of Day stays on, just time-of-day rather than prayer-driven). The
-  /// PrayerTimesCubit/repo stay registered (lazily, untouched) so flipping this
-  /// survives a hot reload. Flip to true to surface prayer times.
+  /// boundaries). ON for v1. While false the pill never appears, no location
+  /// is ever requested, and the theme falls back to clock-hour phases (Light
+  /// of Day stays on, just time-of-day rather than prayer-driven). The
+  /// PrayerTimesCubit/repo stay registered (lazily, untouched) so flipping
+  /// this survives a hot reload.
   static const bool prayerTimes = true;
 
   /// Home-screen widgets (Android `PrayerWidgetProvider` + `PrayerScheduleWidget`,
@@ -61,10 +60,10 @@ abstract final class FeatureFlags {
   static const bool sunnahOccasions = true;
 
   /// In-app, single-ayah audio recitation (Mishary Rashid Alafasy), streamed
-  /// from the islamic.network CDN and cached to disk for offline replay. Shipped
-  /// DARK: while false the reader shows no play affordance, the audio cubit/player
-  /// is never constructed, and zero network code runs — the app stays fully
-  /// offline. Flip to true once on-device playback and the audio source's
-  /// licensing are signed off (see the plan + ATTRIBUTION).
+  /// from the islamic.network CDN and cached to disk for offline replay. ON
+  /// for v1 (owner decision 2026-06-28, foreground-only accepted; licensing
+  /// check stays on the pre-submission list). While false the reader shows no
+  /// play affordance, the audio cubit/player is never constructed, and zero
+  /// network code runs — the app stays fully offline.
   static const bool audioRecitation = true;
 }

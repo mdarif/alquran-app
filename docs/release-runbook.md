@@ -68,17 +68,25 @@ These are **not** enforced by CI. Tick each before going public:
       on the About / licenses screen.
 - [ ] **Privacy policy URL** is live and covers: location (prayer times, on-device
       only), local notifications, audio streaming + caching, **no analytics /
-      tracking**. Required by both stores.
+      tracking**. Required by both stores. The policy is drafted at
+      [docs/privacy-policy.md](privacy-policy.md) — add a support email and host
+      it (almarfa.co or the rendered GitHub URL), then paste the URL in both
+      consoles.
 
 ### C. Store-config gates
 - [ ] **Android `SCHEDULE_EXACT_ALARM`** — either file the Play Console
       declaration, or accept the scheduler's inexact fallback. Decide and record.
 - [ ] **Store assets** ready: icon, screenshots (phone + tablet), feature
       graphic, listing copy ("offline reading + optional audio recitation"),
-      content rating questionnaire (expect Everyone / 4+). Store name, tagline,
+      content rating questionnaire (expect Everyone / 4+). Ready-to-paste copy,
+      the screenshot shot-list, and the console checklists live in
+      [docs/play-store-listing.md](play-store-listing.md); store name, tagline,
       colours, and naming are in [docs/brand.md](brand.md).
 - [ ] **Data-safety (Play) / privacy-nutrition (App Store)** forms filled —
-      declare Location; declare *no* tracking.
+      **no data collected, no tracking** (prayer-time location is processed
+      on-device only and never transmitted, which under Play's definition is
+      not "collection"; reasoning in
+      [docs/play-store-listing.md §4](play-store-listing.md)).
 
 > Reframe reminder: the app is **"offline reading + optional audio recitation,"**
 > not "fully offline" (audio streams). Keep store copy consistent.

@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
+
+/// Open an attribution's source site in the browser, with a snackbar fallback
+/// (mirrors the About screen's almarfa.co link) so a tap never fails silently.
+Future<void> _openSource(BuildContext context, String url) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final uri = Uri.parse(url);
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!ok) {
+    messenger.showSnackBar(
+      SnackBar(content: Text('Couldn’t open ${uri.host}')),
+    );
+  }
+}
 
 /// Credits & licenses. Holds the attributions our content licenses require — the
 /// Qur'an text + page layout (KFGQPC), the translations (Tanzil / King Fahd), the
@@ -39,9 +53,14 @@ class CreditsPage extends StatelessWidget {
                 name: 'Arabic text & 604-page layout',
                 detail:
                     '© King Fahd Glorious Qur’an Printing Complex (KFGQPC).',
+                url: 'https://qurancomplex.gov.sa',
               ),
               if (FeatureFlags.indopakScript)
-                _Credit(name: 'IndoPak text', detail: 'Quran.com.'),
+                _Credit(
+                  name: 'IndoPak text',
+                  detail: 'Quran.com.',
+                  url: 'https://quran.com',
+                ),
             ],
           ),
           const _Section(
@@ -50,14 +69,17 @@ class CreditsPage extends StatelessWidget {
               _Credit(
                 name: 'Urdu — Maulana Muhammad Junagarhi',
                 detail: 'Tanzil Project · tanzil.net',
+                url: 'https://tanzil.net',
               ),
               _Credit(
                 name: 'Hindi — Suhel Farooq Khan & Saifur Rahman Nadwi',
                 detail: 'Tanzil Project · tanzil.net',
+                url: 'https://tanzil.net',
               ),
               _Credit(
                 name: 'English — Dr. Hilali & Dr. Muhsin Khan',
                 detail: 'King Fahd Complex, Madinah.',
+                url: 'https://qurancomplex.gov.sa',
               ),
             ],
           ),
@@ -67,22 +89,27 @@ class CreditsPage extends StatelessWidget {
               _Credit(
                 name: 'KFGQPC Uthmanic Hafs',
                 detail: 'King Fahd Complex (KFGQPC).',
+                url: 'https://qurancomplex.gov.sa',
               ),
               _Credit(
                 name: 'Noorehuda (IndoPak)',
                 detail: 'Abu Saad · CC BY-NC.',
+                url: 'https://noorehidayat.org',
               ),
               _Credit(
                 name: 'Noto Nastaliq Urdu',
                 detail: 'Google · SIL Open Font License 1.1.',
+                url: 'https://fonts.google.com/noto',
               ),
               _Credit(
                 name: 'Noto Sans Devanagari',
                 detail: 'Google · SIL Open Font License 1.1.',
+                url: 'https://fonts.google.com/noto',
               ),
               _Credit(
                 name: 'Playfair Display',
                 detail: 'Claus Eggers Sørensen · SIL Open Font License 1.1.',
+                url: 'https://fonts.google.com/specimen/Playfair+Display',
               ),
             ],
           ),
@@ -93,6 +120,7 @@ class CreditsPage extends StatelessWidget {
                 _Credit(
                   name: 'Mishary Rashid Alafasy',
                   detail: 'Audio via islamic.network.',
+                  url: 'https://islamic.network',
                 ),
               ],
             ),
@@ -160,29 +188,66 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// One attribution line: a name over a muted detail/source.
+/// One attribution line: a name over a muted detail/source. When [url] is set
+/// the row is tappable and opens the source site (with an external-link
+/// affordance on the detail line).
 class _Credit extends StatelessWidget {
-  const _Credit({required this.name, required this.detail});
+  const _Credit({required this.name, required this.detail, this.url});
 
   final String name;
   final String detail;
+  final String? url;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(name, style: theme.textTheme.bodyLarge),
-          Text(
-            detail,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    final cs = theme.colorScheme;
+    final url = this.url;
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(name, style: theme.textTheme.bodyLarge),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                detail,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
             ),
+            if (url != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.open_in_new_rounded,
+                size: 12,
+                color: cs.onSurfaceVariant,
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+    if (url == null) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: content,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Semantics(
+        link: true,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _openSource(context, url),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: content,
           ),
-        ],
+        ),
       ),
     );
   }
