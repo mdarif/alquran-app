@@ -62,11 +62,20 @@ of them — Play blocks production until every one is green:
       email, category *Reference / Educational*, answer **No** to all
       violence/sexual/profanity/controlled-substance/gambling questions → expect
       **Everyone / PEGI 3**.
-- [ ] **Target audience and content** — select **13+** age bands (13–15, 16–17,
-      18+). *Avoid ticking under-13* for v1: it pulls the app into the
-      **Designed for Families** programme (extra policy + privacy affirmations).
-      The content is child-safe, so add younger bands later if you want — but
-      it's avoidable complexity at launch.
+- [ ] **Target audience and content** — select **13+ only** (13–15, 16–17,
+      18 and over); leave *Aged 5 and under*, *6–8*, *9–12* **unchecked**.
+      - **Target age = who the app is *directed to/marketed as*, NOT who may use
+        it.** A 13+ target does **not** block children from installing or using
+        the app — a Qur'an reader is simply a general-audience app, not a kids'
+        product. So 13+ costs nothing in reach.
+      - **Ticking any under-13 band flips the app to child-directed** → the
+        **Designed for Families / Families Policy** track: stricter Data-safety
+        rules, extra affirmations, an *Expert Approved* (teacher-review) prompt
+        on the Store-presence step, and slower/closer review.
+      - **Gotcha:** declining the *Expert Approved programme* does **not** remove
+        the Families obligations — only **deselecting the under-13 bands** does.
+      - The content is child-safe, so you can opt into Families/Kids later as a
+        deliberate step; keep it off for a fast v1.
 - [ ] **Data safety** — see the dedicated walkthrough below.
 - [ ] **Advertising ID** — declare the app does **not** use it. ⚠️ First
       confirm no dependency dragged in the `AD_ID` permission: check the merged
