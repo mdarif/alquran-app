@@ -23,11 +23,15 @@ RAW = os.path.join(ROOT, "docs/store-assets/screenshots/raw")
 OUT = os.path.join(ROOT, "docs/store-assets/screenshots")
 FONT = os.path.join(ROOT, "assets/fonts/PlayfairDisplay-SemiBold.ttf")
 
+# 1242x2208 (9:16) — accepted by the phone, 7-inch and 10-inch slots, so one set
+# uploads to all three. (If Play ever rejects a source as "too small to crop",
+# scale W/H up proportionally — still 9:16, <= 3840px/side — and rerun.)
 W, H = 1242, 2208
+K = W / 1242                # layout scale (1.0 here; keep for easy resizing)
 CENTER, EDGE = (0x17, 0x66, 0x46), (0x0A, 0x3A, 0x25)
 CREAM, GOLD = (245, 235, 210), (216, 166, 46)
-STATUS_CROP = 122         # drop the OS status bar
-DEV_H, DEV_TOP = 1560, 440
+STATUS_CROP = 122         # drop the OS status bar (on the raw, in raw px)
+DEV_H, DEV_TOP = int(1560 * K), int(440 * K)
 
 # raw filename (in raw/) -> caption. Output keeps the same filename in OUT.
 SHOTS = [
@@ -70,29 +74,32 @@ def wrap(draw, text, font, maxw):
 def frame(src, caption):
     bg = brand_bg()
     d = ImageDraw.Draw(bg)
-    f = ImageFont.truetype(FONT, 66)
-    y = 150
-    for ln in wrap(d, caption, f, W - 200):
+    f = ImageFont.truetype(FONT, int(66 * K))
+    y = int(150 * K)
+    for ln in wrap(d, caption, f, W - int(200 * K)):
         w = d.textlength(ln, font=f)
         d.text(((W - w) / 2, y), ln, font=f, fill=CREAM)
-        y += 84
-    d.line([(W / 2 - 70, y + 10), (W / 2 + 70, y + 10)], fill=GOLD, width=3)
+        y += int(84 * K)
+    rw = int(70 * K)
+    d.line([(W / 2 - rw, y + 10 * K), (W / 2 + rw, y + 10 * K)],
+           fill=GOLD, width=max(2, int(3 * K)))
 
     shot = Image.open(src).convert("RGB")
     shot = shot.crop((0, STATUS_CROP, shot.width, shot.height))
     scale = DEV_H / shot.height
     dw, dh = int(shot.width * scale), DEV_H
     shot = shot.resize((dw, dh), Image.LANCZOS).convert("RGBA")
-    rad = 44
+    rad = int(44 * K)
     mask = Image.new("L", (dw, dh), 0)
     ImageDraw.Draw(mask).rounded_rectangle([0, 0, dw, dh], rad, fill=255)
     shot.putalpha(mask)
 
+    off = int(22 * K)
     dx, dy = (W - dw) // 2, DEV_TOP
     shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(shadow).rounded_rectangle(
-        [dx, dy + 22, dx + dw, dy + dh + 22], rad, fill=(0, 0, 0, 160))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(34))
+        [dx, dy + off, dx + dw, dy + dh + off], rad, fill=(0, 0, 0, 160))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(int(34 * K)))
     bg = Image.alpha_composite(bg, shadow)
     bg.paste(shot, (dx, dy), shot)
     return bg.convert("RGB")
