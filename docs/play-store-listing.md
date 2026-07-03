@@ -43,8 +43,8 @@ READ, BEAUTIFULLY
 • Pinch-to-zoom and font-size controls for effortless legibility
 • "Light of Day": the page's light adapts gently to the time of day
 
-FULLY OFFLINE
-The entire Qur'an, all translations and navigation are bundled with the app. Read anywhere — no internet needed, ever. The one optional online feature is audio recitation.
+OFFLINE-FIRST
+The complete Qur'an, all translations, and navigation are bundled in the app — read anywhere, no internet needed. The only optional online feature is audio recitation.
 
 TRANSLATIONS
 • Urdu — Maulana Muhammad Junagarhi
@@ -62,11 +62,16 @@ STAY ON TRACK
 • Share a verse with its translation in one tap
 
 PRIVATE BY DESIGN
-No ads, no analytics, no accounts. Your reading, your location and your habits never leave your device. See our privacy policy for the details.
+No ads, no analytics, no accounts. Your reading, your location, and your habits never leave your device.
 
-Al Quran is built with care by Al Marfa Technologies — simple, beautiful apps that benefit Muslims. If something isn't right, we'd love to hear from you before you leave a review.
+Built with care by Al Marfa Technologies — simple, beautiful apps that benefit Muslims. Questions or feedback? Email hello@almarfa.co.
 ```
-(~1900 chars — room to grow.)
+(~1900 chars — room to grow. NOTE: no "contact us before a negative review"
+wording and no unverifiable "FULLY OFFLINE" claim — both trip Play's metadata
+policy; keep it this way.)
+
+Store icon: `docs/store-assets/play-icon-512.png` (512×512, generated from
+`assets/icon/icon.png`).
 
 ### Category & tags
 
