@@ -502,4 +502,77 @@ void main() {
       expect(find.text('Chapter 2'), findsNothing); // no jump-back
     });
   });
+
+  // Power-user gauntlet: rapid gesture/toggle combinations that stress the
+  // PageView position, the section cache, and their interplay.
+  group('Power-user stress (rapid toggles and flings)', () {
+    testWidgets('rapid triple-toggle keeps the swiped surah', (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.pumpAndSettle();
+      expect(find.text('Chapter 3'), findsWidgets);
+
+      // Mash the viewport toggle: Detailed → Reading → Detailed.
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+        await tester.pumpAndSettle();
+      }
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('Chapter 3'), findsWidgets); // still the swiped surah
+      expect(find.text('Chapter 2'), findsNothing);
+      expect(find.byType(MushafView), findsNothing); // odd count → Detailed
+    });
+
+    testWidgets('toggling mid-fling settles with title matching content',
+        (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      // Start a fling and toggle while the page animation is still in flight.
+      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.pump(const Duration(milliseconds: 60));
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(MushafView), findsNothing); // Detailed now
+      // Wherever the fling settled, the app bar and the visible section header
+      // must agree — no title/content desync.
+      final title = tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byType(AppBar),
+              matching: find.textContaining('Chapter'),
+            ),
+          )
+          .data!;
+      expect(
+        find.descendant(of: find.byType(PageView), matching: find.text(title)),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('swiping in Detailed then returning to Reading keeps place',
+        (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
+      expect(find.byType(MushafView), findsNothing);
+
+      // Swipe forward INSIDE Detailed (the PageView spans both viewports).
+      // Regression: SelectionArea used to claim horizontal drags on Android
+      // (eager victory), so Detailed could not be swiped at all.
+      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1200);
+      await tester.pumpAndSettle();
+      expect(find.text('Chapter 3'), findsWidgets);
+
+      // Back to Reading — must stay on the swiped surah.
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(MushafView), findsOneWidget);
+      expect(find.text('Chapter 3'), findsWidgets);
+      expect(find.text('Chapter 2'), findsNothing);
+    });
+  });
 }

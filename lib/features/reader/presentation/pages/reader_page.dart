@@ -301,8 +301,10 @@ class _ReaderViewState extends State<_ReaderView> {
         onToggleTranslation: interactive ? _toggleReadingTranslation : null,
       );
     } else {
-      // Detailed view owns its own SelectionArea (around the verses) for
-      // copy/share; translation languages are chosen in the Settings sheet.
+      // Copy/share in Detailed is per-verse (the tile's ⋯ menu) — no
+      // SelectionArea in either viewport, it steals gestures (taps in Reading,
+      // horizontal swipes in Detailed); translation languages are chosen in
+      // the Settings sheet.
       view = _DetailedList(
         key: key,
         ayahs: ayahs,
@@ -789,13 +791,17 @@ class _DetailedListState extends State<_DetailedList> {
             }
             return false;
           },
-          child: SelectionArea(
-            child: ScrollablePositionedList.builder(
-              itemScrollController: _scrollController,
-              itemPositionsListener: _positions,
-              itemCount: _rows.length,
-              itemBuilder: _buildRow,
-            ),
+          // No SelectionArea here (mirrors Reading): on Android its touch
+          // recognizer claims horizontal drags with EAGER victory
+          // (SelectableRegion.eagerVictoryOnDrag), so swipes over the verses
+          // selected text instead of turning the PageView's page — Detailed
+          // couldn't be swiped at all. Copy/share stays available per verse
+          // via the tile's ⋯ menu.
+          child: ScrollablePositionedList.builder(
+            itemScrollController: _scrollController,
+            itemPositionsListener: _positions,
+            itemCount: _rows.length,
+            itemBuilder: _buildRow,
           ),
         ),
         Positioned(

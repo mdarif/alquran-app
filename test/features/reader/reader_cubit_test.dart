@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
@@ -353,6 +355,32 @@ void main() {
 
       await cubit.close();
       await cubit2.close();
+    });
+
+    test('a storm of concurrent loads settles on the last target, cached',
+        () async {
+      final repo = _CountingAyahRepository();
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+
+      // A power user flinging across many sections: every crossed page fires
+      // load() without awaiting the previous one.
+      for (var s = 2; s <= 12; s++) {
+        unawaited(cubit.load(ReaderTarget.surah(s, 'Surah $s')));
+      }
+      // Let all loads + their neighbour prefetches settle.
+      for (var i = 0; i < 10; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      // The state shows the LAST target and its section is (and stays) cached.
+      expect(cubit.state.status, ReaderStatus.loaded);
+      expect(cubit.state.ayahs.single.surahId, 12);
+      expect(
+        cubit.cachedAyahs(const ReaderTarget.surah(12, 'Surah 12')),
+        isNotEmpty,
+        reason: 'the settled section must survive the straggler stores',
+      );
+      await cubit.close();
     });
   });
 }
