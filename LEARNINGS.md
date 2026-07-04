@@ -392,6 +392,23 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 - **Selectable text / copy:** wrap the reader body in `SelectionArea`. Exclude
   inline non-text widgets (e.g. verse-number medallions) with
   `SelectionContainer.disabled(child: …)` so a copied passage is pure Quran text.
+- **A `PageView` silently loses its position if its ancestor tree SHAPE changes
+  across a rebuild** (v1.0.0 field bug). We branched
+  `isReading ? BlocBuilder(...pages) : pages` — toggling Reading⇄Detailed
+  changed the widget type at that slot, Flutter couldn't match the element, the
+  PageView remounted and its controller re-attached at `initialPage`: the
+  toggle silently jumped back to the surah the reader was opened on. When that
+  section had also been LRU-evicted (see next), the jump landed on an eternal
+  spinner. Fix: keep the wrapper in BOTH branches and vary only the *data*
+  (`pages(isReading ? audio : null)`). Rule: branch on data, never on tree
+  shape, around stateful scrollables.
+- **A cache that widgets read directly must notify on fill, and never evict
+  what's on screen.** The reader's section LRU (cap 7) was silently topped up
+  by `warm()` (no emit) — any page that missed the cache spun forever — and a
+  fast multi-page fling's straggler warms could evict the *current* section.
+  Fix: bump a `cacheEpoch` on `ReaderState` whenever a background warm stores
+  (wakes cache-reading builders), skip the live section in eviction, and treat
+  an empty cached list as a miss. Regression tests verified to fail pre-fix.
 - **Verse number INSIDE the ornament — SOLVED: just write the number as
   Arabic-Indic digits; the KFGQPC font draws the rosette around them.** In the
   KFGQPC HAFS face (both `UthmanicHafs1 Ver18` Regular and `1B Ver13` Bold) the
