@@ -35,15 +35,13 @@ DEV_H, DEV_TOP = int(1560 * K), int(440 * K)
 
 # caption per raw screen (in raw/)
 CAPTIONS = {
+    # Shared by the phone slots 1–2 and the tablet (7") breadth set.
     "01-home.png":      "Every surah, a tap away",
     "02-reading.png":   "Read in authentic Uthmani script",
-    "03-peek.png":      "Tap a verse — translation & audio",
+    # Tablet (7") breadth set only.
     "04-detailed.png":  "Urdu, Hindi & English, together",
-    "05-indopak.png":   "Prefer IndoPak? One tap.",
-    "06-light.png":     "Light of Day — dawn to dusk",
     "07-prayer.png":    "Prayer times, fully on-device",
     "08-reminders.png": "Gentle Sunnah reminders",
-    "09-settings.png":  "Script, size & language",
     "10-audio.png":     "Listen — verse-by-verse recitation",
     "11-about.png":     "Offline, private — no sign-up",
     "12-fontzoom.png":  "Pinch to zoom — read at any size",
@@ -63,8 +61,9 @@ CAPTIONS = {
 PHONE = ["01-home.png", "02-reading.png", "13-peek.png", "14-detailed.png",
          "16-light.png", "17-size.png", "18-zoom.png"]
 
-# TABLET slot (7-inch AND 10-inch, up to 8) — surfaces the extras + anchors.
-# Left as-is (breadth set); intentionally NOT part of the phone-story rework.
+# TABLET (7-inch) slot — phone captures reframed to portrait; a breadth set of
+# extras. The 10-inch slot uses ACTUAL tablet captures instead — see
+# make_tablet_shots.py (screenshots/tablet-10in/).
 TABLET = ["01-home.png", "02-reading.png", "04-detailed.png", "10-audio.png",
           "08-reminders.png", "12-fontzoom.png", "11-about.png", "07-prayer.png"]
 
@@ -145,5 +144,5 @@ def build(slot, names):
 if __name__ == "__main__":
     print("PHONE slot (upload to Phone screenshots):")
     build("phone", PHONE)
-    print("TABLET slot (upload to BOTH 7-inch and 10-inch):")
+    print("TABLET slot (upload to 7-inch; 10-inch uses make_tablet_shots.py):")
     build("tablet", TABLET)

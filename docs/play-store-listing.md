@@ -82,41 +82,37 @@ Store icon: `docs/store-assets/play-icon-512.png` (512×512, generated from
 
 ---
 
-## 2. Screenshot shot-list (phone, portrait)
+## 2. Screenshots (what ships)
 
-Capture 6–8; Play needs 2+ phone screenshots (min 320 px, max 3840 px,
-16:9–9:16). Suggested order tells the app's story:
+Framed PNGs are generated, not uploaded raw. Two pipelines under
+`docs/store-assets/`, both brand-framed (deep-green radial + Playfair caption):
 
-| # | Screen | How to stage it |
-|---|--------|-----------------|
-| 1 | Home — reading-first, next-prayer pill, Hijri dateline | Fresh launch, daytime |
-| 2 | Reader, Reading mode — pure Uthmani page | Surah Al-Fatiha or Al-Kahf opening |
-| 3 | Reader, Detailed mode — Arabic + Urdu + Hindi + English | Ayat al-Kursi (2:255) |
-| 4 | Script choice — IndoPak rendering | Same verse as #3 for contrast |
-| 5 | Audio recitation playing (verse highlighted) | Tap a verse, capture mid-playback |
-| 6 | Prayer-times sheet (all five + Hijri date) | Tap the prayer pill |
-| 7 | Sunnah reminders sheet | Home → reminders button |
-| 8 | Pinch-zoom / large-type reading (accessibility story) | Max font, Reading mode |
+- **`make_screenshots.py`** → `screenshots/phone/` (7 shots) + `screenshots/tablet/`
+  (7-inch breadth set). Reads device captures from `screenshots/raw/`.
+- **`make_tablet_shots.py`** → `screenshots/tablet-10in/` (2 actual 10-inch
+  tablet shots, landscape). Reads `screenshots/raw-tablet/`.
 
-Capture commands:
+**Phone (7) — one continuous session: Al-Baqarah, Fajr light (`#EAEEF1`), anchor
+verse 2:2, reading font 32, ending on pinch-to-zoom.** Slots 1–2 kept from v1:
 
-```bash
-# Android (device/emulator):
-adb exec-out screencap -p > docs/store-assets/screenshots/01-home.png
-# iOS simulator:
-xcrun simctl io booted screenshot docs/store-assets/screenshots/ios-01-home.png
-```
+| # | Screen |
+|---|--------|
+| 1 | Home — surah list, next-prayer pill, Hijri dateline |
+| 2 | Reader, Reading mode — Al-Baqarah, Uthmani |
+| 3 | Tap verse 2:2 → peek card (Urdu translation + audio) |
+| 4 | Detailed mode — verse 2:2 with Urdu + Hindi + English |
+| 5 | Light of Day — Reading Light sheet, Fajr held |
+| 6 | Settings — script, size & language |
+| 7 | Pinch-zoom / large-type reading |
 
-Tips (from Al-Tawheed's workflow):
-- Status bar: full battery, no notification icons (emulator demo mode:
-  `adb shell settings put global sysui_demo_allowed 1` then the demo-mode
-  broadcasts), clock set to a tidy time.
-- Keep one visual story per shot; no overlapping sheets.
-- Al-Tawheed's `scripts/frame_screenshots.py` (device frame + brand gradient +
-  caption) can be borrowed later for framed marketing shots; plain screenshots
-  are fine for v1.
-- Tablet screenshots are optional for v1 — add a 7"/10" set once the phone
-  listing is live.
+**10-inch tablet (2) — actual captures from a Pixel Tablet emulator
+(2560×1600), landscape:** reading (wide Uthmani mushaf) + detailed (Arabic +
+translation across the page), both Al-Baqarah / Fajr.
+
+**Capture** (Android device/emulator): `adb exec-out screencap -p > …/raw/NN-name.png`
+(1272×2800 phone; 2560×1600 tablet), then run the matching pipeline. Captions
+live in the scripts, so re-running reframes everything. Status-bar clutter is
+cropped by the framer, so demo mode isn't required.
 
 ## 3. Feature graphic (1024×500, required by Play)
 

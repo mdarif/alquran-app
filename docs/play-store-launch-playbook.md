@@ -114,8 +114,10 @@ Play Console → App content → **Data safety** → Start. Al Quran's answer is
       **contact details** (support email required; website/phone optional).
 - [ ] **Main store listing** → app name, short description (≤80), full
       description (≤4000), app icon **512×512**, **feature graphic 1024×500**,
-      and **≥2 phone screenshots** (we have an 8-shot list). All copy + the
-      shot-list + the feature-graphic spec are in
+      and **≥2 phone screenshots** (we ship a 7-shot phone set +
+      2 actual 10-inch tablet shots; framed PNGs live in
+      `docs/store-assets/screenshots/phone/` and `…/tablet-10in/`). All copy +
+      the feature-graphic spec are in
       [play-store-listing.md](play-store-listing.md).
 
 ## Phase 4 — Production release (staged)
