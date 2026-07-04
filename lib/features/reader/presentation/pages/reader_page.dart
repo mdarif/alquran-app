@@ -240,9 +240,18 @@ class _ReaderViewState extends State<_ReaderView> {
                   onPageChanged: _onPageChanged,
                   itemBuilder: (context, i) => _sectionPage(i, state, audio),
                 );
-            return isReading && FeatureFlags.audioRecitation
+            // The tree shape must be IDENTICAL in both viewports: the
+            // BlocBuilder wraps the PageView whenever audio is on, and
+            // Detailed simply ignores the audio state. Branching on the
+            // viewport here (Reading wrapped, Detailed bare) used to remount
+            // the PageView on every toggle — the controller re-attached at its
+            // initial page, silently jumping back to the surah the reader was
+            // opened on (and to an endless spinner once that section had been
+            // evicted from the cache after a long fling).
+            return FeatureFlags.audioRecitation
                 ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
-                    builder: (context, audio) => pages(audio),
+                    builder: (context, audio) =>
+                        pages(isReading ? audio : null),
                   )
                 : pages(null);
           },

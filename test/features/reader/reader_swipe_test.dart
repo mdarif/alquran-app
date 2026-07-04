@@ -449,4 +449,57 @@ void main() {
       expect(find.byType(MushafView), findsOneWidget);
     });
   });
+
+  // Regression for the v1.0.0 field bug: fling across many surahs, stop, tap
+  // Detailed → endless spinner. Straggler warms from the fling evicted the
+  // on-screen section from the LRU; the toggle's cache read missed; and the
+  // silent re-warm never woke the spinner page.
+  group('Viewport toggle after a fast fling (regression)', () {
+    testWidgets('Detailed shows verses even after a straggler-warm storm',
+        (tester) async {
+      late ReaderCubit cubit;
+      GetIt.I
+        ..unregister<ReaderCubit>()
+        ..registerFactory<ReaderCubit>(() {
+          cubit = ReaderCubit(_FakeAyahRepository(), _FakeLastReadRepository());
+          return cubit;
+        });
+
+      await _pumpReader(tester, const ReaderTarget.surah(9, 'At-Tawbah'));
+      expect(find.text('Chapter 9'), findsWidgets);
+
+      // The straggler warms of a fast multi-page fling: far more sections
+      // than the cache cap, all landing after At-Tawbah's own store.
+      for (var s = 20; s < 40; s++) {
+        cubit.warm(ReaderTarget.surah(s, 'Surah $s'));
+      }
+      await tester.pumpAndSettle();
+
+      // Reading ⇄ Detailed — this used to stick on a spinner forever.
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.text('نص'), findsWidgets); // the verses are on screen
+      expect(find.byType(MushafView), findsNothing); // and we ARE in Detailed
+    });
+
+    testWidgets('toggling Detailed after a swipe stays on the swiped surah',
+        (tester) async {
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.pumpAndSettle();
+      expect(find.text('Chapter 3'), findsWidgets);
+
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
+
+      // The Detailed view must show surah 3 — not silently jump back to the
+      // surah the reader was opened on (the PageView used to remount on the
+      // toggle because the tree shape changed, re-attaching at initialPage).
+      expect(find.byType(MushafView), findsNothing); // in Detailed
+      expect(find.text('Chapter 3'), findsWidgets); // app bar + section header
+      expect(find.text('Chapter 2'), findsNothing); // no jump-back
+    });
+  });
 }

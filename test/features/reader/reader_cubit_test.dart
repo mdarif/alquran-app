@@ -273,4 +273,113 @@ void main() {
       await cubit.close();
     });
   });
+
+  // Regressions for the v1.0.0 field bug: fast multi-page flings fire racing
+  // loads/warms whose stragglers evicted the on-screen section from the LRU;
+  // the next cache read (the Reading⇄Detailed toggle) then stuck on a spinner
+  // forever, because warm() fills the cache without notifying the UI.
+  group('ReaderCubit section cache (fast-fling regressions)', () {
+    test('a background warm bumps cacheEpoch so cache-miss pages recover',
+        () async {
+      final repo = _CountingAyahRepository();
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+      await Future<void>.delayed(Duration.zero);
+
+      final before = cubit.state.cacheEpoch;
+      cubit.warm(const ReaderTarget.surah(50, 'Qaf'));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        cubit.cachedAyahs(const ReaderTarget.surah(50, 'Qaf')),
+        isNotEmpty,
+      );
+      expect(
+        cubit.state.cacheEpoch,
+        greaterThan(before),
+        reason: 'a silent warm must wake widgets that render from the cache, '
+            'or a cache-miss spinner never resolves',
+      );
+      await cubit.close();
+    });
+
+    test('eviction never drops the section being read', () async {
+      final repo = _CountingAyahRepository();
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+      // The reader settled on At-Tawbah (the section on screen).
+      await cubit.load(const ReaderTarget.surah(9, 'At-Tawbah'));
+      await Future<void>.delayed(Duration.zero);
+
+      // A storm of straggler warms (a fast fling across many pages) lands
+      // AFTER the settled section's store — far more than the cache cap.
+      for (var s = 20; s < 40; s++) {
+        cubit.warm(ReaderTarget.surah(s, 'Surah $s'));
+      }
+      await Future<void>.delayed(Duration.zero);
+
+      // The viewport toggle re-reads the cache for the current section: it
+      // must still be there (it used to get evicted → endless spinner).
+      expect(
+        cubit.cachedAyahs(const ReaderTarget.surah(9, 'At-Tawbah')),
+        isNotEmpty,
+        reason: 'the on-screen section must be immune to LRU eviction',
+      );
+      await cubit.close();
+    });
+
+    test('warm() and load() treat an empty cached entry as a miss', () async {
+      final repo = _EmptyOnceAyahRepository();
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+      const target = ReaderTarget.surah(3, 'Aal-e-Imran');
+
+      // First warm caches the (bad) empty result.
+      cubit.warm(target);
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.cachedAyahs(target), isEmpty);
+
+      // A later warm must refetch rather than trust the empty entry (an empty
+      // entry renders nothing — trusting it would spin forever).
+      cubit.warm(target);
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.cachedAyahs(target), isNotEmpty);
+
+      // And load() must also refuse to treat empty as a hit.
+      final repo2 = _EmptyOnceAyahRepository();
+      final cubit2 = ReaderCubit(repo2, _FakeLastReadRepository());
+      cubit2.warm(target);
+      await Future<void>.delayed(Duration.zero);
+      await cubit2.load(target);
+      expect(cubit2.state.ayahs, isNotEmpty);
+
+      await cubit.close();
+      await cubit2.close();
+    });
+  });
+}
+
+/// Returns an empty ayah list on the first fetch, real data afterwards —
+/// simulates a transient bad read being cached.
+class _EmptyOnceAyahRepository implements AyahRepository {
+  int _calls = 0;
+
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async {
+    _calls++;
+    if (_calls == 1) return const [];
+    return [
+      Ayah(
+        id: target.value,
+        surahId: target.value,
+        ayahNumber: 1,
+        textArabic: 'x',
+        isSajda: false,
+      ),
+    ];
+  }
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => const {};
+
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async => const [];
 }
