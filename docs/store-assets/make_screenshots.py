@@ -47,13 +47,25 @@ CAPTIONS = {
     "10-audio.png":     "Listen — verse-by-verse recitation",
     "11-about.png":     "Offline, private — no sign-up",
     "12-fontzoom.png":  "Pinch to zoom — read at any size",
+    # New phone "one continuous session" story — all Al-Baqarah, Fajr light
+    # (#EAEEF1), same anchor verse 2:2, reading → … → pinch-zoom finale. These
+    # use fresh 13–18 filenames so the tablet set (which shares 04/10/12) is
+    # left untouched.
+    "13-peek.png":      "Tap any verse — translation & audio",
+    "14-detailed.png":  "Urdu, Hindi & English, together",
+    "15-audio.png":     "Listen — verse-by-verse recitation",
+    "16-light.png":     "Light of Day — a light for every hour",
+    "17-size.png":      "Your script, size & language",
+    "18-zoom.png":      "Pinch to zoom — read at any size",
 }
 
-# PHONE slot (up to 8) — headline features, in display order.
-PHONE = ["01-home.png", "02-reading.png", "03-peek.png", "04-detailed.png",
-         "05-indopak.png", "06-light.png", "07-prayer.png", "09-settings.png"]
+# PHONE slot (up to 8) — one continuous Al-Baqarah / Fajr / verse-2:2 story,
+# ending on pinch-to-zoom. Slots 1–2 kept; 3–8 rebuilt (see 13–18 above).
+PHONE = ["01-home.png", "02-reading.png", "13-peek.png", "14-detailed.png",
+         "15-audio.png", "16-light.png", "17-size.png", "18-zoom.png"]
 
 # TABLET slot (7-inch AND 10-inch, up to 8) — surfaces the extras + anchors.
+# Left as-is (breadth set); intentionally NOT part of the phone-story rework.
 TABLET = ["01-home.png", "02-reading.png", "04-detailed.png", "10-audio.png",
           "08-reminders.png", "12-fontzoom.png", "11-about.png", "07-prayer.png"]
 
