@@ -379,6 +379,29 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   pin the owner's flagged words as **codepoint canaries in `verify_db.py`** so the
   spelling can't silently regress. Lesson: "0 `.notdef`" only proves it *renders*, not
   that it's the *right text* — eyeball the orthography against a reference Mushaf.
+- **Noorehuda floats waqf signs after a fatha/damma — fixed by deleting ONE GSUB
+  subtable, not by touching anchors (2026-07-05).** Owner flagged Al-Fatihah: the
+  `ۙ`/`ؕ` verse-end signs hovered high-left over the ayah medallion (1,853 ayahs),
+  and bismillah's `اللهِ` rendered bare. Root cause found by headless HarfBuzz
+  tracing: Noorehuda's own `ccmp` first converts EVERY small-high waqf sign to a
+  proper **spacing** glyph that sits inline after the word (how 5,188 of 7,063
+  corpus occurrences — and quran.com — render), then a second ChainContextSubst
+  rule *reverts* it to a zero-width mark whenever an above-ḥarakah precedes,
+  intending an mkmk stack whose anchors land ~155 units left / ~345 up = the float.
+  `tool/patch_noorehuda_waqf.py` removes that one revert subtable so everything
+  falls through to the spacing form (idempotent; corpus-diffed pre/post — only
+  waqf presentation changed; the 4 mid-word `ۜ` U+06DC qiraʾat signs correctly
+  stay stacked marks). The bare Allah: Quran.com's text writes 2,551 Allah-words
+  with explicit shadda+dagger-alef but leaves 4 bare (1:1, 3× in 5:7) — their
+  PDMS font draws the marks inside its Allah ligature, Noorehuda doesn't, so
+  `build_indopak_source.py` now folds bare `لله` to the majority spelling.
+  Lessons: (a) when a font misplaces a mark, check GSUB for a *designed
+  alternative presentation* before doing anchor surgery — the font may already
+  contain the right rendering behind a bad contextual rule; (b) corpus-wide
+  shaping fingerprints (glyph+advance+offset per ayah, diffed pre/post) turn a
+  font patch from "looks right on Fatihah" into a provable no-regression change;
+  (c) full-corpus text verification vs the live source is cheap (114 API calls)
+  and settled "font bug vs data bug" in minutes.
 
 ---
 
