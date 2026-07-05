@@ -909,9 +909,10 @@ class _HeaderMarker {
 // verbatim from Al-Fatihah:1 in the bundled quran.db (text_arabic_uthmani /
 // text_arabic_indopak) rather than hand-typed, so the IndoPak form renders cleanly
 // in Noorehuda (validated to 0 .notdef). They differ by design — e.g. Uthmani
-// writes "ٱللَّه" with the waṣla alif (U+0671), IndoPak "الله" with a plain alif.
+// writes "ٱللَّه" with the waṣla alif (U+0671), IndoPak "اللّٰه" with a plain
+// alif + explicit shadda/dagger-alef (Noorehuda draws no marks of its own).
 const String _uthmaniSample = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ';
-const String _indopakSample = 'بِسۡمِ اللهِ الرَّحۡمٰنِ الرَّحِيۡمِ';
+const String _indopakSample = 'بِسۡمِ اللّٰهِ الرَّحۡمٰنِ الرَّحِيۡمِ';
 
 /// The reader's "Settings" bottom sheet: reading size, Arabic font + translation.
 /// Stateful so
