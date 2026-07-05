@@ -68,6 +68,9 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   drift_dev: ^2.18.0
+  # Direct import in test/quran_text_constants_test.dart (opens the bundled
+  # quran.db to guard hardcoded Qur'an literals); already transitive via drift.
+  sqlite3: ^3.3.3
   build_runner: ^2.4.11
   flutter_launcher_icons: ^0.14.1
   patrol: ^4.6.1
