@@ -402,6 +402,40 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   font patch from "looks right on Fatihah" into a provable no-regression change;
   (c) full-corpus text verification vs the live source is cheap (114 API calls)
   and settled "font bug vs data bug" in minutes.
+- **Normalising translation transliteration — a fixed char map, never NFKD
+  (2026-07-06).** The owner wanted the Hilali-Khan English de-accented
+  (`Allâh→Allah`, `Muhâjirûn→Muhajirun`). Enumerating the actual non-ASCII in the
+  English text (`resource_id=3`) showed exactly **5** Latin codepoints to touch —
+  `â û î Â Î → a u i A I` — while the same column also carries **embedded Arabic**
+  (the ﷺ ligature U+FDFA, `صلى الله عليه وسلم`) and **curly quotes** that must
+  survive. So a blind `unicodedata.normalize('NFKD', …)` diacritic-strip would
+  have corrupted the Arabic/quotes; the right tool is a precise
+  `str.translate({...})`. Did it at the source (pipeline `build_db.py`
+  `normalize_translit()`, gated by a `strip_translit_diacritics: true` flag on the
+  en source in `sources.yaml`) so app + web inherit one rebuilt DB. Guard that
+  proved it safe: diff the rebuilt DB vs the old one — Arabic/Urdu/Hindi rows
+  **0 changes**, English rows changed **only** where `old.translate(map)==new`.
+- **"Gaps between sentences" = NO-BREAK SPACES in the source, not layout
+  (2026-07-06).** A follow-up report: English verses wrapped with big empty gaps
+  at the ends of short lines (e.g. 2:29 broke `Then He rose over` ⏎ `(Istawa)`
+  with room to spare). Not word-wrap, not a bug in the reader — the Hilali-Khan
+  edition glues transliterated terms with **U+00A0 no-break space** (~4300 of
+  them: `Al-Ansar\xa0and\xa0Al-Muhajirun`, `over (Istawa)\xa0towards`). NBSP
+  *forbids* wrapping, so chained NBSPs form long unbreakable runs that get pushed
+  whole to the next line, leaving the ragged gaps. Fix = convert U+00A0→normal
+  space (+ squeeze runs) in the pipeline (`collapse_nbsp()` under a `collapse_nbsp:
+  true` flag). Diagnosis tip: `repr()` the stored string — `\xa0` is invisible in
+  normal output but obvious in repr; and check whitespace codepoints per language
+  (ur/hi had **0** NBSP, so it was English-only). Same verify guard: only English
+  rows changed, all NBSP-only.
+  - **Aftermath — don't confuse ragged-right with the bug.** Once NBSP was fixed,
+    a report of "still gaps" pointed at verses (6:2, 6:6) that **never had an NBSP**
+    in the source — i.e. plain left-aligned ragged-right line ends, not a defect.
+    Decisive check: look at the *source* whitespace for the reported verse; if
+    there's no NBSP there, it's alignment, not data. Owner chose (2026-07-06) to
+    **keep the translation left-aligned** (ragged-right) rather than justify —
+    justification in a narrow phone column risks inter-word "rivers." So
+    ragged-right line ends are **intended**, not a bug to fix.
 
 ---
 
@@ -987,6 +1021,21 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   fight the flutter startup lock (especially if a Patrol test is running).
 - Prefer the **official upstream fix** (V2 font) over a clever local hack (we had
   a working GSUB patch moving `liga` lookups into `calt`, but discarded it).
+- **A reported "bug" can be a viewport artifact — verify the data before you
+  theorise a fix (2026-07-06).** A screenshot showed an English translation
+  "starting mid-sentence" (2:25 tail: *"...same form but different in taste)..."*).
+  It looked like split/truncated data. It was **not**: the reader is a continuous
+  vertical scroll, and 2:25 (~462 chars, one of the longest Hilali-Khan verses)
+  simply spans a screen — scrolling up reveals the full opening. Before touching
+  code we proved the data was clean (all three `quran.db` copies byte-identical;
+  one full row per verse; pipeline `UNIQUE(ayah_id,resource_id)` + `INSERT OR
+  IGNORE` makes splitting impossible) and that neither renderer truncates. The
+  cheap discriminator is the **one question to the user**: "scroll up — is the
+  opening there?" A *latent* trap did surface though: the app buckets
+  translations `map[resourceId] = textContent` (last-write-wins, no `ORDER BY`,
+  in `app_database.dart` `translationsFor*`) — harmless on one-row-per-pair data,
+  but a future multi-row DB would silently show only the tail. Aggregate/guard
+  it if that code is ever touched.
 
 ---
 

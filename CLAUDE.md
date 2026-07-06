@@ -130,6 +130,19 @@ Commands:
   mirrors Tanzil; see `../alquran-data/config/sources.yaml`). Earlier builds
   used Maulana Azizul Haque al-Umari. Urdu is Junagarhi. Reader order:
   Urdu → Hindi → English.
+- **English text is cleaned in the data pipeline, not the app** (owner decision
+  2026-07-06): two per-source flags on the en source in `sources.yaml` +
+  `build_db.py` helpers — `strip_translit_diacritics` flattens circumflexes
+  (`Allâh→Allah`, `Muhâjirûn→Muhajirun`; `â î û Â Î → a i u A I`), and
+  `collapse_nbsp` turns the edition's ~4300 no-break spaces (U+00A0, which forbid
+  wrapping and left ragged gaps in the reader) into regular spaces. English only;
+  embedded Arabic + curly quotes preserved; the app just renders the DB. After a
+  rebuild, propagate the DB to app **and** web. See `../alquran-data/HANDOFF.md`.
+- **Default reader translation = Urdu-only** on a fresh install (no saved
+  selection), **regardless of device locale** — `_activeLangs()` in
+  `features/reader/presentation/pages/reader_page.dart` returns `{'ur'}` (else the
+  first available edition). This is app-only; the website is deliberately left on
+  its own default (not an exact replica).
 - **Licensing** of translations/fonts is UNVERIFIED — clear before any release
   (see `../alquran-data/HANDOFF.md`).
 
