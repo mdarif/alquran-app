@@ -25,6 +25,14 @@ const _alFatiha = Surah(
   revelationPlace: 'makkah',
 );
 
+const _alKahf = Surah(
+  id: 18,
+  nameArabic: 'الكهف',
+  nameEnglish: 'Al-Kahf',
+  totalAyahs: 110,
+  revelationPlace: 'makkah',
+);
+
 void main() {
   group('SurahListCubit', () {
     test('initial state is SurahListStatus.initial with no surahs', () {
@@ -69,6 +77,23 @@ void main() {
 
       expect(cubit.state.error, contains('db unavailable'));
       expect(cubit.state.surahs, isEmpty);
+      await cubit.close();
+    });
+
+    test('search() narrows visibleSurahs; clearing restores the full list',
+        () async {
+      final cubit = SurahListCubit(
+        _FakeSurahRepository(surahs: const [_alFatiha, _alKahf]),
+      );
+      await cubit.load();
+      expect(cubit.state.visibleSurahs, const [_alFatiha, _alKahf]);
+
+      cubit.search('kahf');
+      expect(cubit.state.query, 'kahf');
+      expect(cubit.state.visibleSurahs, const [_alKahf]);
+
+      cubit.search('');
+      expect(cubit.state.visibleSurahs, const [_alFatiha, _alKahf]);
       await cubit.close();
     });
   });

@@ -11,6 +11,10 @@ class WidgetKeys {
   static const jumpButton = Key('home-jump-button');
   static const lastReadCard = Key('home-last-read-card');
   static Key surahTile(int surahId) => Key('surah-tile-$surahId');
+  static const surahSearchButton = Key('home-surah-search-button');
+  static const surahSearchField = Key('home-surah-search');
+  static const surahSearchBack = Key('home-surah-search-back');
+  static const homeOverflowMenu = Key('home-overflow-menu');
 
   // Reader chrome
   static const viewportToggle = Key('reader-viewport-toggle');

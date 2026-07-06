@@ -11,7 +11,6 @@ import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_l
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
 import 'package:al_quran/features/reader/presentation/widgets/last_read_banner.dart';
-import 'package:al_quran/features/reminders/presentation/widgets/reminders_button.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
 import 'package:al_quran/features/surahs/presentation/cubit/surah_list_cubit.dart';
@@ -95,7 +94,7 @@ void main() {
     testWidgets('is an immersive surah list with no tab bar', (tester) async {
       await _pumpHome(tester);
       expect(find.byType(TabBar), findsNothing);
-      expect(find.byType(SurahListView), findsOneWidget);
+      expect(find.byType(SurahListBody), findsOneWidget);
       expect(find.text('Al-Fatihah'), findsOneWidget);
     });
 
@@ -134,16 +133,28 @@ void main() {
         (tester) async {
       await _pumpHome(tester, advancedNavigation: false);
       expect(find.byIcon(AppIcons.jumpMenu), findsNothing);
-      expect(find.byType(SurahListView), findsOneWidget);
+      expect(find.byType(SurahListBody), findsOneWidget);
     });
 
     testWidgets('surfaces the flagged features when their flags are on',
         (tester) async {
       await _pumpHome(tester); // all default to on
       expect(find.byType(HijriDateLine), findsOneWidget);
-      expect(find.byType(RemindersButton), findsOneWidget);
-      expect(find.byType(ThemeToggleButton), findsOneWidget);
       expect(find.byType(LastReadBanner), findsOneWidget);
+      // Reminders + Reading Light now live behind the app-bar overflow.
+      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
+    });
+
+    testWidgets('the overflow menu opens Reading Light (and reveals its items)',
+        (tester) async {
+      await _pumpHome(tester); // ThemeCubit is provided → Reading Light shows
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      expect(find.text('Reading Light'), findsOneWidget);
+      await tester.tap(find.text('Reading Light'));
+      await tester.pumpAndSettle();
+      // The Reading-Light sheet opened.
+      expect(find.byType(ReadingLightSheet), findsOneWidget);
     });
 
     testWidgets('hides each flagged feature when its flag is off',
@@ -156,11 +167,50 @@ void main() {
         lightOfDay: false,
       );
       expect(find.byType(HijriDateLine), findsNothing);
-      expect(find.byType(RemindersButton), findsNothing);
-      expect(find.byType(ThemeToggleButton), findsNothing);
       expect(find.byType(LastReadBanner), findsNothing);
+      // No secondary controls → no overflow menu at all.
+      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsNothing);
       // The reading list itself is unaffected.
-      expect(find.byType(SurahListView), findsOneWidget);
+      expect(find.byType(SurahListBody), findsOneWidget);
+    });
+  });
+
+  group('HomePage — app-bar search', () {
+    testWidgets('search icon opens a search field and hides the other controls',
+        (tester) async {
+      await _pumpHome(tester);
+      // Normal bar: title + overflow, no search field yet.
+      expect(find.byKey(WidgetKeys.surahSearchField), findsNothing);
+      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
+
+      await tester.tap(find.byKey(WidgetKeys.surahSearchButton));
+      await tester.pumpAndSettle();
+
+      // Search mode: field + back arrow show; the About title + overflow hide.
+      expect(find.byKey(WidgetKeys.surahSearchField), findsOneWidget);
+      expect(find.byKey(WidgetKeys.surahSearchBack), findsOneWidget);
+      expect(find.byKey(WidgetKeys.aboutButton), findsNothing);
+      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsNothing);
+    });
+
+    testWidgets('typing filters the list; back exits and restores it',
+        (tester) async {
+      // Two surahs so filtering is observable.
+      await _pumpHome(tester);
+      expect(find.text('Al-Fatihah'), findsOneWidget);
+
+      await tester.tap(find.byKey(WidgetKeys.surahSearchButton));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(WidgetKeys.surahSearchField), 'fatiha');
+      await tester.pumpAndSettle();
+      expect(find.text('Al-Fatihah'), findsOneWidget);
+
+      // Back exits search, clears the query, and restores the normal bar.
+      await tester.tap(find.byKey(WidgetKeys.surahSearchBack));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.surahSearchField), findsNothing);
+      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
+      expect(find.text('Al-Fatihah'), findsOneWidget);
     });
   });
 }

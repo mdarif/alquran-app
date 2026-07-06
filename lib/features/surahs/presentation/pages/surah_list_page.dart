@@ -5,7 +5,7 @@ import 'package:get_it/get_it.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../reader/domain/entities/reader_target.dart';
 import '../../../reader/presentation/pages/reader_page.dart';
-import '../../domain/entities/surah.dart';
+import '../../domain/surah_search.dart';
 import '../cubit/surah_list_cubit.dart';
 import '../widgets/surah_tile.dart';
 
@@ -20,7 +20,9 @@ class SurahListPage extends StatelessWidget {
   }
 }
 
-/// The surah list body (no Scaffold), embeddable as a navigation tab.
+/// The surah list, self-contained with its own cubit — embeddable standalone
+/// (e.g. [SurahListPage]). The Home screen instead provides the cubit itself
+/// (so its app-bar search can drive it) and renders [SurahListBody] directly.
 class SurahListView extends StatelessWidget {
   const SurahListView({super.key});
 
@@ -28,13 +30,15 @@ class SurahListView extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => GetIt.I<SurahListCubit>()..load(),
-      child: const _SurahListBody(),
+      child: const SurahListBody(),
     );
   }
 }
 
-class _SurahListBody extends StatelessWidget {
-  const _SurahListBody();
+/// Just the list body — consumes an ambient [SurahListCubit]. Search lives in the
+/// host's app bar (see the Home screen); this renders `state.visibleHits`.
+class SurahListBody extends StatelessWidget {
+  const SurahListBody({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -50,21 +54,29 @@ class _SurahListBody extends StatelessWidget {
               onRetry: () => context.read<SurahListCubit>().load(),
             );
           case SurahListStatus.loaded:
+            final hits = state.visibleHits;
+            if (hits.isEmpty) return _NoMatch(query: state.query);
             return ListView.separated(
-              itemCount: state.surahs.length,
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              itemCount: hits.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (context, i) {
-                final Surah surah = state.surahs[i];
+                final hit = hits[i];
+                final surah = hit.surah;
                 return SurahTile(
                   key: WidgetKeys.surahTile(surah.id),
                   surah: surah,
+                  verse: hit.verse,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => ReaderPage(
-                        target: ReaderTarget.surah(
-                          surah.id,
-                          surah.nameEnglish,
-                        ),
+                        target: ReaderTarget.surah(surah.id, surah.nameEnglish),
+                        // For a verse-ref hit ("18:5"), open the reader scrolled
+                        // to that verse (its global ayah id — the same focus
+                        // Last Read uses).
+                        focusAyahId: hit.verse == null
+                            ? null
+                            : globalAyahId(state.surahs, surah.id, hit.verse!),
                       ),
                     ),
                   ),
@@ -73,6 +85,30 @@ class _SurahListBody extends StatelessWidget {
             );
         }
       },
+    );
+  }
+}
+
+class _NoMatch extends StatelessWidget {
+  const _NoMatch({required this.query});
+
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'No surah matches “$query”',
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: cs.onSurfaceVariant),
+        ),
+      ),
     );
   }
 }

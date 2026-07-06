@@ -52,6 +52,10 @@ class AppIcons {
     0xe5cd,
     fontFamily: _kSymbolFamily,
   ); // close_rounded
+  static const IconData search = IconData(
+    0xe8b6,
+    fontFamily: _kSymbolFamily,
+  ); // search_rounded
 
   // ── Translation ───────────────────────────────────────────────────────────
   /// Reading peek card's show/hide-translation toggle: an open eye when the

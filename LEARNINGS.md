@@ -441,6 +441,19 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 
 ## 3. Flutter reading-UX patterns that worked
 
+- **App-bar "search mode" driving a body list (2026-07-06).** To let a search
+  icon in the AppBar filter a list rendered in the body, the list's Cubit must be
+  **provided above the AppBar** (wrap the whole `Scaffold` in the `BlocProvider`),
+  not created inside the body — otherwise the bar can't reach it. Then a
+  `_searching` bool swaps the AppBar between a normal bar and a
+  `leading: back-arrow + title: TextField(autofocus)` bar, hiding the other
+  actions; `PopScope(canPop: !_searching)` makes system-back close search first.
+- **`PopupMenuButton` leaves a blank strip on the right; `MenuAnchor` doesn't
+  (2026-07-06).** The old popup menu rounds its width up in fixed steps and
+  left-aligns tight content, so a short menu looks too wide. Material-3
+  `MenuAnchor` + `MenuItemButton` size to content — use them for a menu that
+  hugs its widest label. (Also: never put a `ListTile` inside a `PopupMenuItem`
+  — it forces min-width + a big leading/label gap.)
 - **Pinch-to-zoom without breaking scroll/selection:** do NOT use
   `GestureDetector.onScaleUpdate` — its ScaleGestureRecognizer wins the gesture
   arena and kills the scroll view. Use a raw `Listener`, track pointers in a
