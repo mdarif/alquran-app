@@ -7,17 +7,15 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import 'credits_page.dart';
 
-/// Open the developer site (almarfa.co) in the browser, with a snackbar fallback
-/// if no handler is available.
-Future<void> _openAlMarfa(BuildContext context) async {
+/// Open an external site in the browser, with a snackbar fallback if no
+/// handler is available.
+Future<void> _openExternal(BuildContext context, String url) async {
   final messenger = ScaffoldMessenger.of(context);
-  final ok = await launchUrl(
-    Uri.parse('https://almarfa.co'),
-    mode: LaunchMode.externalApplication,
-  );
+  final uri = Uri.parse(url);
+  final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
   if (!ok) {
     messenger.showSnackBar(
-      const SnackBar(content: Text('Couldn’t open almarfa.co')),
+      SnackBar(content: Text('Couldn’t open ${uri.host}')),
     );
   }
 }
@@ -69,7 +67,7 @@ class _AboutPageState extends State<AboutPage> {
           Center(
             child: InkWell(
               borderRadius: BorderRadius.circular(8),
-              onTap: () => _openAlMarfa(context),
+              onTap: () => _openExternal(context, 'https://almarfa.co'),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Row(
@@ -142,7 +140,8 @@ class _BrandHeader extends StatelessWidget {
     return Semantics(
       container: true,
       label: 'Al Quran. Read. Reflect. Remember.'
-          '${version == null ? '' : ' Version $version'}',
+          '${version == null ? '' : ' Version $version'}'
+          ' Also on the web at alquranreader.com.',
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
         decoration: BoxDecoration(
@@ -178,10 +177,22 @@ class _BrandHeader extends StatelessWidget {
                 color: cs.onSurfaceVariant,
               ),
             ),
-            if (version != null) ...[
-              const SizedBox(height: 14),
-              _MetaPill(label: 'Version $version'),
-            ],
+            const SizedBox(height: 14),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (version != null) _MetaPill(label: 'Version $version'),
+                // The reader lives on the web too — the header links it; the
+                // company credit stays below, next to Credits & Licenses.
+                _MetaPill(
+                  label: 'alquranreader.com',
+                  onTap: () =>
+                      _openExternal(context, 'https://alquranreader.com'),
+                ),
+              ],
+            ),
             const SizedBox(height: 18),
             Container(
               width: 28,
@@ -199,26 +210,51 @@ class _BrandHeader extends StatelessWidget {
 }
 
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.label});
+  const _MetaPill({required this.label, this.onTap});
 
   final String label;
+
+  /// When set, the pill is tappable and shows an external-link affordance.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.secondaryContainer,
-        borderRadius: BorderRadius.circular(99),
-      ),
+    final radius = BorderRadius.circular(99);
+    final content = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-      child: Text(
-        label,
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: cs.onSecondaryContainer,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: cs.onSecondaryContainer,
+            ),
+          ),
+          if (onTap != null) ...[
+            const SizedBox(width: 4),
+            Icon(
+              Icons.open_in_new_rounded,
+              size: 13,
+              color: cs.onSecondaryContainer,
+            ),
+          ],
+        ],
       ),
+    );
+    if (onTap == null) {
+      return Container(
+        decoration:
+            BoxDecoration(color: cs.secondaryContainer, borderRadius: radius),
+        child: content,
+      );
+    }
+    return Material(
+      color: cs.secondaryContainer,
+      borderRadius: radius,
+      child: InkWell(borderRadius: radius, onTap: onTap, child: content),
     );
   }
 }

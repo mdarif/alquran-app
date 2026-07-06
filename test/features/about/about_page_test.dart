@@ -29,7 +29,9 @@ void main() {
     expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
     expect(find.text('Al Quran'), findsOneWidget);
     expect(find.textContaining('Version 1.0.0'), findsOneWidget);
-    // Exactly one company mention — the footer link; the header pill is gone.
+    // The header pill links the website; the single company mention is the
+    // footer link.
+    expect(find.text('alquranreader.com'), findsOneWidget);
     expect(find.text('Al Marfa Technologies'), findsOneWidget);
 
     // The credits + open-source licenses now live one tap deeper, on Credits.
