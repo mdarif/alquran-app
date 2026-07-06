@@ -142,8 +142,7 @@ class _BrandHeader extends StatelessWidget {
     return Semantics(
       container: true,
       label: 'Al Quran. Read. Reflect. Remember.'
-          '${version == null ? '' : ' Version $version'}'
-          ' By Al Marfa Technologies.',
+          '${version == null ? '' : ' Version $version'}',
       child: Container(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
         decoration: BoxDecoration(
@@ -179,19 +178,10 @@ class _BrandHeader extends StatelessWidget {
                 color: cs.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 14),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (version != null) _MetaPill(label: 'Version $version'),
-                _MetaPill(
-                  label: 'Al Marfa Technologies',
-                  onTap: () => _openAlMarfa(context),
-                ),
-              ],
-            ),
+            if (version != null) ...[
+              const SizedBox(height: 14),
+              _MetaPill(label: 'Version $version'),
+            ],
             const SizedBox(height: 18),
             Container(
               width: 28,
@@ -209,51 +199,26 @@ class _BrandHeader extends StatelessWidget {
 }
 
 class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.label, this.onTap});
+  const _MetaPill({required this.label});
 
   final String label;
-
-  /// When set, the pill is tappable and shows an external-link affordance.
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final radius = BorderRadius.circular(99);
-    final content = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: cs.onSecondaryContainer,
-            ),
-          ),
-          if (onTap != null) ...[
-            const SizedBox(width: 4),
-            Icon(
-              Icons.open_in_new_rounded,
-              size: 13,
-              color: cs.onSecondaryContainer,
-            ),
-          ],
-        ],
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(99),
       ),
-    );
-    if (onTap == null) {
-      return Container(
-        decoration:
-            BoxDecoration(color: cs.secondaryContainer, borderRadius: radius),
-        child: content,
-      );
-    }
-    return Material(
-      color: cs.secondaryContainer,
-      borderRadius: radius,
-      child: InkWell(borderRadius: radius, onTap: onTap, child: content),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      child: Text(
+        label,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: cs.onSecondaryContainer,
+        ),
+      ),
     );
   }
 }
