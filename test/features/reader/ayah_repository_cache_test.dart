@@ -121,4 +121,86 @@ void main() {
       reason: 'headings are mushaf-wide constants, memoised for the session',
     );
   });
+
+  test('translation editions are memoised across calls', () async {
+    await db.into(db.resources).insert(
+          ResourcesCompanion.insert(
+            id: const Value(1),
+            type: 'translation',
+            languageCode: 'ur',
+            name: 'Urdu',
+          ),
+        );
+    expect(await repo.getTranslationResources(), hasLength(1));
+
+    // A second edition added after the first read must NOT appear — memoised.
+    await db.into(db.resources).insert(
+          ResourcesCompanion.insert(
+            id: const Value(2),
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Hindi',
+          ),
+        );
+    expect(
+      await repo.getTranslationResources(),
+      hasLength(1),
+      reason: 'editions are session constants, memoised like the headings',
+    );
+  });
+
+  test('a non-surah dimension (juz) reads by its index column', () async {
+    // Two ayahs tagged juz 1 (ids already: ayah 1 from setUp; add ayah 2).
+    await db.into(db.ayahs).insert(
+          AyahsCompanion.insert(
+            id: const Value(2),
+            surahId: 1,
+            ayahNumber: 2,
+            textArabicUthmani: 'UTHMANI-2',
+            juzNumber: const Value(1),
+          ),
+        );
+    await (db.update(db.ayahs)..where((a) => a.id.equals(1)))
+        .write(const AyahsCompanion(juzNumber: Value(1)));
+
+    final juz = await repo.getAyahs(const ReaderTarget.juz(1));
+    expect(juz.map((a) => a.id), [1, 2]);
+  });
+
+  test('the session cache is LRU-capped — the oldest untouched entry evicts',
+      () async {
+    // Seed 41 single-ayah surahs 2..42 (surah 1 already holds the setUp ayah),
+    // cap is 40, then read them all in order so surah 2 (first read) is oldest.
+    for (var s = 2; s <= 42; s++) {
+      await db.into(db.ayahs).insert(
+            AyahsCompanion.insert(
+              id: Value(1000 + s),
+              surahId: s,
+              ayahNumber: 1,
+              textArabicUthmani: 'S$s',
+            ),
+          );
+    }
+    for (var s = 2; s <= 42; s++) {
+      await repo.getAyahs(ReaderTarget.surah(s, 'S$s'));
+    }
+
+    // Delete both rows from the DB: only a still-cached entry survives.
+    await (db.delete(db.ayahs)..where((a) => a.id.equals(1002)))
+        .go(); // surah 2
+    await (db.delete(db.ayahs)..where((a) => a.id.equals(1042)))
+        .go(); // surah 42
+
+    // Surah 2 was evicted (oldest) → cache miss → re-query → empty.
+    expect(
+      await repo.getAyahs(const ReaderTarget.surah(2, 'S2')),
+      isEmpty,
+      reason: 'the oldest untouched section should have been evicted',
+    );
+    // Surah 42 is still cached → served despite the row being gone.
+    expect(
+      await repo.getAyahs(const ReaderTarget.surah(42, 'S42')),
+      hasLength(1),
+    );
+  });
 }
