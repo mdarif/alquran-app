@@ -1069,6 +1069,57 @@ void main() {
 
   // -------------------------------------------------------------------------
 
+  group('page pill visibility', () {
+    // Long Arabic + page metadata so the view actually scrolls and _onScroll
+    // runs. [pages] assigns each verse's Mushaf page.
+    List<Ayah> scrollable(int count, int Function(int n) pages) => [
+          for (var n = 1; n <= count; n++)
+            Ayah(
+              id: 2000 + n,
+              surahId: 2,
+              ayahNumber: n,
+              textArabic: 'نص طويل جدا للآية رقم $n مع كلمات إضافية كثيرة هنا',
+              isSajda: false,
+              page: pages(n),
+            ),
+        ];
+
+    double pillOpacity(WidgetTester tester) => tester
+        .widget<AnimatedOpacity>(
+          find.ancestor(
+            of: find.textContaining('Page '),
+            matching: find.byType(AnimatedOpacity),
+          ),
+        )
+        .opacity;
+
+    testWidgets('stays hidden while scrolling a single-page section',
+        (tester) async {
+      await tester.pumpWidget(_wrap(_view(ayahs: scrollable(30, (_) => 1))));
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -400),
+      );
+      await tester.pump();
+      expect(pillOpacity(tester), 0.0);
+    });
+
+    testWidgets('appears while scrolling a multi-page section',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(_view(ayahs: scrollable(30, (n) => (n + 4) ~/ 5))),
+      );
+      await tester.drag(
+        find.byType(SingleChildScrollView),
+        const Offset(0, -400),
+      );
+      await tester.pump();
+      expect(pillOpacity(tester), greaterThan(0));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
   group('groupAyahsBySurah', () {
     test('single surah → one group', () {
       final groups = groupAyahsBySurah(_ayahs(2, 5));

@@ -127,6 +127,10 @@ class _MushafViewState extends State<MushafView>
   int? _currentPage;
   bool _showPage = false;
 
+  /// Whether the section spans more than one Mushaf page — when it doesn't,
+  /// the page pill is suppressed (it would always show the same number).
+  bool _multiPage = false;
+
   // "Back to top" appears once the reader is roughly a screen deep into a surah.
   bool _showTop = false;
   static const double _topButtonThreshold = 800;
@@ -156,6 +160,12 @@ class _MushafViewState extends State<MushafView>
       _cumLen[i] = acc;
     }
     _totalLen = acc;
+    // The scroll pill only informs when the section spans Mushaf pages — on a
+    // single-page section (e.g. Al-Fatihah) it would always read the same
+    // number, so it stays hidden entirely.
+    _multiPage = widget.ayahs.isNotEmpty &&
+        widget.ayahs.first.page != null &&
+        widget.ayahs.first.page != widget.ayahs.last.page;
   }
 
   /// The printed-Mushaf page at a vertical scroll [fraction] — O(log n) over the
@@ -367,7 +377,7 @@ class _MushafViewState extends State<MushafView>
     }
     final showTop = _controller.offset > _topButtonThreshold;
     if (showTop != _showTop) setState(() => _showTop = showTop);
-    if (!_showPage) setState(() => _showPage = true);
+    if (_multiPage && !_showPage) setState(() => _showPage = true);
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(milliseconds: 1200), () {
       if (!mounted) return;

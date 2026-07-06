@@ -1019,6 +1019,19 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 - You can screenshot and inspect a **user's already-running** sim
   (`xcrun simctl io booted screenshot`) — no need to launch your own instance and
   fight the flutter startup lock (especially if a Patrol test is running).
+- **Driving the iOS sim without any tap driver (2026-07-06):** `simctl` cannot
+  tap, and `osascript`/System Events needs assistive access that a sandboxed
+  shell won't have. What works: a throwaway `DevAutopilot` widget wrapping
+  `home:` that pushes routes via the app's `navigatorKey` and **injects real
+  pointer events** with `GestureBinding.instance.handlePointerEvent(...)`, then
+  `debugPrint`s `AUTOPILOT: <step>` markers; an outer script greps the
+  `flutter run` log for each marker (tracking the **file offset**, since attach
+  can replay a previous launch's tail) and screenshots via `simctl`. Two traps:
+  (a) injected `PointerDown/Move/UpEvent`s MUST carry increasing `timeStamp`s
+  (use a `Stopwatch`) or the velocity tracker sees Δt=0 and **no fling/swipe
+  gesture ever fires**; (b) byte-identical PNG sizes across "different" steps
+  means your timeline stalled or your markers matched a stale launch — hash the
+  screenshots to catch it. Delete the autopilot + revert `home:` before commit.
 - Prefer the **official upstream fix** (V2 font) over a clever local hack (we had
   a working GSUB patch moving `liga` lookups into `calt`, but discarded it).
 - **A reported "bug" can be a viewport artifact — verify the data before you
