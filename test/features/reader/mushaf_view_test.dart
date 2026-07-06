@@ -1110,8 +1110,7 @@ void main() {
       expect(pillOpacity(tester), 0.0);
     });
 
-    testWidgets('appears while scrolling a multi-page section',
-        (tester) async {
+    testWidgets('appears while scrolling a multi-page section', (tester) async {
       await tester.pumpWidget(
         _wrap(_view(ayahs: scrollable(30, (n) => (n + 4) ~/ 5))),
       );
