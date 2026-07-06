@@ -3,6 +3,7 @@ import 'dart:ui' show BoxHeightStyle;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
@@ -30,9 +31,28 @@ const int _surahAtTawbah = 9;
 // and — overlaid on the Reading-view ayah medallion — see [_MarkedParagraph]). The
 // font's Arabic-Indic rosette (٢) is dropped: it reads like "4" to Urdu readers.
 
-/// Reading viewport (PRD 4.3): Arabic-only, continuous Mushaf-style flow. A
-/// section may span surahs (juz/hizb/page/ruku), so ayahs are grouped by surah
-/// and each group gets a chapter header (and Basmala where appropriate).
+/// A row in the lazy Reading list: a chapter header, or one Mushaf-page chunk of
+/// verses. Chunking by page keeps each paragraph small so only the on-screen
+/// pages lay out — a long surah opens as fast as a short one.
+sealed class _ReadingRow {
+  const _ReadingRow();
+}
+
+class _HeaderRow extends _ReadingRow {
+  const _HeaderRow(this.surahId, this.showBismillah);
+  final int surahId;
+  final bool showBismillah;
+}
+
+class _ChunkRow extends _ReadingRow {
+  const _ChunkRow(this.ayahs);
+  final List<Ayah> ayahs; // the verses on one Mushaf page of one surah
+}
+
+/// Reading viewport (PRD 4.3): Arabic-only, Mushaf-style flow, rendered as a lazy
+/// list of per-page chunks. A section may span surahs (juz/hizb/page/ruku), so
+/// ayahs are grouped by surah, each group gets a chapter header (and Basmala
+/// where appropriate), then one paragraph per Mushaf page.
 class MushafView extends StatefulWidget {
   const MushafView({
     required this.ayahs,
@@ -106,16 +126,24 @@ class MushafView extends StatefulWidget {
 
 class _MushafViewState extends State<MushafView>
     with SingleTickerProviderStateMixin {
-  final ScrollController _controller = ScrollController();
+  // Lazy, index-based scrolling (mirrors the Detailed view): only the on-screen
+  // Mushaf-page chunks lay out, so a long surah opens as fast as a short one.
+  final ItemScrollController _scrollCtrl = ItemScrollController();
+  final ItemPositionsListener _positions = ItemPositionsListener.create();
+
+  Timer? _reportTimer;
   Timer? _hideTimer;
   Timer? _highlightTimer;
+  Timer? _zoomTimer;
   int? _highlightAyahId;
 
-  // The verse we resumed to (Last Read). While set, Last Read stays pinned here
-  // so the post-scroll "topmost" report — which lands on whatever ended up at
-  // the top (especially near a surah's end, where the scroll can't place the
-  // verse at the usual offset) — never drifts the saved position. Cleared the
-  // moment the reader actually scrolls, after which reporting tracks the top.
+  // True for a short window after a font/script change (a pinch fires many).
+  // A pinch can leak an incidental scroll into the list; while zooming we don't
+  // let that drop the resume pin, so a zoom holds your exact verse.
+  bool _zooming = false;
+
+  // The verse we resumed to (Last Read) — pinned so the post-scroll report can't
+  // drift it; cleared the moment the reader finger-scrolls.
   int? _heldFocusId;
 
   // Tap-to-peek translation card.
@@ -131,62 +159,62 @@ class _MushafViewState extends State<MushafView>
   /// the page pill is suppressed (it would always show the same number).
   bool _multiPage = false;
 
-  // "Back to top" appears once the reader is roughly a screen deep into a surah.
   bool _showTop = false;
-  static const double _topButtonThreshold = 800;
 
-  // One key per surah group (on the Text widget); character offset per ayah in
-  // its group paragraph — used for RenderParagraph-based scroll anchoring and
-  // for anchoring the overlaid verse-number on its U+06DD rosette.
-  final Map<int, GlobalKey> _groupKeys = {};
-  final Map<int, int> _verseStart = {};
+  // Flattened rows for the lazy list: a header per surah, then one paragraph per
+  // Mushaf page. `_ayahRowIndex` maps a verse to its chunk's row (for
+  // focus/resume). Each chunk paragraph owns its own render-object key and
+  // resolves its own taps, so no per-chunk key is held here (a parent-held key
+  // clashes inside the SPL dual list mid-animation).
+  final List<_ReadingRow> _rows = [];
+  final Map<int, int> _ayahRowIndex = {};
 
-  GlobalKey _groupKeyFor(int surahId) =>
-      _groupKeys.putIfAbsent(surahId, GlobalKey.new);
+  // Where the list first lays out. For a resume/verse-jump open we position the
+  // SPL AT the focus row via initialScrollIndex, not a post-build scrollTo — the
+  // ItemScrollController isn't attached yet on the first post-frame after an
+  // async-loaded section builds, so a scrollTo there silently no-ops (the verse
+  // jump from search / Last Read would land at the top instead).
+  int _initialIndex = 0;
+  double _initialAlignment = 0;
 
-  // Derived from widget.ayahs and memoised — recomputed only when the ayah list
-  // changes, so build() and the scroll listener don't re-group or re-scan O(n)
-  // (and re-allocate) on every frame.
-  late List<List<Ayah>> _groups;
-  late List<int> _cumLen; // running total of textArabic length, per ayah index
-  late int _totalLen;
+  /// A focused verse sits just below the very top (4%), so a sliver of the
+  /// preceding verse shows it's mid-surah, not the chapter start.
+  static const double _focusAlignment = 0.04;
 
-  void _recomputeDerived() {
-    _groups = groupAyahsBySurah(widget.ayahs);
-    _cumLen = List<int>.filled(widget.ayahs.length, 0);
-    var acc = 0;
-    for (var i = 0; i < widget.ayahs.length; i++) {
-      acc += widget.ayahs[i].textArabic.length;
-      _cumLen[i] = acc;
+  void _buildRows() {
+    _rows.clear();
+    _ayahRowIndex.clear();
+    for (final group in groupAyahsBySurah(widget.ayahs)) {
+      _rows.add(_HeaderRow(group.first.surahId, _showBismillah(group)));
+      var chunk = <Ayah>[];
+      int? page;
+      void flush() {
+        if (chunk.isEmpty) return;
+        final verses = List<Ayah>.of(chunk);
+        final rowIndex = _rows.length;
+        for (final a in verses) {
+          _ayahRowIndex[a.id] = rowIndex;
+        }
+        _rows.add(_ChunkRow(verses));
+        chunk = <Ayah>[];
+      }
+
+      for (final a in group) {
+        if (page != null && a.page != page) flush();
+        // Start a fresh chunk exactly at the focus verse (resume / verse-jump), so
+        // it becomes a chunk's first row and initialScrollIndex lands it precisely
+        // at the top — no fragile off-screen measurement of where it sits inside a
+        // page. Only the focus page is split; every other page stays one paragraph.
+        if (a.id == widget.focusAyahId && chunk.isNotEmpty) flush();
+        page = a.page;
+        chunk.add(a);
+      }
+      flush();
     }
-    _totalLen = acc;
-    // The scroll pill only informs when the section spans Mushaf pages — on a
-    // single-page section (e.g. Al-Fatihah) it would always read the same
-    // number, so it stays hidden entirely.
     _multiPage = widget.ayahs.isNotEmpty &&
         widget.ayahs.first.page != null &&
         widget.ayahs.first.page != widget.ayahs.last.page;
-  }
-
-  /// The printed-Mushaf page at a vertical scroll [fraction] — O(log n) over the
-  /// memoised cumulative lengths, vs the old per-call O(n) + list allocation that
-  /// ran on every scroll frame. Same result: the page of the first ayah whose
-  /// cumulative length reaches the target offset.
-  int? _pageAt(double fraction) {
-    if (widget.ayahs.isEmpty) return null;
-    if (_totalLen == 0) return widget.ayahs.first.page;
-    final target = fraction.clamp(0.0, 1.0) * _totalLen;
-    var lo = 0;
-    var hi = _cumLen.length - 1;
-    while (lo < hi) {
-      final mid = (lo + hi) >> 1;
-      if (_cumLen[mid] >= target) {
-        hi = mid;
-      } else {
-        lo = mid + 1;
-      }
-    }
-    return widget.ayahs[lo].page;
+    _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
   }
 
   @override
@@ -208,14 +236,26 @@ class _MushafViewState extends State<MushafView>
         setState(() => _shownAyah = null);
       }
     });
-    _recomputeDerived();
-    _buildOffsets();
-    _currentPage = widget.ayahs.isNotEmpty ? widget.ayahs.first.page : null;
-    _controller.addListener(_onScroll);
+    _buildRows();
+    _positions.itemPositions.addListener(_onPositions);
     final id = widget.focusAyahId;
-    if (id != null && widget.ayahs.any((a) => a.id == id)) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _scrollToFocus(id, resume: true));
+    if (id != null && _ayahRowIndex.containsKey(id)) {
+      // The focus verse begins its own chunk (see _buildRows), so opening the list
+      // AT that row lands the verse itself near the top — deterministic, no
+      // measurement. Pin Last Read to it; report + highlight after the first frame.
+      _initialIndex = _ayahRowIndex[id]!;
+      _initialAlignment = _focusAlignment;
+      _heldFocusId = id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onVisibleAyah?.call(
+          widget.ayahs.firstWhere(
+            (a) => a.id == id,
+            orElse: () => widget.ayahs.first,
+          ),
+        );
+        _flash(id);
+      });
     }
     widget.onRegisterFlush?.call(_reportTopmost);
   }
@@ -225,10 +265,8 @@ class _MushafViewState extends State<MushafView>
     super.didUpdateWidget(old);
 
     // Follow the reciter: when the now-playing verse advances (continuous
-    // playback), bring it into view and advance the peek card to it — the peek
-    // is the now-playing control in Reading. Only on a real verse change, not a
-    // play/pause status tick on the same verse. Deferred a frame so the scroll
-    // measures the settled layout.
+    // playback), bring it into view and advance the peek card to it. Only on a
+    // real verse change, deferred a frame so the scroll measures settled layout.
     final playing = widget.audioState?.playingAyahId;
     if (playing != null && playing != old.audioState?.playingAyahId) {
       final ayah = _ayahById(playing);
@@ -239,62 +277,69 @@ class _MushafViewState extends State<MushafView>
       }
     }
 
-    final ayahsChanged = widget.ayahs != old.ayahs;
+    // The SPL holds a PIXEL offset across a rebuild, not a logical row — so a
+    // font-size change or a script reload (same verses, longer/shorter glyphs)
+    // reflows every chunk and the old offset lands on an earlier verse. Capture
+    // the top row now (old layout) and jump it back to the same spot after the
+    // reflow, so the reader stays on their verse.
     final fontChanged = widget.arabicFontSize != old.arabicFontSize;
-    if (!ayahsChanged && !fontChanged) return;
-
-    // Both reflow the text while the ScrollController keeps the same pixel
-    // offset, so the reading position would drift to an earlier verse (and
-    // corrupt "Last Read"): a font-size change reflows it, and an ayah-list
-    // change is a *same-section reload* — only a script switch (Uthmani ⇄
-    // IndoPak) reloads identical verses in a longer/shorter face, since section
-    // navigation changes the widget key and rebuilds from scratch. Capture the
-    // verse at the top NOW (the render objects still hold the old layout), then
-    // re-anchor to it once the new layout is in. While a resume verse is pinned,
-    // re-anchor to THAT (a zoom must not unpin or drift the resume point).
-    final anchor = _heldFocusId != null ? _heldOrTopmost() : _topmostAyah();
-    if (ayahsChanged) {
-      _groupKeys.clear();
-      _recomputeDerived();
-      _buildOffsets();
+    final styleChanged = widget.arabicStyle != old.arabicStyle;
+    final ayahsChanged = widget.ayahs != old.ayahs;
+    if (fontChanged || styleChanged) {
+      _zooming = true;
+      _zoomTimer?.cancel();
+      _zoomTimer = Timer(
+        const Duration(milliseconds: 300),
+        () => _zooming = false,
+      );
     }
-    if (anchor != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _anchorTo(anchor);
-      });
-    }
+    if (fontChanged || styleChanged || ayahsChanged) _reanchor();
+    if (ayahsChanged) _buildRows();
   }
 
-  /// Keep [ayah] at the top of the viewport after a relayout (font-size change),
-  /// and refresh "Last Read" to it so the resume point doesn't drift.
-  void _anchorTo(Ayah ayah) {
-    final target = _offsetForAyahTop(ayah.id);
-    if (target == null) return;
-    _controller.jumpTo(target);
-    widget.onVisibleAyah?.call(ayah);
+  /// Hold the current top verse across a reflow (font/script change): capture the
+  /// topmost row and its alignment from the pre-reflow layout, then jump back to
+  /// it once the new layout settles. Runs before [_buildRows] so it reads the old
+  /// rows; the post-frame jump resolves the verse's NEW row index.
+  void _reanchor() {
+    final visible = _positions.itemPositions.value
+        .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1);
+    if (visible.isEmpty) return;
+    final top = visible
+        .reduce((a, b) => a.itemLeadingEdge <= b.itemLeadingEdge ? a : b);
+    final align = top.itemLeadingEdge;
+    final held = _heldFocusId;
+    final topRow = top.index < _rows.length ? _rows[top.index] : null;
+    final anchorAyahId =
+        held ?? (topRow is _ChunkRow ? topRow.ayahs.first.id : null);
+    final rawIndex = top.index;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollCtrl.isAttached) return;
+      final idx = (anchorAyahId != null ? _ayahRowIndex[anchorAyahId] : null) ??
+          rawIndex;
+      _scrollCtrl.jumpTo(index: idx, alignment: held != null ? 0.04 : align);
+    });
   }
 
   @override
   void dispose() {
     widget.onRegisterFlush?.call(null);
+    // Flush the resume point before teardown (a pending debounce is about to be
+    // cancelled), so a quick pop right after scrolling still saves the position.
+    _reportTopmost();
+    _reportTimer?.cancel();
     _hideTimer?.cancel();
     _highlightTimer?.cancel();
-    _controller.dispose();
+    _zoomTimer?.cancel();
+    _positions.itemPositions.removeListener(_onPositions);
     _peekCtrl.dispose();
     super.dispose();
   }
 
-  void _onGroupTap(TapUpDetails details, List<Ayah> group) {
-    final key = _groupKeys[group.first.surahId];
-    final ro = key?.currentContext?.findRenderObject();
-    if (ro is! RenderParagraph) return;
-    final localPos = ro.globalToLocal(details.globalPosition);
-    final charOffset = ro.getPositionForOffset(localPos).offset;
-    Ayah? tapped;
-    for (final ayah in group) {
-      if (charOffset >= (_verseStart[ayah.id] ?? 0)) tapped = ayah;
-    }
-    if (tapped == null) return;
+  /// A verse was tapped in one of the chunk paragraphs (each resolves the hit
+  /// against its own render object, so no per-chunk GlobalKey has to survive in
+  /// this parent — which would clash inside the SPL dual list mid-animation).
+  void _onVerseTapped(Ayah tapped) {
     if (_selectedAyah?.id == tapped.id) {
       _dismissPeek();
       return;
@@ -351,95 +396,25 @@ class _MushafViewState extends State<MushafView>
     _peekCtrl.reverse();
   }
 
-  /// Pre-computes each ayah's character offset within its surah group paragraph
-  /// (for scroll anchoring). Mirrors the span layout in [build] exactly: each
-  /// verse is `textArabic` + ' <arabic-indic digits> ' (a leading space, the
-  /// digits, a trailing space). Must be called whenever [widget.ayahs] changes.
-  void _buildOffsets() {
-    _verseStart.clear();
-    for (final group in _groups) {
-      int offset = 0;
-      for (final ayah in group) {
-        _verseStart[ayah.id] = offset;
-        offset += ayah.textArabic.length +
-            3; // ' ۝ ' — leading space + medallion (U+06DD) + trailing space
-      }
+  /// Scroll the verse's Mushaf-page chunk to the top (reciter follow / verse
+  /// stepper). Both release the resume pin — this is a deliberate move. The
+  /// initial resume/verse-jump does NOT come through here: it opens the list AT
+  /// the focus verse via initialScrollIndex (the verse begins its own chunk).
+  void _scrollToFocus(int ayahId) {
+    _heldFocusId = null;
+    final idx = _ayahRowIndex[ayahId];
+    if (idx != null && mounted && _scrollCtrl.isAttached) {
+      _scrollCtrl.scrollTo(
+        index: idx,
+        alignment: _focusAlignment,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+      );
     }
+    _flash(ayahId);
   }
 
-  void _onScroll() {
-    if (!_controller.hasClients) return;
-    final max = _controller.position.maxScrollExtent;
-    final fraction = max <= 0 ? 0.0 : _controller.offset / max;
-    final page = _pageAt(fraction);
-    if (page != null && page != _currentPage) {
-      setState(() => _currentPage = page);
-    }
-    final showTop = _controller.offset > _topButtonThreshold;
-    if (showTop != _showTop) setState(() => _showTop = showTop);
-    if (_multiPage && !_showPage) setState(() => _showPage = true);
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(milliseconds: 1200), () {
-      if (!mounted) return;
-      setState(() => _showPage = false);
-      _reportTopmost();
-    });
-  }
-
-  void _scrollToTop() {
-    if (!_controller.hasClients) return;
-    _controller.animateTo(
-      0,
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  /// Local Y of [ayahId]'s first character within its paragraph [obj].
-  ///
-  /// Uses `getOffsetForCaret`, NOT `getBoxesForSelection`: the latter returns an
-  /// EMPTY list for most offsets in heavily-shaped Arabic text (only isolated
-  /// glyphs like the medallion/spaces box cleanly), which silently broke
-  /// focus-scroll, Last-Read resume, and the font-size re-anchor on real verses —
-  /// the anchor functions bailed out, so the position drifted (badly on zoom-in).
-  double _verseLocalTop(RenderParagraph obj, int ayahId) {
-    final offset = _verseStart[ayahId] ?? 0;
-    return obj.getOffsetForCaret(TextPosition(offset: offset), Rect.zero).dy;
-  }
-
-  void _scrollToFocus(int ayahId, {bool resume = false}) {
-    if (!mounted) return;
-    // A resume pins Last Read to this verse and records it straight away (so it
-    // holds even if the scroll can't land it at the usual offset); a deliberate
-    // move (verse stepper / reciter follow) releases the pin instead.
-    final focus = widget.ayahs.firstWhere(
-      (a) => a.id == ayahId,
-      orElse: () => widget.ayahs.first,
-    );
-    if (resume) {
-      _heldFocusId = ayahId;
-      widget.onVisibleAyah?.call(focus);
-    } else {
-      _heldFocusId = null;
-    }
-    final surahId = focus.surahId;
-    final key = _groupKeys[surahId];
-    if (key?.currentContext == null) return;
-    final obj = key!.currentContext!.findRenderObject();
-    if (obj is! RenderParagraph || !obj.attached) return;
-    final verseTop = _verseLocalTop(obj, ayahId);
-    final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
-    final viewportGlobalY = (context.findRenderObject()! as RenderBox)
-        .localToGlobal(Offset.zero)
-        .dy;
-    final target =
-        (_controller.offset + (groupGlobalY - viewportGlobalY) + verseTop - 48)
-            .clamp(0.0, _controller.position.maxScrollExtent);
-    _controller.animateTo(
-      target,
-      duration: const Duration(milliseconds: 450),
-      curve: Curves.easeOutCubic,
-    );
+  void _flash(int ayahId) {
     setState(() => _highlightAyahId = ayahId);
     _highlightTimer?.cancel();
     _highlightTimer = Timer(const Duration(milliseconds: 1800), () {
@@ -447,70 +422,81 @@ class _MushafViewState extends State<MushafView>
     });
   }
 
-  /// The verse currently at the top of the viewport (the one being read), or
-  /// null if it can't be determined yet. Walks the laid-out paragraphs and
-  /// returns the last verse whose top has scrolled to/above the viewport top.
-  Ayah? _topmostAyah() {
-    final viewport = context.findRenderObject();
-    if (viewport is! RenderBox || !viewport.attached) return null;
-    final viewportTop = viewport.localToGlobal(Offset.zero).dy;
-    Ayah? current;
-    outer:
-    for (final group in _groups) {
-      final key = _groupKeys[group.first.surahId];
-      if (key?.currentContext == null) continue;
-      final obj = key!.currentContext!.findRenderObject();
-      if (obj is! RenderParagraph || !obj.attached) continue;
-      final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
-      for (final ayah in group) {
-        if (groupGlobalY + _verseLocalTop(obj, ayah.id) <= viewportTop + 12) {
-          current = ayah;
-        } else {
-          break outer;
-        }
-      }
-    }
-    return current;
+  void _onPositions() {
+    _updateShowTop();
+    _updatePage();
+    _reportTimer?.cancel();
+    _reportTimer = Timer(const Duration(milliseconds: 400), _reportTopmost);
   }
 
-  /// Reports the topmost verse (drives "Last Read") on scroll-idle — or the
-  /// pinned resume verse, while one is held (before the reader has scrolled).
+  void _updateShowTop() {
+    final positions = _positions.itemPositions.value;
+    ItemPosition? first;
+    for (final p in positions) {
+      if (p.index == 0) {
+        first = p;
+        break;
+      }
+    }
+    final showTop =
+        positions.isNotEmpty && (first == null || first.itemLeadingEdge < -1.0);
+    if (showTop != _showTop) setState(() => _showTop = showTop);
+  }
+
+  /// The topmost visible chunk row (skipping headers), or null.
+  _ChunkRow? _topChunk() {
+    final visible = _positions.itemPositions.value
+        .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1);
+    if (visible.isEmpty) return null;
+    final top = visible
+        .reduce((a, b) => a.itemLeadingEdge <= b.itemLeadingEdge ? a : b);
+    for (var i = top.index; i < _rows.length; i++) {
+      final row = _rows[i];
+      if (row is _ChunkRow) return row;
+    }
+    return null;
+  }
+
+  void _updatePage() {
+    if (!_multiPage) return;
+    final page = _topChunk()?.ayahs.first.page;
+    if (page != null && page != _currentPage) {
+      setState(() => _currentPage = page);
+    }
+    if (!_showPage) setState(() => _showPage = true);
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _showPage = false);
+    });
+  }
+
+  void _scrollToTop() {
+    if (!_scrollCtrl.isAttached) return;
+    _scrollCtrl.scrollTo(
+      index: 0,
+      alignment: 0,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Reports the topmost verse (drives "Last Read") — or the pinned resume verse
+  /// while one is held.
   void _reportTopmost() {
     final onVisible = widget.onVisibleAyah;
     if (onVisible == null) return;
-    onVisible(_heldOrTopmost());
-  }
-
-  /// The pinned resume verse if one is held, else the topmost-visible verse.
-  Ayah _heldOrTopmost() {
     final held = _heldFocusId;
     if (held != null) {
-      return widget.ayahs.firstWhere(
-        (a) => a.id == held,
-        orElse: () => widget.ayahs.first,
+      onVisible(
+        widget.ayahs.firstWhere(
+          (a) => a.id == held,
+          orElse: () => widget.ayahs.first,
+        ),
       );
+      return;
     }
-    return _topmostAyah() ?? widget.ayahs.first;
-  }
-
-  /// Scroll offset that puts [ayahId]'s top just under the viewport top, using
-  /// the CURRENT layout. Null if it can't be located.
-  double? _offsetForAyahTop(int ayahId) {
-    if (!_controller.hasClients) return null;
-    final surahId = widget.ayahs
-        .firstWhere((a) => a.id == ayahId, orElse: () => widget.ayahs.first)
-        .surahId;
-    final obj = _groupKeys[surahId]?.currentContext?.findRenderObject();
-    if (obj is! RenderParagraph || !obj.attached) return null;
-    final groupGlobalY = obj.localToGlobal(Offset.zero).dy;
-    final viewportGlobalY = (context.findRenderObject()! as RenderBox)
-        .localToGlobal(Offset.zero)
-        .dy;
-    return (_controller.offset +
-            (groupGlobalY - viewportGlobalY) +
-            _verseLocalTop(obj, ayahId) -
-            16)
-        .clamp(0.0, _controller.position.maxScrollExtent);
+    final chunk = _topChunk();
+    if (chunk != null) onVisible(chunk.ayahs.first);
   }
 
   @override
@@ -518,72 +504,41 @@ class _MushafViewState extends State<MushafView>
     final fontSize = widget.arabicFontSize;
     return Stack(
       children: [
-        // Record the resume point the moment scrolling settles (finger release /
-        // fling end) — reliable and immediate, so leaving right after scrolling
-        // still saves where you actually are. (The 1200ms timer below only drives
-        // the page pill; on its own it loses the final position when you pop the
-        // route before it fires.)
-        NotificationListener<ScrollNotification>(
-          onNotification: (n) {
-            // A finger-driven scroll (dragDetails set) means the reader took
-            // over — release the resume pin so reporting tracks the top again.
-            // The programmatic resume/anchor scrolls carry no dragDetails.
-            if (n is ScrollStartNotification && n.dragDetails != null) {
-              _heldFocusId = null;
-            }
-            if (n is ScrollEndNotification) _reportTopmost();
-            return false;
-          },
-          // SizedBox.expand forces the inner Stack to fill the full Scaffold body
-          // even when the surah content is shorter than the screen (e.g. Al-Fatihah).
-          // Without it the Stack sizes to the ScrollView's content height, so
-          // Positioned(bottom:0) would anchor to that short height instead of the
-          // real screen bottom — causing the peek card to appear partially on-screen
-          // after dismissal on short surahs.
-          child: SizedBox.expand(
-            child: SingleChildScrollView(
-              controller: _controller,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 48),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final group in _groups) ...[
-                    SurahHeaderCard(
-                      heading: widget.headings[group.first.surahId],
-                      fallbackNumber: group.first.surahId,
-                      fontSize: fontSize,
-                    ),
-                    const SizedBox(height: 12),
-                    if (_showBismillah(group)) ...[
-                      Bismillah(fontSize: fontSize),
-                      const SizedBox(height: 18),
-                    ],
-                    // Continuous Mushaf paragraph with each ayah's number drawn as
-                    // a readable Urdu numeral centred inside the font's ornate ayah
-                    // medallion (U+06DD). See [_MarkedParagraph].
-                    _MarkedParagraph(
-                      group: group,
-                      fontSize: fontSize,
-                      arabicStyle: widget.arabicStyle,
-                      paragraphKey: _groupKeyFor(group.first.surahId),
-                      highlightAyahId: _highlightAyahId,
-                      selectedAyahId: _selectedAyah?.id,
-                      // The sticky now-playing tint applies ONLY while audio is
-                      // sounding. When paused/idle the highlight follows the
-                      // peek selection, so stepping verses (now allowed while
-                      // paused) never leaves the paused verse double-highlighted.
-                      playingAyahId: (widget.audioState?.isSounding ?? false)
-                          ? widget.audioState!.playingAyahId
-                          : null,
-                      onTap: (d) => _onGroupTap(d, group),
-                    ),
-                    const SizedBox(height: 28),
-                  ],
-                ],
-              ),
+        // SizedBox.expand fills the page so the lazy list has a bounded height
+        // to lay its items out, and so the peek card's Positioned(bottom:0)
+        // anchors to the real screen bottom on short surahs.
+        SizedBox.expand(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              // A finger-driven scroll (dragDetails set) releases the resume pin
+              // so reporting tracks the top again; programmatic focus/reciter
+              // scrolls carry no dragDetails. Report the resume point the moment
+              // scrolling settles, so leaving right after a scroll still saves it.
+              if (n is ScrollStartNotification &&
+                  n.dragDetails != null &&
+                  !_zooming) {
+                _heldFocusId = null;
+              }
+              // Report after the settle frame lays out — the item positions
+              // update during layout, so reading them here (mid-notification)
+              // would still see the pre-scroll top.
+              if (n is ScrollEndNotification) {
+                WidgetsBinding.instance
+                    .addPostFrameCallback((_) => _reportTopmost());
+              }
+              return false;
+            },
+            child: ScrollablePositionedList.builder(
+              itemScrollController: _scrollCtrl,
+              itemPositionsListener: _positions,
+              initialScrollIndex: _initialIndex,
+              initialAlignment: _initialAlignment,
+              itemCount: _rows.length,
+              padding: const EdgeInsets.only(top: 8, bottom: 56),
+              itemBuilder: _buildRow,
             ),
-          ), // SizedBox.expand
-        ), // NotificationListener
+          ),
+        ),
         if (_currentPage != null)
           Positioned(
             left: 0,
@@ -640,6 +595,61 @@ class _MushafViewState extends State<MushafView>
     );
   }
 
+  Widget _buildRow(BuildContext context, int i) {
+    final row = _rows[i];
+    if (row is _HeaderRow) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(20, i == 0 ? 12 : 28, 20, 4),
+        child: Column(
+          children: [
+            SurahHeaderCard(
+              heading: widget.headings[row.surahId],
+              fallbackNumber: row.surahId,
+              fontSize: widget.arabicFontSize,
+            ),
+            if (row.showBismillah) ...[
+              const SizedBox(height: 12),
+              Bismillah(fontSize: widget.arabicFontSize),
+            ],
+            const SizedBox(height: 6),
+          ],
+        ),
+      );
+    }
+    final chunk = (row as _ChunkRow).ayahs;
+    // One paragraph per Mushaf page — small enough that the lazy list only lays
+    // out the on-screen pages. Consecutive pages of a surah butt together (tiny
+    // vertical gap) so they still read continuously, with a break at each real
+    // Mushaf page boundary.
+    // The SPL viewport hands items an unbounded cross-axis, so bound the width
+    // to the screen ourselves; the paragraph's Stack then sizes to its text
+    // height (the lazy list's main axis is unbounded, which is fine).
+    final width = MediaQuery.sizeOf(context).width;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+      child: SizedBox(
+        width: width - 40,
+        // IntrinsicHeight gives the paragraph's Stack a bounded height (its text
+        // height) inside the unbounded-main-axis list. Cheap — a chunk is one
+        // small Mushaf page, not the whole surah.
+        child: IntrinsicHeight(
+          child: _MarkedParagraph(
+            group: chunk,
+            fontSize: widget.arabicFontSize,
+            arabicStyle: widget.arabicStyle,
+            highlightAyahId: _highlightAyahId,
+            selectedAyahId: _selectedAyah?.id,
+            // The sticky now-playing tint applies ONLY while audio is sounding.
+            playingAyahId: (widget.audioState?.isSounding ?? false)
+                ? widget.audioState!.playingAyahId
+                : null,
+            onVerseTap: _onVerseTapped,
+          ),
+        ),
+      ),
+    );
+  }
+
   bool _showBismillah(List<Ayah> group) =>
       group.first.surahId != _surahAlFatiha &&
       group.first.surahId != _surahAtTawbah &&
@@ -664,23 +674,25 @@ class _MarkedParagraph extends StatefulWidget {
     required this.group,
     required this.fontSize,
     required this.arabicStyle,
-    required this.paragraphKey,
     required this.highlightAyahId,
     required this.selectedAyahId,
     required this.playingAyahId,
-    required this.onTap,
+    required this.onVerseTap,
   });
 
   final List<Ayah> group;
   final double fontSize;
   final TextStyle arabicStyle;
-  final GlobalKey paragraphKey;
   final int? highlightAyahId;
   final int? selectedAyahId;
 
   /// The verse currently being recited — kept tinted for the whole playback.
   final int? playingAyahId;
-  final void Function(TapUpDetails) onTap;
+
+  /// Called with the verse the reader tapped. Resolved from this paragraph's own
+  /// render object so no GlobalKey escapes to the parent — a parent-held key
+  /// would collide in ScrollablePositionedList's dual list mid-animation.
+  final void Function(Ayah) onVerseTap;
 
   @override
   State<_MarkedParagraph> createState() => _MarkedParagraphState();
@@ -690,8 +702,16 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
   // The empty ayah medallion glyph; the Urdu numeral is overlaid on its centre.
   static const String _medallion = '۝';
 
+  // This paragraph's render-object key — created here (not passed in) so it never
+  // escapes to the parent. The SPL keeps two internal lists during a scroll
+  // animation; a parent-shared GlobalKey would then be in two trees at once.
+  final GlobalKey _paraKey = GlobalKey();
+
   // Character offset of each ayah's medallion glyph within the paragraph.
   final List<int> _markerOffsets = [];
+
+  // Each verse's START char offset (parallel to widget.group) — for tap→verse.
+  final List<int> _verseStarts = [];
 
   // Measured medallion boxes (paragraph-local), one per ayah; empty until laid out.
   List<Rect> _rects = const [];
@@ -718,8 +738,31 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     _markerOffsets
       ..clear()
       ..addAll(_offsetsFor(widget.group));
+    _verseStarts.clear();
+    var off = 0;
+    for (final ayah in widget.group) {
+      _verseStarts.add(off);
+      // ' ۝ ' = leading space + medallion + trailing space.
+      off += ayah.textArabic.length + 3;
+    }
     // Force a re-measure: a new group may lay out to the same height as the old.
     _lastMeasuredSize = null;
+  }
+
+  /// Resolve the tapped verse against this paragraph's own render object and
+  /// report it up. Kept here (not in the parent) so no GlobalKey has to survive
+  /// outside — see [_paraKey].
+  void _handleTap(TapUpDetails details) {
+    final ro = _paraKey.currentContext?.findRenderObject();
+    if (ro is! RenderParagraph) return;
+    final charOffset = ro
+        .getPositionForOffset(ro.globalToLocal(details.globalPosition))
+        .offset;
+    Ayah? tapped;
+    for (var i = 0; i < widget.group.length; i++) {
+      if (charOffset >= _verseStarts[i]) tapped = widget.group[i];
+    }
+    if (tapped != null) widget.onVerseTap(tapped);
   }
 
   static List<int> _offsetsFor(List<Ayah> group) {
@@ -736,7 +779,7 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
 
   void _measure() {
     if (!mounted) return;
-    final obj = widget.paragraphKey.currentContext?.findRenderObject();
+    final obj = _paraKey.currentContext?.findRenderObject();
     if (obj is! RenderParagraph || !obj.attached) return;
     // The medallion boxes only move when the paragraph REFLOWS — a font-size,
     // width (rotation) or text change, each of which changes its size. On a plain
@@ -813,16 +856,22 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
 
     return Stack(
       children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: widget.onTap,
-          child: Text.rich(
-            key: widget.paragraphKey,
-            TextSpan(children: spans),
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-            locale: const Locale('ar'),
-            style: widget.arabicStyle.copyWith(fontSize: widget.fontSize),
+        // The paragraph itself is the only non-positioned child, so the Stack
+        // sizes to its (finite) height — essential inside the lazy list, which
+        // hands items an unbounded height. Taps are caught by the fill overlay
+        // below; the badges (IgnorePointer) sit on top of it.
+        Text.rich(
+          key: _paraKey,
+          TextSpan(children: spans),
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.rtl,
+          locale: const Locale('ar'),
+          style: widget.arabicStyle.copyWith(fontSize: widget.fontSize),
+        ),
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: _handleTap,
           ),
         ),
         // The visible verse badge: a clean filled circle with the Western number,

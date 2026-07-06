@@ -30,6 +30,9 @@ class _LongSurahRepo implements AyahRepository {
           surahId: s,
           ayahNumber: n,
           textArabic: 'نص الآية رقم $n',
+          // 8 verses per Mushaf page → the Reading view chunks into several lazy
+          // paragraphs, as it does against the real page-numbered DB.
+          page: s * 100 + (n - 1) ~/ 8,
           isSajda: false,
           translations: {1: 'اردو ترجمہ $n', 2: 'हिंदी अनुवाद $n'},
         ),
@@ -265,7 +268,7 @@ void main() {
 
     // A real finger drag DOWN reveals earlier verses; it must unpin Last Read so
     // it follows the new top instead of staying frozen on verse 50.
-    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, 600));
+    await tester.drag(find.byType(MushafView), const Offset(0, 600));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 1300));
 

@@ -12,6 +12,7 @@ import 'core/navigation/route_observer.dart';
 import 'core/scroll/quran_scroll_behavior.dart';
 import 'core/theme/mushaf_palette.dart';
 import 'core/theme/theme_cubit.dart';
+import 'core/warmup/reader_warmup.dart';
 import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
 import 'features/reminders/domain/scheduling/notification_scheduler.dart';
@@ -46,6 +47,15 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
         routeFromPayload(payload);
       });
     }
+    // Prime the reader's caches shortly after the first frame — off the launch
+    // critical path (the TOC loads first), so "Continue reading" and the first
+    // surah open resolve from memory with no loading flash.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(
+        const Duration(milliseconds: 600),
+        () => unawaited(warmReaderCache()),
+      );
+    });
   }
 
   @override

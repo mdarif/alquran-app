@@ -234,8 +234,12 @@ class _ReaderViewState extends State<_ReaderView> {
                   controller: _pageController,
                   physics:
                       _pageLocked ? const NeverScrollableScrollPhysics() : null,
-                  // Keep the neighbours built so the first swipe is smooth.
-                  allowImplicitScrolling: true,
+                  // Only the on-screen section builds on open. Neighbour VERSES
+                  // are still prefetched into the cubit cache (_prefetchNeighbours
+                  // after every load), so the first swipe renders from memory in a
+                  // single cheap frame (one virtualized Mushaf page) — we don't
+                  // also pay two off-screen MushafView builds under the open slide.
+                  allowImplicitScrolling: false,
                   itemCount: _target.dimension.count,
                   onPageChanged: _onPageChanged,
                   itemBuilder: (context, i) => _sectionPage(i, state, audio),

@@ -441,6 +441,92 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 
 ## 3. Flutter reading-UX patterns that worked
 
+- **Jump-to-verse in a page-chunked list: split the chunk AT the verse, don't
+  measure into it (2026-07-06).** After virtualizing the Reading view into
+  per-Mushaf-page chunks (below), "search Muhammad 10" / Last-Read resume opened
+  the right surah but at the PAGE top (verse 1), because the SPL positions by ROW
+  (a whole page chunk), and verse 10 sits mid-page. Two measurement approaches
+  both failed on-device (they passed every widget test — `pumpAndSettle` hides
+  it): (a) scroll to the chunk then a negative `alignment` = the verse's offset
+  down the chunk, measured off-screen with a matching `TextPainter`; (b) express
+  it as verseFraction × the chunk's live viewport fraction. Both broke because the
+  alignment is a fraction of the **viewport**, and the viewport is a moving target
+  right after open — `context.size` reported ~404 vs the real ~730, and even the
+  live `itemPositions` fraction was measured a frame before the SPL applied the
+  jump at a different viewport → wild overshoot (landed ~5 verses late). It was
+  NOT the keyboard (`viewInsets.bottom==0` throughout) — just the route/layout
+  settling. The robust fix is **deterministic, no measurement**: in the row
+  builder, force a chunk boundary exactly at `focusAyahId` so the focus verse
+  becomes its chunk's first row, then open with `initialScrollIndex` at that row +
+  a small `initialAlignment` (0.04). The verse lands at the top every time,
+  independent of viewport transients. Only the focus page splits into two
+  paragraphs; every other page stays one. Reciter-follow / verse-stepper keep the
+  page-granular `scrollTo` (the viewport is stable mid-session, and the highlight
+  + peek card mark the exact verse). Lesson: if you're fighting a viewport-fraction
+  measurement against a mid-transition layout, restructure so the target is a
+  first-class scroll index instead.
+- **The reader-open cost is three layers, not one — profile each (2026-07-06).**
+  After the paragraph-layout freeze was killed by virtualization (below), a
+  "slight latency" remained on open. On-device timing (a `kProfileMode` autopilot
+  calling the repo with a `Stopwatch`, printed via `debugPrint`) split it cleanly:
+  (1) the `ReaderCubit` is a per-page **factory**, so its instance memo of the
+  mushaf-wide constants (114 surah headers + translation editions) was **re-queried
+  on every open** — cache the FUTURE in the singleton **repository** instead
+  (4.7 ms → 5 µs). (2) `getAyahs(Al-Baqarah)` is ~35 ms cold (286 verses + their
+  translations, two batched queries — not N+1); a per-section **session cache in
+  the singleton repo, keyed by section AND script**, makes a re-open or a
+  prefetched-then-discarded neighbour ~15 µs. Key on script because the two scripts
+  read different columns — else a switch serves stale text. (3) the `PageView` had
+  `allowImplicitScrolling: true`, so **both neighbour pages fully built under the
+  open slide** — set it to `false`: the neighbour VERSES are still prefetched into
+  cache (smooth first swipe, one cheap virtualized page), you just don't pay two
+  off-screen `MushafView` builds during the transition. Note the DB runs on a
+  background isolate (`NativeDatabase.createInBackground`), so a cold query delays
+  content but doesn't jank the UI thread — the visible win is removing the neighbour
+  builds + the redundant constant queries. Finally, a best-effort **startup warm**
+  (`core/warmup/reader_warmup.dart`, fired ~600 ms after the first frame so it's off
+  the launch critical path) primes the constants + the Last-Read section, so
+  "Continue reading" opens from cache with no flash. Measured on the OnePlus after
+  all of the above: worst open frame 28 ms on the FIRST open of a session (one-time
+  Skia shader compile — Impeller is off for Arabic), then **13–14 ms with zero
+  frames over 16 ms** on every subsequent open. The DB is already fully indexed by
+  the pipeline (`idx_tr_ayah`, `idx_ayahs_surah`, …) — verify with a
+  `sqlite_master` dump before "optimising" queries; there was nothing to add.
+/usage- **Virtualize the Reading view: chunk each surah by Mushaf page into a lazy
+  `ScrollablePositionedList` (2026-07-06).** The Reading view laid out the WHOLE
+  surah as one continuous `Text.rich` inside a `SingleChildScrollView`, so opening
+  Al-Baqarah (286 verses) froze the OnePlus ~352 ms after the page slide — the
+  single paragraph laid out in one blocking pass. Fix: group ayahs by surah, then
+  emit one paragraph PER Mushaf page (`page_number`) as rows in an SPL, so only the
+  on-screen pages lay out and a long surah opens as fast as a short one. Trade-off
+  the owner accepted: line-wrapping resets at each page boundary (each chunk is its
+  own paragraph). Three non-obvious gotchas, all real:
+  1. **A `Stack` won't size inside the SPL's `UnboundedViewport`.** The list hands
+     items an unbounded cross-axis; a `Stack` (used to overlay verse medallions on
+     the text) then throws `A Stack requires bounded constraints … size.isFinite`.
+     Fix: bound the width yourself (`SizedBox(width: MediaQuery.width - pad)`) AND
+     wrap the paragraph in `IntrinsicHeight` so the Stack gets a finite height from
+     its text. Bounded width alone is not enough.
+  2. **A per-item `GlobalKey` collides in SPL's dual list.** SPL keeps TWO internal
+     lists (crossfaded) during a scroll animation, so any widget carrying a
+     parent-held `GlobalKey` briefly lives in two trees → "Multiple widgets used the
+     same GlobalKey" on every `scrollTo` (focus/resume). Fix: don't pass a key in —
+     create the paragraph's `GlobalKey` INSIDE its `State` (one per element, so the
+     two lists get distinct keys) and let the paragraph resolve its OWN taps
+     (`getPositionForOffset` → verse) via a `void Function(Ayah) onVerseTap`
+     callback, so no key escapes to the parent. The Detailed view never hit this
+     because its tiles are unkeyed.
+  3. **SPL holds a PIXEL offset across a rebuild, not a logical index.** A font-size
+     or script change reflows every chunk, so the old offset lands on an earlier
+     verse (drifts to v1). SPL does NOT auto-hold by index. Fix: on the change,
+     capture the top row + its `itemLeadingEdge` from the pre-reflow
+     `itemPositions`, then `addPostFrameCallback` → `ItemScrollController.jumpTo`
+     back to that row/alignment once the new layout settles. Also: a pinch leaks an
+     incidental scroll into the list whose `ScrollStartNotification` would drop the
+     resume pin — guard it with a short `_zooming` window set on font change so a
+     zoom holds your exact verse. And report the resume point in a post-frame
+     callback (not inline in the ScrollEnd handler) — `itemPositions` only updates
+     during layout, so reading it mid-notification still sees the pre-scroll top.
 - **App-bar "search mode" driving a body list (2026-07-06).** To let a search
   icon in the AppBar filter a list rendered in the body, the list's Cubit must be
   **provided above the AppBar** (wrap the whole `Scaffold` in the `BlocProvider`),

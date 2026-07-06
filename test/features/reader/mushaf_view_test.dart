@@ -20,6 +20,9 @@ List<Ayah> _ayahs(int surahId, int count) => [
           surahId: surahId,
           ayahNumber: n,
           textArabic: 'نص$n',
+          // 8 verses per Mushaf page, so the Reading view chunks into several
+          // lazy paragraphs (mirrors the real DB, where every ayah has a page).
+          page: surahId * 100 + (n - 1) ~/ 8,
           isSajda: false,
         ),
     ];
@@ -34,6 +37,9 @@ List<Ayah> _ayahsLongText(int surahId, int count) => [
           surahId: surahId,
           ayahNumber: n,
           textArabic: 'نص طويل جدا للآية رقم $n مع كلمات إضافية كثيرة هنا',
+          // Same verse→page mapping as [_ayahs] so a script reload keeps each
+          // verse on its page (the re-anchor test relies on that).
+          page: surahId * 100 + (n - 1) ~/ 8,
           isSajda: false,
         ),
     ];
@@ -880,7 +886,7 @@ void main() {
       // Drag to scroll, then pump just one frame (NO 1200ms wait): the report
       // must already have fired on the scroll-end notification.
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -1500),
       );
       await tester.pump();
@@ -921,7 +927,7 @@ void main() {
 
       // Scroll well into the surah and let the resume-point report fire.
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -1500),
       );
       await tester.pump(const Duration(seconds: 2));
@@ -938,7 +944,7 @@ void main() {
       // Re-trigger a report from the (re-anchored) position: it must not have
       // drifted to an earlier verse than before the font change.
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -40),
       );
       await tester.pump(const Duration(seconds: 2));
@@ -973,7 +979,7 @@ void main() {
       await tester.pump();
 
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -1500),
       );
       await tester.pump(const Duration(seconds: 2));
@@ -987,7 +993,7 @@ void main() {
       await tester.pump(); // post-frame re-anchor
 
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -40),
       );
       await tester.pump(const Duration(seconds: 2));
@@ -1032,13 +1038,13 @@ void main() {
 
         // Scroll deep into the surah.
         await tester.drag(
-          find.byType(SingleChildScrollView),
+          find.byType(MushafView),
           const Offset(0, -4000),
         );
         await tester.pump(const Duration(seconds: 2));
         // Nudge to fire a fresh report of where we actually are.
         await tester.drag(
-          find.byType(SingleChildScrollView),
+          find.byType(MushafView),
           const Offset(0, -20),
         );
         await tester.pump(const Duration(seconds: 2));
@@ -1052,7 +1058,7 @@ void main() {
         // Read the ACTUAL position after the change (not the re-anchor's own
         // report) by nudging the scroll.
         await tester.drag(
-          find.byType(SingleChildScrollView),
+          find.byType(MushafView),
           const Offset(0, -20),
         );
         await tester.pump(const Duration(seconds: 2));
@@ -1097,7 +1103,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_wrap(_view(ayahs: scrollable(30, (_) => 1))));
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -400),
       );
       await tester.pump();
@@ -1110,7 +1116,7 @@ void main() {
         _wrap(_view(ayahs: scrollable(30, (n) => (n + 4) ~/ 5))),
       );
       await tester.drag(
-        find.byType(SingleChildScrollView),
+        find.byType(MushafView),
         const Offset(0, -400),
       );
       await tester.pump();
