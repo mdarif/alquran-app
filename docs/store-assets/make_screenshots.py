@@ -22,8 +22,14 @@ import os
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-RAW = os.path.join(ROOT, "docs/store-assets/screenshots/raw")
-BASE = os.path.join(ROOT, "docs/store-assets/screenshots")
+# Output/raw base; override to keep an older set intact while framing a new one,
+# e.g. SCREENSHOTS_DIR=docs/store-assets/screenshots-v1.1 python3 make_screenshots.py
+BASE = os.environ.get(
+    "SCREENSHOTS_DIR", os.path.join(ROOT, "docs/store-assets/screenshots")
+)
+if not os.path.isabs(BASE):
+    BASE = os.path.join(ROOT, BASE)
+RAW = os.path.join(BASE, "raw")
 FONT = os.path.join(ROOT, "assets/fonts/PlayfairDisplay-SemiBold.ttf")
 
 W, H = 1242, 2208
@@ -54,18 +60,21 @@ CAPTIONS = {
     "16-light.png":     "Light of Day — a light for every hour",
     "17-size.png":      "Your script, size & language",
     "18-zoom.png":      "Pinch to zoom — read at any size",
+    # Smart search — find any surah by name/number, or jump straight to a verse
+    # reference ("muhammad 10" → Surah Muhammad, ayah 10).
+    "19-search.png":    "Find a surah — or jump to a verse",
 }
 
-# PHONE slot (up to 8) — one continuous Al-Baqarah / Fajr / verse-2:2 story,
-# ending on pinch-to-zoom. Slots 1–2 kept; 3–7 rebuilt (see 13–18 above).
-PHONE = ["01-home.png", "02-reading.png", "13-peek.png", "14-detailed.png",
-         "16-light.png", "17-size.png", "18-zoom.png"]
+# PHONE slot (up to 8) — the Al-Baqarah / Fajr story, now opening with search
+# (slot 2) so the smart find/verse-jump leads, ending on pinch-to-zoom.
+PHONE = ["01-home.png", "19-search.png", "02-reading.png", "13-peek.png",
+         "14-detailed.png", "16-light.png", "17-size.png", "18-zoom.png"]
 
 # TABLET (7-inch) slot — phone captures reframed to portrait; a breadth set of
 # extras. The 10-inch slot uses ACTUAL tablet captures instead — see
 # make_tablet_shots.py (screenshots/tablet-10in/).
-TABLET = ["01-home.png", "02-reading.png", "04-detailed.png", "10-audio.png",
-          "08-reminders.png", "12-fontzoom.png", "11-about.png", "07-prayer.png"]
+TABLET = ["01-home.png", "19-search.png", "02-reading.png", "04-detailed.png",
+          "10-audio.png", "08-reminders.png", "11-about.png", "07-prayer.png"]
 
 
 def brand_bg():

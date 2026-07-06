@@ -14,8 +14,13 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = os.path.abspath(os.path.join(HERE, "..", ".."))
-RAW = os.path.join(HERE, "screenshots", "raw-tablet")
-OUT = os.path.join(HERE, "screenshots", "tablet-10in")
+# Base dir; override to frame a new set while keeping an older one intact, e.g.
+# SCREENSHOTS_DIR=docs/store-assets/screenshots-v1.1 python3 make_tablet_shots.py
+BASE = os.environ.get("SCREENSHOTS_DIR", os.path.join(HERE, "screenshots"))
+if not os.path.isabs(BASE):
+    BASE = os.path.join(APP, BASE)
+RAW = os.path.join(BASE, "raw-tablet")
+OUT = os.path.join(BASE, "tablet-10in")
 FONT = os.path.join(APP, "assets", "fonts", "PlayfairDisplay-SemiBold.ttf")
 
 # Landscape canvas (16:10, Play-valid for 10-inch tablets).
@@ -31,8 +36,9 @@ RADIUS = 40
 CAPTIONS = {
     "tab-reading.png": "The whole page — beautifully, on tablet",
     "tab-detailed.png": "Arabic with translation, side by side",
+    "tab-search.png": "Find a surah — or jump to a verse",
 }
-ORDER = ["tab-reading.png", "tab-detailed.png"]
+ORDER = ["tab-reading.png", "tab-detailed.png", "tab-search.png"]
 
 
 def brand_bg():
