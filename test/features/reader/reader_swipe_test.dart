@@ -93,9 +93,9 @@ class _FakeAyahRepoWithTranslations implements AyahRepository {
       ];
 }
 
-/// Repo with Urdu + Hindi (no English) — exercises the "device language not
-/// available → fall back to Urdu" default, given the en test-host locale.
-class _FakeAyahRepoUrHi implements AyahRepository {
+/// Repo with English + Hindi but NO Urdu — exercises the last-resort
+/// "no Urdu edition → first available" default.
+class _FakeAyahRepoEnOnly implements AyahRepository {
   @override
   Future<List<Ayah>> getAyahs(ReaderTarget target) async => const [
         Ayah(
@@ -104,7 +104,7 @@ class _FakeAyahRepoUrHi implements AyahRepository {
           ayahNumber: 1,
           textArabic: 'نص',
           isSajda: false,
-          translations: {1: 'اردو متن', 2: 'हिंदी अनुवाद'},
+          translations: {3: 'english body', 2: 'हिंदी अनुवाद'},
         ),
       ];
 
@@ -120,10 +120,10 @@ class _FakeAyahRepoUrHi implements AyahRepository {
   @override
   Future<List<TranslationResource>> getTranslationResources() async => const [
         TranslationResource(
-          id: 1,
-          languageCode: 'ur',
-          name: 'Urdu',
-          author: 'Junagarhi',
+          id: 3,
+          languageCode: 'en',
+          name: 'English',
+          author: 'Khan',
         ),
         TranslationResource(
           id: 2,
@@ -388,7 +388,8 @@ void main() {
 
   group('Default translation selection', () {
     // No saved selection (the default _FakeSettings) → the reader resolves a
-    // single default: the device language if we have that edition, else Urdu.
+    // single default: Urdu (the flagship), regardless of device language, per
+    // owner decision. Only falls through to the first edition when Urdu is absent.
     Future<void> openDetailed(WidgetTester tester, AyahRepository repo) async {
       GetIt.I
         ..unregister<ReaderCubit>()
@@ -400,20 +401,20 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('defaults to the device language when that edition exists',
+    testWidgets('defaults to Urdu even when the device-language edition exists',
         (tester) async {
-      // Test host locale is en, and English is available → default to English.
+      // Test host locale is en and English is available, but the fresh-install
+      // default is Urdu-only regardless of device language.
       await openDetailed(tester, _FakeAyahRepoWithTranslations());
-      expect(find.text('english body'), findsOneWidget);
-      expect(find.text('اردو متن'), findsNothing);
+      expect(find.text('اردو متن'), findsOneWidget);
+      expect(find.text('english body'), findsNothing);
     });
 
-    testWidgets('falls back to Urdu when the device language has no edition',
+    testWidgets('falls back to the first edition when Urdu has no edition',
         (tester) async {
-      // en host locale, but only Urdu + Hindi exist → fall back to Urdu.
-      await openDetailed(tester, _FakeAyahRepoUrHi());
-      expect(find.text('اردو متن'), findsOneWidget);
-      expect(find.text('हिंदी अनुवाद'), findsNothing);
+      // No Urdu edition available → last-resort first available (English here).
+      await openDetailed(tester, _FakeAyahRepoEnOnly());
+      expect(find.text('english body'), findsOneWidget);
     });
   });
 

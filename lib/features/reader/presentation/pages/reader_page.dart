@@ -471,9 +471,9 @@ class _ReaderViewState extends State<_ReaderView> {
 
   /// The reader's active translation editions — shared by the Reading peek and
   /// Detailed view. The saved selection (validated against what's available),
-  /// or a sensible default when nothing is saved: a SINGLE language matching the
-  /// device language if we have that edition, otherwise Urdu (the flagship), and
-  /// only as a last resort the first available edition.
+  /// or a sensible default when nothing is saved: a SINGLE language — Urdu (the
+  /// flagship translation), regardless of device language, per owner decision;
+  /// only as a last resort (no Urdu edition) the first available edition.
   Set<String> _activeLangs(List<TranslationResource> all) {
     final available = [for (final r in all) r.languageCode];
     if (available.isEmpty) return {};
@@ -482,9 +482,6 @@ class _ReaderViewState extends State<_ReaderView> {
       final valid = saved.where(available.contains).toSet();
       if (valid.isNotEmpty) return valid;
     }
-    final locale =
-        WidgetsBinding.instance.platformDispatcher.locale.languageCode;
-    if (available.contains(locale)) return {locale};
     if (available.contains('ur')) return {'ur'};
     return {available.first};
   }
