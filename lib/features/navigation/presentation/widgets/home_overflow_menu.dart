@@ -125,9 +125,10 @@ class HomeOverflowMenu extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           text: 'Read. Reflect. Remember. 🌙\n\n'
-              'Al Quran — a calm, distraction-free way to read the Qur’an '
+              'Al Quran — a calm, distraction-free app for reading the Qur’an '
               'offline, with Urdu, Hindi & English translations and recitation. '
               'Free, no ads.\n\n'
+              'Download the app:\n'
               '$_downloadUrl',
         ),
       );
