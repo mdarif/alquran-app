@@ -266,8 +266,11 @@ void main() {
       // Reading → Detailed → Reading: unlike a section swipe (which stops the
       // reciter), a viewport toggle must leave playback running throughout.
       await toggleViewport(tester);
-      expect(player.stopCalls, stopsBefore,
-          reason: 'toggle must not stop audio');
+      expect(
+        player.stopCalls,
+        stopsBefore,
+        reason: 'toggle must not stop audio',
+      );
       expect(
         pauseIn(find.byKey(WidgetKeys.ayahPlayButton(recitingVerse))),
         findsOneWidget,
@@ -302,16 +305,54 @@ void main() {
     });
   });
 
+  // A PAUSED verse is still the reader's current verse: pausing to switch views
+  // and see/read that exact verse is a core listener flow (owner-reported — pause
+  // 7:10 in Detailed, switch to Reading, and it must land on 7:10, not 7:9). So a
+  // switch homes to the paused verse in BOTH directions, exactly as while it plays.
+  group('moving viewports with a paused verse', () {
+    testWidgets('Detailed → Reading lands on the paused verse (not one before)',
+        (tester) async {
+      await open(tester, detailed: true);
+      await startReciting(tester, recitingVerse);
+      player.paused(recitingVerse);
+      await tester.pumpAndSettle();
+
+      await toggleViewport(tester);
+
+      expect(find.byType(MushafView), findsOneWidget, reason: 'now in Reading');
+      expect(
+        lastRead.saved?.ayahId,
+        recitingVerse,
+        reason:
+            'a paused verse stays the reading position — Detailed follows it '
+            'a verse-sliver early, so the flush alone would hand Reading the '
+            'verse just above it (the reported 7:10 → 7:9 slip)',
+      );
+    });
+
+    testWidgets('Reading → Detailed lands on the paused verse', (tester) async {
+      await open(tester, detailed: false);
+      await startReciting(tester, recitingVerse);
+      player.paused(recitingVerse);
+      await tester.pumpAndSettle();
+
+      await toggleViewport(tester);
+
+      expect(find.byType(MushafView), findsNothing, reason: 'now in Detailed');
+      expect(lastRead.saved?.ayahId, recitingVerse);
+    });
+  });
+
   testWidgets(
-      'a PAUSED reader keeps their browsing place on switch (not force-homed)',
+      'with no current verse (stopped), a switch keeps the reading place',
       (tester) async {
-    // Fix is scoped to a SOUNDING reciter: once paused, the reader is browsing
-    // again (the now-playing tint clears, the verse stepper re-enables), so a
-    // viewport switch should keep the scroll position, not snap to the verse
-    // that was paused.
+    // The override is bounded to when a verse is actually loaded in the player.
+    // Once audio fully stops (idle — end of surah, or a section swipe stops it),
+    // there is no "current verse", so a switch falls back to the flushed reading
+    // position instead of snapping to the verse that WAS playing.
     await open(tester, detailed: false);
     await startReciting(tester, recitingVerse);
-    player.paused(recitingVerse);
+    player.controller.add(const RecitationPlayback()); // idle: no current verse
     await tester.pumpAndSettle();
 
     await toggleViewport(tester);
@@ -319,14 +360,12 @@ void main() {
     expect(
       lastRead.saved?.ayahId,
       isNot(recitingVerse),
-      reason: 'paused → do not force-home to the paused verse',
+      reason: 'stopped → not force-homed to the verse that WAS playing',
     );
-    // Kept the browsing position (which trails the paused verse), rather than
-    // snapping forward to it — and did not reset to the top of the surah.
     expect(
       lastRead.saved?.ayahId,
       allOf(lessThan(recitingVerse), greaterThan(firstVerse)),
-      reason: 'paused → keep the place the reader was browsing',
+      reason: 'stopped → keeps the reading position',
     );
   });
 }

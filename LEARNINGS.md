@@ -441,27 +441,38 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 
 ## 3. Flutter reading-UX patterns that worked
 
-- **A viewport switch mid-recitation must home to the RECITER, not the scroll
-  position (2026-07-08).** Playing audio in Reading, then toggling to Detailed,
-  landed on the wrong verse — the reader "reads from somewhere else." Root cause:
-  `_setDetailed` homes the incoming viewport to `_focusAyahId`, which the outgoing
-  view's position-flush had just set to its **topmost-visible** verse. But Reading
-  follows the reciter only a whole Mushaf-PAGE at a time (page-granular `scrollTo`,
-  by design — see the jump-to-verse entry), and the focus-alignment sliver (0.04)
-  leaves the *previous* page peeking at the top, so the flush reported a verse up
-  to a full page BEHIND the reciter (measured: reciting 2030 → flushed 2017). Worse,
-  Detailed's reciter-follow only fires on a `playingAyahId` **change**, so it opened
-  on that stale verse and didn't catch up until the current verse *finished*. Fix
-  is one clause in `_setDetailed`: while `audioState.isSounding` (playing/buffering),
-  override `_focusAyahId` to the playing verse before the rebuild — the reciter's
-  verse IS the reading position when you're listening. Scoped to `isSounding` so it
-  matches the now-playing tint/stepper semantics; a paused/idle reader is browsing
-  and keeps their scroll position. Regression coverage:
-  `test/features/reader/reader_audio_viewport_test.dart` (both toggle directions,
-  no-interrupt, continuous-advance-survives-toggle, paused-scope). Lesson: when a
-  feature (audio) rides on top of a virtualized list whose follow is deliberately
-  coarse-grained, any hand-off that reads "current position" from scroll state
-  inherits that coarseness — read it from the feature's own source of truth instead.
+- **A viewport switch with a loaded verse must home to THAT verse, not the scroll
+  position — and the home target needs a teardown-proof field (2026-07-08).**
+  Two bugs, same root. (1) Playing audio in Reading, then toggling to Detailed,
+  landed on the wrong verse ("reads from somewhere else"): `_setDetailed` homes the
+  incoming viewport to `_focusAyahId`, which the outgoing view's position-flush had
+  set to its **topmost-visible** verse. Reading follows the reciter only a whole
+  Mushaf-PAGE at a time (page-granular `scrollTo`, by design — see the jump-to-verse
+  entry), and the focus-alignment sliver (0.04) leaves the *previous* page peeking at
+  the top, so the flush reported a verse up to a full page BEHIND the reciter
+  (measured: reciting 2030 → flushed 2017). Detailed's follow only fires on a
+  `playingAyahId` **change**, so it opened stale and didn't catch up until the verse
+  *finished*. (2) The owner then hit the same thing **paused** — pause 7:10 in
+  Detailed, switch to Reading, land on 7:9 (Detailed's follow sits a verse-sliver
+  early). So the home rule is: whenever a verse is loaded in the player — playing,
+  buffering, OR paused (`playingAyahId != null`) — home to it; only a fully
+  idle/stopped/errored reader keeps their scroll position. THE TRAP: writing that
+  verse into `_focusAyahId` before `setState` still lost, but only in ONE direction.
+  `_focusAyahId` is shared, and the OUTGOING view's `dispose()` re-runs its
+  position-flush (reporting its topmost verse) as it unmounts — and whether that
+  write lands before or after the incoming view reads `_focusAyahId` depends on
+  element-reconciliation order, which differs by direction (Detailed→Reading read
+  first and survived; Reading→Detailed got clobbered back to the topmost). Fix: stash
+  the toggle's home in a **dedicated `_pendingToggleHome`** the teardown can't touch,
+  have the interactive build read `_pendingToggleHome ?? _focusAyahId`, and clear it
+  one post-frame later so a later swipe still starts at the top. Coverage:
+  `test/features/reader/reader_audio_viewport_test.dart` (both directions × playing
+  and paused, no-interrupt, continuous-advance-survives-toggle, stopped-keeps-place).
+  Lessons: (a) when a feature rides on a virtualized list whose follow is
+  deliberately coarse, read "current position" from the feature's own source of
+  truth, not the scroll state; (b) a field mutated by a widget's `dispose()` is
+  racy across a rebuild that swaps that widget — give any value that must outlive the
+  swap its own field.
 - **Jump-to-verse in a page-chunked list: split the chunk AT the verse, don't
   measure into it (2026-07-06).** After virtualizing the Reading view into
   per-Mushaf-page chunks (below), "search Muhammad 10" / Last-Read resume opened

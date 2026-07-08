@@ -39,20 +39,23 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   in-page visual anchor of where they stopped.
 - **Root cause:** The paragraph tint is gated on `isSounding` (playing/buffering),
   which excludes `paused` — by design, so the ‹/› stepper is freed for browsing.
-- **Decision needed (owner):** keep as-is, or keep a dimmer "paused here" tint.
-  Note: the viewport-switch fix is deliberately scoped to `isSounding` for the same
-  reason — if we decide a paused verse should stay "the current verse", revisit
-  that scope (item 3) too.
+- **Now slightly inconsistent (worth resolving):** as of the paused-homing fix a
+  switch DOES land you on the paused verse, and the **Detailed tile** keeps its
+  now-playing tint while paused (`isActive`), but the **Reading paragraph** drops it
+  (`isSounding`). So after pausing + switching to Reading you land on the right verse
+  with only a brief flash, no sticky mark. Cheap consistency fix if wanted: gate the
+  Reading paragraph tint on `isActive` too (keep a dimmer shade while paused).
+- **Decision needed (owner):** keep as-is, or a dimmer "paused here" tint in Reading.
 
 ### 3. No explicit stop / clear for audio; a paused verse stays "active" — MINOR
 - **Area:** reader · audio
 - **Symptom / context:** Once a verse is active it stays active (even paused) until
   you swipe to another section or leave the reader — there's no dedicated stop
-  control. This is *why* the viewport-switch fix keys off `isSounding`, not
-  `isActive`: an `isActive` scope would keep re-homing the view to an
-  indefinitely-paused verse on every toggle.
-- **Impact:** Mostly benign for v1. Revisit only if the lingering paused-active
-  state ever causes confusion (e.g. add a stop affordance or auto-clear-on-idle).
+  control. This is now *leveraged intentionally*: a paused verse is still "the current
+  verse", which is why a viewport switch homes to it. The only edge is a long-paused
+  verse that the reader has scrolled far away from — a switch will jump back to it.
+- **Impact:** Benign for v1 and the less-common flow. Revisit only if that jump-back
+  ever surprises people (e.g. add a stop affordance or auto-clear-on-idle).
 
 ---
 
@@ -68,9 +71,14 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Resolved
 
-- **2026-07-08 — Viewport switch mid-recitation homed to the wrong verse.**
-  Toggling Reading⇄Detailed while a verse played landed on the scroll-position verse
-  (up to a page behind the reciter); Detailed didn't self-correct until the verse
-  finished. Fixed in `_setDetailed` (home to the sounding verse while `isSounding`).
-  Covered by `test/features/reader/reader_audio_viewport_test.dart` (5 scenarios).
-  See LEARNINGS.md §3.
+- **2026-07-08 — Viewport switch with a loaded verse homed to the wrong verse.**
+  Toggling Reading⇄Detailed while a verse was **playing** landed on the scroll-
+  position verse (up to a page behind the reciter; Detailed didn't self-correct
+  until the verse finished); and while **paused** it landed one verse early (pause
+  7:10 in Detailed → Reading showed 7:9). Fixed in `_setDetailed`: home to the
+  player's current verse whenever one is loaded (playing/buffering/paused), carried
+  in a dedicated `_pendingToggleHome` field so the outgoing view's dispose-flush
+  can't clobber it mid-rebuild (it did, in one direction only — a reconciliation-order
+  race). Covered by `test/features/reader/reader_audio_viewport_test.dart` (7
+  scenarios: both directions × playing & paused, no-interrupt, continuous-advance,
+  stopped-keeps-place). See LEARNINGS.md §3.

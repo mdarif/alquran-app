@@ -120,6 +120,14 @@ class _ReaderViewState extends State<_ReaderView> {
   // at the top.
   late int? _focusAyahId = widget.focusAyahId;
 
+  // The verse the NEXT-built viewport must home to, set only for the duration of a
+  // Reading⇄Detailed toggle and cleared the frame after. It wins over _focusAyahId
+  // because the outgoing viewport's dispose re-reports its topmost verse (mutating
+  // _focusAyahId) as it tears down — and that write can race ahead of the incoming
+  // viewport reading _focusAyahId, so the toggle's chosen verse (e.g. the one being
+  // recited) needs a field the teardown can't touch.
+  int? _pendingToggleHome;
+
   // A fresh open (from the index) always starts in Reading (Mushaf) — the calm,
   // Arabic-only default. "Last Read" instead resumes in the viewport the reader
   // left off in (widget.initialDetailed), so Reading stays Reading and Detailed
@@ -279,6 +287,13 @@ class _ReaderViewState extends State<_ReaderView> {
     // Key by the section's first ayah so a new section starts at the top, while
     // a same-section rebuild preserves scroll position.
     final key = ValueKey(ayahs.first.id);
+    // The verse the live viewport homes to. A viewport toggle stashes its home in
+    // _pendingToggleHome, which wins over _focusAyahId — the outgoing view's
+    // dispose-flush mutates _focusAyahId as it tears down (reporting its topmost
+    // verse), and that can land before the incoming view reads it; the dedicated
+    // field is immune to that race. Off-screen (non-interactive) pages never home.
+    final int? focus =
+        interactive ? (_pendingToggleHome ?? _focusAyahId) : null;
     final Widget view;
     if (_viewport == _Viewport.reading) {
       // No SelectionArea in Reading mode — it competes in the gesture arena and
@@ -290,7 +305,7 @@ class _ReaderViewState extends State<_ReaderView> {
         arabicFontSize: _arabicFont,
         arabicStyle: _arabicStyle,
         resources: resources,
-        focusAyahId: interactive ? _focusAyahId : null,
+        focusAyahId: focus,
         onVisibleAyah: interactive ? _onVisibleAyah : null,
         selectedLanguages: _activeLangs(resources),
         onRegisterFlush:
@@ -317,7 +332,7 @@ class _ReaderViewState extends State<_ReaderView> {
         headings: headings,
         arabicFontSize: _arabicFont,
         arabicStyle: _arabicStyle,
-        focusAyahId: interactive ? _focusAyahId : null,
+        focusAyahId: focus,
         onVisibleAyah: interactive ? _onVisibleAyah : null,
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
@@ -459,24 +474,32 @@ class _ReaderViewState extends State<_ReaderView> {
   }
 
   void _setDetailed(bool detailed) {
-    // Capture the current reading position from the active viewport NOW —
-    // before setState tears it down. This updates _focusAyahId synchronously
-    // so the incoming viewport homes to the exact verse, not a stale debounce.
+    // Capture the current reading position from the active viewport NOW — before
+    // setState tears it down — so the incoming viewport homes to where you were,
+    // not a stale debounce.
     _flushCurrentPosition?.call();
-    // While a recitation is sounding, the reading position IS the verse being
-    // recited — home the incoming viewport to it, overriding the flushed scroll
-    // position. Reading follows the reciter only a Mushaf-PAGE at a time (and the
-    // reader may have scrolled ahead to read while listening), so that flushed
-    // top can be several verses from the verse actually playing; without this the
-    // new viewport opens on a stale verse and doesn't catch up until the reciter
-    // rolls into the next one. Only while SOUNDING (playing/buffering) — a
-    // paused/idle reader is browsing and should keep wherever they scrolled to.
+    // Decide the verse the incoming viewport opens on. Default: the position the
+    // outgoing view just flushed (_focusAyahId). But whenever a verse is loaded in
+    // the player — playing, buffering, OR paused — THAT verse is the reader's real
+    // place, so home to it instead. Both views follow the current verse only
+    // approximately (Reading scrolls a whole Mushaf PAGE at a time, and the focus-
+    // alignment sliver leaves the preceding verse peeking at the top), so the
+    // flushed "topmost-visible" verse can sit a page — or, in Detailed, one verse —
+    // BEHIND the verse being recited. E.g. pause on 7:10 in Detailed, toggle to
+    // Reading, and the flush alone hands over 7:9. Only a fully idle/stopped/errored
+    // reader (no current verse) is browsing and keeps wherever they scrolled to.
+    int? home = _focusAyahId;
     if (FeatureFlags.audioRecitation) {
-      final audio = context.read<AyahAudioCubit>().state;
-      if (audio.isSounding && audio.playingAyahId != null) {
-        _focusAyahId = audio.playingAyahId;
-      }
+      final playing = context.read<AyahAudioCubit>().state.playingAyahId;
+      if (playing != null) home = playing;
     }
+    // Stash it in the dedicated, teardown-proof field (see _pendingToggleHome) and
+    // clear it the frame after the incoming viewport has read it — so a later swipe
+    // still starts its section at the top.
+    _focusAyahId = home;
+    _pendingToggleHome = home;
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _pendingToggleHome = null);
     // Session-only toggle: the choice holds while this reader is open (including
     // across swipes) but is intentionally NOT persisted as the open default — a
     // fresh open always starts in Reading. It IS recorded on the Last Read point
