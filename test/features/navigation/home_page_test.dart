@@ -166,6 +166,15 @@ void main() {
       expect(find.text('Share Al Quran'), findsOneWidget);
     });
 
+    testWidgets('the overflow opens the About screen', (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.aboutMenuButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
+    });
+
     testWidgets('hides each flagged feature when its flag is off',
         (tester) async {
       await _pumpHome(

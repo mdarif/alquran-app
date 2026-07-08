@@ -7,6 +7,7 @@ import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
+import '../../../about/presentation/pages/about_page.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
 
@@ -98,7 +99,21 @@ class HomeOverflowMenu extends StatelessWidget {
           label: 'Share Al Quran',
           onPressed: _shareApp,
         ),
+        // About screen — also reachable via the discreet title tap, surfaced here
+        // as a visible entry.
+        _MenuItem(
+          key: WidgetKeys.aboutMenuButton,
+          icon: AppIcons.about,
+          label: 'About',
+          onPressed: () => _openAbout(context),
+        ),
       ],
+    );
+  }
+
+  void _openAbout(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AboutPage()),
     );
   }
 
