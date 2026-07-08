@@ -90,6 +90,28 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   surah needs loading the next section + repushing the sequence, and a product call
   on auto-advancing chapters. Deferred.
 
+### 10. Stepper doesn't keep the selected verse visible above the peek card — GOOD-TO-HAVE / UX
+- **Area:** reader · reading-view · peek card
+- **Symptoms (owner, on-device):**
+  - (a) With the translation panel open, stepping ‹/› to the next verse doesn't scroll
+    the surah up to reveal it — the selected verse can sit behind the (tall) card. It
+    should stay visible in the strip above the panel.
+  - (b) With the panel minimized (translation hidden), stepping ‹/› across a page
+    boundary doesn't carry the page + selection across gracefully.
+- **Root cause:** the Reading view scrolls at page-CHUNK granularity (`_ayahRowIndex`
+  → chunk row), so `_scrollToFocus` aligns the whole page's top to 0.04, never the
+  selected verse — a verse low in its page lands behind the peek card. And the
+  `_rowVisible` skip (resolved item 9) treats the card-occluded lower area as
+  "visible", so it won't scroll a verse that's technically on screen but hidden behind
+  the card. Cross-page steps hard-align the next chunk rather than easing the selection
+  across.
+- **Approach (needs care):** reveal the exact verse above the card — split the chunk at
+  the selected verse (as the initial verse-jump does — LEARNINGS §3 "split the chunk AT
+  the verse") and scroll it to an alignment above the card's top edge, accounting for
+  the card being open vs minimized. Must not re-introduce the item-9 jump.
+- **Deferred:** good-to-have reader-UX polish; recommend a focused pass post-1.0.1
+  (tune on-device).
+
 ---
 
 ## Pre-release gates (hard blockers — tracked elsewhere, restated so they're in one place)
