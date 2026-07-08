@@ -98,13 +98,17 @@ Started 2026-07-08 during the audio / viewport-switch pass.
     should stay visible in the strip above the panel.
   - (b) With the panel minimized (translation hidden), stepping ‹/› across a page
     boundary doesn't carry the page + selection across gracefully.
+  - (c) Tapping next repeatedly doesn't scroll the view progressively — the highlight
+    + peek card advance, but the page only moves when a chunk goes fully off screen,
+    so it feels static then jumps.
 - **Root cause:** the Reading view scrolls at page-CHUNK granularity (`_ayahRowIndex`
   → chunk row), so `_scrollToFocus` aligns the whole page's top to 0.04, never the
   selected verse — a verse low in its page lands behind the peek card. And the
-  `_rowVisible` skip (resolved item 9) treats the card-occluded lower area as
-  "visible", so it won't scroll a verse that's technically on screen but hidden behind
-  the card. Cross-page steps hard-align the next chunk rather than easing the selection
-  across.
+  `_rowVisible` skip (resolved item 9) is too lenient: it treats ANY viewport overlap
+  as "visible", so a chunk merely peeking at the bottom edge (or the card-occluded
+  lower area) counts as visible and the stepper won't scroll to it — hence (a)/(c).
+  Cross-page steps hard-align the next chunk rather than easing the selection across
+  (b).
 - **Approach (needs care):** reveal the exact verse above the card — split the chunk at
   the selected verse (as the initial verse-jump does — LEARNINGS §3 "split the chunk AT
   the verse") and scroll it to an alignment above the card's top edge, accounting for

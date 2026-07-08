@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
@@ -8,6 +9,10 @@ import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
+
+/// The app's website — the shareable link (there's no store listing to point at
+/// yet); mirrors the link on the About screen.
+const String _websiteUrl = 'https://alquranreader.com';
 
 /// Phase → app-bar glyph (mirrors [ThemeToggleButton]'s private mapping); Dusk
 /// is the only filled one (the golden going-down light).
@@ -86,8 +91,31 @@ class HomeOverflowMenu extends StatelessWidget {
             label: 'Reading Light',
             onPressed: () => _openReadingLight(context, theme),
           ),
+        // Always available — a "tell a friend" share of the app via its website.
+        _MenuItem(
+          key: WidgetKeys.shareAppButton,
+          icon: AppIcons.share,
+          label: 'Share Al Quran',
+          onPressed: _shareApp,
+        ),
       ],
     );
+  }
+
+  /// Share the app via its website (there's no store link yet). Uses the same
+  /// share sheet as verse sharing; a missing share target is swallowed so opening
+  /// the sheet can never crash Home.
+  Future<void> _shareApp() async {
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: 'Al Quran — a calm, distraction-free Qur’an reader.\n'
+              '$_websiteUrl',
+        ),
+      );
+    } catch (_) {
+      // best-effort: no share target, or the user dismissed the sheet
+    }
   }
 
   void _openReminders(BuildContext context, RemindersCubit cubit) {
@@ -121,6 +149,7 @@ class _MenuItem extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.filled = false,
+    super.key,
   });
 
   final IconData icon;

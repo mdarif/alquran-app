@@ -157,6 +157,15 @@ void main() {
       expect(find.byType(ReadingLightSheet), findsOneWidget);
     });
 
+    testWidgets('the overflow offers a Share Al Quran item', (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      // The share entry sits alongside the feature items (always available).
+      expect(find.byKey(WidgetKeys.shareAppButton), findsOneWidget);
+      expect(find.text('Share Al Quran'), findsOneWidget);
+    });
+
     testWidgets('hides each flagged feature when its flag is off',
         (tester) async {
       await _pumpHome(

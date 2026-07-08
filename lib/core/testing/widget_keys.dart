@@ -15,6 +15,7 @@ class WidgetKeys {
   static const surahSearchField = Key('home-surah-search');
   static const surahSearchBack = Key('home-surah-search-back');
   static const homeOverflowMenu = Key('home-overflow-menu');
+  static const shareAppButton = Key('home-share-app-button');
 
   // Reader chrome
   static const viewportToggle = Key('reader-viewport-toggle');
