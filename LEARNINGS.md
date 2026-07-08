@@ -441,6 +441,27 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
 
 ## 3. Flutter reading-UX patterns that worked
 
+- **A viewport switch mid-recitation must home to the RECITER, not the scroll
+  position (2026-07-08).** Playing audio in Reading, then toggling to Detailed,
+  landed on the wrong verse — the reader "reads from somewhere else." Root cause:
+  `_setDetailed` homes the incoming viewport to `_focusAyahId`, which the outgoing
+  view's position-flush had just set to its **topmost-visible** verse. But Reading
+  follows the reciter only a whole Mushaf-PAGE at a time (page-granular `scrollTo`,
+  by design — see the jump-to-verse entry), and the focus-alignment sliver (0.04)
+  leaves the *previous* page peeking at the top, so the flush reported a verse up
+  to a full page BEHIND the reciter (measured: reciting 2030 → flushed 2017). Worse,
+  Detailed's reciter-follow only fires on a `playingAyahId` **change**, so it opened
+  on that stale verse and didn't catch up until the current verse *finished*. Fix
+  is one clause in `_setDetailed`: while `audioState.isSounding` (playing/buffering),
+  override `_focusAyahId` to the playing verse before the rebuild — the reciter's
+  verse IS the reading position when you're listening. Scoped to `isSounding` so it
+  matches the now-playing tint/stepper semantics; a paused/idle reader is browsing
+  and keeps their scroll position. Regression coverage:
+  `test/features/reader/reader_audio_viewport_test.dart` (both toggle directions,
+  no-interrupt, continuous-advance-survives-toggle, paused-scope). Lesson: when a
+  feature (audio) rides on top of a virtualized list whose follow is deliberately
+  coarse-grained, any hand-off that reads "current position" from scroll state
+  inherits that coarseness — read it from the feature's own source of truth instead.
 - **Jump-to-verse in a page-chunked list: split the chunk AT the verse, don't
   measure into it (2026-07-06).** After virtualizing the Reading view into
   per-Mushaf-page chunks (below), "search Muhammad 10" / Last-Read resume opened

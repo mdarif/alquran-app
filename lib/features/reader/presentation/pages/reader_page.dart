@@ -463,6 +463,20 @@ class _ReaderViewState extends State<_ReaderView> {
     // before setState tears it down. This updates _focusAyahId synchronously
     // so the incoming viewport homes to the exact verse, not a stale debounce.
     _flushCurrentPosition?.call();
+    // While a recitation is sounding, the reading position IS the verse being
+    // recited — home the incoming viewport to it, overriding the flushed scroll
+    // position. Reading follows the reciter only a Mushaf-PAGE at a time (and the
+    // reader may have scrolled ahead to read while listening), so that flushed
+    // top can be several verses from the verse actually playing; without this the
+    // new viewport opens on a stale verse and doesn't catch up until the reciter
+    // rolls into the next one. Only while SOUNDING (playing/buffering) — a
+    // paused/idle reader is browsing and should keep wherever they scrolled to.
+    if (FeatureFlags.audioRecitation) {
+      final audio = context.read<AyahAudioCubit>().state;
+      if (audio.isSounding && audio.playingAyahId != null) {
+        _focusAyahId = audio.playingAyahId;
+      }
+    }
     // Session-only toggle: the choice holds while this reader is open (including
     // across swipes) but is intentionally NOT persisted as the open default — a
     // fresh open always starts in Reading. It IS recorded on the Last Read point
