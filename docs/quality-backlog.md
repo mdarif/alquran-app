@@ -59,24 +59,6 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 - **Impact:** Benign for v1 and the less-common flow. Revisit only if that jump-back
   ever surprises people (e.g. add a stop affordance or auto-clear-on-idle).
 
-### 5. Audio state desyncs when the app is backgrounded mid-playback — MINOR · recommend a fix
-- **Area:** reader · audio · lifecycle
-- **Symptom:** Background the app while a verse plays, then return → the reader still
-  shows "playing" (pause icon; tint in Detailed) but nothing is sounding. Tapping the
-  control then pauses a player the OS already suspended.
-- **Root cause:** foreground-only by decision — there's no iOS `UIBackgroundModes:
-  audio` and no Android media/foreground service, and neither `app.dart` nor the
-  reader pauses audio on `AppLifecycleState.paused/hidden`. So the OS suspends the
-  sound while the (still-mounted) cubit keeps its playing state.
-- **Recommended fix (low-risk):** in `app.dart didChangeAppLifecycleState`, on
-  `paused`/`hidden` pause the shared player —
-  `if (FeatureFlags.audioRecitation) GetIt.I<AyahRecitationPlayer>().pause()`. The
-  player is a singleton and its `pause()` emits `paused` on the stream, so the live
-  cubit updates and you return to a truthful *paused* state (tap to resume).
-  Consistent with the app's foreground-only + always-on wakelock posture (background
-  listening isn't supported anyway). Add a small lifecycle test.
-- **Decision (owner):** accept the desync, or pause-on-background (recommended).
-
 ### 6. Reading peek card reopens on every verse during continuous playback — MINOR
 - **Area:** reader · audio
 - **Symptom:** While a surah plays continuously in Reading, the translation peek card
@@ -110,6 +92,17 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Resolved
 
+- **2026-07-08 — Audio state desynced when the app was backgrounded mid-playback
+  (was item 5).** Foreground-only playback (no bg-audio mode / media service) left
+  the reader showing "playing" over silence after a background→return. Fixed by
+  pausing on `AppLifecycleState.paused`/`hidden` — scoped to the **reader** (a
+  `WidgetsBindingObserver` on `_ReaderViewState`) rather than `app.dart`, since audio
+  can only sound while a reader is open and this avoids waking the lazily-registered
+  player when audio was never used. New `AyahAudioCubit.pauseForBackground()` pauses
+  only a *playing* verse; the player echoes `paused` so the live cubit updates to a
+  truthful state (tap to resume; no auto-resume). Covered by
+  `reader_audio_viewport_test.dart` → "app backgrounded during recitation" (pauses
+  when playing; no-op when idle). Shipped in 1.0.1.
 - **2026-07-08 — Viewport switch with a loaded verse homed to the wrong verse.**
   Toggling Reading⇄Detailed while a verse was **playing** landed on the scroll-
   position verse (up to a page behind the reciter; Detailed didn't self-correct

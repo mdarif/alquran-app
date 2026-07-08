@@ -88,7 +88,7 @@ class _ReaderView extends StatefulWidget {
 /// Detailed = Arabic stacked over Urdu + Hindi translations.
 enum _Viewport { reading, detailed }
 
-class _ReaderViewState extends State<_ReaderView> {
+class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Pinch-to-zoom font scaling is an accessibility requirement (PRD 4.1).
   // Bounds target 20–48pt; tune on-device.
   static const double _minFont = 20;
@@ -103,6 +103,12 @@ class _ReaderViewState extends State<_ReaderView> {
   // resume-point flush). An ancestor lookup there is illegal ("deactivated
   // widget's ancestor is unsafe"), so we hold the reference instead.
   late final ReaderCubit _cubit;
+
+  // The recitation cubit, cached in initState while the audio feature is on (null
+  // otherwise). Held so the lifecycle callback can pause playback on background
+  // without an ancestor lookup — and only exists while a reader is open, which is
+  // the only time a verse can be sounding.
+  AyahAudioCubit? _audioCubit;
 
   // The active viewport registers its position-flush here so _setDetailed()
   // can capture the exact current verse synchronously — before the debounce
@@ -174,12 +180,33 @@ class _ReaderViewState extends State<_ReaderView> {
     // Tell the cubit which viewport we opened in, so Last Read records it (this
     // runs before the cubit's first progress save, which is async).
     _cubit.setViewportDetailed(_viewport == _Viewport.detailed);
+    // Recitation is foreground-only (no background audio service), so observe the
+    // app lifecycle and pause on background — the reader is the only place a verse
+    // can sound, so it owns this. Only while the audio feature is on (the cubit
+    // exists then); caching it here keeps the lifecycle callback context-free.
+    if (FeatureFlags.audioRecitation) {
+      _audioCubit = context.read<AyahAudioCubit>();
+      WidgetsBinding.instance.addObserver(this);
+    }
   }
 
   @override
   void dispose() {
+    if (_audioCubit != null) WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Leaving the foreground pauses a sounding verse so the reader never shows a
+    // now-playing state over silence when it returns (foreground-only playback).
+    // No-op unless something is playing; resuming does NOT auto-play — the reader
+    // taps to resume.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _audioCubit?.pauseForBackground();
+    }
   }
 
   @override

@@ -92,6 +92,15 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   /// Stop playback entirely (e.g. on swipe to another section).
   Future<void> stopAll() => _player.stop();
 
+  /// Pause the current verse if it is actively playing — called when the app goes
+  /// to the background. Recitation is foreground-only (no background audio
+  /// service), so this keeps the UI honest: you return to a verse you can resume,
+  /// not a now-playing highlight over silence. No-op unless a verse is playing
+  /// (buffering/paused/idle are left untouched).
+  Future<void> pauseForBackground() async {
+    if (state.status == RecitationStatus.playing) await _player.pause();
+  }
+
   @override
   Future<void> close() async {
     await _sub?.cancel();

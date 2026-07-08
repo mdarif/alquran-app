@@ -95,25 +95,34 @@ class _FakeSettings implements ReaderSettingsRepository {
 }
 
 /// A fake player: the test pushes playback states onto the stream the cubit
-/// listens to, and it records stop() calls + auto-advance plays (so we can prove
-/// a viewport toggle never interrupts playback the way a section swipe does).
+/// listens to, and it records stop()/pause() calls + auto-advance plays (so we can
+/// prove a viewport toggle never interrupts playback the way a section swipe does,
+/// and that backgrounding pauses).
 class _RecordingPlayer implements AyahRecitationPlayer {
   final controller = StreamController<RecitationPlayback>.broadcast();
   int stopCalls = 0;
+  int pauseCalls = 0;
   int? lastPlayed;
+  int? _current; // the loaded verse, so pause() can echo `paused` for it
 
   @override
   Stream<RecitationPlayback> get playbackStream => controller.stream;
 
   /// Simulate the reciter reaching [ayahId] and sounding.
-  void playing(int ayahId) => controller.add(
-        RecitationPlayback(ayahId: ayahId, status: RecitationStatus.playing),
-      );
+  void playing(int ayahId) {
+    _current = ayahId;
+    controller.add(
+      RecitationPlayback(ayahId: ayahId, status: RecitationStatus.playing),
+    );
+  }
 
   /// Simulate [ayahId] pausing (still the active verse, just not sounding).
-  void paused(int ayahId) => controller.add(
-        RecitationPlayback(ayahId: ayahId, status: RecitationStatus.paused),
-      );
+  void paused(int ayahId) {
+    _current = ayahId;
+    controller.add(
+      RecitationPlayback(ayahId: ayahId, status: RecitationStatus.paused),
+    );
+  }
 
   /// Simulate [ayahId] finishing on its own — drives continuous auto-advance.
   void complete(int ayahId) => controller.add(
@@ -122,6 +131,7 @@ class _RecordingPlayer implements AyahRecitationPlayer {
 
   @override
   Future<void> play(int ayahId) async {
+    _current = ayahId;
     lastPlayed = ayahId;
     controller.add(
       RecitationPlayback(ayahId: ayahId, status: RecitationStatus.playing),
@@ -130,14 +140,26 @@ class _RecordingPlayer implements AyahRecitationPlayer {
 
   @override
   Future<void> prefetch(int ayahId) async {}
+
   @override
-  Future<void> pause() async {}
+  Future<void> pause() async {
+    pauseCalls++;
+    // Mirror the real player: pausing echoes `paused` for the current verse.
+    final id = _current;
+    if (id != null) {
+      controller.add(
+        RecitationPlayback(ayahId: id, status: RecitationStatus.paused),
+      );
+    }
+  }
+
   @override
   Future<void> resume() async {}
 
   @override
   Future<void> stop() async {
     stopCalls++;
+    _current = null;
     if (!controller.isClosed) controller.add(const RecitationPlayback());
   }
 
@@ -367,5 +389,46 @@ void main() {
       allOf(lessThan(recitingVerse), greaterThan(firstVerse)),
       reason: 'stopped → keeps the reading position',
     );
+  });
+
+  // Recitation is foreground-only (no background audio service), so leaving the
+  // foreground must pause — otherwise the reader returns showing "playing" over
+  // silence. The reader owns this: audio can only sound while a reader is open.
+  group('app backgrounded during recitation', () {
+    // Drive the valid resumed → inactive → paused transition (the handler acts
+    // only on paused/hidden).
+    Future<void> background(WidgetTester tester) async {
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a playing verse pauses when the app backgrounds',
+        (tester) async {
+      await open(tester, detailed: false);
+      await startReciting(tester, recitingVerse);
+      expect(player.pauseCalls, 0);
+
+      await background(tester);
+
+      expect(
+        player.pauseCalls,
+        1,
+        reason: 'foreground-only: a sounding verse must pause on background',
+      );
+    });
+
+    testWidgets('backgrounding with nothing playing is a no-op',
+        (tester) async {
+      await open(tester, detailed: false);
+      // No recitation started — nothing is loaded in the player.
+      await background(tester);
+
+      expect(
+        player.pauseCalls,
+        0,
+        reason: 'no current verse → nothing to pause (and no player woken)',
+      );
+    });
   });
 }
