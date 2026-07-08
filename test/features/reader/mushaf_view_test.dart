@@ -1125,6 +1125,52 @@ void main() {
 
   // -------------------------------------------------------------------------
 
+  group('MushafView — stepper does not re-scroll a visible verse', () {
+    // The bug (visible on small surahs like Al-Fatihah, and at the top of any
+    // surah): the ‹/› stepper forced scrollTo(chunk, 0.04) even when the verse
+    // was already on screen, re-aligning the whole page to the top — a "jump"
+    // (an overscroll bounce when the surah fits, a real header-shift when it
+    // doesn't). It must only scroll when the target verse isn't already visible.
+    //
+    // A short surah's scroll clamps to a no-op (untestable settled state), so
+    // this exercises the same root cause where it IS observable: a scrollable
+    // surah sitting at its natural top, where stepping to a visible verse would
+    // otherwise scroll the header off.
+    testWidgets('stepping a visible verse leaves the page put (header stays)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          MushafView(
+            ayahs: _ayahs(2, 60), // multi-page, scrollable
+            headings: _headings(2, 'Al-Baqarah', 286),
+            arabicFontSize: 28,
+            resources: _kResources,
+            selectedLanguages: const {'ur'},
+          ),
+        ),
+      );
+      await tester.pump();
+      // Open the peek on a verse in the visible top page.
+      await _tapText(tester);
+
+      // At the natural top, the header sits at the very top. Stepping to a verse
+      // on the same (visible) page must not scroll it off.
+      final headerBefore = tester.getTopLeft(find.byType(SurahHeaderCard)).dy;
+      await tester.tap(find.byKey(WidgetKeys.peekNextButton));
+      await tester.pumpAndSettle();
+      final headerAfter = tester.getTopLeft(find.byType(SurahHeaderCard)).dy;
+
+      expect(
+        headerAfter,
+        moreOrLessEquals(headerBefore, epsilon: 1.0),
+        reason: 'stepping re-aligned a visible verse — the page jumped '
+            '(header moved ${headerBefore - headerAfter}px)',
+      );
+
+      await tester.pump(const Duration(seconds: 2)); // drain the flash timer
+    });
+  });
+
   group('groupAyahsBySurah', () {
     test('single surah → one group', () {
       final groups = groupAyahsBySurah(_ayahs(2, 5));

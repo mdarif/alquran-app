@@ -358,14 +358,20 @@ class _MushafViewState extends State<MushafView>
 
   /// Select [ayah] as the peeked verse (highlight + slide the card up). When
   /// [scroll] is set (stepping with ‹/›, not a direct tap) it also animates the
-  /// verse into view.
-  void _selectVerse(Ayah ayah, {bool scroll = false}) {
+  /// verse into view — but [onlyScrollIfNeeded] skips that when the verse is
+  /// already on screen, so stepping through a short surah (or the top of any
+  /// surah) doesn't re-align the page and jump.
+  void _selectVerse(
+    Ayah ayah, {
+    bool scroll = false,
+    bool onlyScrollIfNeeded = false,
+  }) {
     setState(() {
       _selectedAyah = ayah;
       _shownAyah = ayah;
     });
     _peekCtrl.forward();
-    if (scroll) _scrollToFocus(ayah.id);
+    if (scroll) _scrollToFocus(ayah.id, onlyIfNeeded: onlyScrollIfNeeded);
   }
 
   /// Step the peeked verse by [delta] (+1 next, -1 previous) within the loaded
@@ -376,7 +382,10 @@ class _MushafViewState extends State<MushafView>
     final i = widget.ayahs.indexWhere((a) => a.id == cur.id);
     final j = i + delta;
     if (i < 0 || j < 0 || j >= widget.ayahs.length) return;
-    _selectVerse(widget.ayahs[j], scroll: true);
+    // Browsing verse-by-verse: reveal the next verse only if it's off screen.
+    // Re-aligning a verse that's already visible scrolls the whole page (a "jump"
+    // on a short surah — the header lurches / overscroll-bounces).
+    _selectVerse(widget.ayahs[j], scroll: true, onlyScrollIfNeeded: true);
   }
 
   /// Index of the peeked verse in the loaded section, or -1 if none. Drives the
@@ -400,10 +409,16 @@ class _MushafViewState extends State<MushafView>
   /// stepper). Both release the resume pin — this is a deliberate move. The
   /// initial resume/verse-jump does NOT come through here: it opens the list AT
   /// the focus verse via initialScrollIndex (the verse begins its own chunk).
-  void _scrollToFocus(int ayahId) {
+  ///
+  /// [onlyIfNeeded] (the ‹/› stepper) skips the scroll when the verse's chunk is
+  /// already on screen — re-aligning a visible verse only lurches the page.
+  void _scrollToFocus(int ayahId, {bool onlyIfNeeded = false}) {
     _heldFocusId = null;
     final idx = _ayahRowIndex[ayahId];
-    if (idx != null && mounted && _scrollCtrl.isAttached) {
+    if (idx != null &&
+        mounted &&
+        _scrollCtrl.isAttached &&
+        !(onlyIfNeeded && _rowVisible(idx))) {
       _scrollCtrl.scrollTo(
         index: idx,
         alignment: _focusAlignment,
@@ -412,6 +427,17 @@ class _MushafViewState extends State<MushafView>
       );
     }
     _flash(ayahId);
+  }
+
+  /// Whether row [index] is currently within the viewport (even partially) — so a
+  /// verse in it is already on screen and the stepper needn't scroll to it.
+  bool _rowVisible(int index) {
+    for (final p in _positions.itemPositions.value) {
+      if (p.index == index) {
+        return p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1;
+      }
+    }
+    return false;
   }
 
   void _flash(int ayahId) {
