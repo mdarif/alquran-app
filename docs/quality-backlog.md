@@ -90,6 +90,23 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   surah needs loading the next section + repushing the sequence, and a product call
   on auto-advancing chapters. Deferred.
 
+### 9. Reading ‹/› verse stepper jumps the whole page (most visible after audio) — MINOR/UX
+- **Area:** reader · reading-view · audio
+- **Symptom:** In Reading, the peek card's next/prev buttons scroll the stepped-to
+  verse's whole Mushaf page to the top — so stepping across a page boundary "turns
+  the page" (the entire view jumps), and after any manual scroll the first step snaps
+  the page back to the top. Most noticeable right after audio: the peek card
+  auto-opens on the reciter's (mid-page) verse, so you're positioned exactly where the
+  next ‹/› press re-aligns/turns the page.
+- **Root cause:** `_step` → `_selectVerse(scroll: true)` → `_scrollToFocus` always
+  `scrollTo(chunkRow, alignment 0.04)`. Scrolling is page-chunk-granular (the Reading
+  virtualization — `_ayahRowIndex` maps a verse to its *page* row), so it re-aligns the
+  whole page, not the verse. Pre-existing; unrelated to this cycle's audio fixes.
+- **Fix (recommended):** only scroll when the target verse's chunk isn't already
+  visible (check `_positions`). Within-page steps just move the highlight + peek card;
+  cross-page steps turn the page. Kills the jump, keeps off-screen verses reachable.
+- **Not a crash.** Owner decision whether to fix for 1.0.1.
+
 ---
 
 ## Pre-release gates (hard blockers — tracked elsewhere, restated so they're in one place)
