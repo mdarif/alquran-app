@@ -120,13 +120,14 @@ void main() {
       expect(find.widgetWithText(AppBar, 'Juz'), findsOneWidget);
     });
 
-    testWidgets('the title is an invisible tap that opens About',
+    testWidgets('the title is plain text — no longer a tap target for About',
         (tester) async {
+      // About moved into the ⋯ overflow (covered above); the title itself no
+      // longer navigates, so tapping it must not open About.
       await _pumpHome(tester);
-      // No visible affordance — the title text itself is the tap target.
-      await tester.tap(find.byKey(WidgetKeys.aboutButton));
+      await tester.tap(find.text('Al Quran'));
       await tester.pumpAndSettle();
-      expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
+      expect(find.byKey(WidgetKeys.aboutPage), findsNothing);
     });
 
     testWidgets('hides the Jump button when advanced nav is off',
@@ -204,10 +205,10 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.surahSearchButton));
       await tester.pumpAndSettle();
 
-      // Search mode: field + back arrow show; the About title + overflow hide.
+      // Search mode: field + back arrow show; the title + overflow hide.
       expect(find.byKey(WidgetKeys.surahSearchField), findsOneWidget);
       expect(find.byKey(WidgetKeys.surahSearchBack), findsOneWidget);
-      expect(find.byKey(WidgetKeys.aboutButton), findsNothing);
+      expect(find.text('Al Quran'), findsNothing);
       expect(find.byKey(WidgetKeys.homeOverflowMenu), findsNothing);
     });
 

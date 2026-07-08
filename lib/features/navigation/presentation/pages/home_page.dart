@@ -5,7 +5,6 @@ import 'package:get_it/get_it.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../../about/presentation/pages/about_page.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
@@ -108,27 +107,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// The default bar: the About-tap title, the prayer pill, a search icon, and
-  /// the reminders/light overflow.
+  /// The default bar: the title, the prayer pill, a search icon, and the
+  /// reminders/light/share/About overflow.
   AppBar _defaultAppBar(BuildContext context) {
     return AppBar(
       centerTitle: false,
-      // The title doubles as a discreet, unlabelled entry to the About screen
-      // (an intentional easter-egg tap — no visible affordance).
-      title: GestureDetector(
-        key: WidgetKeys.aboutButton,
-        behavior: HitTestBehavior.opaque,
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const AboutPage()),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Al Quran'),
-            if (widget.hijriDate) const HijriDateLine(),
-          ],
-        ),
+      // Plain title — About now lives as a visible entry in the ⋯ overflow (it
+      // used to be a discreet tap here).
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Al Quran'),
+          if (widget.hijriDate) const HijriDateLine(),
+        ],
       ),
       actions: [
         if (widget.advancedNavigation)
