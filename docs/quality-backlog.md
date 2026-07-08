@@ -69,6 +69,18 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 - **Fix (if wanted):** remember a per-session "dismissed while playing" intent and
   don't reopen until the reader taps a verse again.
 
+### 8. Impeller opt-out is deprecated (Flutter warns at startup) — WATCH (future Flutter upgrade)
+- **Area:** rendering · Arabic · build
+- **Symptom:** On launch Flutter logs "Impeller opt-out deprecated. The application
+  opted out of Impeller…". The app deliberately runs on Skia (`--no-enable-impeller`
+  / the manifest `EnableImpeller=false` entry) because Impeller mis-rendered Arabic
+  GPOS marks (see LEARNINGS §1).
+- **Risk:** a future Flutter version may remove the opt-out and force Impeller.
+  Before any major Flutter upgrade, re-validate Arabic (kashida carriers, waqf marks,
+  elongated madd) on Impeller across both faces; if still broken, pin Flutter or find
+  a per-text workaround.
+- **Not a blocker for 1.0.1** — informational log only; rendering is correct today.
+
 ### 7. Continuous "play from here" stops at the surah end (no roll to next surah) — ENHANCEMENT
 - **Area:** reader · audio
 - **Symptom:** Continuous playback stops when the last verse of the surah finishes
