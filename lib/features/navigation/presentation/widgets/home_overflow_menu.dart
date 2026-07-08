@@ -11,9 +11,9 @@ import '../../../about/presentation/pages/about_page.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
 
-/// The app's website — the shareable link (there's no store listing to point at
-/// yet); mirrors the link on the About screen.
-const String _websiteUrl = 'https://alquranreader.com';
+/// The app's download page — a funnel that lands on a download screen and routes
+/// to the store. Deliberately distinct from the About screen's homepage link.
+const String _downloadUrl = 'https://alquranreader.com/download';
 
 /// Phase → app-bar glyph (mirrors [ThemeToggleButton]'s private mapping); Dusk
 /// is the only filled one (the golden going-down light).
@@ -124,8 +124,11 @@ class HomeOverflowMenu extends StatelessWidget {
     try {
       await SharePlus.instance.share(
         ShareParams(
-          text: 'Al Quran — a calm, distraction-free Qur’an reader.\n'
-              '$_websiteUrl',
+          text: 'Read. Reflect. Remember. 🌙\n\n'
+              'Al Quran — a calm, distraction-free way to read the Qur’an '
+              'offline, with Urdu, Hindi & English translations and recitation. '
+              'Free, no ads.\n\n'
+              '$_downloadUrl',
         ),
       );
     } catch (_) {
