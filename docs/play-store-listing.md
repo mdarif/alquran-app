@@ -26,9 +26,11 @@ qualifier for search.)
 ### Short description (max 80 chars)
 
 ```
-A beautiful offline Qur'an — Uthmani & IndoPak, Urdu, Hindi & English. No ads.
+A beautiful offline Qur'an reader — Uthmani & IndoPak, Urdu, Hindi & English.
 ```
-(78 chars.)
+(77 chars. **No price/promo keywords here** — Play flags "No ads / Free / sale" in
+the *short* description and drops promotability, so keep them out. The full
+description below may still say "no ads"; the rule only bites the short one.)
 
 ### Full description (max 4000 chars)
 
@@ -40,6 +42,7 @@ READ, BEAUTIFULLY
 • IndoPak (South-Asian) script option, rendered in the Noorehuda typeface
 • Reading mode: pure Arabic, nothing else on the page
 • Detailed mode: every verse with Urdu, Hindi and English translations
+• Search — find any surah by name, number, or a verse reference (like "Muhammad 10")
 • Pinch-to-zoom and font-size controls for effortless legibility
 • "Light of Day": the page's light adapts gently to the time of day
 
