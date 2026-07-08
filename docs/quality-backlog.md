@@ -79,7 +79,7 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   Before any major Flutter upgrade, re-validate Arabic (kashida carriers, waqf marks,
   elongated madd) on Impeller across both faces; if still broken, pin Flutter or find
   a per-text workaround.
-- **Not a blocker for 1.0.1** — informational log only; rendering is correct today.
+- **Not a blocker for 1.1.0** — informational log only; rendering is correct today.
 
 ### 7. Continuous "play from here" stops at the surah end (no roll to next surah) — ENHANCEMENT
 - **Area:** reader · audio
@@ -142,7 +142,7 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   scoping the stepper to scroll only when the verse's chunk isn't already visible
   (`_scrollToFocus(onlyIfNeeded)` + `_rowVisible`); the reciter-follow's alignment is
   unchanged. Covered by `mushaf_view_test.dart` → "stepping a visible verse leaves the
-  page put" (reproduced a 185px header jump; now 0). Shipped in 1.0.1.
+  page put" (reproduced a 185px header jump; now 0). Shipped in 1.1.0.
 - **2026-07-08 — Audio state desynced when the app was backgrounded mid-playback
   (was item 5).** Foreground-only playback (no bg-audio mode / media service) left
   the reader showing "playing" over silence after a background→return. Fixed by
@@ -153,7 +153,7 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   only a *playing* verse; the player echoes `paused` so the live cubit updates to a
   truthful state (tap to resume; no auto-resume). Covered by
   `reader_audio_viewport_test.dart` → "app backgrounded during recitation" (pauses
-  when playing; no-op when idle). Shipped in 1.0.1.
+  when playing; no-op when idle). Shipped in 1.1.0.
 - **2026-07-08 — Viewport switch with a loaded verse homed to the wrong verse.**
   Toggling Reading⇄Detailed while a verse was **playing** landed on the scroll-
   position verse (up to a page behind the reciter; Detailed didn't self-correct
