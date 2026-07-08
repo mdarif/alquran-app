@@ -90,31 +90,35 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   surah needs loading the next section + repushing the sequence, and a product call
   on auto-advancing chapters. Deferred.
 
-### 10. Stepper doesn't keep the selected verse visible above the peek card — GOOD-TO-HAVE / UX
-- **Area:** reader · reading-view · peek card
+### 10. Reading verse-follow is page-granular, not per-verse (reciter drift + stepper) — UX
+- **Area:** reader · reading-view · audio · peek card
+- **(d) matters most — it degrades the core listening follow, not just manual stepping.**
 - **Symptoms (owner, on-device):**
+  - (d) **Reciter drift:** during audio playback the now-playing highlight drifts down
+    the page as verses advance and slips **below the reading area / behind the peek
+    card**, only re-centring at the next page (after ~2–4 verses). It should
+    auto-scroll the playing verse up to the top edge for the best view.
   - (a) With the translation panel open, stepping ‹/› to the next verse doesn't scroll
-    the surah up to reveal it — the selected verse can sit behind the (tall) card. It
-    should stay visible in the strip above the panel.
-  - (b) With the panel minimized (translation hidden), stepping ‹/› across a page
-    boundary doesn't carry the page + selection across gracefully.
-  - (c) Tapping next repeatedly doesn't scroll the view progressively — the highlight
-    + peek card advance, but the page only moves when a chunk goes fully off screen,
-    so it feels static then jumps.
+    the surah up to reveal it — the selected verse can sit behind the (tall) card.
+  - (b) With the panel minimized, stepping ‹/› across a page boundary doesn't carry the
+    page + selection across gracefully.
+  - (c) Tapping next repeatedly doesn't scroll progressively — the highlight advances
+    but the page only moves when a chunk goes fully off screen (static, then jumps).
 - **Root cause:** the Reading view scrolls at page-CHUNK granularity (`_ayahRowIndex`
   → chunk row), so `_scrollToFocus` aligns the whole page's top to 0.04, never the
-  selected verse — a verse low in its page lands behind the peek card. And the
-  `_rowVisible` skip (resolved item 9) is too lenient: it treats ANY viewport overlap
-  as "visible", so a chunk merely peeking at the bottom edge (or the card-occluded
-  lower area) counts as visible and the stepper won't scroll to it — hence (a)/(c).
-  Cross-page steps hard-align the next chunk rather than easing the selection across
-  (b).
-- **Approach (needs care):** reveal the exact verse above the card — split the chunk at
-  the selected verse (as the initial verse-jump does — LEARNINGS §3 "split the chunk AT
-  the verse") and scroll it to an alignment above the card's top edge, accounting for
-  the card being open vs minimized. Must not re-introduce the item-9 jump.
-- **Deferred:** good-to-have reader-UX polish; recommend a focused pass post-1.0.1
-  (tune on-device).
+  followed verse. The reciter-follow (`didUpdateWidget` → `_selectVerse(scroll:true)`)
+  and the stepper both go through it; within a page consecutive verses map to the SAME
+  chunk row, so `scrollTo` no-ops and the highlight drifts (d). A verse low in its page
+  lands behind the card (a); the item-9 `_rowVisible` skip is too lenient — ANY viewport
+  overlap counts as visible (a/c); cross-page hard-aligns the next chunk (b).
+- **Approach (needs care):** make the follow per-verse — split the chunk at the FOLLOWED
+  verse (the playing verse for the reciter, the selected verse for the stepper) as the
+  initial verse-jump does (LEARNINGS §3 "split the chunk AT the verse"), rebuilding rows
+  on advance, and scroll it to the top edge above the card. Splitting keeps the same
+  total height (≈no visual jump on rebuild), then the scroll eases the verse up. Must
+  not re-introduce the item-9 jump; needs on-device tuning (jank + card-height).
+- **Status:** (d) reciter-follow is the priority — decide fix-now vs fast-follow; (a)–(c)
+  stepper polish can trail it. All share the one per-verse-scroll change.
 
 ---
 
