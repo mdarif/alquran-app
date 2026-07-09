@@ -74,20 +74,26 @@ shadow = shadow.filter(ImageFilter.GaussianBlur(48))
 img = Image.alpha_composite(img, shadow)
 img.alpha_composite(phone, (px, py))
 
-# ---- headline (left, vertically centred) ----
+# ---- headline (left, WHOLE group vertically centred) ----
+# The Play developer-page header displays as a wide banner and crops the top &
+# bottom of this 16:9 art, so the headline must sit well inside the centre band.
+# Centre the entire group (3 lines + gold rule + sub-line), not just the lines,
+# and keep it compact enough that nothing rides the crop edge.
 d = ImageDraw.Draw(img)
-big = ImageFont.truetype(FONT, 258)
-sub = ImageFont.truetype(FONT, 78)
-x, step = 340, 296
-top = (H - step * len(HEAD)) // 2 - 26
+big = ImageFont.truetype(FONT, 212)
+sub = ImageFont.truetype(FONT, 66)
+x, step = 340, 248
+rule_gap, sub_gap = 46, 30                 # line -> rule, rule -> sub
+grp_h = step * len(HEAD) + rule_gap + 6 + sub_gap + sub.size
+top = (H - grp_h) // 2
 y = top
 for ln in HEAD:
     bb = d.textbbox((0, 0), ln, font=big)
     d.text((x, y - bb[1]), ln, font=big, fill=CREAM)
     y += step
-ry = y + 22
-d.line([(x + 6, ry), (x + 296, ry)], fill=GOLD, width=6)
-d.text((x, ry + 28), SUB, font=sub, fill=SUBGOLD)
+ry = y + rule_gap
+d.line([(x + 6, ry), (x + 288, ry)], fill=GOLD, width=6)
+d.text((x, ry + sub_gap), SUB, font=sub, fill=SUBGOLD)
 
 img.convert("RGB").save(OUT)   # no alpha
 print("saved", OUT, img.size)
