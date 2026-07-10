@@ -42,6 +42,10 @@ class _Settings implements ReaderSettingsRepository {
   Future<void> setRecitationSpeed(double value) async {}
   @override
   Future<void> setContinuousRecitation(bool value) async {}
+  @override
+  bool get showTranslationPeek => false;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async {}
 }
 
 void main() {

@@ -93,6 +93,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) async =>
       continuousRecitation = value;
+  @override
+  bool showTranslationPeek = false;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
 }
 
 class _SilentPlayer implements AyahRecitationPlayer {
@@ -255,7 +260,8 @@ void main() {
     await openAt(tester, detailed: false, ayahNumber: 1);
     expect(lastRead.saved?.surahId, 2); // started on surah 2
 
-    await tester.fling(find.byType(PageView), const Offset(-400, 0), 1200);
+    // Swipe RIGHT → next surah (RTL/Mushaf paging).
+    await tester.fling(find.byType(PageView), const Offset(400, 0), 1200);
     await tester.pumpAndSettle();
 
     // Last Read now points at the new section, opened at its first verse.

@@ -161,6 +161,21 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Reading-only — Detailed is the translation view and ignores this.
   late bool _readingTranslation = _settings.readingTranslationVisible;
 
+  // Whether a Reading tap opens the translation peek at all. Off by default — the
+  // always-on player owns playback, so a tap just SELECTS the verse (queues it for
+  // the bar's Play). Opt-in from Settings; persisted.
+  late bool _showTranslationPeek = _settings.showTranslationPeek;
+
+  // The verse the reader tapped in Reading — "queued" for the always-on player's
+  // Play button (which has no per-verse buttons of its own). Drives the queued
+  // highlight + the bar's idle label/Play target. Null = nothing queued yet.
+  int? _queuedAyahId;
+
+  // True while autoplay is rolling from one surah into the next: it suppresses the
+  // stop-on-page-change and triggers playing the incoming section's first verse.
+  // Distinguishes an audio-driven advance from a user swipe.
+  bool _audioAdvancing = false;
+
   // Section paging is a PageView (one page per section in the active dimension),
   // but WE drive it (the PageView's own scroll physics is NeverScrollable) via a
   // directional swipe recognizer, so a scroll is never mistaken for a page turn.
@@ -199,13 +214,19 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // exists then); caching it here keeps the lifecycle callback context-free.
     if (FeatureFlags.audioRecitation) {
       _audioCubit = context.read<AyahAudioCubit>();
+      // Autoplay rolls into the next surah at a section's end (the cubit knows
+      // only one section, so the reader drives the navigation).
+      _audioCubit!.onSequenceEnd = _autoAdvanceSection;
       WidgetsBinding.instance.addObserver(this);
     }
   }
 
   @override
   void dispose() {
-    if (_audioCubit != null) WidgetsBinding.instance.removeObserver(this);
+    if (_audioCubit != null) {
+      WidgetsBinding.instance.removeObserver(this);
+      _audioCubit!.onSequenceEnd = null; // don't call into a disposed State
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -226,10 +247,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final isReading = _viewport == _Viewport.reading;
     return Scaffold(
-      // The persistent mini player pins here (outside the body's pinch/swipe
-      // gesture arena); it hides itself when no verse is loaded. Behind the flag.
-      bottomNavigationBar:
-          FeatureFlags.audioRecitation ? const ReaderPlayerBar() : null,
+      // The always-on player pins here (outside the body's pinch/swipe gesture
+      // arena). It's the single playback surface in both viewports; when idle its
+      // Play starts the queued verse (the one the reader tapped). Behind the flag.
+      bottomNavigationBar: FeatureFlags.audioRecitation
+          ? ReaderPlayerBar(queuedAyahId: _queuedAyahId)
+          : null,
       appBar: AppBar(
         title: Text(_target.title),
         actions: [
@@ -268,9 +291,15 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           // Guarded by the flag (the cubit only exists when audio is on).
           listenWhen: (a, b) =>
               FeatureFlags.audioRecitation && a.ayahs != b.ayahs,
-          listener: (context, state) => context
-              .read<AyahAudioCubit>()
-              .setSequence([for (final a in state.ayahs) a.id]),
+          listener: (context, state) {
+            final cubit = context.read<AyahAudioCubit>();
+            cubit.setSequence([for (final a in state.ayahs) a.id]);
+            // Autoplay just rolled into this section — start its first verse.
+            if (_audioAdvancing && state.ayahs.isNotEmpty) {
+              _audioAdvancing = false;
+              cubit.toggle(state.ayahs.first.id);
+            }
+          },
           builder: (context, state) {
             if (state.status == ReaderStatus.error) {
               return Center(child: Text(state.error ?? 'Failed to load'));
@@ -284,6 +313,11 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
             // tick repaints the active page without extra plumbing.
             Widget pages(AyahAudioState? audio) => PageView.builder(
                   controller: _pageController,
+                  // RTL paging (the Arabic/Mushaf convention): swipe RIGHT advances
+                  // to the NEXT surah (ascending). `reverse` mirrors the layout so
+                  // the next section enters from the LEFT; the manual drag/fling
+                  // below flip sign to match (see _onSwipeUpdate / _onSwipeEnd).
+                  reverse: true,
                   // The PageView never handles the drag itself — the directional
                   // recognizer below does (so a vertical scroll is never stolen).
                   // We drive the controller programmatically (jumpTo/animateToPage),
@@ -378,13 +412,17 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
         audioState: audio,
-        onTogglePlay: interactive && audio != null
-            ? (id) => context.read<AyahAudioCubit>().toggle(id)
-            : null,
+        // The peek is translation-only now (the always-on bar owns playback) —
+        // null hides its play button.
+        onTogglePlay: null,
         onToggleLanguage:
             interactive ? (code) => _toggleLang(code, resources) : null,
         showTranslation: _readingTranslation,
         onToggleTranslation: interactive ? _toggleReadingTranslation : null,
+        // The peek only opens when the reader opts in (Settings); off by default.
+        showPeek: _showTranslationPeek,
+        // A tap always selects/queues the verse for the player, peek or not.
+        onSelectVerse: interactive ? _onSelectVerse : null,
       );
     } else {
       // Copy/share in Detailed is per-verse (the tile's ⋯ menu) — no
@@ -451,7 +489,10 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void _onPageChanged(int i) {
     final next = _targetForIndex(i);
     if (next == _target) return;
-    if (FeatureFlags.audioRecitation) {
+    // A user swipe stops the recitation; an autoplay-driven advance keeps it
+    // rolling (the incoming section's first verse plays via the setSequence
+    // listener above).
+    if (FeatureFlags.audioRecitation && !_audioAdvancing) {
       context.read<AyahAudioCubit>().stopAll();
     }
     setState(() {
@@ -459,6 +500,22 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       _focusAyahId = null; // a swiped-to section opens at its top, not a resume
     });
     _cubit.load(next);
+  }
+
+  /// Autoplay hit the section's last verse — roll into the next section (the next
+  /// surah) and keep playing. No next section (the last one) → let it end.
+  void _autoAdvanceSection() {
+    if (!_pageController.hasClients) return;
+    // Page indices are 0-based; the current section's index is value-1, so the
+    // next section's page index is `value`. Out of range → this was the last one.
+    final nextPage = _target.value;
+    if (nextPage > _target.dimension.count - 1) return;
+    _audioAdvancing = true;
+    _pageController.animateToPage(
+      nextPage,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   // --- Section swipe (driven by _HorizontalSwipeRecognizer) ------------------
@@ -473,8 +530,10 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // A pinch is in progress (two fingers) — never pan the page.
     if (_pageLocked || !_pageController.hasClients) return;
     final pos = _pageController.position;
-    // Follow the finger: dragging left (negative dx) advances the page (+pixels).
-    final next = (pos.pixels - (details.primaryDelta ?? 0))
+    // RTL follow-the-finger: with the PageView reversed, +pixels advances to the
+    // next surah, so dragging RIGHT (positive dx) advances (the section follows
+    // the finger, next enters from the left).
+    final next = (pos.pixels + (details.primaryDelta ?? 0))
         .clamp(pos.minScrollExtent, pos.maxScrollExtent);
     pos.jumpTo(next);
   }
@@ -484,10 +543,10 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     final page = _pageController.page ?? _swipeStartPage;
     final v = details.primaryVelocity ?? 0;
     final int target;
-    if (v <= -_kSwipeFlingVelocity) {
-      target = _swipeStartPage.round() + 1; // flick left → next surah
-    } else if (v >= _kSwipeFlingVelocity) {
-      target = _swipeStartPage.round() - 1; // flick right → previous surah
+    if (v >= _kSwipeFlingVelocity) {
+      target = _swipeStartPage.round() + 1; // flick RIGHT → next surah (RTL)
+    } else if (v <= -_kSwipeFlingVelocity) {
+      target = _swipeStartPage.round() - 1; // flick LEFT → previous surah
     } else {
       target = page.round(); // slow drag → settle to whichever half it's past
     }
@@ -573,6 +632,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         resources: resources,
         selectedLanguages: _activeLangs(resources),
         onToggleLanguage: (code) => _toggleLang(code, resources),
+        isReading: _viewport == _Viewport.reading,
+        showTranslationPeek: _showTranslationPeek,
+        onToggleTranslationPeek: _toggleShowTranslationPeek,
       ),
     );
   }
@@ -650,6 +712,20 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void _toggleReadingTranslation() {
     setState(() => _readingTranslation = !_readingTranslation);
     unawaited(_settings.setReadingTranslationVisible(_readingTranslation));
+  }
+
+  /// Opt in/out of the translation peek on tap (Reading). Off by default — a tap
+  /// just queues the verse for the player; on, it also opens the translation card.
+  void _toggleShowTranslationPeek(bool value) {
+    setState(() => _showTranslationPeek = value);
+    unawaited(_settings.setShowTranslationPeek(value));
+  }
+
+  /// The reader tapped (or stepped to) a verse in Reading — queue it for the
+  /// always-on player's Play. Null clears the queue (tap-off / dismiss).
+  void _onSelectVerse(Ayah? ayah) {
+    if (ayah?.id == _queuedAyahId) return;
+    setState(() => _queuedAyahId = ayah?.id);
   }
 
   /// Slider: set the zoom to an absolute value and persist it.
@@ -1073,6 +1149,9 @@ class _SettingsSheet extends StatefulWidget {
     required this.resources,
     required this.selectedLanguages,
     required this.onToggleLanguage,
+    required this.isReading,
+    required this.showTranslationPeek,
+    required this.onToggleTranslationPeek,
   });
 
   final double fontSize;
@@ -1084,6 +1163,11 @@ class _SettingsSheet extends StatefulWidget {
   final List<TranslationResource> resources;
   final Set<String> selectedLanguages;
   final ValueChanged<String> onToggleLanguage;
+  // The sheet's "Show translation" toggle is a Reading-only aid, so it's hidden in
+  // Detailed (which always shows translations). Captured at open time.
+  final bool isReading;
+  final bool showTranslationPeek;
+  final ValueChanged<bool> onToggleTranslationPeek;
 
   @override
   State<_SettingsSheet> createState() => _SettingsSheetState();
@@ -1096,6 +1180,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
   late double _fontSize = widget.fontSize;
   late ArabicScript _script = widget.script;
   late Set<String> _selectedLangs = {...widget.selectedLanguages};
+  late bool _showPeek = widget.showTranslationPeek;
 
   void _setFont(double value) {
     final v = value.clamp(widget.minFont, widget.maxFont).roundToDouble();
@@ -1261,6 +1346,25 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                         onTap: () => _toggleLang(r.languageCode),
                       ),
                   ],
+                ),
+              ],
+              // Reading-only: opt in to the translation peek on tap (off by
+              // default; the always-on player owns playback, so a tap otherwise
+              // just cues the verse). Hidden in Detailed, which always shows
+              // translations, and when there's no translation to peek.
+              if (widget.isReading && widget.resources.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const _SectionLabel('Reading'),
+                SwitchListTile.adaptive(
+                  key: WidgetKeys.translationPeekToggle,
+                  value: _showPeek,
+                  onChanged: (v) {
+                    setState(() => _showPeek = v);
+                    widget.onToggleTranslationPeek(v);
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show translation'),
+                  subtitle: const Text('Tap a verse to see its translation.'),
                 ),
               ],
             ],

@@ -316,6 +316,7 @@ void main() {
             resources: resources,
             selectedLanguages: selected,
             onToggleLanguage: onToggleLanguage,
+            showPeek: true, // this group exercises the (opt-in) peek card
           ),
         );
 
@@ -334,16 +335,14 @@ void main() {
       expect(cardVisible(tester), isFalse);
     });
 
-    testWidgets('tapping a verse opens the card with the verse reference',
-        (tester) async {
+    testWidgets('tapping a verse opens the translation card', (tester) async {
       await tester.pumpWidget(reader(_ayahsWithTranslations(1, 3)));
       await tester.pump();
       await _tapText(tester);
 
       expect(cardVisible(tester), isTrue);
-      // Reference like "Al-Fatihah · 1:2" — unique to the card (the header meta
-      // line reads "Meccan · 7 Verses").
-      expect(find.textContaining('Al-Fatihah · 1:'), findsOneWidget);
+      // Translation-only now (no verse ref / ‹/› steppers): the Urdu text shows.
+      expect(find.text('اردو ترجمہ'), findsOneWidget);
     });
 
     testWidgets('card does NOT repeat the Arabic of the tapped verse',
@@ -405,38 +404,6 @@ void main() {
       expect(find.text('al-Umari'), findsNothing);
     });
 
-    testWidgets('‹/› step through verses and clamp at the section edges',
-        (tester) async {
-      await tester.pumpWidget(reader(_ayahsWithTranslations(1, 3)));
-      await tester.pump();
-      await _tapText(tester); // open the peek on a verse
-
-      String ref() => tester
-          .widgetList<Text>(find.textContaining('Al-Fatihah · 1:'))
-          .first
-          .data!;
-      Future<void> step(Key k) async {
-        await tester.tap(find.byKey(k));
-        await tester.pumpAndSettle();
-      }
-
-      // Walk to the first verse; taps past the edge are no-ops (button disabled).
-      for (var i = 0; i < 3; i++) {
-        await step(WidgetKeys.peekPrevButton);
-      }
-      expect(ref(), 'Al-Fatihah · 1:1');
-
-      // Next advances the peeked verse (reference + its translation update).
-      await step(WidgetKeys.peekNextButton);
-      expect(ref(), 'Al-Fatihah · 1:2');
-
-      // Walk to the last verse; further next taps clamp at 1:3.
-      for (var i = 0; i < 3; i++) {
-        await step(WidgetKeys.peekNextButton);
-      }
-      expect(ref(), 'Al-Fatihah · 1:3');
-    });
-
     testWidgets('shows multiple translations when multiple are selected',
         (tester) async {
       await tester.pumpWidget(
@@ -494,7 +461,7 @@ void main() {
     // real ~16ms frame cadence on purpose — pumpAndSettle's coarse 100ms fake
     // time-steps mis-settle the scroll/peek animation and can false-time-out
     // even though nothing actually loops; that's why audio tests pump manually.)
-    testWidgets('reader stops scheduling frames after stepping then playing',
+    testWidgets('reader stops scheduling frames after tap then playing',
         (tester) async {
       var audio = const AyahAudioState();
       late StateSetter setOuter;
@@ -510,7 +477,7 @@ void main() {
                 resources: _kResources,
                 selectedLanguages: const {'ur'},
                 onToggleLanguage: (_) {},
-                onTogglePlay: (_) {},
+                showPeek: true,
                 onVisibleAyah: (_) {},
                 audioState: audio,
               );
@@ -519,19 +486,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await _tapText(tester); // open the peek
-
-      // Browse with the ‹/› stepper first — the exact path that exposed the
-      // (benign) pumpAndSettle non-settling.
-      for (var i = 0; i < 3; i++) {
-        await tester.tap(
-          find.byKey(WidgetKeys.peekPrevButton),
-          warnIfMissed: false,
-        );
-        await tester.pumpAndSettle();
-      }
-      await tester.tap(find.byKey(WidgetKeys.peekNextButton));
-      await tester.pumpAndSettle();
+      await _tapText(tester); // open the peek on a verse
 
       // Now start playback → now-playing tint + the audio-follow scroll.
       setOuter(
@@ -617,214 +572,9 @@ void main() {
     });
   });
 
-  group('MushafView — verse stepping during recitation', () {
-    // The ‹/› buttons are _PeekStepButtons keyed by peekPrev/NextButton, each
-    // wrapping an IconButton whose onPressed is null when disabled.
-    IconButton stepButton(WidgetTester tester, Key k) =>
-        tester.widget<IconButton>(
-          find.descendant(of: find.byKey(k), matching: find.byType(IconButton)),
-        );
-
-    testWidgets(
-        'arrows lock ONLY while sounding (playing/loading); paused, idle, '
-        'finished and error all free them', (tester) async {
-      // On a middle verse both ‹ and › have neighbours, so "free" must enable
-      // BOTH — distinguishing the audio gate from the first/last boundary.
-      var audio = const AyahAudioState(); // start idle
-      late StateSetter setOuter;
-      await tester.pumpWidget(
-        _wrap(
-          StatefulBuilder(
-            builder: (context, setState) {
-              setOuter = setState;
-              return MushafView(
-                ayahs: _ayahsWithTranslations(1, 3),
-                headings: _headings(1, 'Al-Fatihah', 7),
-                arabicFontSize: 28,
-                resources: _kResources,
-                selectedLanguages: const {'ur'},
-                onToggleLanguage: (_) {},
-                onTogglePlay: (_) {},
-                audioState: audio,
-              );
-            },
-          ),
-        ),
-      );
-      await tester.pump();
-      await _tapText(tester); // open the peek
-
-      // Walk to the first verse, then one forward → the middle verse (1:2), so
-      // both neighbours exist. (Stepping works because audio is idle here.)
-      for (var i = 0; i < 3; i++) {
-        await tester.tap(
-          find.byKey(WidgetKeys.peekPrevButton),
-          warnIfMissed: false,
-        );
-        await tester.pumpAndSettle();
-      }
-      await tester.tap(find.byKey(WidgetKeys.peekNextButton));
-      await tester.pumpAndSettle();
-
-      // pump (not pumpAndSettle): after stepping the peek, starting audio leaves
-      // a scroll/animation in flight that doesn't settle under fake-async here.
-      // The arrow state is synchronous from audioState, so two frames suffice.
-      Future<void> setAudio(AyahAudioState s) async {
-        setOuter(() => audio = s);
-        await tester.pump();
-        await tester.pump();
-      }
-
-      void expectLocked(String label) {
-        expect(
-          stepButton(tester, WidgetKeys.peekPrevButton).onPressed,
-          isNull,
-          reason: '$label: ‹ should be locked',
-        );
-        expect(
-          stepButton(tester, WidgetKeys.peekNextButton).onPressed,
-          isNull,
-          reason: '$label: › should be locked',
-        );
-      }
-
-      void expectFree(String label) {
-        expect(
-          stepButton(tester, WidgetKeys.peekPrevButton).onPressed,
-          isNotNull,
-          reason: '$label: ‹ should be enabled',
-        );
-        expect(
-          stepButton(tester, WidgetKeys.peekNextButton).onPressed,
-          isNotNull,
-          reason: '$label: › should be enabled',
-        );
-      }
-
-      expectFree('idle baseline');
-      await setAudio(
-        const AyahAudioState(
-          playingAyahId: 1002,
-          status: RecitationStatus.playing,
-        ),
-      );
-      expectLocked('playing');
-      await setAudio(
-        const AyahAudioState(
-          playingAyahId: 1002,
-          status: RecitationStatus.loading,
-        ),
-      );
-      expectLocked('loading');
-      await setAudio(
-        const AyahAudioState(
-          playingAyahId: 1002,
-          status: RecitationStatus.paused,
-        ),
-      );
-      expectFree('paused');
-      await setAudio(
-        const AyahAudioState(
-          status: RecitationStatus.error,
-          errorAyahId: 1002,
-        ),
-      );
-      expectFree('error');
-      await setAudio(const AyahAudioState());
-      expectFree('stopped/finished');
-
-      // Drain the pending highlight-flash timer + scroll so teardown is clean.
-      await tester.pump(const Duration(seconds: 2));
-    });
-
-    // The verse texts that carry the highlight backgroundColor in the Mushaf
-    // paragraph (selected / now-playing / flash all paint the same tint).
-    Set<String> highlightedTexts(WidgetTester tester) {
-      final paragraph = tester
-          .widgetList<Text>(find.byType(Text))
-          .firstWhere((t) => t.textSpan != null);
-      final out = <String>{};
-      void walk(InlineSpan span) {
-        if (span is TextSpan) {
-          if (span.text != null && span.style?.backgroundColor != null) {
-            out.add(span.text!);
-          }
-          span.children?.forEach(walk);
-        }
-      }
-
-      walk(paragraph.textSpan!);
-      return out;
-    }
-
-    testWidgets(
-        'now-playing tint shows only while sounding — browsing while paused '
-        'never leaves the paused verse highlighted', (tester) async {
-      var audio = const AyahAudioState();
-      late StateSetter setOuter;
-      await tester.pumpWidget(
-        _wrap(
-          StatefulBuilder(
-            builder: (context, setState) {
-              setOuter = setState;
-              return MushafView(
-                ayahs: _ayahsWithTranslations(1, 3),
-                headings: _headings(1, 'Al-Fatihah', 7),
-                arabicFontSize: 28,
-                resources: _kResources,
-                selectedLanguages: const {'ur'},
-                onToggleLanguage: (_) {},
-                onTogglePlay: (_) {},
-                audioState: audio,
-              );
-            },
-          ),
-        ),
-      );
-      await tester.pump();
-      await _tapText(tester); // open the peek
-
-      Future<void> setAudio(AyahAudioState s) async {
-        setOuter(() => audio = s);
-        await tester.pump(); // rebuild
-        await tester.pump(); // run the audio-follow post-frame
-      }
-
-      // Play verse 1 → the card follows to it and it's tinted (sounding).
-      await setAudio(
-        const AyahAudioState(
-          playingAyahId: 1001,
-          status: RecitationStatus.playing,
-        ),
-      );
-      expect(highlightedTexts(tester), contains('نص1'));
-
-      // Pause there, then browse forward two verses (allowed while paused).
-      await setAudio(
-        const AyahAudioState(
-          playingAyahId: 1001,
-          status: RecitationStatus.paused,
-        ),
-      );
-      await tester.tap(find.byKey(WidgetKeys.peekNextButton)); // 1 → 2
-      await tester.pump();
-      await tester.tap(find.byKey(WidgetKeys.peekNextButton)); // 2 → 3
-      await tester.pump();
-
-      final hl = highlightedTexts(tester);
-      expect(hl, contains('نص3'), reason: 'the verse you browsed to is tinted');
-      expect(
-        hl,
-        isNot(contains('نص1')),
-        reason: 'the paused verse must NOT stay tinted once you browse away',
-      );
-
-      await tester.pump(const Duration(seconds: 2)); // drain timers
-    });
-
-    // The tinted verse texts mapped to the exact background color they carry, so
-    // a test can tell the now-playing tint (gold) apart from the peek tint
-    // (green) — not just "is it tinted".
+  group('MushafView — now-playing tint + peek follow', () {
+    // Tinted verse texts → the exact background color, so a test can tell the
+    // now-playing tint (gold) from the cue tint (green).
     Map<String, Color> tintByText(WidgetTester tester) {
       final paragraph = tester
           .widgetList<Text>(find.byType(Text))
@@ -842,9 +592,7 @@ void main() {
       return out;
     }
 
-    testWidgets(
-        'now-playing (gold) and the tap-peek (green) never share a tint — '
-        'and starting playback does not drag the peek onto the playing verse',
+    testWidgets('the now-playing (gold) tint persists while paused',
         (tester) async {
       var audio = const AyahAudioState();
       late StateSetter setOuter;
@@ -860,7 +608,6 @@ void main() {
                 resources: _kResources,
                 selectedLanguages: const {'ur'},
                 onToggleLanguage: (_) {},
-                onTogglePlay: (_) {},
                 audioState: audio,
               );
             },
@@ -868,149 +615,221 @@ void main() {
         ),
       );
       await tester.pump();
-      // Open the peek on whichever verse the tap lands on.
-      await _tapText(tester);
 
-      // Before playback the only tinted verse is the tapped peek verse M.
-      final beforePlay = tintByText(tester);
-      expect(beforePlay.length, 1, reason: 'only the tapped verse is tinted');
-      final mText = beforePlay.keys.first;
-      final greenTint = beforePlay[mText]!;
+      Future<void> setAudio(AyahAudioState s) async {
+        setOuter(() => audio = s);
+        await tester.pump();
+        await tester.pump();
+      }
 
-      // Choose a DIFFERENT verse to play, so N != M is guaranteed.
+      final cs = Theme.of(tester.element(find.byType(MushafView))).colorScheme;
+      final gold = cs.tertiary.withValues(alpha: 0.18);
+
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1001,
+          status: RecitationStatus.playing,
+        ),
+      );
+      expect(tintByText(tester)['نص1'], gold, reason: 'playing → gold');
+
+      // Pause → the gold tint PERSISTS (a resume anchor, matching Detailed).
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1001,
+          status: RecitationStatus.paused,
+        ),
+      );
+      expect(tintByText(tester)['نص1'], gold, reason: 'paused → still gold');
+
+      // Stop → the tint clears (after the brief follow-flash drains).
+      await setAudio(const AyahAudioState());
+      await tester.pump(const Duration(seconds: 2)); // drain the follow-flash
+      expect(tintByText(tester)['نص1'], isNull, reason: 'stopped → no tint');
+    });
+
+    testWidgets(
+        'the green cue shows only while idle — suppressed once audio plays',
+        (tester) async {
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahsWithTranslations(1, 3),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                audioState: audio,
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester); // select a verse → green cue
+
+      final cs = Theme.of(tester.element(find.byType(MushafView))).colorScheme;
+      final green = cs.primary.withValues(alpha: 0.16);
+
+      final idle = tintByText(tester);
+      expect(
+        idle.length,
+        1,
+        reason: 'only the tapped verse is tinted while idle',
+      );
+      final mText = idle.keys.first;
+      expect(
+        idle[mText],
+        green,
+        reason: 'the tapped verse is green while idle',
+      );
+
+      // Play a DIFFERENT verse → gold on it, and the stale green cue is
+      // suppressed (so it never lingers on the tapped verse during prev/next).
       const allTexts = ['نص1', 'نص2', 'نص3'];
       final nText = allTexts.firstWhere((t) => t != mText);
       final nId = 1000 + (allTexts.indexOf(nText) + 1);
-
       setOuter(
         () => audio = AyahAudioState(
           playingAyahId: nId,
           status: RecitationStatus.playing,
         ),
       );
-      await tester.pump(); // rebuild
-      await tester.pump(); // audio-follow post-frame
+      await tester.pump();
+      await tester.pump();
 
-      final tints = tintByText(tester);
-      final cs = Theme.of(tester.element(find.byType(MushafView))).colorScheme;
-
-      // The playing verse is gold; the peek verse stays green; they differ.
+      final playing = tintByText(tester);
       expect(
-        tints[nText],
+        playing[nText],
         cs.tertiary.withValues(alpha: 0.18),
-        reason: 'the now-playing verse carries the gold tertiary tint',
+        reason: 'the playing verse is gold',
       );
       expect(
-        tints[mText],
-        cs.primary.withValues(alpha: 0.16),
-        reason: 'the peeked verse keeps the green primary tint',
-      );
-      expect(
-        tints[nText],
-        isNot(tints[mText]),
-        reason: 'now-playing and peek must never paint the same tint',
-      );
-      // Decoupled: playback started but the peek did NOT jump onto the verse
-      // that is now playing (that was the stale-selection bug).
-      expect(
-        tints[mText],
-        greenTint,
-        reason: 'the peek stays on the verse the user tapped',
+        playing[mText],
+        isNull,
+        reason: 'the green cue is suppressed while audio plays',
       );
 
-      await tester.pump(const Duration(seconds: 2)); // drain timers
+      await tester.pump(const Duration(seconds: 2));
     });
-  });
 
-  // -------------------------------------------------------------------------
-
-  group('MushafView — translation collapse toggle', () {
-    bool cardVisible(WidgetTester tester) => tester
-        .widgetList<Material>(find.byType(Material))
-        .any((m) => m.elevation == 12);
-
-    testWidgets('toggle hides the translation (text + chips), then restores',
+    testWidgets('with the peek on, it follows the playing verse',
         (tester) async {
-      var show = true;
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      final ayahs = [
+        for (var n = 1; n <= 3; n++)
+          Ayah(
+            id: 1000 + n,
+            surahId: 1,
+            ayahNumber: n,
+            textArabic: 'نص$n',
+            isSajda: false,
+            translations: {1: 'ترجمہ $n'},
+          ),
+      ];
       await tester.pumpWidget(
         _wrap(
           StatefulBuilder(
-            builder: (context, setState) => MushafView(
-              ayahs: _ayahsWithTranslations(1, 1),
-              headings: _headings(1, 'Al-Fatihah', 7),
-              arabicFontSize: 28,
-              resources: _kResources,
-              selectedLanguages: const {'ur'},
-              onToggleLanguage: (_) {},
-              showTranslation: show,
-              onToggleTranslation: () => setState(() => show = !show),
-            ),
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: ayahs,
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                showPeek: true,
+                audioState: audio,
+              );
+            },
           ),
         ),
       );
       await tester.pump();
-      await _tapText(tester);
 
-      // Expanded: the translation text + a language chip are visible.
-      expect(find.text('اردو ترجمہ'), findsOneWidget);
-      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsOneWidget);
+      Future<void> setAudio(AyahAudioState s) async {
+        setOuter(() => audio = s);
+        await tester.pump();
+        await tester.pump();
+      }
 
-      // Collapse → translation text + chips gone; the card stays open (controls).
-      await tester.tap(find.byKey(WidgetKeys.peekTranslationToggle));
-      await tester.pumpAndSettle();
-      expect(cardVisible(tester), isTrue);
-      expect(find.text('اردو ترجمہ'), findsNothing);
-      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsNothing);
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1001,
+          status: RecitationStatus.playing,
+        ),
+      );
+      expect(find.text('ترجمہ 1'), findsOneWidget, reason: 'peek shows v1');
 
-      // Expand again → translation back.
-      await tester.tap(find.byKey(WidgetKeys.peekTranslationToggle));
-      await tester.pumpAndSettle();
-      expect(find.text('اردو ترجمہ'), findsOneWidget);
+      await setAudio(
+        const AyahAudioState(
+          playingAyahId: 1002,
+          status: RecitationStatus.playing,
+        ),
+      );
+      expect(
+        find.text('ترجمہ 2'),
+        findsOneWidget,
+        reason: 'peek followed to v2',
+      );
+      expect(find.text('ترجمہ 1'), findsNothing);
+
+      await tester.pump(const Duration(seconds: 2));
     });
 
-    testWidgets('opens collapsed when showTranslation is false',
+    testWidgets('starting playback after a tap does not corrupt the tree',
         (tester) async {
+      // Regression: MushafView.didUpdateWidget must not notify the parent
+      // (onSelectVerse → its setState) when playback starts — that runs inside
+      // the parent's rebuild and threw "_elements.contains(element)" on device.
+      var audio = const AyahAudioState();
+      int? queued;
+      late StateSetter setOuter;
       await tester.pumpWidget(
         _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-            selectedLanguages: const {'ur'},
-            onToggleLanguage: (_) {},
-            showTranslation: false,
-            onToggleTranslation: () {},
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahsWithTranslations(1, 3),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                // Mirrors the reader: a selection cues a parent rebuild.
+                onSelectVerse: (a) => setState(() => queued = a?.id),
+                audioState: audio,
+              );
+            },
           ),
         ),
       );
       await tester.pump();
+      // Select a verse → onSelectVerse → parent setState.
       await _tapText(tester);
+      expect(queued, isNotNull);
 
-      // The card opens (you can drive audio), but with no translation/chips —
-      // and the toggle is present so you can bring it back.
-      expect(cardVisible(tester), isTrue);
-      expect(find.text('اردو ترجمہ'), findsNothing);
-      expect(find.byKey(WidgetKeys.peekTranslationToggle), findsOneWidget);
-    });
-
-    testWidgets('no toggle when onToggleTranslation is unwired',
-        (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahsWithTranslations(1, 1),
-            headings: _headings(1, 'Al-Fatihah', 7),
-            arabicFontSize: 28,
-            resources: _kResources,
-            selectedLanguages: const {'ur'},
-            onToggleLanguage: (_) {},
-          ),
+      // Now start playback on the cued verse (the exact on-device sequence).
+      setOuter(
+        () => audio = AyahAudioState(
+          playingAyahId: queued,
+          status: RecitationStatus.playing,
         ),
       );
       await tester.pump();
-      await _tapText(tester);
-      expect(find.byKey(WidgetKeys.peekTranslationToggle), findsNothing);
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+
+      await tester.pump(const Duration(seconds: 2));
     });
   });
 
@@ -1277,52 +1096,6 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
-
-  group('MushafView — stepper does not re-scroll a visible verse', () {
-    // The bug (visible on small surahs like Al-Fatihah, and at the top of any
-    // surah): the ‹/› stepper forced scrollTo(chunk, 0.04) even when the verse
-    // was already on screen, re-aligning the whole page to the top — a "jump"
-    // (an overscroll bounce when the surah fits, a real header-shift when it
-    // doesn't). It must only scroll when the target verse isn't already visible.
-    //
-    // A short surah's scroll clamps to a no-op (untestable settled state), so
-    // this exercises the same root cause where it IS observable: a scrollable
-    // surah sitting at its natural top, where stepping to a visible verse would
-    // otherwise scroll the header off.
-    testWidgets('stepping a visible verse leaves the page put (header stays)',
-        (tester) async {
-      await tester.pumpWidget(
-        _wrap(
-          MushafView(
-            ayahs: _ayahs(2, 60), // multi-page, scrollable
-            headings: _headings(2, 'Al-Baqarah', 286),
-            arabicFontSize: 28,
-            resources: _kResources,
-            selectedLanguages: const {'ur'},
-          ),
-        ),
-      );
-      await tester.pump();
-      // Open the peek on a verse in the visible top page.
-      await _tapText(tester);
-
-      // At the natural top, the header sits at the very top. Stepping to a verse
-      // on the same (visible) page must not scroll it off.
-      final headerBefore = tester.getTopLeft(find.byType(SurahHeaderCard)).dy;
-      await tester.tap(find.byKey(WidgetKeys.peekNextButton));
-      await tester.pumpAndSettle();
-      final headerAfter = tester.getTopLeft(find.byType(SurahHeaderCard)).dy;
-
-      expect(
-        headerAfter,
-        moreOrLessEquals(headerBefore, epsilon: 1.0),
-        reason: 'stepping re-aligned a visible verse — the page jumped '
-            '(header moved ${headerBefore - headerAfter}px)',
-      );
-
-      await tester.pump(const Duration(seconds: 2)); // drain the flash timer
-    });
-  });
 
   group('groupAyahsBySurah', () {
     test('single surah → one group', () {

@@ -139,6 +139,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) async =>
       continuousRecitation = value;
+  @override
+  bool showTranslationPeek = false;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
 }
 
 void main() {
@@ -214,8 +219,7 @@ void main() {
     expect(player.lastPlayed, 2003);
   });
 
-  testWidgets('the last verse stops — no advance past the surah end',
-      (tester) async {
+  testWidgets('the last verse autoplays into the next surah', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: ReaderPage(target: ReaderTarget.surah(2, 'Al-Baqarah')),
@@ -223,14 +227,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // The fake surah has 5 verses (2001..2005); finishing the last one must NOT
-    // start anything new.
+    // Finishing the last verse of surah 2 (2005) rolls into surah 3's first verse
+    // (3001) — quran.com-style continuous playback across chapters.
     player.complete(2005);
     await tester.pumpAndSettle();
     expect(
       player.lastPlayed,
-      isNull,
-      reason: 'nothing plays after the last verse',
+      3001,
+      reason: 'autoplay rolls into the next surah',
     );
   });
 }

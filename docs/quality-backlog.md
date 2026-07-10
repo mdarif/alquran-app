@@ -11,6 +11,19 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Open
 
+### 11. Lock-screen / background audio — DEFERRED to next release (owner decision 2026-07-10)
+- **Area:** reader · audio · platform
+- **Want:** recitation keeps playing when the app is backgrounded / the screen is
+  locked, with lock-screen + notification transport (play/pause, prev/next).
+- **Today:** foreground-only by design — `AyahAudioCubit.pauseForBackground` pauses on
+  background so the reader never shows a now-playing state over silence.
+- **What it needs:** `just_audio_background` (or `audio_service`) + `MediaItem`
+  metadata; iOS `UIBackgroundModes: audio` + the playback audio-session category;
+  an Android foreground service + media notification; and relaxing
+  `pauseForBackground`. The `AyahRecitationPlayer` interface is the only seam —
+  cubit/state/UI stay put. **Test the OnePlus/OxygenOS OEM-kill case** (see the
+  reminders device note) since aggressive battery management can kill the service.
+
 ### 2. Now-playing tint clears on pause (Reading view) — MINOR · largely superseded
 - **Update (2026-07-10):** the persistent **player bar** now gives a paused verse a
   visible anchor + play/seek/stop controls that don't depend on the in-paragraph tint,

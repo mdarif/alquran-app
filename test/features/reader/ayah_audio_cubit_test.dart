@@ -290,20 +290,50 @@ void main() {
       expect(player.calls, contains('setLoopMode(off)'));
     });
 
-    test('continuous off → a finished verse stops instead of advancing',
+    test('repeat-all loops the surah: the last verse rolls back to the first',
         () async {
       cubit.setSequence([1, 2, 3]);
+      await cubit.setRepeat(RecitationRepeat.all);
+      await playing(3);
+      player.calls.clear();
+
+      // The last verse finishing wraps to the first (not idle), even with
+      // continuous off — repeat-all overrides the stop-at-end.
       await cubit.setContinuous(false);
-      expect(cubit.state.continuousPlay, false);
+      player.push(3, RecitationStatus.completed);
+      await pumpEventQueue();
+      expect(player.calls, ['play(1)']);
+    });
+
+    test('autoplay at the section end hands off (onSequenceEnd), not idle',
+        () async {
+      var handoffs = 0;
+      cubit.onSequenceEnd = () => handoffs++;
+      cubit.setSequence([1, 2, 3]);
+      await playing(3); // the last verse of the section
+      player.calls.clear();
+
+      player.push(3, RecitationStatus.completed);
+      await pumpEventQueue();
+      // Nothing left IN this section → hand off to the reader for the next surah;
+      // the cubit does NOT go idle (the reader plays the next section's verse 1).
+      expect(handoffs, 1);
+      expect(player.calls, isEmpty);
+      // Still shows the last verse during the hand-off.
+      expect(cubit.state.playingAyahId, 3);
+    });
+
+    test('onSequenceEnd fires only at the last verse, not mid-surah', () async {
+      var handoffs = 0;
+      cubit.onSequenceEnd = () => handoffs++;
+      cubit.setSequence([1, 2, 3]);
       await playing(1);
       player.calls.clear();
 
       player.push(1, RecitationStatus.completed);
       await pumpEventQueue();
-      expect(player.calls, isEmpty); // did NOT play(2)
-      expect(cubit.state.playingAyahId, isNull); // idle
-      // setting preserved through the idle rebuild
-      expect(cubit.state.continuousPlay, false);
+      expect(handoffs, 0);
+      expect(player.calls, ['play(2)']); // rolled on within the section
     });
 
     test('transport settings survive playback-event rebuilds', () async {
@@ -374,6 +404,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) async =>
       continuousRecitation = value;
+  @override
+  bool showTranslationPeek = false;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
   @override
   Future<void> setScript(ArabicScript value) async => script = value;
   @override

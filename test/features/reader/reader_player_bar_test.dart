@@ -159,12 +159,16 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets('hidden while idle', (tester) async {
+  testWidgets('always visible; idle shows play + the reciter', (tester) async {
     await pumpBar(tester);
-    expect(find.byKey(WidgetKeys.playerBar), findsNothing);
+    // Always-on: the bar is present even before anything plays, minimal (a play
+    // control + the reciter name).
+    expect(find.byKey(WidgetKeys.playerBar), findsOneWidget);
+    expect(find.byKey(WidgetKeys.playerBarPlay), findsOneWidget);
+    expect(find.text('Mishary Rashid Alafasy'), findsOneWidget);
   });
 
-  testWidgets('appears when a verse plays and resolves the Surah · ayah ref',
+  testWidgets('when a verse plays it shows the Surah · ayah ref',
       (tester) async {
     await pumpBar(tester);
     await playVerse(tester, 2003);
@@ -201,14 +205,16 @@ void main() {
     expect(player.lastPlayed, 2003);
   });
 
-  testWidgets('close stops playback and hides the bar', (tester) async {
+  testWidgets('close stops playback; the bar reverts to idle', (tester) async {
     await pumpBar(tester);
     await playVerse(tester, 2003);
 
     await tester.tap(find.byKey(WidgetKeys.playerBarClose));
     await settle(tester);
     expect(player.calls, contains('stop'));
-    expect(find.byKey(WidgetKeys.playerBar), findsNothing);
+    // Always-on: the bar stays but reverts to the minimal idle row (play + reciter).
+    expect(find.byKey(WidgetKeys.playerBar), findsOneWidget);
+    expect(find.text('Mishary Rashid Alafasy'), findsOneWidget);
   });
 
   group('full player sheet', () {
@@ -228,31 +234,37 @@ void main() {
       expect(find.byKey(WidgetKeys.playerSheetPlay), findsOneWidget);
     });
 
-    testWidgets('speed button cycles the playback rate', (tester) async {
+    testWidgets('speed menu sets the playback rate', (tester) async {
       await openSheet(tester);
-      // Starts at 1× → tapping advances to the next preset (1.25×).
-      expect(find.text('1×'), findsOneWidget);
+      // The button shows the current rate; tapping opens a menu of presets.
+      expect(find.text('1×'), findsWidgets);
       await tester.tap(find.byKey(WidgetKeys.playerSpeed));
+      await tester.pumpAndSettle();
+      // Pick 1.25× from the menu.
+      await tester.tap(find.text('1.25×').last);
       await settle(tester);
       expect(audio.state.speed, 1.25);
       expect(player.calls, contains('setSpeed(1.25)'));
     });
 
-    testWidgets('repeat button toggles repeat-verse', (tester) async {
+    testWidgets('repeat cycles off → verse → surah → off', (tester) async {
       await openSheet(tester);
       expect(audio.state.repeat, RecitationRepeat.off);
+
       await tester.tap(find.byKey(WidgetKeys.playerRepeat));
       await settle(tester);
       expect(audio.state.repeat, RecitationRepeat.one);
       expect(player.calls, contains('setLoopMode(one)'));
-    });
 
-    testWidgets('continuous switch flips the setting', (tester) async {
-      await openSheet(tester);
-      expect(audio.state.continuousPlay, true);
-      await tester.tap(find.byKey(WidgetKeys.playerContinuous));
+      await tester.tap(find.byKey(WidgetKeys.playerRepeat));
       await settle(tester);
-      expect(audio.state.continuousPlay, false);
+      expect(audio.state.repeat, RecitationRepeat.all);
+      // Surah loop is cubit-level, so the player loop mode goes back off.
+      expect(player.calls, contains('setLoopMode(off)'));
+
+      await tester.tap(find.byKey(WidgetKeys.playerRepeat));
+      await settle(tester);
+      expect(audio.state.repeat, RecitationRepeat.off);
     });
   });
 }

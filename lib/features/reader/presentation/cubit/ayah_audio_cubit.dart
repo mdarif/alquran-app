@@ -8,9 +8,10 @@ import '../../domain/repositories/reader_settings_repository.dart';
 
 part 'ayah_audio_state.dart';
 
-/// How the current verse repeats. `off` plays through (continuous, if enabled);
-/// `one` loops the current verse. (Verse-range repeat for hifz is a follow-up.)
-enum RecitationRepeat { off, one }
+/// How playback repeats. `off` plays through (continuous, if enabled) then stops;
+/// `one` loops the current verse; `all` loops the whole surah (plays through, then
+/// restarts at the first verse). (Verse-range repeat for hifz is a follow-up.)
+enum RecitationRepeat { off, one, all }
 
 /// Drives single-ayah recitation for the reader. Holds which verse is active and
 /// its [RecitationStatus], re-emitted from the player's stream so the play buttons
@@ -44,6 +45,12 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   double _speed = 1.0;
   RecitationRepeat _repeat = RecitationRepeat.off;
   bool _continuous = true;
+
+  /// Autoplay reached the section's LAST verse with nothing left in this section:
+  /// the reader hooks this to roll into the next surah (the cubit only knows one
+  /// section at a time). Null, or no next section → playback simply ends. Not
+  /// invoked under repeat-verse (loops at the player) or repeat-surah (loops here).
+  void Function()? onSequenceEnd;
 
   /// Playback position/duration for the scrubber — a separate stream so its
   /// ~5×/s tick never rebuilds the reader (the state carries no position).
@@ -84,7 +91,22 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     // stop. (repeat-verse loops at the player, so `completed` won't even fire.)
     // Intercepted here so the UI never sees `completed`.
     if (p.status == RecitationStatus.completed) {
-      final next = _continuous ? _nextAfter(p.ayahId) : null;
+      int? next;
+      if (_repeat == RecitationRepeat.all) {
+        // Loop the surah: roll to the next verse, or back to the first at the end.
+        next = _nextAfter(p.ayahId) ??
+            (_sequence.isNotEmpty ? _sequence.first : null);
+      } else {
+        // Autoplay is the default and ALWAYS on (there is no single-verse mode) —
+        // only an explicit stop (✕) ends playback. Roll to the next verse; at the
+        // surah's LAST verse hand off to the reader to roll into the next surah
+        // (keeping the non-idle state so the bar doesn't flicker during hand-off).
+        next = _nextAfter(p.ayahId);
+        if (next == null && onSequenceEnd != null) {
+          onSequenceEnd!.call();
+          return;
+        }
+      }
       if (next != null) {
         _player.play(next); // continues: emits loading→playing for `next`
       } else {

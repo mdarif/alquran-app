@@ -31,13 +31,25 @@ String? _nowPlayingRef(ReaderState s, int? playingId) {
   return '$name · ${ayah.ayahNumber}';
 }
 
-/// Persistent mini player pinned below the reader while a verse is loaded. Shows
-/// the reciter/verse, a thin progress line, and the core transport; tapping the
-/// body opens the full [ReaderPlayerSheet]. Lives in the Scaffold's
-/// bottomNavigationBar slot, so it's outside the reader's pinch/swipe gesture
-/// arena and stacks naturally below the Reading peek card.
+/// The index of [id] in the loaded section, or -1. Drives the prev/next enable
+/// state (disabled at the section's first/last verse).
+int _indexOf(ReaderState s, int? id) =>
+    id == null ? -1 : s.ayahs.indexWhere((a) => a.id == id);
+
+/// Always-on player pinned below the reader in BOTH viewports — the single
+/// playback surface (there are no per-verse play buttons in Reading). Lives in the
+/// Scaffold's bottomNavigationBar slot, so it's outside the reader's pinch/swipe
+/// gesture arena.
+///
+/// Two states: **idle** (nothing loaded) shows the cued verse + a Play that starts
+/// it; **active** (playing/paused/loading/error) shows the now-playing verse, a
+/// thin progress line, and the full transport (tap the row → the full sheet).
 class ReaderPlayerBar extends StatelessWidget {
-  const ReaderPlayerBar({super.key});
+  const ReaderPlayerBar({this.queuedAyahId, super.key});
+
+  /// The verse the reader tapped/selected in Reading — the target of the idle
+  /// Play. Null falls back to the section's first verse.
+  final int? queuedAyahId;
 
   @override
   Widget build(BuildContext context) {
@@ -45,78 +57,126 @@ class ReaderPlayerBar extends StatelessWidget {
       // Rebuild on status/verse/settings — NOT on position (that rides the
       // progressStream in the thin line below).
       builder: (context, audio) {
-        final id = audio.playingAyahId;
-        final visible = id != null || audio.status == RecitationStatus.error;
         final cs = Theme.of(context).colorScheme;
-        return AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          alignment: Alignment.topCenter,
-          child: !visible
-              ? const SizedBox(width: double.infinity)
-              : Material(
-                  key: WidgetKeys.playerBar,
-                  color: cs.surfaceContainer,
-                  elevation: 3,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _ProgressLine(cs: cs),
-                      SafeArea(
-                        top: false,
-                        minimum: const EdgeInsets.symmetric(horizontal: 4),
-                        child: InkWell(
-                          onTap: () => _openPlayerSheet(context),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: Row(
-                              children: [
-                                const SizedBox(width: 8),
-                                AppIcon(
-                                  AppIcons.play,
-                                  size: AppIconSize.label,
-                                  color: cs.tertiary,
-                                  filled: true,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(child: _NowPlayingLabel(audio: audio)),
-                                _TransportButton(
-                                  keyValue: WidgetKeys.playerBarPrev,
-                                  icon: AppIcons.skipPrevious,
-                                  tooltip: 'Previous verse',
-                                  onPressed: () => context
-                                      .read<AyahAudioCubit>()
-                                      .playPrevious(),
-                                ),
-                                _PlayPauseButton(
-                                  keyValue: WidgetKeys.playerBarPlay,
-                                  audio: audio,
-                                  size: AppIconSize.action,
-                                ),
-                                _TransportButton(
-                                  keyValue: WidgetKeys.playerBarNext,
-                                  icon: AppIcons.skipNext,
-                                  tooltip: 'Next verse',
-                                  onPressed: () =>
-                                      context.read<AyahAudioCubit>().playNext(),
-                                ),
-                                _TransportButton(
-                                  keyValue: WidgetKeys.playerBarClose,
-                                  icon: AppIcons.close,
-                                  tooltip: 'Stop',
-                                  onPressed: () =>
-                                      context.read<AyahAudioCubit>().stopAll(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+        // Active = a verse is loaded (playing / paused / buffering) or errored.
+        final active = audio.playingAyahId != null ||
+            audio.status == RecitationStatus.error;
+        return Material(
+          key: WidgetKeys.playerBar,
+          color: cs.surfaceContainer,
+          elevation: 3,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (active) _ProgressLine(cs: cs),
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.symmetric(horizontal: 4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: active
+                      ? _ActiveRow(audio: audio)
+                      : _IdleRow(queuedAyahId: queuedAyahId),
                 ),
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+}
+
+/// The active transport row (a verse is loaded). Tap the row → the full sheet.
+class _ActiveRow extends StatelessWidget {
+  const _ActiveRow({required this.audio});
+  final AyahAudioState audio;
+
+  @override
+  Widget build(BuildContext context) {
+    final reader = context.watch<ReaderCubit>().state;
+    final idx = _indexOf(reader, audio.playingAyahId);
+    final hasPrev = idx > 0;
+    final hasNext = idx >= 0 && idx < reader.ayahs.length - 1;
+    return InkWell(
+      onTap: () => _openPlayerSheet(context),
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          Expanded(child: _NowPlayingLabel(audio: audio)),
+          _TransportButton(
+            keyValue: WidgetKeys.playerBarPrev,
+            icon: AppIcons.skipPrevious,
+            tooltip: 'Previous verse',
+            onPressed: hasPrev
+                ? () => context.read<AyahAudioCubit>().playPrevious()
+                : null,
+          ),
+          _PlayPauseButton(
+            keyValue: WidgetKeys.playerBarPlay,
+            audio: audio,
+            size: AppIconSize.action,
+          ),
+          _TransportButton(
+            keyValue: WidgetKeys.playerBarNext,
+            icon: AppIcons.skipNext,
+            tooltip: 'Next verse',
+            onPressed: hasNext
+                ? () => context.read<AyahAudioCubit>().playNext()
+                : null,
+          ),
+          _TransportButton(
+            keyValue: WidgetKeys.playerBarClose,
+            icon: AppIcons.close,
+            tooltip: 'Stop',
+            onPressed: () => context.read<AyahAudioCubit>().stopAll(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The idle row (nothing loaded) — minimal, quran.com-style: just a Play and the
+/// reciter's name. Play starts the cued verse (the one the reader tapped), or the
+/// section's first verse when nothing is cued.
+class _IdleRow extends StatelessWidget {
+  const _IdleRow({required this.queuedAyahId});
+  final int? queuedAyahId;
+
+  @override
+  Widget build(BuildContext context) {
+    final reader = context.watch<ReaderCubit>().state;
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    final target = queuedAyahId ??
+        (reader.ayahs.isNotEmpty ? reader.ayahs.first.id : null);
+    return Row(
+      children: [
+        IconButton(
+          key: WidgetKeys.playerBarPlay,
+          tooltip: 'Play',
+          visualDensity: VisualDensity.compact,
+          icon: AppIcon(
+            AppIcons.play,
+            size: AppIconSize.action,
+            color: target == null ? cs.onSurfaceVariant : cs.primary,
+          ),
+          onPressed: target == null
+              ? null
+              : () => context.read<AyahAudioCubit>().toggle(target),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            _kReciterName,
+            style: t.bodyMedium,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 12),
+      ],
     );
   }
 }
@@ -194,7 +254,8 @@ class _TransportButton extends StatelessWidget {
   final Key keyValue;
   final IconData icon;
   final String tooltip;
-  final VoidCallback onPressed;
+  // Null → the button renders disabled (dimmed) — e.g. prev/next at a bound.
+  final VoidCallback? onPressed;
   final double size;
 
   @override
@@ -290,11 +351,11 @@ class ReaderPlayerSheet extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return BlocBuilder<AyahAudioCubit, AyahAudioState>(
       builder: (context, audio) {
-        final ref = _nowPlayingRef(
-              context.watch<ReaderCubit>().state,
-              audio.playingAyahId,
-            ) ??
-            'Recitation';
+        final reader = context.watch<ReaderCubit>().state;
+        final ref = _nowPlayingRef(reader, audio.playingAyahId) ?? 'Recitation';
+        final idx = _indexOf(reader, audio.playingAyahId);
+        final hasPrev = idx > 0;
+        final hasNext = idx >= 0 && idx < reader.ayahs.length - 1;
         return SafeArea(
           top: false,
           child: Padding(
@@ -304,16 +365,27 @@ class ReaderPlayerSheet extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(ref, style: t.titleMedium, textAlign: TextAlign.center),
+                Text(
+                  ref,
+                  style: t.titleMedium,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 2),
                 Text(
                   _kReciterName,
                   style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 _Scrubber(cs: cs),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                // One transport row — repeat mode + speed flank prev / play / next.
+                // Autoplay (verse→verse→next surah) is the default, so there's no
+                // separate continuous switch. Keeps the sheet short.
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -323,8 +395,9 @@ class ReaderPlayerSheet extends StatelessWidget {
                       icon: AppIcons.skipPrevious,
                       tooltip: 'Previous verse',
                       size: AppIconSize.bar,
-                      onPressed: () =>
-                          context.read<AyahAudioCubit>().playPrevious(),
+                      onPressed: hasPrev
+                          ? () => context.read<AyahAudioCubit>().playPrevious()
+                          : null,
                     ),
                     _BigPlayPause(audio: audio),
                     _TransportButton(
@@ -332,22 +405,12 @@ class ReaderPlayerSheet extends StatelessWidget {
                       icon: AppIcons.skipNext,
                       tooltip: 'Next verse',
                       size: AppIconSize.bar,
-                      onPressed: () =>
-                          context.read<AyahAudioCubit>().playNext(),
+                      onPressed: hasNext
+                          ? () => context.read<AyahAudioCubit>().playNext()
+                          : null,
                     ),
                     _SpeedButton(audio: audio),
                   ],
-                ),
-                const SizedBox(height: 4),
-                SwitchListTile.adaptive(
-                  key: WidgetKeys.playerContinuous,
-                  value: audio.continuousPlay,
-                  onChanged: (v) =>
-                      context.read<AyahAudioCubit>().setContinuous(v),
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Continuous play'),
-                  subtitle:
-                      const Text('Roll into the next verse automatically'),
                 ),
               ],
             ),
@@ -468,6 +531,9 @@ class _BigPlayPause extends StatelessWidget {
   }
 }
 
+/// Repeat cycle: off → repeat verse → repeat surah → off. The icon tells them
+/// apart — a dim repeat glyph is off, primary repeat-one is verse, primary repeat
+/// is the whole surah (loops back to the first verse at the end).
 class _RepeatButton extends StatelessWidget {
   const _RepeatButton({required this.audio});
   final AyahAudioState audio;
@@ -475,38 +541,69 @@ class _RepeatButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final on = audio.repeat == RecitationRepeat.one;
+    final repeat = audio.repeat;
+    final (IconData icon, String tip, RecitationRepeat next) = switch (repeat) {
+      RecitationRepeat.off => (
+          AppIcons.repeat,
+          'Repeat: off',
+          RecitationRepeat.one,
+        ),
+      RecitationRepeat.one => (
+          AppIcons.repeatOne,
+          'Repeat verse',
+          RecitationRepeat.all,
+        ),
+      RecitationRepeat.all => (
+          AppIcons.repeat,
+          'Repeat surah',
+          RecitationRepeat.off,
+        ),
+    };
     return IconButton(
       key: WidgetKeys.playerRepeat,
-      tooltip: on ? 'Repeat verse: on' : 'Repeat verse: off',
+      tooltip: tip,
       icon: AppIcon(
-        on ? AppIcons.repeatOne : AppIcons.repeat,
-        color: on ? cs.primary : cs.onSurfaceVariant,
+        icon,
+        color:
+            repeat == RecitationRepeat.off ? cs.onSurfaceVariant : cs.primary,
       ),
-      onPressed: () => context.read<AyahAudioCubit>().setRepeat(
-            on ? RecitationRepeat.off : RecitationRepeat.one,
-          ),
+      onPressed: () => context.read<AyahAudioCubit>().setRepeat(next),
     );
   }
 }
 
+String _speedLabel(double s) =>
+    s == s.roundToDouble() ? '${s.toStringAsFixed(0)}×' : '$s×';
+
+/// Playback speed — a menu of the presets (with the current one checked), so the
+/// choice is visible up-front rather than a blind cycle-on-tap.
 class _SpeedButton extends StatelessWidget {
   const _SpeedButton({required this.audio});
   final AyahAudioState audio;
 
   @override
   Widget build(BuildContext context) {
-    final label = audio.speed == audio.speed.roundToDouble()
-        ? '${audio.speed.toStringAsFixed(0)}×'
-        : '${audio.speed}×';
-    return TextButton(
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<double>(
       key: WidgetKeys.playerSpeed,
-      onPressed: () {
-        final i = _kSpeeds.indexOf(audio.speed);
-        final next = _kSpeeds[(i < 0 ? 1 : (i + 1) % _kSpeeds.length)];
-        context.read<AyahAudioCubit>().setSpeed(next);
-      },
-      child: Text(label),
+      tooltip: 'Playback speed',
+      initialValue: audio.speed,
+      onSelected: (v) => context.read<AyahAudioCubit>().setSpeed(v),
+      itemBuilder: (context) => [
+        for (final s in _kSpeeds)
+          CheckedPopupMenuItem<double>(
+            value: s,
+            checked: s == audio.speed,
+            child: Text(_speedLabel(s)),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Text(
+          _speedLabel(audio.speed),
+          style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600),
+        ),
+      ),
     );
   }
 }

@@ -103,6 +103,11 @@ class _Settings implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) async =>
       continuousRecitation = value;
+  @override
+  bool showTranslationPeek = false;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
 }
 
 /// No-op player so ReaderPage's audio branch (behind FeatureFlags.audioRecitation)
@@ -274,12 +279,13 @@ void main() {
         await pump(tester, 2);
         await openPanel(tester);
         await tapScript(tester, ArabicScript.indopak);
-        // close the Display sheet (tap the scrim above it), then swipe
+        // close the Display sheet (tap the scrim above it), then swipe RIGHT
+        // (RTL → next surah)
         await tester.tapAt(const Offset(400, 100));
         await tester.pumpAndSettle();
         await tester.fling(
           find.byType(MushafView),
-          const Offset(-400, 0),
+          const Offset(400, 0),
           1200,
         );
         await tester.pumpAndSettle();

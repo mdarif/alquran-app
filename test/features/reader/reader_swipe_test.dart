@@ -201,6 +201,13 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) async =>
       continuousRecitation = value;
+  @override
+  // On for these tests: the shared-selection test taps a verse and expects the
+  // translation peek to open. (Production default is off.)
+  bool showTranslationPeek = true;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
 }
 
 Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
@@ -251,34 +258,36 @@ void main() {
   tearDown(GetIt.I.reset);
 
   group('Reader swipe navigation', () {
-    testWidgets('swipe left advances to the next surah', (tester) async {
+    // RTL (Arabic/Mushaf) paging: swipe RIGHT advances (ascending surah number),
+    // swipe LEFT goes back.
+    testWidgets('swipe right advances to the next surah', (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
       expect(find.text('Chapter 2'), findsOneWidget);
 
-      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.fling(find.byType(MushafView), const Offset(400, 0), 1200);
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 3'), findsWidgets); // header + app bar
       expect(find.text('Chapter 2'), findsNothing);
     });
 
-    testWidgets('swipe right goes to the previous surah', (tester) async {
+    testWidgets('swipe left goes to the previous surah', (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(3, 'Ali Imran'));
       expect(find.text('Chapter 3'), findsOneWidget);
 
-      await tester.fling(find.byType(MushafView), const Offset(400, 0), 1200);
+      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 2'), findsWidgets);
       expect(find.text('Chapter 3'), findsNothing);
     });
 
-    testWidgets('swipe right on the first surah is a no-op (no wrap)',
+    testWidgets('swipe left on the first surah is a no-op (no wrap)',
         (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(1, 'Al-Fatihah'));
       expect(find.text('Chapter 1'), findsOneWidget);
 
-      await tester.fling(find.byType(MushafView), const Offset(400, 0), 1200);
+      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 1'), findsOneWidget); // unchanged
@@ -310,20 +319,20 @@ void main() {
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
       expect(find.text('Chapter 2'), findsOneWidget);
 
-      // Past half the page width, with no fling, the PageView snaps forward.
-      await tester.drag(find.byType(MushafView), const Offset(-500, 0));
+      // Past half the page width (rightward, RTL), with no fling, it snaps forward.
+      await tester.drag(find.byType(MushafView), const Offset(500, 0));
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 3'), findsWidgets);
       expect(find.text('Chapter 2'), findsNothing);
     });
 
-    testWidgets('swipe left on the last surah is a no-op (no wrap)',
+    testWidgets('swipe right on the last surah is a no-op (no wrap)',
         (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(114, 'An-Nas'));
       expect(find.text('Chapter 114'), findsOneWidget);
 
-      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.fling(find.byType(MushafView), const Offset(400, 0), 1200);
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 114'), findsOneWidget); // unchanged
@@ -410,9 +419,9 @@ void main() {
     testWidgets('a deliberate horizontal swipe still turns the page',
         (tester) async {
       await pumpScrollableReader(tester);
-      // Clearly-horizontal fling — must still navigate (the recognizer must not
-      // over-reject a genuine swipe).
-      await tester.fling(find.byType(MushafView), const Offset(-500, 0), 1400);
+      // Clearly-horizontal fling (rightward → next surah, RTL) — must still
+      // navigate (the recognizer must not over-reject a genuine swipe).
+      await tester.fling(find.byType(MushafView), const Offset(500, 0), 1400);
       await tester.pumpAndSettle();
       expect(find.text('Chapter 3'), findsWidgets);
     });
@@ -626,7 +635,7 @@ void main() {
     testWidgets('toggling Detailed after a swipe stays on the swiped surah',
         (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
-      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.fling(find.byType(MushafView), const Offset(400, 0), 1200);
       await tester.pumpAndSettle();
       expect(find.text('Chapter 3'), findsWidgets);
 
@@ -647,7 +656,7 @@ void main() {
   group('Power-user stress (rapid toggles and flings)', () {
     testWidgets('rapid triple-toggle keeps the swiped surah', (tester) async {
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
-      await tester.fling(find.byType(MushafView), const Offset(-400, 0), 1200);
+      await tester.fling(find.byType(MushafView), const Offset(400, 0), 1200);
       await tester.pumpAndSettle();
       expect(find.text('Chapter 3'), findsWidgets);
 
@@ -697,10 +706,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(MushafView), findsNothing);
 
-      // Swipe forward INSIDE Detailed (the PageView spans both viewports).
-      // Regression: SelectionArea used to claim horizontal drags on Android
-      // (eager victory), so Detailed could not be swiped at all.
-      await tester.fling(find.byType(PageView), const Offset(-400, 0), 1200);
+      // Swipe forward (rightward, RTL) INSIDE Detailed (the PageView spans both
+      // viewports). Regression: SelectionArea used to claim horizontal drags on
+      // Android (eager victory), so Detailed could not be swiped at all.
+      await tester.fling(find.byType(PageView), const Offset(400, 0), 1200);
       await tester.pumpAndSettle();
       expect(find.text('Chapter 3'), findsWidgets);
 

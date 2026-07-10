@@ -46,6 +46,8 @@ class WidgetKeys {
       Key('peek-lang-option-$languageCode');
   // Collapse/expand the peek card's translation (read/listen to Arabic alone).
   static const peekTranslationToggle = Key('reader-peek-translation-toggle');
+  // Settings-sheet switch: open the translation peek on tap (default off).
+  static const translationPeekToggle = Key('reader-translation-peek-toggle');
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');

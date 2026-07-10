@@ -117,6 +117,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) async =>
       continuousRecitation = value;
+  @override
+  bool showTranslationPeek = false;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
 }
 
 /// A fake player: the test pushes playback states onto the stream the cubit

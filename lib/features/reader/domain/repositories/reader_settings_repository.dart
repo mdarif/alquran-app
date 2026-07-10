@@ -31,12 +31,19 @@ abstract interface class ReaderSettingsRepository {
   /// vs. stopping after one verse. Defaults to true.
   bool get continuousRecitation;
 
+  /// Whether tapping a verse in Reading opens the translation peek card. Defaults
+  /// to **false** — the always-on player owns playback, so a tap just selects the
+  /// verse (queues it for the player). Turning this on brings back the peek as a
+  /// translation-only reading aid (no play control). Reading-only.
+  bool get showTranslationPeek;
+
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setSelectedTranslations(List<String> languageCodes);
   Future<void> setReadingTranslationVisible(bool value);
   Future<void> setRecitationSpeed(double value);
   Future<void> setContinuousRecitation(bool value);
+  Future<void> setShowTranslationPeek(bool value);
 
   static const double defaultFontSize = 28;
   static const double defaultRecitationSpeed = 1.0;

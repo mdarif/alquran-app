@@ -6,7 +6,6 @@ import 'package:flutter/rendering.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../../core/testing/widget_keys.dart';
-import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
 import '../../domain/ayah_share.dart' show nativeLanguageName;
@@ -69,6 +68,8 @@ class MushafView extends StatefulWidget {
     this.onToggleLanguage,
     this.showTranslation = true,
     this.onToggleTranslation,
+    this.showPeek = false,
+    this.onSelectVerse,
     super.key,
   });
 
@@ -119,6 +120,16 @@ class MushafView extends StatefulWidget {
   /// Collapse/expand the peek's translation (the in-card toggle). Null hides the
   /// toggle (e.g. on the inert off-screen pages).
   final VoidCallback? onToggleTranslation;
+
+  /// Whether a verse tap opens the translation peek card at all. Default false —
+  /// the always-on player owns playback, so a tap just SELECTS the verse (the
+  /// green highlight + [onSelectVerse]); turning this on additionally opens the
+  /// translation-only peek. The select highlight shows either way.
+  final bool showPeek;
+
+  /// Called whenever the selected/queued verse changes (a tap, a stepper move, or
+  /// a dismiss → null). The reader uses it to cue the always-on player's Play.
+  final ValueChanged<Ayah?>? onSelectVerse;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -278,36 +289,48 @@ class _MushafViewState extends State<MushafView>
     // the scroll measures settled layout; re-run once more after the animation so
     // a verse whose chunk was off-screen (a big jump / page turn) still homes.
     final playing = widget.audioState?.playingAyahId;
-    if (playing != null && playing != old.audioState?.playingAyahId) {
+    final oldPlaying = old.audioState?.playingAyahId;
+    if (playing != null && playing != oldPlaying) {
+      // Playback started or advanced. The tap selection steps aside — the gold
+      // now-playing tint represents the current verse, so the green cue shouldn't
+      // linger on a stale verse while you skip prev/next. Clear it LOCALLY only:
+      // we're inside the parent's rebuild here, so notifying it (onSelectVerse →
+      // its setState) would be a re-entrant build and corrupt the element tree.
+      if (oldPlaying == null) _selectedAyah = null;
+      // The peek FOLLOWS the reciter (shows the playing verse's translation).
+      _syncPeek();
       final ayah = _ayahById(playing);
       if (ayah != null) {
+        _followCorrectTimer?.cancel();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          // Decoupled: audio does NOT touch the peek selection (that's tap-only).
-          // The playing verse shows via the gold now-playing tint + follow-scroll
-          // + the player bar; the peek card stays on whatever the reader tapped.
-          _scrollFollowVerse(ayah.id);
+          final precise = _scrollFollowVerse(ayah.id);
           // Pin the reciter so the post-scroll report saves the PLAYING verse as
           // Last Read — not whatever verse is topmost after the follow-scroll.
           // Set AFTER the scroll, which clears the pin. A finger-scroll during
           // playback still releases it (see the ScrollStartNotification handler);
           // a pause keeps playingAyahId, so the pin holds the paused verse too.
           _heldFocusId = ayah.id;
-        });
-        // If the verse's chunk was off-screen, the first scroll computes from an
-        // estimate; refine once it's on-screen and measured (within-page advances
-        // are already precise, so this second pass is a no-op there).
-        _followCorrectTimer?.cancel();
-        _followCorrectTimer = Timer(const Duration(milliseconds: 480), () {
-          if (!mounted) return;
-          _scrollFollowVerse(ayah.id);
-          _heldFocusId = ayah.id;
+          // Only re-scroll when the first pass had to ESTIMATE (the verse's chunk
+          // was off-screen — a page turn / big jump). A precise within-page advance
+          // is already correct, so skipping the second scroll kills the little
+          // double-scroll "jump" that fired on every verse.
+          if (!precise) {
+            _followCorrectTimer = Timer(const Duration(milliseconds: 480), () {
+              if (!mounted) return;
+              _scrollFollowVerse(ayah.id);
+              _heldFocusId = ayah.id;
+            });
+          }
         });
       }
-    } else if (playing == null && old.audioState?.playingAyahId != null) {
+    } else if (playing == null && oldPlaying != null) {
       // Audio fully stopped (idle / end-of-surah / error) — no current verse, so
       // release the reciter pin and let Last Read track the reading position again.
       _heldFocusId = null;
+      // The peek was following the reciter; with nothing playing it reverts to the
+      // tap selection (null here → it slides closed).
+      _syncPeek();
     }
 
     // The SPL holds a PIXEL offset across a rebuild, not a logical row — so a
@@ -393,6 +416,28 @@ class _MushafViewState extends State<MushafView>
     return null;
   }
 
+  /// The verse the translation peek should show. While a verse is loaded in the
+  /// player the peek FOLLOWS the reciter (the playing verse, so the translation
+  /// keeps pace with the audio); otherwise it's the verse the reader tapped.
+  Ayah? get _peekAyah {
+    final playing = widget.audioState?.playingAyahId;
+    if (playing != null) return _ayahById(playing);
+    return _selectedAyah;
+  }
+
+  /// Open/keep or slide the peek to match [_peekAyah] (only when opted in). Kept
+  /// in one place so a tap, a dismiss, and the reciter-follow all agree.
+  void _syncPeek() {
+    final target = widget.showPeek ? _peekAyah : null;
+    if (target != null) {
+      _shownAyah = target; // populate + retain through the slide-out
+      _peekCtrl.forward();
+    } else {
+      _peekCtrl
+          .reverse(); // _shownAyah cleared by the dismissed-status listener
+    }
+  }
+
   /// Select [ayah] as the peeked verse (highlight + slide the card up). When
   /// [scroll] is set (stepping with ‹/›, not a direct tap) it also animates the
   /// verse into view — but [onlyScrollIfNeeded] skips that when the verse is
@@ -403,43 +448,18 @@ class _MushafViewState extends State<MushafView>
     bool scroll = false,
     bool onlyScrollIfNeeded = false,
   }) {
-    setState(() {
-      _selectedAyah = ayah;
-      _shownAyah = ayah;
-    });
-    _peekCtrl.forward();
+    setState(() => _selectedAyah = ayah);
+    // Always cue the verse for the always-on player (Reading has no per-verse
+    // play button); the green select-highlight shows whether or not the peek does.
+    widget.onSelectVerse?.call(ayah);
+    _syncPeek(); // open the peek on this verse when opted in
     if (scroll) _scrollToFocus(ayah.id, onlyIfNeeded: onlyScrollIfNeeded);
   }
 
-  /// Step the peeked verse by [delta] (+1 next, -1 previous) within the loaded
-  /// section. No-op at the bounds (the ‹/› buttons are disabled there anyway).
-  void _step(int delta) {
-    final cur = _selectedAyah;
-    if (cur == null) return;
-    final i = widget.ayahs.indexWhere((a) => a.id == cur.id);
-    final j = i + delta;
-    if (i < 0 || j < 0 || j >= widget.ayahs.length) return;
-    // Browsing verse-by-verse: reveal the next verse only if it's off screen.
-    // Re-aligning a verse that's already visible scrolls the whole page (a "jump"
-    // on a short surah — the header lurches / overscroll-bounces).
-    _selectVerse(widget.ayahs[j], scroll: true, onlyScrollIfNeeded: true);
-  }
-
-  /// Index of the peeked verse in the loaded section, or -1 if none. Drives the
-  /// ‹/› enable state (disabled at the first/last verse).
-  int get _selIdx => _selectedAyah == null
-      ? -1
-      : widget.ayahs.indexWhere((a) => a.id == _selectedAyah!.id);
-
-  /// The ‹/› stepper is disabled only while audio is actively SOUNDING (playing
-  /// or buffering), so it never competes with the card auto-following the
-  /// reciter. Paused, stopped/idle and finished all free it again — that's when
-  /// the reader wants to step through and read individual translations.
-  bool get _canStep => !(widget.audioState?.isSounding ?? false);
-
   void _dismissPeek() {
     setState(() => _selectedAyah = null);
-    _peekCtrl.reverse();
+    widget.onSelectVerse?.call(null); // clear the player's cue too
+    _syncPeek();
   }
 
   /// Scroll the verse's Mushaf-page chunk to the top (reciter follow / verse
@@ -476,14 +496,30 @@ class _MushafViewState extends State<MushafView>
   /// honours for an already-visible item (it scrolls by pure arithmetic). If the
   /// chunk is off-screen (a big jump), we can't measure it yet, so fall back to the
   /// chunk top and let the follow's second pass refine it once it's on screen.
-  void _scrollFollowVerse(int ayahId) {
+  /// Scrolls the playing verse to the top WITHIN its flowing paragraph. Returns
+  /// true when the target was computed from the MEASURED verse top (precise);
+  /// false when it fell back to an estimate (the verse's chunk is off-screen) and
+  /// the caller should schedule one corrective re-scroll once it lays out.
+  bool _scrollFollowVerse(int ayahId) {
     _heldFocusId = null;
     final idx = _ayahRowIndex[ayahId];
     if (idx == null || !mounted || !_scrollCtrl.isAttached) {
       _flash(ayahId);
-      return;
+      return false;
+    }
+    // A short section that fits entirely on screen (e.g. Al-Fatihah): the verse is
+    // already visible, so following it would only shove the surah header off the
+    // top — a pointless "jump" on every verse change. Skip the scroll (still flash).
+    final positions = _positions.itemPositions.value;
+    if (positions.length >= _rows.length &&
+        positions.every(
+          (p) => p.itemLeadingEdge >= -0.02 && p.itemTrailingEdge <= 1.02,
+        )) {
+      _flash(ayahId);
+      return true;
     }
     var alignment = _focusAlignment;
+    var precise = false;
     final row = idx < _rows.length ? _rows[idx] : null;
     ItemPosition? pos;
     for (final p in _positions.itemPositions.value) {
@@ -497,7 +533,9 @@ class _MushafViewState extends State<MushafView>
           pos.itemTrailingEdge - pos.itemLeadingEdge; // h / vp
       // Prefer the paragraph's MEASURED verse top; fall back to a char estimate
       // for a verse whose chunk hasn't laid out yet (a big jump / page turn).
-      final f = _verseTops[ayahId] ?? _verseTopFraction(row.ayahs, ayahId);
+      final measured = _verseTops[ayahId];
+      final f = measured ?? _verseTopFraction(row.ayahs, ayahId);
+      precise = measured != null;
       alignment = _focusAlignment - f * chunkFraction;
     }
     _scrollCtrl.scrollTo(
@@ -507,6 +545,7 @@ class _MushafViewState extends State<MushafView>
       curve: Curves.easeOutCubic,
     );
     _flash(ayahId);
+    return precise;
   }
 
   /// Fraction of the chunk's text that precedes [ayahId] — a proxy for where the
@@ -688,27 +727,19 @@ class _MushafViewState extends State<MushafView>
           child: SlideTransition(
             position: _peekSlide,
             child: IgnorePointer(
-              ignoring: _selectedAyah == null,
+              // The peek only opens when the reader opts in (Settings →
+              // Translation on tap); otherwise a tap just cues the verse and this
+              // stays an inert, zero-size box.
+              // Interactive whenever the peek is actually showing a verse — during
+              // playback that's the reciter's verse (via _shownAyah), not a tap.
+              ignoring: !widget.showPeek || _shownAyah == null,
               child: _MushafPeekCard(
-                ayah: _shownAyah,
+                ayah: widget.showPeek ? _shownAyah : null,
                 resources: widget.resources,
-                surahName: _shownAyah == null
-                    ? null
-                    : widget.headings[_shownAyah!.surahId]?.nameEnglish,
                 fontSize: fontSize,
                 selected: widget.selectedLanguages,
                 onDismiss: _dismissPeek,
-                audioState: widget.audioState,
-                onTogglePlay: widget.onTogglePlay,
                 onToggleLanguage: widget.onToggleLanguage,
-                showTranslation: widget.showTranslation,
-                onToggleTranslation: widget.onToggleTranslation,
-                onPrev: _canStep && _selIdx > 0 ? () => _step(-1) : null,
-                onNext: _canStep &&
-                        _selIdx >= 0 &&
-                        _selIdx < widget.ayahs.length - 1
-                    ? () => _step(1)
-                    : null,
               ),
             ),
           ),
@@ -760,11 +791,16 @@ class _MushafViewState extends State<MushafView>
             fontSize: widget.arabicFontSize,
             arabicStyle: widget.arabicStyle,
             highlightAyahId: _highlightAyahId,
-            selectedAyahId: _selectedAyah?.id,
-            // The sticky now-playing tint applies ONLY while audio is sounding.
-            playingAyahId: (widget.audioState?.isSounding ?? false)
-                ? widget.audioState!.playingAyahId
-                : null,
+            // Green "cued" tint only while idle — once a verse is loaded the gold
+            // now-playing tint owns the highlight, so a stale green never lingers
+            // on the tapped verse while you skip prev/next.
+            selectedAyahId: widget.audioState?.playingAyahId != null
+                ? null
+                : _selectedAyah?.id,
+            // The now-playing tint follows the LOADED verse — it persists while
+            // paused (a resume anchor, matching the Detailed tile) and clears only
+            // when idle/stopped/errored (playingAyahId is null then).
+            playingAyahId: widget.audioState?.playingAyahId,
             onVerseTap: _onVerseTapped,
             onVerseTops: (tops) => _verseTops.addAll(tops),
           ),
@@ -1308,22 +1344,14 @@ class _MushafPeekCard extends StatelessWidget {
   const _MushafPeekCard({
     required this.ayah,
     required this.resources,
-    required this.surahName,
     required this.fontSize,
     required this.selected,
     required this.onDismiss,
-    this.audioState,
-    this.onTogglePlay,
-    this.onPrev,
-    this.onNext,
     this.onToggleLanguage,
-    this.showTranslation = true,
-    this.onToggleTranslation,
   });
 
   final Ayah? ayah;
   final List<TranslationResource> resources;
-  final String? surahName;
   final double fontSize;
   final Set<String> selected;
   final VoidCallback onDismiss;
@@ -1331,23 +1359,6 @@ class _MushafPeekCard extends StatelessWidget {
   /// Toggle a translation edition in the shared selection (the inline chips).
   /// Null hides the chips.
   final ValueChanged<String>? onToggleLanguage;
-
-  /// Step to the previous/next verse in the section. Null ⇒ at the edge (the
-  /// ‹/› control is shown disabled).
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-
-  /// Live recitation state + toggle for the tapped verse. Null when the audio
-  /// feature is off → no play control (the card renders exactly as before).
-  final AyahAudioState? audioState;
-  final ValueChanged<int>? onTogglePlay;
-
-  /// Whether to show the translation text + language chips. False collapses the
-  /// card to just its control row (read/listen to the Arabic alone).
-  final bool showTranslation;
-
-  /// Collapse/expand the translation (the inline ⓣ toggle). Null hides it.
-  final VoidCallback? onToggleTranslation;
 
   @override
   Widget build(BuildContext context) {
@@ -1371,10 +1382,6 @@ class _MushafPeekCard extends StatelessWidget {
         if (selected.contains(r.languageCode)) r,
     ];
     if (shown.isEmpty && available.isNotEmpty) shown = [available.first];
-
-    final reference = surahName == null
-        ? '${current.surahId}:${current.ayahNumber}'
-        : '$surahName · ${current.surahId}:${current.ayahNumber}';
 
     return Material(
       key: WidgetKeys.peekCard,
@@ -1420,110 +1427,66 @@ class _MushafPeekCard extends StatelessWidget {
                   shrinkWrap: true,
                   padding: const EdgeInsets.fromLTRB(22, 0, 22, 20),
                   children: [
-                    // Play · ‹ reference › verse stepper (the inline language
-                    // chips sit just below this row).
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (onTogglePlay != null) ...[
-                          _peekPlayButton(context, current.id),
-                          const SizedBox(width: 2),
-                        ],
-                        _PeekStepButton(
-                          key: WidgetKeys.peekPrevButton,
-                          icon: AppIcons.chevronLeft,
-                          tooltip: 'Previous verse',
-                          onPressed: onPrev,
-                        ),
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              reference,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: cs.onSurfaceVariant,
+                    // Translation-only: the verse ref + ‹/› steppers are gone (the
+                    // player bar owns navigation); the peek follows the player (or
+                    // the tapped verse) and just shows the meaning + language picker.
+                    if (onToggleLanguage != null && available.length > 1) ...[
+                      const SizedBox(height: 2),
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final r in available)
+                              TranslationChip(
+                                key: WidgetKeys.peekLangOption(r.languageCode),
+                                label: nativeLanguageName(r.languageCode),
+                                selected: selected.contains(r.languageCode),
+                                onTap: () => onToggleLanguage!(r.languageCode),
                               ),
-                            ),
-                          ),
+                          ],
                         ),
-                        _PeekStepButton(
-                          key: WidgetKeys.peekNextButton,
-                          icon: AppIcons.chevronRight,
-                          tooltip: 'Next verse',
-                          onPressed: onNext,
-                        ),
-                        // Collapse/expand the translation (read/listen to the
-                        // Arabic alone) — only when there's a translation to hide.
-                        if (onToggleTranslation != null && available.isNotEmpty)
-                          _translationToggle(context),
-                      ],
-                    ),
-                    // Translation — the text + inline language picker. Hidden
-                    // when collapsed (the translate toggle) so the card is just
-                    // controls over the Arabic. Same picker as the Settings sheet.
-                    if (showTranslation) ...[
-                      if (onToggleLanguage != null && available.length > 1) ...[
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              for (final r in available)
-                                TranslationChip(
-                                  key:
-                                      WidgetKeys.peekLangOption(r.languageCode),
-                                  label: nativeLanguageName(r.languageCode),
-                                  selected: selected.contains(r.languageCode),
-                                  onTap: () =>
-                                      onToggleLanguage!(r.languageCode),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      if (shown.isEmpty)
-                        Text(
-                          'No translation available',
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: cs.onSurfaceVariant),
-                        )
-                      else
-                        for (var i = 0; i < shown.length; i++) ...[
-                          if (i > 0) const SizedBox(height: 18),
-                          Text(
-                            current.translations[shown[i].id]!,
-                            textAlign: shown[i].languageCode == 'ur'
-                                ? TextAlign.right
-                                : TextAlign.left,
-                            textDirection: shown[i].languageCode == 'ur'
-                                ? TextDirection.rtl
-                                : TextDirection.ltr,
-                            locale: Locale(shown[i].languageCode),
-                            style: shown[i].languageCode.scriptStyle(
-                                  theme.textTheme.bodyLarge!.copyWith(
-                                    height: 1.5,
-                                    fontSize: translationSize,
-                                  ),
-                                ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            shown[i].attribution,
-                            textAlign: shown[i].languageCode == 'ur'
-                                ? TextAlign.right
-                                : TextAlign.left,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: cs.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                      ),
                     ],
+                    const SizedBox(height: 14),
+                    if (shown.isEmpty)
+                      Text(
+                        'No translation available',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      )
+                    else
+                      for (var i = 0; i < shown.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 18),
+                        Text(
+                          current.translations[shown[i].id]!,
+                          textAlign: shown[i].languageCode == 'ur'
+                              ? TextAlign.right
+                              : TextAlign.left,
+                          textDirection: shown[i].languageCode == 'ur'
+                              ? TextDirection.rtl
+                              : TextDirection.ltr,
+                          locale: Locale(shown[i].languageCode),
+                          style: shown[i].languageCode.scriptStyle(
+                                theme.textTheme.bodyLarge!.copyWith(
+                                  height: 1.5,
+                                  fontSize: translationSize,
+                                ),
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          shown[i].attribution,
+                          textAlign: shown[i].languageCode == 'ur'
+                              ? TextAlign.right
+                              : TextAlign.left,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                   ],
                 ),
               ),
@@ -1531,95 +1494,6 @@ class _MushafPeekCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-
-  /// Recitation control for the tapped verse: play ▸ / pause ❚❚ / a spinner while
-  /// buffering / an error glyph (tap to retry).
-  Widget _peekPlayButton(BuildContext context, int ayahId) {
-    final cs = Theme.of(context).colorScheme;
-    final audio = audioState;
-    final Widget icon;
-    if (audio != null && audio.isLoading(ayahId)) {
-      icon = SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
-      );
-    } else if (audio != null && audio.isPlaying(ayahId)) {
-      icon = AppIcon(
-        AppIcons.pauseCircle,
-        filled: true,
-        color: cs.primary,
-        size: AppIconSize.prominent,
-      );
-    } else if (audio != null && audio.hasError(ayahId)) {
-      icon = AppIcon(
-        AppIcons.audioError,
-        color: cs.error,
-        size: AppIconSize.prominent,
-      );
-    } else {
-      icon = AppIcon(
-        AppIcons.playCircle,
-        filled: true,
-        color: cs.primary,
-        size: AppIconSize.prominent,
-      );
-    }
-    return IconButton(
-      key: WidgetKeys.peekPlayButton,
-      tooltip: 'Play recitation',
-      visualDensity: VisualDensity.compact,
-      onPressed: () => onTogglePlay!(ayahId),
-      icon: icon,
-    );
-  }
-
-  /// Collapse/expand the translation: an open eye (primary) when shown, a slashed
-  /// eye (muted) when hidden — the unambiguous "hide" affordance. Lets the reader
-  /// read/listen to the Arabic alone without losing the play controls.
-  Widget _translationToggle(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return IconButton(
-      key: WidgetKeys.peekTranslationToggle,
-      tooltip: showTranslation ? 'Hide translation' : 'Show translation',
-      visualDensity: VisualDensity.compact,
-      onPressed: onToggleTranslation,
-      icon: AppIcon(
-        showTranslation ? AppIcons.visibility : AppIcons.visibilityOff,
-        size: AppIconSize.action,
-        color: showTranslation ? cs.primary : cs.onSurfaceVariant,
-      ),
-    );
-  }
-}
-
-/// A compact ‹/› chevron that steps the peeked verse. Disabled (dimmed) at the
-/// section's first/last verse — [onPressed] is null there.
-class _PeekStepButton extends StatelessWidget {
-  const _PeekStepButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onPressed,
-    super.key,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onPressed,
-      icon: AppIcon(icon),
-      iconSize: 24,
-      tooltip: tooltip,
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
   }
 }

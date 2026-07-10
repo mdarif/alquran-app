@@ -16,6 +16,7 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
       'reader_reading_translation_visible';
   static const String _kRecitationSpeed = 'reader_recitation_speed';
   static const String _kContinuousRecitation = 'reader_continuous_recitation';
+  static const String _kShowTranslationPeek = 'reader_show_translation_peek';
 
   @override
   ArabicScript get script => _prefs.getString(_kScript) == 'indopak'
@@ -61,6 +62,10 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
       _prefs.getBool(_kContinuousRecitation) ?? true;
 
   @override
+  bool get showTranslationPeek =>
+      _prefs.getBool(_kShowTranslationPeek) ?? false;
+
+  @override
   Future<void> setReadingTranslationVisible(bool value) =>
       _prefs.setBool(_kReadingTranslation, value);
 
@@ -71,4 +76,8 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   @override
   Future<void> setContinuousRecitation(bool value) =>
       _prefs.setBool(_kContinuousRecitation, value);
+
+  @override
+  Future<void> setShowTranslationPeek(bool value) =>
+      _prefs.setBool(_kShowTranslationPeek, value);
 }
