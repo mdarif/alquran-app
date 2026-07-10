@@ -29,6 +29,28 @@ class RecitationPlayback extends Equatable {
   List<Object?> get props => [ayahId, status];
 }
 
+/// Playback position within the current verse's file, for the scrubber. Rides its
+/// own stream (NOT the cubit's state) so a ~5×/s tick never rebuilds the reader.
+class PlaybackProgress extends Equatable {
+  const PlaybackProgress({
+    this.position = Duration.zero,
+    this.duration,
+    this.buffered = Duration.zero,
+  });
+
+  final Duration position;
+  final Duration? duration;
+  final Duration buffered;
+
+  @override
+  List<Object?> get props => [position, duration, buffered];
+}
+
+/// Repeat mode at the player level. `one` loops the current verse's track; `off`
+/// lets it complete (so the cubit can advance). Keeps just_audio's `LoopMode` out
+/// of the interface. (Verse-RANGE repeat is cubit-level and not represented here.)
+enum RecitationLoop { off, one }
+
 /// Plays a single ayah's recitation, streaming + caching to disk. This is the
 /// seam (mirrors `core/home_widget`'s `HomeWidgetClient`): everything else
 /// depends on this interface so the plugin stays out of every test — never
@@ -37,12 +59,27 @@ abstract interface class AyahRecitationPlayer {
   /// Status updates keyed by the verse being played.
   Stream<RecitationPlayback> get playbackStream;
 
+  /// Position/duration within the current verse's file (~5×/s while playing), for
+  /// the scrubber. Separate from [playbackStream] to avoid rebuild storms.
+  Stream<PlaybackProgress> get progressStream;
+
   /// Stream + cache the given verse and start playing it. Stops any previous one.
   Future<void> play(int ayahId);
 
   /// Pause / resume the current verse (no-op if nothing is loaded).
   Future<void> pause();
   Future<void> resume();
+
+  /// Seek within the current verse's file.
+  Future<void> seek(Duration position);
+
+  /// Playback rate (1.0 = normal). Persisted by the cubit and applied to the
+  /// shared player, so it holds across verses.
+  Future<void> setSpeed(double speed);
+  double get speed;
+
+  /// Loop the current verse (`one`) or let it complete (`off`).
+  Future<void> setLoopMode(RecitationLoop mode);
 
   /// Warm [ayahId] into the on-disk cache in the background (best-effort), so a
   /// later [play] of it starts without the per-verse network gap. No playback
@@ -72,13 +109,32 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
       (_) {},
       onError: (Object _, StackTrace __) => _emit(RecitationStatus.error),
     );
+    // Throttled position ticks (~5×/s) for the scrubber, off its own stream.
+    _positionSub = _player
+        .createPositionStream(
+      minPeriod: const Duration(milliseconds: 200),
+      maxPeriod: const Duration(milliseconds: 200),
+    )
+        .listen((pos) {
+      if (_progressController.isClosed) return;
+      _progressController.add(
+        PlaybackProgress(
+          position: pos,
+          duration: _player.duration,
+          buffered: _player.bufferedPosition,
+        ),
+      );
+    });
   }
 
   late final AudioPlayer _player;
   StreamSubscription<PlayerState>? _stateSub;
   StreamSubscription<PlaybackEvent>? _eventSub;
+  StreamSubscription<Duration>? _positionSub;
   final StreamController<RecitationPlayback> _controller =
       StreamController<RecitationPlayback>.broadcast();
+  final StreamController<PlaybackProgress> _progressController =
+      StreamController<PlaybackProgress>.broadcast();
 
   int? _currentAyahId;
   bool _loading = false;
@@ -88,6 +144,9 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
 
   @override
   Stream<RecitationPlayback> get playbackStream => _controller.stream;
+
+  @override
+  Stream<PlaybackProgress> get progressStream => _progressController.stream;
 
   /// The deterministic on-disk cache file for [ayahId] — the SAME path both
   /// [play] (via [LockCachingAudioSource]) and [prefetch] write, so a warmed
@@ -201,6 +260,19 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
   }
 
   @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> setSpeed(double speed) => _player.setSpeed(speed);
+
+  @override
+  double get speed => _player.speed;
+
+  @override
+  Future<void> setLoopMode(RecitationLoop mode) => _player
+      .setLoopMode(mode == RecitationLoop.one ? LoopMode.one : LoopMode.off);
+
+  @override
   Future<void> stop() async {
     await _player.stop();
     _currentAyahId = null;
@@ -211,7 +283,9 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
   Future<void> dispose() async {
     await _stateSub?.cancel();
     await _eventSub?.cancel();
+    await _positionSub?.cancel();
     await _player.dispose();
     await _controller.close();
+    await _progressController.close();
   }
 }

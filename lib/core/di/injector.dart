@@ -157,6 +157,9 @@ Future<void> configureDependencies() async {
   getIt
     ..registerLazySingleton<AyahRecitationPlayer>(JustAudioRecitationPlayer.new)
     ..registerFactory<AyahAudioCubit>(
-      () => AyahAudioCubit(getIt<AyahRecitationPlayer>()),
+      () => AyahAudioCubit(
+        getIt<AyahRecitationPlayer>(),
+        getIt<ReaderSettingsRepository>(),
+      ),
     );
 }

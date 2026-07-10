@@ -283,7 +283,9 @@ class _MushafViewState extends State<MushafView>
       if (ayah != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          _selectVerse(ayah); // highlight + peek card, no scroll
+          // Decoupled: audio does NOT touch the peek selection (that's tap-only).
+          // The playing verse shows via the gold now-playing tint + follow-scroll
+          // + the player bar; the peek card stays on whatever the reader tapped.
           _scrollFollowVerse(ayah.id);
           // Pin the reciter so the post-scroll report saves the PLAYING verse as
           // Last Read — not whatever verse is topmost after the follow-scroll.
@@ -978,15 +980,22 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
     final cs = Theme.of(context).colorScheme;
     final spans = <InlineSpan>[];
     for (final ayah in widget.group) {
-      final highlighted = widget.highlightAyahId == ayah.id ||
-          widget.selectedAyahId == ayah.id ||
-          widget.playingAyahId == ayah.id;
+      // Two ORTHOGONAL signals, two colours (so they never look like one
+      // ambiguous selection): the reciter's now-playing verse tints GOLD
+      // (cs.tertiary — matching the Detailed tile), while the tap-peek / Last-Read
+      // verse tints GREEN (cs.primary). Now-playing wins if a verse is both.
+      final isNowPlaying = widget.playingAyahId == ayah.id;
+      final isPeeked =
+          widget.highlightAyahId == ayah.id || widget.selectedAyahId == ayah.id;
+      final Color? tint = isNowPlaying
+          ? cs.tertiary.withValues(alpha: 0.18)
+          : isPeeked
+              ? cs.primary.withValues(alpha: 0.16)
+              : null;
       spans.add(
         TextSpan(
           text: ayah.textArabic,
-          style: highlighted
-              ? TextStyle(backgroundColor: cs.primary.withValues(alpha: 0.16))
-              : null,
+          style: tint != null ? TextStyle(backgroundColor: tint) : null,
         ),
       );
       // The medallion glyph is INVISIBLE — it only reserves the inline slot and

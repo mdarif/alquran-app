@@ -922,6 +922,38 @@ the bug — its synthetic first move resolves to one axis; use a multi-phase `Te
 sideways lead, *then* vertical, pumped between). (2) Assert the DIAGONAL case (big sideways
 component but `|dy| > |dx|` throughout) scrolls — that's the owner's real failure mode.
 
+### Audio player: keep the ~5×/s scrubber tick OFF the widget-state stream (2026-07-10)
+
+An audio transport (scrubber + progress line) needs position/duration ~5×/s. **Putting
+position in the Cubit state rebuilds every listener of that state 5×/s** — for the reader that's
+the whole Mushaf paragraph + tiles. The split that worked: the state stream (`AyahAudioState`)
+carries only *discrete* facts (which verse, status, speed, repeat, continuous — things that
+change on user action), and **position/duration ride a SEPARATE `progressStream`** off the
+player, consumed only by scoped `StreamBuilder`s inside the 2px progress line and the scrubber.
+Nothing else rebuilds on the tick. Same principle behind the **tint split + decouple** in the
+same pass: "what's sounding" (now-playing, gold `tertiary@0.18`, gated on `isSounding`) and
+"what I'm inspecting" (tap-peek, green `primary@0.16`) are *orthogonal* signals — paint them
+different colors and never let one write the other's field (the audio-follow used to call
+`_selectVerse`, which is exactly what made a tap-while-playing leave two "selected" verses).
+
+**Sizing note:** a `LinearProgressIndicator` with `value: null` (indeterminate) animates
+forever → it hangs `pumpAndSettle` in tests and burns frames while buffering. Feed it a
+**determinate** value (0 when duration is unknown), never null.
+
+### Driving a cubit from an EXTERNAL broadcast stream in a widget test needs `runAsync` (2026-07-10)
+
+`AyahAudioCubit` reacts to the player's broadcast `playbackStream` (player stream → cubit
+`emit` → cubit state stream → `BlocBuilder`). Under `testWidgets`' FakeAsync, a plain
+`tester.pump()` / even `pumpAndSettle()` **does not reliably drain that chained two-hop of
+broadcast-stream microtasks** — the cubit's own `state` updates (hop 1 ran) but subscribed
+widgets never rebuild (hop 2's notification is a microtask that no scheduled *frame* is waiting
+on, so `pumpAndSettle` returns "settled" before it fires). Symptom that cost an hour: the cubit
+state read `2003` but every `BlocBuilder<AyahAudioCubit>` — including a throwaway probe one —
+still showed idle. **Fix:** push the event inside `tester.runAsync(() async { player.push(...);
+await Future.delayed(10ms); })` (real async drains the microtasks), *then* `pumpAndSettle()` to
+rebuild. A tiny `settle()` helper wrapping that is worth it. (Cubit-only unit tests using
+`await pumpEventQueue()` are fine — this is specific to the FakeAsync widget harness.)
+
 ---
 
 ## 4. Flutter project & build mechanics

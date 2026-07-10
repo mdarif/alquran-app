@@ -24,10 +24,20 @@ abstract interface class ReaderSettingsRepository {
   /// to read/listen to the Arabic alone. Reading-only — Detailed is unaffected.
   bool get readingTranslationVisible;
 
+  /// Recitation playback rate (1.0 = normal); defaults to [defaultRecitationSpeed].
+  double get recitationSpeed;
+
+  /// Whether recitation rolls into the next verse automatically (continuous play)
+  /// vs. stopping after one verse. Defaults to true.
+  bool get continuousRecitation;
+
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setSelectedTranslations(List<String> languageCodes);
   Future<void> setReadingTranslationVisible(bool value);
+  Future<void> setRecitationSpeed(double value);
+  Future<void> setContinuousRecitation(bool value);
 
   static const double defaultFontSize = 28;
+  static const double defaultRecitationSpeed = 1.0;
 }

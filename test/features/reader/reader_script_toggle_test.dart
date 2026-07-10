@@ -93,6 +93,16 @@ class _Settings implements ReaderSettingsRepository {
   @override
   Future<void> setReadingTranslationVisible(bool value) async =>
       readingTranslationVisible = value;
+  @override
+  double recitationSpeed = 1.0;
+  @override
+  bool continuousRecitation = true;
+  @override
+  Future<void> setRecitationSpeed(double value) async =>
+      recitationSpeed = value;
+  @override
+  Future<void> setContinuousRecitation(bool value) async =>
+      continuousRecitation = value;
 }
 
 /// No-op player so ReaderPage's audio branch (behind FeatureFlags.audioRecitation)
@@ -109,6 +119,17 @@ class _SilentPlayer implements AyahRecitationPlayer {
   Future<void> resume() async {}
   @override
   Future<void> prefetch(int ayahId) async {}
+  @override
+  Stream<PlaybackProgress> get progressStream =>
+      const Stream<PlaybackProgress>.empty();
+  @override
+  Future<void> seek(Duration position) async {}
+  @override
+  Future<void> setSpeed(double speed) async {}
+  @override
+  double get speed => 1.0;
+  @override
+  Future<void> setLoopMode(RecitationLoop mode) async {}
   @override
   Future<void> stop() async {}
   @override

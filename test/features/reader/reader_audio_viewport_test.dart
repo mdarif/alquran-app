@@ -107,6 +107,16 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setReadingTranslationVisible(bool value) async =>
       readingTranslationVisible = value;
+  @override
+  double recitationSpeed = 1.0;
+  @override
+  bool continuousRecitation = true;
+  @override
+  Future<void> setRecitationSpeed(double value) async =>
+      recitationSpeed = value;
+  @override
+  Future<void> setContinuousRecitation(bool value) async =>
+      continuousRecitation = value;
 }
 
 /// A fake player: the test pushes playback states onto the stream the cubit
@@ -178,6 +188,17 @@ class _RecordingPlayer implements AyahRecitationPlayer {
     if (!controller.isClosed) controller.add(const RecitationPlayback());
   }
 
+  @override
+  Stream<PlaybackProgress> get progressStream =>
+      const Stream<PlaybackProgress>.empty();
+  @override
+  Future<void> seek(Duration position) async {}
+  @override
+  Future<void> setSpeed(double speed) async {}
+  @override
+  double get speed => 1.0;
+  @override
+  Future<void> setLoopMode(RecitationLoop mode) async {}
   @override
   Future<void> dispose() async {}
 }

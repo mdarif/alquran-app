@@ -2,27 +2,26 @@
 /// and on-disk cache path. No plugin imports → fully unit-testable (the numbering
 /// canary lives in `test/core/audio/recitation_source_test.dart`).
 ///
-/// Reciter + bitrate are baked into both the URL and the cache path so a future
-/// reciter or bitrate can never collide with this one's cached files.
+/// Reciter + bitrate are baked into both the URL path and the cache namespace so a
+/// future reciter or bitrate can never collide with this one's cached files.
 library;
 
-/// CDN reciter slug (islamic.network): Mishary Rashid Alafasy, 128 kbps.
-const String _reciterSlug = 'ar.alafasy';
-const int _bitrateKbps = 128;
+/// Reciter Mishary Rashid Alafasy, 64 kbps mono — self-hosted on Cloudflare R2
+/// (an infrastructure mirror, verse-by-verse), addressed by the global 1..6236
+/// ayah id, the same index the bundled DB uses.
+const String _cacheNamespace = 'alafasy_64';
 
-/// Local cache namespace — mirrors the reciter+bitrate so it's self-describing.
-const String _cacheNamespace = 'alafasy_128';
+/// R2 bucket base, fronted by a Cloudflare custom domain (edge-cached, range
+/// requests + immutable cache headers). Files live at
+/// `recitation/alafasy_64/{globalId}.mp3`. Point this at the R2 custom domain.
+const String _audioBaseUrl = 'https://audio.alquranreader.com';
 
 /// The recitation audio URL for a global ayah id.
 ///
-/// islamic.network numbers audio by the SAME global 1..6236 ayah index our DB
+/// R2 stores one MP3 per whole ayah, keyed by the SAME global 1..6236 index our DB
 /// uses (Fatiha 1:1 = 1; 2:1 = 8; …), so `ayah.id` maps directly — no table.
-///
-// NOTE: audio source licence UNVERIFIED — clear islamic.network's redistribution
-// + on-device-caching terms (and any required in-app attribution: reciter Mishary
-// Rashid Alafasy) before flipping FeatureFlags.audioRecitation for release.
 String alafasyUrl(int ayahId) =>
-    'https://cdn.islamic.network/quran/audio/$_bitrateKbps/$_reciterSlug/$ayahId.mp3';
+    '$_audioBaseUrl/recitation/$_cacheNamespace/$ayahId.mp3';
 
 /// Deterministic cache path (relative to the OS cache dir) for a global ayah id.
 /// Same file on every replay → first play streams + caches, replays are offline.

@@ -821,6 +821,105 @@ void main() {
 
       await tester.pump(const Duration(seconds: 2)); // drain timers
     });
+
+    // The tinted verse texts mapped to the exact background color they carry, so
+    // a test can tell the now-playing tint (gold) apart from the peek tint
+    // (green) — not just "is it tinted".
+    Map<String, Color> tintByText(WidgetTester tester) {
+      final paragraph = tester
+          .widgetList<Text>(find.byType(Text))
+          .firstWhere((t) => t.textSpan != null);
+      final out = <String, Color>{};
+      void walk(InlineSpan span) {
+        if (span is TextSpan) {
+          final bg = span.style?.backgroundColor;
+          if (span.text != null && bg != null) out[span.text!] = bg;
+          span.children?.forEach(walk);
+        }
+      }
+
+      walk(paragraph.textSpan!);
+      return out;
+    }
+
+    testWidgets(
+        'now-playing (gold) and the tap-peek (green) never share a tint — '
+        'and starting playback does not drag the peek onto the playing verse',
+        (tester) async {
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahsWithTranslations(1, 3),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: 28,
+                resources: _kResources,
+                selectedLanguages: const {'ur'},
+                onToggleLanguage: (_) {},
+                onTogglePlay: (_) {},
+                audioState: audio,
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      // Open the peek on whichever verse the tap lands on.
+      await _tapText(tester);
+
+      // Before playback the only tinted verse is the tapped peek verse M.
+      final beforePlay = tintByText(tester);
+      expect(beforePlay.length, 1, reason: 'only the tapped verse is tinted');
+      final mText = beforePlay.keys.first;
+      final greenTint = beforePlay[mText]!;
+
+      // Choose a DIFFERENT verse to play, so N != M is guaranteed.
+      const allTexts = ['نص1', 'نص2', 'نص3'];
+      final nText = allTexts.firstWhere((t) => t != mText);
+      final nId = 1000 + (allTexts.indexOf(nText) + 1);
+
+      setOuter(
+        () => audio = AyahAudioState(
+          playingAyahId: nId,
+          status: RecitationStatus.playing,
+        ),
+      );
+      await tester.pump(); // rebuild
+      await tester.pump(); // audio-follow post-frame
+
+      final tints = tintByText(tester);
+      final cs = Theme.of(tester.element(find.byType(MushafView))).colorScheme;
+
+      // The playing verse is gold; the peek verse stays green; they differ.
+      expect(
+        tints[nText],
+        cs.tertiary.withValues(alpha: 0.18),
+        reason: 'the now-playing verse carries the gold tertiary tint',
+      );
+      expect(
+        tints[mText],
+        cs.primary.withValues(alpha: 0.16),
+        reason: 'the peeked verse keeps the green primary tint',
+      );
+      expect(
+        tints[nText],
+        isNot(tints[mText]),
+        reason: 'now-playing and peek must never paint the same tint',
+      );
+      // Decoupled: playback started but the peek did NOT jump onto the verse
+      // that is now playing (that was the stale-selection bug).
+      expect(
+        tints[mText],
+        greenTint,
+        reason: 'the peek stays on the verse the user tapped',
+      );
+
+      await tester.pump(const Duration(seconds: 2)); // drain timers
+    });
   });
 
   // -------------------------------------------------------------------------

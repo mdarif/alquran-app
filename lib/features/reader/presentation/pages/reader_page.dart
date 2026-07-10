@@ -23,6 +23,7 @@ import '../cubit/ayah_audio_cubit.dart';
 import '../cubit/reader_cubit.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
+import '../widgets/reader_player_bar.dart';
 import '../widgets/scroll_to_top_button.dart';
 import '../widgets/translation_chip.dart';
 
@@ -225,6 +226,10 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final isReading = _viewport == _Viewport.reading;
     return Scaffold(
+      // The persistent mini player pins here (outside the body's pinch/swipe
+      // gesture arena); it hides itself when no verse is loaded. Behind the flag.
+      bottomNavigationBar:
+          FeatureFlags.audioRecitation ? const ReaderPlayerBar() : null,
       appBar: AppBar(
         title: Text(_target.title),
         actions: [

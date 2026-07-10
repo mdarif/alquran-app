@@ -136,6 +136,24 @@ class AppIcons {
     fontFamily: _kSymbolFamily,
   ); // error_rounded
 
+  /// Player-bar transport: previous / next verse, and repeat off / repeat-one.
+  static const IconData skipPrevious = IconData(
+    0xe045,
+    fontFamily: _kSymbolFamily,
+  ); // skip_previous_rounded
+  static const IconData skipNext = IconData(
+    0xe044,
+    fontFamily: _kSymbolFamily,
+  ); // skip_next_rounded
+  static const IconData repeat = IconData(
+    0xe040,
+    fontFamily: _kSymbolFamily,
+  ); // repeat_rounded
+  static const IconData repeatOne = IconData(
+    0xe041,
+    fontFamily: _kSymbolFamily,
+  ); // repeat_one_rounded
+
   // ── Navigation ────────────────────────────────────────────────────────────
   /// AppBar back button — wired into the theme's [ActionIconThemeData] so the
   /// auto-generated leading button joins the family instead of the platform
