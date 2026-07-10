@@ -570,6 +570,54 @@ void main() {
       // Drain the one-shot highlight-flash timer so teardown is clean.
       await tester.pump(const Duration(seconds: 2));
     });
+
+    testWidgets(
+        'Last Read advances to the playing verse even when it fits on '
+        'screen', (tester) async {
+      // Regression: a short surah (everything visible) makes the follow skip the
+      // scroll (no pointless jump) — but Last Read must STILL track the reciter,
+      // so a resume lands on the verse you were hearing, not an earlier one.
+      Ayah? reported;
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahs(1, 5), // Al-Fatihah-ish; fits on screen
+                headings: _headings(1, 'Al-Fatihah', 5),
+                arabicFontSize: 28,
+                resources: const [],
+                onVisibleAyah: (a) => reported = a,
+                audioState: audio,
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      for (final n in [1, 2, 3]) {
+        setOuter(
+          () => audio = AyahAudioState(
+            playingAyahId: 1000 + n,
+            status: RecitationStatus.playing,
+          ),
+        );
+        await tester.pump(); // didUpdateWidget
+        await tester.pump(); // post-frame follow + report
+        await tester.pump(const Duration(milliseconds: 500)); // debounce
+      }
+      await tester.pump(const Duration(seconds: 2)); // drain flash timer
+
+      expect(
+        reported?.id,
+        1003,
+        reason: 'Last Read froze on an earlier verse while audio advanced',
+      );
+    });
   });
 
   group('MushafView — now-playing tint + peek follow', () {

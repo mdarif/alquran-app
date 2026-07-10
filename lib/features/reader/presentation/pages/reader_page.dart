@@ -1022,7 +1022,11 @@ class _DetailedListState extends State<_DetailedList> {
       listenWhen: (a, b) => a.playingAyahId != b.playingAyahId,
       listener: (_, state) {
         final id = state.playingAyahId;
-        if (id != null) _scrollToFocus(id);
+        // resume: true PINS Last Read to the reciter and records it now — the
+        // playing verse IS the reader's place. Without the pin, the debounced
+        // report drifts Last Read to the topmost tile, which sits a verse BEHIND
+        // the one being recited (the focus-alignment leaves the prior verse on top).
+        if (id != null) _scrollToFocus(id, resume: true);
       },
       child: content,
     );

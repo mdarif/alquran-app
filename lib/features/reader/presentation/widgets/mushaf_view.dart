@@ -142,6 +142,11 @@ class _MushafViewState extends State<MushafView>
   // drift it; cleared the moment the reader finger-scrolls.
   int? _heldFocusId;
 
+  // Set when a scroll-to-top disturbed the view mid-playback, so the NEXT reciter
+  // advance re-homes with a corrective pass even if its first scroll looked precise
+  // (the single scroll can be interrupted by the scroll-to-top animation).
+  bool _forceFollowCorrection = false;
+
   // Tap-to-peek translation card.
   Ayah? _selectedAyah; // highlighted verse (null = none)
   Ayah? _shownAyah; // kept during slide-out so card doesn't blink
@@ -289,17 +294,24 @@ class _MushafViewState extends State<MushafView>
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           final precise = _scrollFollowVerse(ayah.id);
-          // Pin the reciter so the post-scroll report saves the PLAYING verse as
-          // Last Read — not whatever verse is topmost after the follow-scroll.
-          // Set AFTER the scroll, which clears the pin. A finger-scroll during
-          // playback still releases it (see the ScrollStartNotification handler);
-          // a pause keeps playingAyahId, so the pin holds the paused verse too.
+          // Pin the reciter so the report saves the PLAYING verse as Last Read —
+          // not whatever verse is topmost. Set AFTER the scroll (which clears the
+          // pin). A finger-scroll during playback still releases it (see the
+          // ScrollStartNotification handler); a pause keeps playingAyahId, so the
+          // pin holds the paused verse too.
           _heldFocusId = ayah.id;
-          // Only re-scroll when the first pass had to ESTIMATE (the verse's chunk
-          // was off-screen — a page turn / big jump). A precise within-page advance
-          // is already correct, so skipping the second scroll kills the little
-          // double-scroll "jump" that fired on every verse.
-          if (!precise) {
+          // REPORT it now, directly — Last Read must track the reciter even when
+          // the follow SKIPS the scroll (a short surah that fits on screen, or the
+          // verse already near the top after a scroll-to-top). Relying on the
+          // scroll's ScrollEnd would leave Last Read frozen on an earlier verse.
+          _reportTopmost();
+          // Re-home once more after the layout settles when the first pass had to
+          // ESTIMATE (off-screen chunk — a page turn / big jump), or when a
+          // scroll-to-top just disturbed the view (its single scroll can be
+          // interrupted). A precise within-page advance is already correct, so
+          // skipping the second scroll otherwise kills the double-scroll "jump".
+          if (!precise || _forceFollowCorrection) {
+            _forceFollowCorrection = false;
             _followCorrectTimer = Timer(const Duration(milliseconds: 480), () {
               if (!mounted) return;
               _scrollFollowVerse(ayah.id);
@@ -617,6 +629,13 @@ class _MushafViewState extends State<MushafView>
 
   void _scrollToTop() {
     if (!_scrollCtrl.isAttached) return;
+    // A deliberate jump to the surah start. Drop the reciter pin (Last Read now
+    // tracks the top, like a finger-scroll) and cancel any pending follow
+    // correction so it can't yank the view back. If audio is playing, flag the
+    // NEXT advance to fully re-home so the follow reliably returns to the reciter.
+    _heldFocusId = null;
+    _followCorrectTimer?.cancel();
+    if (widget.audioState?.playingAyahId != null) _forceFollowCorrection = true;
     _scrollCtrl.scrollTo(
       index: 0,
       alignment: 0,
