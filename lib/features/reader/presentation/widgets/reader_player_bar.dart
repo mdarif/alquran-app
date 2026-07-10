@@ -4,46 +4,29 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/audio/ayah_recitation_player.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../domain/entities/ayah.dart';
 import '../cubit/ayah_audio_cubit.dart';
 import '../cubit/reader_cubit.dart';
 
 /// Reciter name shown in the player (single reciter for now; a picker is a
-/// follow-up — see the audio plan). Mirrors the attribution in credits_page.
+/// follow-up). Mirrors the attribution in credits_page.
 const String _kReciterName = 'Mishary Rashid Alafasy';
 
 const List<double> _kSpeeds = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-
-/// "{Surah} · {ayah}" for the verse currently loaded in the player, resolved from
-/// the reader's loaded section. Null if the verse isn't in the section (shouldn't
-/// happen — audio is section-bounded).
-String? _nowPlayingRef(ReaderState s, int? playingId) {
-  if (playingId == null) return null;
-  Ayah? ayah;
-  for (final a in s.ayahs) {
-    if (a.id == playingId) {
-      ayah = a;
-      break;
-    }
-  }
-  if (ayah == null) return null;
-  final name = s.headings[ayah.surahId]?.nameEnglish ?? 'Surah ${ayah.surahId}';
-  return '$name · ${ayah.ayahNumber}';
-}
 
 /// The index of [id] in the loaded section, or -1. Drives the prev/next enable
 /// state (disabled at the section's first/last verse).
 int _indexOf(ReaderState s, int? id) =>
     id == null ? -1 : s.ayahs.indexWhere((a) => a.id == id);
 
-/// Always-on player pinned below the reader in BOTH viewports — the single
-/// playback surface (there are no per-verse play buttons in Reading). Lives in the
-/// Scaffold's bottomNavigationBar slot, so it's outside the reader's pinch/swipe
-/// gesture arena.
+/// Always-on, **single-row** player pinned below the reader in both viewports —
+/// the whole playback UI (deliberately minimal: no modal sheet, no seek scrubber,
+/// no stop). Lives in the Scaffold's bottomNavigationBar slot, outside the
+/// reader's pinch/swipe gesture arena.
 ///
-/// Two states: **idle** (nothing loaded) shows the cued verse + a Play that starts
-/// it; **active** (playing/paused/loading/error) shows the now-playing verse, a
-/// thin progress line, and the full transport (tap the row → the full sheet).
+/// - **Idle** (nothing loaded): a Play + the reciter's name.
+/// - **Active** (playing / paused / loading / error): a thin progress line over
+///   one row — `repeat · prev · play-pause · next · speed`. There's no verse
+///   label; the gold-highlighted verse on the page shows which one is playing.
 class ReaderPlayerBar extends StatelessWidget {
   const ReaderPlayerBar({this.queuedAyahId, super.key});
 
@@ -87,7 +70,7 @@ class ReaderPlayerBar extends StatelessWidget {
   }
 }
 
-/// The active transport row (a verse is loaded). Tap the row → the full sheet.
+/// Active transport — everything in one row (no sheet, no scrubber, no stop).
 class _ActiveRow extends StatelessWidget {
   const _ActiveRow({required this.audio});
   final AyahAudioState audio;
@@ -98,41 +81,28 @@ class _ActiveRow extends StatelessWidget {
     final idx = _indexOf(reader, audio.playingAyahId);
     final hasPrev = idx > 0;
     final hasNext = idx >= 0 && idx < reader.ayahs.length - 1;
-    return InkWell(
-      onTap: () => _openPlayerSheet(context),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          Expanded(child: _NowPlayingLabel(audio: audio)),
-          _TransportButton(
-            keyValue: WidgetKeys.playerBarPrev,
-            icon: AppIcons.skipPrevious,
-            tooltip: 'Previous verse',
-            onPressed: hasPrev
-                ? () => context.read<AyahAudioCubit>().playPrevious()
-                : null,
-          ),
-          _PlayPauseButton(
-            keyValue: WidgetKeys.playerBarPlay,
-            audio: audio,
-            size: AppIconSize.action,
-          ),
-          _TransportButton(
-            keyValue: WidgetKeys.playerBarNext,
-            icon: AppIcons.skipNext,
-            tooltip: 'Next verse',
-            onPressed: hasNext
-                ? () => context.read<AyahAudioCubit>().playNext()
-                : null,
-          ),
-          _TransportButton(
-            keyValue: WidgetKeys.playerBarClose,
-            icon: AppIcons.close,
-            tooltip: 'Stop',
-            onPressed: () => context.read<AyahAudioCubit>().stopAll(),
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _RepeatButton(audio: audio),
+        _TransportButton(
+          keyValue: WidgetKeys.playerBarPrev,
+          icon: AppIcons.skipPrevious,
+          tooltip: 'Previous verse',
+          onPressed: hasPrev
+              ? () => context.read<AyahAudioCubit>().playPrevious()
+              : null,
+        ),
+        _PlayPauseButton(keyValue: WidgetKeys.playerBarPlay, audio: audio),
+        _TransportButton(
+          keyValue: WidgetKeys.playerBarNext,
+          icon: AppIcons.skipNext,
+          tooltip: 'Next verse',
+          onPressed:
+              hasNext ? () => context.read<AyahAudioCubit>().playNext() : null,
+        ),
+        _SpeedButton(audio: audio),
+      ],
     );
   }
 }
@@ -211,44 +181,12 @@ class _ProgressLine extends StatelessWidget {
   }
 }
 
-class _NowPlayingLabel extends StatelessWidget {
-  const _NowPlayingLabel({required this.audio});
-  final AyahAudioState audio;
-
-  @override
-  Widget build(BuildContext context) {
-    final reader = context.watch<ReaderCubit>().state;
-    final ref = _nowPlayingRef(reader, audio.playingAyahId) ?? 'Recitation';
-    final t = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          ref,
-          style: t.bodyMedium,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        Text(
-          _kReciterName,
-          style: t.bodySmall
-              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
-
 class _TransportButton extends StatelessWidget {
   const _TransportButton({
     required this.keyValue,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.size = AppIconSize.action,
   });
 
   final Key keyValue;
@@ -256,13 +194,12 @@ class _TransportButton extends StatelessWidget {
   final String tooltip;
   // Null → the button renders disabled (dimmed) — e.g. prev/next at a bound.
   final VoidCallback? onPressed;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
     return IconButton(
       key: keyValue,
-      icon: AppIcon(icon, size: size),
+      icon: AppIcon(icon, size: AppIconSize.action),
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
       onPressed: onPressed,
@@ -270,22 +207,17 @@ class _TransportButton extends StatelessWidget {
   }
 }
 
-/// Session play/pause (with loading spinner and error-retry), keyed off the
-/// audio status. Calls `toggle` on the loaded verse, matching the per-verse
-/// buttons' semantics.
+/// Play/pause (with a loading spinner and error-retry), keyed off the audio
+/// status. Calls `toggle` on the loaded verse.
 class _PlayPauseButton extends StatelessWidget {
-  const _PlayPauseButton({
-    required this.keyValue,
-    required this.audio,
-    this.size = AppIconSize.action,
-  });
+  const _PlayPauseButton({required this.keyValue, required this.audio});
 
   final Key keyValue;
   final AyahAudioState audio;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
+    const size = AppIconSize.action;
     final cs = Theme.of(context).colorScheme;
     final id = audio.playingAyahId;
     if (audio.status == RecitationStatus.loading) {
@@ -316,217 +248,6 @@ class _PlayPauseButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       onPressed:
           id == null ? null : () => context.read<AyahAudioCubit>().toggle(id),
-    );
-  }
-}
-
-/// Opens the expanded full player.
-void _openPlayerSheet(BuildContext context) {
-  final audioCubit = context.read<AyahAudioCubit>();
-  final readerCubit = context.read<ReaderCubit>();
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    builder: (_) => MultiBlocProvider(
-      providers: [
-        BlocProvider.value(value: audioCubit),
-        BlocProvider.value(value: readerCubit),
-      ],
-      child: const ReaderPlayerSheet(),
-    ),
-  );
-}
-
-/// The expanded full player: reciter, now-playing reference, a seek scrubber, the
-/// full transport (prev / play-pause / next), repeat, speed, and a continuous
-/// toggle. Reads transport state from [AyahAudioCubit]; position from its
-/// progressStream (scoped to the scrubber).
-class ReaderPlayerSheet extends StatelessWidget {
-  const ReaderPlayerSheet({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
-    return BlocBuilder<AyahAudioCubit, AyahAudioState>(
-      builder: (context, audio) {
-        final reader = context.watch<ReaderCubit>().state;
-        final ref = _nowPlayingRef(reader, audio.playingAyahId) ?? 'Recitation';
-        final idx = _indexOf(reader, audio.playingAyahId);
-        final hasPrev = idx > 0;
-        final hasNext = idx >= 0 && idx < reader.ayahs.length - 1;
-        return SafeArea(
-          top: false,
-          child: Padding(
-            key: WidgetKeys.playerSheet,
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  ref,
-                  style: t.titleMedium,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _kReciterName,
-                  style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
-                _Scrubber(cs: cs),
-                const SizedBox(height: 4),
-                // One transport row — repeat mode + speed flank prev / play / next.
-                // Autoplay (verse→verse→next surah) is the default, so there's no
-                // separate continuous switch. Keeps the sheet short.
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _RepeatButton(audio: audio),
-                    _TransportButton(
-                      keyValue: WidgetKeys.playerBarPrev,
-                      icon: AppIcons.skipPrevious,
-                      tooltip: 'Previous verse',
-                      size: AppIconSize.bar,
-                      onPressed: hasPrev
-                          ? () => context.read<AyahAudioCubit>().playPrevious()
-                          : null,
-                    ),
-                    _BigPlayPause(audio: audio),
-                    _TransportButton(
-                      keyValue: WidgetKeys.playerBarNext,
-                      icon: AppIcons.skipNext,
-                      tooltip: 'Next verse',
-                      size: AppIconSize.bar,
-                      onPressed: hasNext
-                          ? () => context.read<AyahAudioCubit>().playNext()
-                          : null,
-                    ),
-                    _SpeedButton(audio: audio),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// The seek slider. Local drag state so dragging isn't yanked by the incoming
-/// position stream; commits on drag end via `seek`.
-class _Scrubber extends StatefulWidget {
-  const _Scrubber({required this.cs});
-  final ColorScheme cs;
-
-  @override
-  State<_Scrubber> createState() => _ScrubberState();
-}
-
-class _ScrubberState extends State<_Scrubber> {
-  double? _dragValue; // 0..1 while dragging; null otherwise
-
-  String _fmt(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<PlaybackProgress>(
-      stream: context.read<AyahAudioCubit>().progress,
-      builder: (context, snap) {
-        final p = snap.data ?? const PlaybackProgress();
-        final dur = p.duration ?? Duration.zero;
-        final durMs = dur.inMilliseconds;
-        final posFrac = durMs > 0
-            ? (p.position.inMilliseconds / durMs).clamp(0.0, 1.0)
-            : 0.0;
-        final value = _dragValue ?? posFrac;
-        return Column(
-          children: [
-            Slider(
-              key: WidgetKeys.playerScrubber,
-              value: value,
-              onChanged:
-                  durMs > 0 ? (v) => setState(() => _dragValue = v) : null,
-              onChangeEnd: durMs > 0
-                  ? (v) {
-                      context.read<AyahAudioCubit>().seek(
-                            Duration(milliseconds: (v * durMs).round()),
-                          );
-                      setState(() => _dragValue = null);
-                    }
-                  : null,
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _fmt(Duration(milliseconds: (value * durMs).round())),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  Text(
-                    _fmt(dur),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _BigPlayPause extends StatelessWidget {
-  const _BigPlayPause({required this.audio});
-  final AyahAudioState audio;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final id = audio.playingAyahId;
-    final isPlaying = audio.status == RecitationStatus.playing;
-    final isLoading = audio.status == RecitationStatus.loading;
-    final isError = audio.status == RecitationStatus.error;
-    return SizedBox(
-      width: 64,
-      height: 64,
-      child: isLoading
-          ? const Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 3),
-              ),
-            )
-          : IconButton.filled(
-              key: WidgetKeys.playerSheetPlay,
-              iconSize: 36,
-              icon: AppIcon(
-                isError
-                    ? AppIcons.audioError
-                    : (isPlaying ? AppIcons.pause : AppIcons.play),
-                size: 36,
-                color: cs.onPrimary,
-              ),
-              onPressed: id == null
-                  ? null
-                  : () => context.read<AyahAudioCubit>().toggle(id),
-            ),
     );
   }
 }

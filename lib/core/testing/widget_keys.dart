@@ -52,19 +52,13 @@ class WidgetKeys {
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');
   static const peekPlayButton = Key('reader-peek-play-button');
-  // Persistent player bar (mini) + its transport controls.
+  // Persistent single-row player bar + its inline transport controls.
   static const playerBar = Key('reader-player-bar');
   static const playerBarPlay = Key('reader-player-bar-play');
   static const playerBarPrev = Key('reader-player-bar-prev');
   static const playerBarNext = Key('reader-player-bar-next');
-  static const playerBarClose = Key('reader-player-bar-close');
-  // Expanded full player sheet + its controls.
-  static const playerSheet = Key('reader-player-sheet');
-  static const playerSheetPlay = Key('reader-player-sheet-play');
-  static const playerScrubber = Key('reader-player-scrubber');
   static const playerSpeed = Key('reader-player-speed');
   static const playerRepeat = Key('reader-player-repeat');
-  static const playerContinuous = Key('reader-player-continuous');
 
   // Prayer times
   static const nextPrayerPill = Key('next-prayer-pill');
