@@ -243,9 +243,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     return Scaffold(
       // The always-on player pins here (outside the body's pinch/swipe gesture
       // arena). It's the single playback surface in both viewports; when idle its
-      // Play starts the queued verse (the one the reader tapped). Behind the flag.
+      // Play starts the queued verse (a tapped verse) or, failing that, the CURRENT
+      // reading position (_focusAyahId — the Last Read resume verse, or the topmost
+      // as you scroll) so it plays from where you are, not the surah's first verse.
+      // Behind the flag.
       bottomNavigationBar: FeatureFlags.audioRecitation
-          ? ReaderPlayerBar(queuedAyahId: _queuedAyahId)
+          ? ReaderPlayerBar(queuedAyahId: _queuedAyahId ?? _focusAyahId)
           : null,
       appBar: AppBar(
         title: Text(_target.title),
@@ -551,10 +554,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void _onVisibleAyah(Ayah ayah) {
     // Advance the resume target to the live position. This is what the *next*
     // viewport built (on a Reading⇄Detailed toggle) homes to — so a toggle keeps
-    // your place instead of snapping back to the original open/resume verse.
-    // Deliberately no setState: the value is only read when a build next runs,
-    // and re-passing it to the current viewport is inert (focus-scroll runs only
-    // in initState), so this never re-homes the view you're already reading.
+    // your place instead of snapping back to the original open/resume verse; it's
+    // also the idle player's "play from here" target (queuedAyahId ?? _focusAyahId).
+    // Deliberately no setState: the value is only read when a build next runs, and
+    // re-passing it to the current viewport is inert (focus-scroll runs only in
+    // initState), so this never re-homes the view you're already reading — nor is
+    // it safe to setState here (this also fires from MushafView.dispose()).
     _focusAyahId = ayah.id;
     _cubit.saveProgress(ayah);
   }

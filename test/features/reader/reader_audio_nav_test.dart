@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:al_quran/core/audio/ayah_recitation_player.dart';
+import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
@@ -225,6 +226,32 @@ void main() {
       player.lastPlayed,
       3001,
       reason: 'autoplay rolls into the next surah',
+    );
+  });
+
+  testWidgets('idle Play starts from the resumed verse, not the surah top',
+      (tester) async {
+    // Landing from Last Read at 2:3 and hitting the idle Play must recite from
+    // 2:3 — the bar targets the current reading position (queuedAyahId ??
+    // _focusAyahId), not the surah's first verse.
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ReaderPage(
+          target: ReaderTarget.surah(2, 'Al-Baqarah'),
+          focusAyahId: 2003,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(WidgetKeys.playerBarPlay));
+    await tester.pumpAndSettle();
+
+    expect(
+      player.lastPlayed,
+      2003,
+      reason:
+          'idle Play should resume the recited verse (2:3), not jump to 2:1',
     );
   });
 }
