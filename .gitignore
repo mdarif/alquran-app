@@ -49,3 +49,8 @@ android/key.properties
 
 # Scratch / working art (brand previews, masks, rasterized PDFs)
 tmp/
+
+# Recitation audio staging — fetched MP3s live here on their way to R2, never
+# committed (R2 is the store; see tool/audio/README.md).
+tool/audio/staging/
+tool/audio/__pycache__/
