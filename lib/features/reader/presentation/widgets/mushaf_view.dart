@@ -64,10 +64,7 @@ class MushafView extends StatefulWidget {
     this.selectedLanguages = const {},
     this.onRegisterFlush,
     this.audioState,
-    this.onTogglePlay,
     this.onToggleLanguage,
-    this.showTranslation = true,
-    this.onToggleTranslation,
     this.showPeek = false,
     this.onSelectVerse,
     super.key,
@@ -101,25 +98,12 @@ class MushafView extends StatefulWidget {
   final void Function(VoidCallback?)? onRegisterFlush;
 
   /// Live recitation state (audio feature on); null when off. Drives the sticky
-  /// now-playing highlight and the peek card's play button.
+  /// now-playing highlight in the page (the gold verse) and the peek's follow.
   final AyahAudioState? audioState;
-
-  /// Toggle recitation for the given global ayah id. Null hides the peek card's
-  /// play control (the flag-off path renders exactly as before).
-  final ValueChanged<int>? onTogglePlay;
 
   /// Toggle a translation edition in the shared selection (from the peek card's
   /// inline language chips, which also drive Detailed view). Null hides them.
   final ValueChanged<String>? onToggleLanguage;
-
-  /// Whether the peek card shows the translation text (and its language chips).
-  /// False → a slim play/stepper-only peek, so the reader can read/listen to the
-  /// Arabic alone. The verse page itself is Arabic-only either way.
-  final bool showTranslation;
-
-  /// Collapse/expand the peek's translation (the in-card toggle). Null hides the
-  /// toggle (e.g. on the inert off-screen pages).
-  final VoidCallback? onToggleTranslation;
 
   /// Whether a verse tap opens the translation peek card at all. Default false —
   /// the always-on player owns playback, so a tap just SELECTS the verse (the

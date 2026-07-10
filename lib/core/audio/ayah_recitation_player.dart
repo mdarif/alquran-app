@@ -29,8 +29,9 @@ class RecitationPlayback extends Equatable {
   List<Object?> get props => [ayahId, status];
 }
 
-/// Playback position within the current verse's file, for the scrubber. Rides its
-/// own stream (NOT the cubit's state) so a ~5×/s tick never rebuilds the reader.
+/// Playback position within the current verse's file, for the bar's progress
+/// line. Rides its own stream (NOT the cubit's state) so a ~5×/s tick never
+/// rebuilds the reader.
 class PlaybackProgress extends Equatable {
   const PlaybackProgress({
     this.position = Duration.zero,
@@ -60,7 +61,7 @@ abstract interface class AyahRecitationPlayer {
   Stream<RecitationPlayback> get playbackStream;
 
   /// Position/duration within the current verse's file (~5×/s while playing), for
-  /// the scrubber. Separate from [playbackStream] to avoid rebuild storms.
+  /// the bar's progress line. Separate from [playbackStream] to avoid rebuild storms.
   Stream<PlaybackProgress> get progressStream;
 
   /// Stream + cache the given verse and start playing it. Stops any previous one.
@@ -109,7 +110,7 @@ class JustAudioRecitationPlayer implements AyahRecitationPlayer {
       (_) {},
       onError: (Object _, StackTrace __) => _emit(RecitationStatus.error),
     );
-    // Throttled position ticks (~5×/s) for the scrubber, off its own stream.
+    // Throttled position ticks (~5×/s) for the progress line, off its own stream.
     _positionSub = _player
         .createPositionStream(
       minPeriod: const Duration(milliseconds: 200),

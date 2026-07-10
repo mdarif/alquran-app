@@ -79,20 +79,10 @@ class _FakeSettings implements ReaderSettingsRepository {
   Future<void> setSelectedTranslations(List<String> codes) async =>
       selectedTranslations = codes;
   @override
-  bool readingTranslationVisible = true;
-  @override
-  Future<void> setReadingTranslationVisible(bool value) async =>
-      readingTranslationVisible = value;
-  @override
   double recitationSpeed = 1.0;
-  @override
-  bool continuousRecitation = true;
   @override
   Future<void> setRecitationSpeed(double value) async =>
       recitationSpeed = value;
-  @override
-  Future<void> setContinuousRecitation(bool value) async =>
-      continuousRecitation = value;
   @override
   bool showTranslationPeek = false;
   @override

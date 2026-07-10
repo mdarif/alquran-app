@@ -45,19 +45,6 @@ void main() {
       expect(repo.selectedTranslations, ['ur']);
     });
 
-    test('reading translation: defaults to visible (true)', () async {
-      final repo = await _repo();
-      expect(repo.readingTranslationVisible, isTrue);
-    });
-
-    test('reading translation: persists hide, then show', () async {
-      final repo = await _repo();
-      await repo.setReadingTranslationVisible(false);
-      expect(repo.readingTranslationVisible, isFalse);
-      await repo.setReadingTranslationVisible(true);
-      expect(repo.readingTranslationVisible, isTrue);
-    });
-
     test('script: defaults to Uthmani', () async {
       final repo = await _repo();
       expect(repo.script, ArabicScript.uthmani);

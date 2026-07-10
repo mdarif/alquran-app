@@ -45,18 +45,18 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   dimmer shade while paused), which also gives the paused verse a resume anchor.
 - **Decision needed (owner):** keep as-is, or a dimmer "paused here" tint in Reading.
 
-### 3. No explicit stop / clear for audio; a paused verse stays "active" — RESOLVED-ish
-- **Update (2026-07-10):** the player bar's **close (✕)** button is now a dedicated
-  Stop (`stopAll`), so there IS an explicit clear. The jump-back-to-a-long-paused-verse
-  edge below only applies if you don't stop first. Keeping the note for that edge only.
+### 3. No explicit stop / clear for audio; a paused verse stays "active" — BY DESIGN
+- **Update (2026-07-10, slim player):** the ✕ Stop was **removed** — owner wanted a
+  "super simple" quran.com-style bar (pause is the stop). So there is again no explicit
+  clear: **Pause** halts playback but keeps the verse loaded (the bar stays on it so you
+  can resume, the gold tint persists); the session only clears on `stopAll` — swiping to
+  another section or leaving the reader. This is intentional and quran.com-like.
 - **Area:** reader · audio
-- **Symptom / context:** Once a verse is active it stays active (even paused) until
-  you swipe to another section or leave the reader — there's no dedicated stop
-  control. This is now *leveraged intentionally*: a paused verse is still "the current
-  verse", which is why a viewport switch homes to it. The only edge is a long-paused
-  verse that the reader has scrolled far away from — a switch will jump back to it.
-- **Impact:** Benign for v1 and the less-common flow. Revisit only if that jump-back
-  ever surprises people (e.g. add a stop affordance or auto-clear-on-idle).
+- **Symptom / context:** A paused verse is still "the current verse", which is why a
+  viewport switch homes to it. The only edge is a long-paused verse the reader has
+  scrolled far away from — a switch will jump back to it.
+- **Impact:** Benign. Revisit only if that jump-back ever surprises people (e.g.
+  auto-clear-on-idle after N minutes paused).
 
 ### 6. Reading peek card reopens on every verse during continuous playback — RESOLVED
 - **Resolved (2026-07-10):** the audio-follow is now **decoupled** from the peek (the
@@ -78,40 +78,23 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 - **Not a release blocker** — informational log only; rendering is correct today
   (shipped fine through 1.1.1).
 
-### 7. Continuous "play from here" stops at the surah end (no roll to next surah) — ENHANCEMENT
-- **Area:** reader · audio
-- **Symptom:** Continuous playback stops when the last verse of the surah finishes
-  (`_nextAfter` returns null at the section end). A listener may expect it to flow
-  into the next surah.
-- **Note:** v1 is Surah-only nav, so a section = one surah. Rolling into the next
-  surah needs loading the next section + repushing the sequence, and a product call
-  on auto-advancing chapters. **Explicitly deferred out of the 2026-07-10 audio-player
-  MVP** (owner-chosen scope) — the cubit `completed` branch is already structured so a
-  future `onSequenceEnd` handoff drops in without reworking it.
+### 7. Continuous play rolls into the next surah at the section end — RESOLVED
+- **Resolved (2026-07-10):** cross-surah autoplay shipped. When the last verse of a
+  section finishes, the cubit fires `onSequenceEnd`; the reader animates to the next
+  page (`_autoAdvanceSection`) and, once that section's verses load, plays its first
+  verse — quran.com-style continuous listening across chapters. Autoplay is now
+  **unconditional** (see LEARNINGS §3): it was briefly gated on a persisted
+  "continuous" flag that could sit `false` and silently stop after one verse; that
+  whole setting has been removed. (Left here as a pointer; see Resolved below.)
 
-### 10. Reading ‹/› stepper is still page-granular (reciter drift (d) now fixed) — UX
-- **Area:** reader · reading-view · peek card
-- **(d) reciter drift is RESOLVED** (2026-07-10) — the reciter-follow now scrolls the
-  playing verse to the top **within the flowing paragraph** (measured negative-alignment,
-  no chunk split); see Resolved below. These three **stepper** items were deliberately
-  left out to keep that change tight:
-  - (a) With the translation panel open, stepping ‹/› to the next verse doesn't scroll
-    the surah up to reveal it — the selected verse can sit behind the (tall) card.
-  - (b) With the panel minimized, stepping ‹/› across a page boundary doesn't carry the
-    page + selection across gracefully.
-  - (c) Tapping next repeatedly doesn't scroll progressively — the highlight advances
-    but the page only moves when a chunk goes fully off screen (static, then jumps).
-- **Root cause:** the ‹/› stepper still scrolls at page-CHUNK granularity via
-  `_scrollToFocus(onlyIfNeeded:true)` — within a page consecutive verses map to the SAME
-  chunk row, and the `_rowVisible` skip is lenient (ANY viewport overlap counts as
-  visible), so the stepped verse can sit low/behind the card (a/c); cross-page
-  hard-aligns the next chunk (b).
-- **Approach:** route the ‹/› stepper through the same `_scrollFollowVerse` the
-  reciter-follow now uses (measured negative-alignment scroll to the verse's position
-  *within* the flowing paragraph, above the peek card) instead of the page-chunk
-  `_scrollToFocus`. Must not re-introduce the item-9 jump (the "stepper does not
-  re-scroll a visible verse" test); needs on-device tuning for card-height. Lower
-  priority now that the core listening follow (d) is fixed.
+### 10. Reading peek ‹/› stepper — OBSOLETE (stepper removed)
+- **Obsolete (2026-07-10, slim player):** the Reading peek was reduced to a
+  **translation-only** card (the always-on player bar owns all playback + verse
+  stepping via prev/next). The peek's in-card ‹/› stepper, play button and language
+  eye were removed, so the page-granular stepper-scroll problems (a/b/c) no longer
+  exist. The reciter-follow drift (d) is separately resolved (measured
+  negative-alignment scroll within the flowing paragraph; see Resolved). Verse-to-verse
+  navigation now goes through the bar's prev/next, which drives that same follow.
 
 ---
 
@@ -128,6 +111,23 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Resolved
 
+- **2026-07-10 — Audio player v2: slim always-on bar, opt-in peek, unconditional
+  autoplay + cross-surah, RTL paging (supersedes the MVP entry below).** On-device
+  iteration reshaped the player MVP toward quran.com minimalism: (1) the modal player
+  **sheet**, the per-verse **seek scrubber**, the big play button and the **✕ Stop** were
+  all removed — the player is now a **single row** in the always-on bar (`repeat · prev ·
+  play/pause · next · speed` over a 2px progress line; idle = play + reciter name). (2) The
+  translation **peek** is decoupled from playback entirely and is now **opt-in** behind a
+  Reading-only "Show translation" setting (default off) — a tap otherwise just selects/queues
+  the verse for the bar. (3) **Autoplay is unconditional** and rolls **across surahs**
+  (`onSequenceEnd` → reader `_autoAdvanceSection`); the persisted "continuous" gate that
+  could stop after one verse was **deleted** (whole setting + state + `readingTranslationVisible`
+  removed). (4) Reading pages now swipe **RTL/Mushaf-wise** (right → next surah). (5) Fixed an
+  `_elements.contains` crash from a re-entrant parent `setState` during
+  `MushafView.didUpdateWidget` (clear the local selection without notifying the parent
+  mid-build). Tests: `reader_player_bar_test.dart` (slim inline bar), `ayah_audio_cubit_test.dart`
+  (repeat-all loop + cross-surah `onSequenceEnd`), `mushaf_view_test.dart` (tint-split + crash
+  regression), RTL swipe flips. See LEARNINGS §3.
 - **2026-07-10 — Stale verse selection during playback + no session transport (audio
   player MVP).** In Reading, playing verse N then tapping another verse M left N
   highlighted **and** showed a stale Play button on M until playback transitioned —

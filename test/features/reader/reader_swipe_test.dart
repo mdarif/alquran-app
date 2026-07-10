@@ -187,20 +187,10 @@ class _FakeSettings implements ReaderSettingsRepository {
   Future<void> setSelectedTranslations(List<String> codes) async =>
       selectedTranslations = codes;
   @override
-  bool readingTranslationVisible = true;
-  @override
-  Future<void> setReadingTranslationVisible(bool value) async =>
-      readingTranslationVisible = value;
-  @override
   double recitationSpeed = 1.0;
-  @override
-  bool continuousRecitation = true;
   @override
   Future<void> setRecitationSpeed(double value) async =>
       recitationSpeed = value;
-  @override
-  Future<void> setContinuousRecitation(bool value) async =>
-      continuousRecitation = value;
   @override
   // On for these tests: the shared-selection test taps a verse and expects the
   // translation peek to open. (Production default is off.)

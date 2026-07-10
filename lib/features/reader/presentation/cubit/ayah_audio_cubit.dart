@@ -8,9 +8,10 @@ import '../../domain/repositories/reader_settings_repository.dart';
 
 part 'ayah_audio_state.dart';
 
-/// How playback repeats. `off` plays through (continuous, if enabled) then stops;
-/// `one` loops the current verse; `all` loops the whole surah (plays through, then
-/// restarts at the first verse). (Verse-range repeat for hifz is a follow-up.)
+/// How playback repeats. `off` plays straight through the surah, then hands off to
+/// the next one (see [onSequenceEnd]); `one` loops the current verse; `all` loops
+/// the whole surah (plays through, then restarts at the first verse). (Verse-range
+/// repeat for hifz is a follow-up.)
 enum RecitationRepeat { off, one, all }
 
 /// Drives single-ayah recitation for the reader. Holds which verse is active and
@@ -21,11 +22,10 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   AyahAudioCubit(this._player, [this._settings])
       : super(const AyahAudioState()) {
     _sub = _player.playbackStream.listen(_onPlayback);
-    // Restore persisted transport settings and apply speed to the shared player.
+    // Restore the persisted playback speed and apply it to the shared player.
     final s = _settings;
     if (s != null) {
       _speed = s.recitationSpeed;
-      _continuous = s.continuousRecitation;
       unawaited(_player.setSpeed(_speed));
       emit(_withSettings(state));
     }
@@ -40,11 +40,9 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   List<int> _sequence = const [];
 
   // Transport settings — held as fields so the fresh states built in _onPlayback
-  // carry them (never reset to defaults). Speed + continuous persist; repeat is
-  // session-only.
+  // carry them (never reset to defaults). Speed persists; repeat is session-only.
   double _speed = 1.0;
   RecitationRepeat _repeat = RecitationRepeat.off;
-  bool _continuous = true;
 
   /// Autoplay reached the section's LAST verse with nothing left in this section:
   /// the reader hooks this to roll into the next surah (the cubit only knows one
@@ -52,8 +50,8 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   /// invoked under repeat-verse (loops at the player) or repeat-surah (loops here).
   void Function()? onSequenceEnd;
 
-  /// Playback position/duration for the scrubber — a separate stream so its
-  /// ~5×/s tick never rebuilds the reader (the state carries no position).
+  /// Playback position/duration for the bar's 2px progress line — a separate
+  /// stream so its ~5×/s tick never rebuilds the reader (state carries no position).
   Stream<PlaybackProgress> get progress => _player.progressStream;
 
   // Re-stamp a state with the current transport settings.
@@ -63,7 +61,6 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
         errorAyahId: s.errorAyahId,
         speed: _speed,
         repeat: _repeat,
-        continuousPlay: _continuous,
       );
 
   /// Teach the cubit the order of the verses on screen, so that when one finishes
@@ -87,9 +84,9 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   }
 
   void _onPlayback(RecitationPlayback p) {
-    // A verse finished on its own: roll into the next one when continuous, else
-    // stop. (repeat-verse loops at the player, so `completed` won't even fire.)
-    // Intercepted here so the UI never sees `completed`.
+    // A verse finished on its own: advance (autoplay is always on). Intercepted
+    // here so the UI never sees `completed`. (repeat-verse loops at the player,
+    // so `completed` won't even fire for it.)
     if (p.status == RecitationStatus.completed) {
       int? next;
       if (_repeat == RecitationRepeat.all) {
@@ -97,10 +94,10 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
         next = _nextAfter(p.ayahId) ??
             (_sequence.isNotEmpty ? _sequence.first : null);
       } else {
-        // Autoplay is the default and ALWAYS on (there is no single-verse mode) —
-        // only an explicit stop (✕) ends playback. Roll to the next verse; at the
-        // surah's LAST verse hand off to the reader to roll into the next surah
-        // (keeping the non-idle state so the bar doesn't flicker during hand-off).
+        // Autoplay is ALWAYS on (no single-verse mode; pause is the only stop).
+        // Roll to the next verse; at the surah's LAST verse hand off to the reader
+        // to roll into the next surah (keeping the non-idle state so the bar
+        // doesn't flicker during the hand-off).
         next = _nextAfter(p.ayahId);
         if (next == null && onSequenceEnd != null) {
           onSequenceEnd!.call();
@@ -110,7 +107,8 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
       if (next != null) {
         _player.play(next); // continues: emits loading→playing for `next`
       } else {
-        // End of surah / single-verse mode → idle (keeps transport settings).
+        // Nothing left to play (last verse, no next-section hand-off) → idle
+        // (keeps transport settings).
         emit(_withSettings(const AyahAudioState()));
       }
       return;
@@ -146,7 +144,8 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     if (p != null) await _player.play(p);
   }
 
-  /// Seek within the current verse's file (the scrubber).
+  /// Seek within the current verse's file. A player capability with no UI in the
+  /// slim bar (the scrubber was retired); kept for a future scrub/verse-progress UI.
   Future<void> seek(Duration position) => _player.seek(position);
 
   /// Set the playback rate (persisted; applied to the shared player).
@@ -155,13 +154,6 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     emit(_withSettings(state));
     await _player.setSpeed(speed);
     await _settings?.setRecitationSpeed(speed);
-  }
-
-  /// Toggle continuous play (roll to the next verse) vs. single-verse (persisted).
-  Future<void> setContinuous(bool value) async {
-    _continuous = value;
-    emit(_withSettings(state));
-    await _settings?.setContinuousRecitation(value);
   }
 
   /// Set the repeat mode (session-only). `one` loops the current verse via the

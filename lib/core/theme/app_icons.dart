@@ -154,12 +154,6 @@ class AppIcons {
     fontFamily: _kSymbolFamily,
   ); // repeat_one_rounded
 
-  /// Continuous play (roll into the next verse) — a "play through the list" glyph.
-  static const IconData continuous = IconData(
-    0xe05f,
-    fontFamily: _kSymbolFamily,
-  ); // playlist_play_rounded
-
   // ── Navigation ────────────────────────────────────────────────────────────
   /// AppBar back button — wired into the theme's [ActionIconThemeData] so the
   /// auto-generated leading button joins the family instead of the platform

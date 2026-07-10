@@ -297,9 +297,8 @@ void main() {
       await playing(3);
       player.calls.clear();
 
-      // The last verse finishing wraps to the first (not idle), even with
-      // continuous off — repeat-all overrides the stop-at-end.
-      await cubit.setContinuous(false);
+      // The last verse finishing wraps to the first (not idle) — repeat-all
+      // overrides the hand-off-at-end.
       player.push(3, RecitationStatus.completed);
       await pumpEventQueue();
       expect(player.calls, ['play(1)']);
@@ -347,9 +346,8 @@ void main() {
   });
 
   group('persisted settings', () {
-    test('restores speed + continuous and applies speed to the player on open',
-        () async {
-      final settings = _FakeSettings(speed: 1.75, continuous: false);
+    test('restores speed and applies it to the player on open', () async {
+      final settings = _FakeSettings(speed: 1.75);
       final p = _FakePlayer();
       final c = AyahAudioCubit(p, settings);
       addTearDown(() async {
@@ -357,11 +355,10 @@ void main() {
       });
       await pumpEventQueue();
       expect(c.state.speed, 1.75);
-      expect(c.state.continuousPlay, false);
       expect(p.calls, contains('setSpeed(1.75)'));
     });
 
-    test('setSpeed / setContinuous persist', () async {
+    test('setSpeed persists', () async {
       final settings = _FakeSettings();
       final p = _FakePlayer();
       final c = AyahAudioCubit(p, settings);
@@ -369,9 +366,7 @@ void main() {
         if (!c.isClosed) await c.close();
       });
       await c.setSpeed(2.0);
-      await c.setContinuous(false);
       expect(settings.recitationSpeed, 2.0);
-      expect(settings.continuousRecitation, false);
     });
   });
 }
@@ -379,14 +374,10 @@ void main() {
 /// In-memory settings fake for the persistence tests — mutable fields so the
 /// cubit's writes are observable (mirrors the fake used across the reader tests).
 class _FakeSettings implements ReaderSettingsRepository {
-  _FakeSettings({double speed = 1.0, bool continuous = true})
-      : recitationSpeed = speed,
-        continuousRecitation = continuous;
+  _FakeSettings({double speed = 1.0}) : recitationSpeed = speed;
 
   @override
   double recitationSpeed;
-  @override
-  bool continuousRecitation;
   @override
   double fontSize = 24;
   @override
@@ -394,16 +385,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   List<String>? selectedTranslations = const [];
   @override
-  bool readingTranslationVisible = true;
-  @override
   ArabicScript script = ArabicScript.uthmani;
 
   @override
   Future<void> setRecitationSpeed(double value) async =>
       recitationSpeed = value;
-  @override
-  Future<void> setContinuousRecitation(bool value) async =>
-      continuousRecitation = value;
   @override
   bool showTranslationPeek = false;
   @override
@@ -418,7 +404,4 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setSelectedTranslations(List<String> codes) async =>
       selectedTranslations = codes;
-  @override
-  Future<void> setReadingTranslationVisible(bool value) async =>
-      readingTranslationVisible = value;
 }

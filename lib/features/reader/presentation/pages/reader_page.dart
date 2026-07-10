@@ -155,12 +155,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // to a sensible default. Restored from settings so it survives restarts.
   late Set<String>? _selected = _settings.selectedTranslations?.toSet();
 
-  // Whether the Reading peek card shows the translation (+ its language chips).
-  // Collapsible from the peek so the reader can read/listen to the Arabic alone;
-  // persisted like the other reading prefs, so it holds across verses + launches.
-  // Reading-only — Detailed is the translation view and ignores this.
-  late bool _readingTranslation = _settings.readingTranslationVisible;
-
   // Whether a Reading tap opens the translation peek at all. Off by default — the
   // always-on player owns playback, so a tap just SELECTS the verse (queues it for
   // the bar's Play). Opt-in from Settings; persisted.
@@ -412,13 +406,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
         audioState: audio,
-        // The peek is translation-only now (the always-on bar owns playback) —
-        // null hides its play button.
-        onTogglePlay: null,
         onToggleLanguage:
             interactive ? (code) => _toggleLang(code, resources) : null,
-        showTranslation: _readingTranslation,
-        onToggleTranslation: interactive ? _toggleReadingTranslation : null,
         // The peek only opens when the reader opts in (Settings); off by default.
         showPeek: _showTranslationPeek,
         // A tap always selects/queues the verse for the player, peek or not.
@@ -705,13 +694,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     }
     setState(() => _selected = current);
     unawaited(_settings.setSelectedTranslations(current.toList()));
-  }
-
-  /// Show/hide the Reading peek card's translation (collapse to read/listen to
-  /// the Arabic alone); persisted so it holds across verses and launches.
-  void _toggleReadingTranslation() {
-    setState(() => _readingTranslation = !_readingTranslation);
-    unawaited(_settings.setReadingTranslationVisible(_readingTranslation));
   }
 
   /// Opt in/out of the translation peek on tap (Reading). Off by default — a tap

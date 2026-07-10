@@ -927,7 +927,7 @@ component but `|dy| > |dx|` throughout) scrolls — that's the owner's real fail
 An audio transport (scrubber + progress line) needs position/duration ~5×/s. **Putting
 position in the Cubit state rebuilds every listener of that state 5×/s** — for the reader that's
 the whole Mushaf paragraph + tiles. The split that worked: the state stream (`AyahAudioState`)
-carries only *discrete* facts (which verse, status, speed, repeat, continuous — things that
+carries only *discrete* facts (which verse, status, speed, repeat — things that
 change on user action), and **position/duration ride a SEPARATE `progressStream`** off the
 player, consumed only by scoped `StreamBuilder`s inside the 2px progress line and the scrubber.
 Nothing else rebuilds on the tick. Same principle behind the **tint split + decouple** in the
@@ -953,6 +953,45 @@ still showed idle. **Fix:** push the event inside `tester.runAsync(() async { pl
 await Future.delayed(10ms); })` (real async drains the microtasks), *then* `pumpAndSettle()` to
 rebuild. A tiny `settle()` helper wrapping that is worth it. (Cubit-only unit tests using
 `await pumpEventQueue()` are fine — this is specific to the FakeAsync widget harness.)
+
+### A re-entrant parent `setState` during a child's `didUpdateWidget` corrupts the element tree (2026-07-10)
+
+On-device, starting playback crashed with `'!_elements.contains(element)': is not true`. Cause:
+`MushafView.didUpdateWidget` (a *build-phase* lifecycle callback) detected playback had just started
+and, to clear a stale tap-selection, called `onSelectVerse(null)` — a parent `ReaderPage` callback
+that ran `setState`. Notifying the parent to rebuild **while the child is mid-`didUpdateWidget`**
+re-enters the build for an element that's currently being updated → the framework's element-registry
+assert trips. **Fix:** inside `didUpdateWidget`, mutate only the child's OWN state
+(`_selectedAyah = null;`) and let the next frame reconcile — never call a parent-notifying callback
+from a build/lifecycle method. If the parent genuinely must hear about it, defer to a post-frame
+callback or a real event handler. Regression test in `mushaf_view_test.dart` ("starting playback does
+not crash the element tree").
+
+### Right-to-left Mushaf paging: `PageView(reverse: true)` + flip your manual drag/fling signs (2026-07-10)
+
+Arabic readers expect swipe-**right** → **next** surah (ascending) — the Mushaf direction, opposite a
+default LTR `PageView`. Two coordinated flips are needed and missing either desyncs them: (1) set
+`reverse: true` on the `PageView` so its own paging + page-position math run RTL; and (2) because the
+reader drives paging through a **custom horizontal recognizer** (to win the gesture arena vs. vertical
+scroll + pinch — see the directional-recognizer note above), flip the sign in BOTH the manual
+`jumpTo(pixels + delta)` during-drag and the fling-velocity → page-delta mapping (`v ≥ +threshold` now
+means *next*). Watch the tests: ~7 swipe tests that flung *leftward* for "next" had to flip to rightward
+`Offset(400, 0)`.
+
+### Don't gate core playback UX behind a hidden persisted flag; make the bar the whole UI (2026-07-10)
+
+Two related calls from the on-device player redesign:
+- **Autoplay must be unconditional.** A persisted `continuousRecitation` flag gated "roll into the next
+  verse". It could sit `false` from an earlier toggle, so playback mysteriously **stopped after one
+  verse** with no visible cause — the control was gone from the slim UI. Lesson: if a behavior is the
+  expected default and there's no obvious affordance for it, don't gate it on a hidden stored bool. We
+  **deleted** the whole `continuous` vertical (setting + `continuousPlay` state + `setContinuous`); the
+  `completed` handler now always advances, rolling across surahs via an `onSequenceEnd` handoff to the
+  reader (which loads the next section and plays its verse 1).
+- **The always-on bar IS the player** — no modal sheet. A single row (`repeat · prev · play/pause · next ·
+  speed`), present both idle (play + reciter name) and active, over a 2px progress line. No scrubber, no
+  ✕ stop (pause is the stop; swiping away clears the session). Less state to hold, less to explain,
+  nothing to open — which is exactly what the owner meant by "super simple UX to play the verses."
 
 ---
 

@@ -10,7 +10,6 @@ class AyahAudioState extends Equatable {
     this.errorAyahId,
     this.speed = 1.0,
     this.repeat = RecitationRepeat.off,
-    this.continuousPlay = true,
   });
 
   final int? playingAyahId;
@@ -21,7 +20,6 @@ class AyahAudioState extends Equatable {
   /// playback position/duration live on the player's progressStream, NOT here).
   final double speed;
   final RecitationRepeat repeat;
-  final bool continuousPlay;
 
   /// The active verse is actually sounding.
   bool isPlaying(int ayahId) =>
@@ -49,5 +47,5 @@ class AyahAudioState extends Equatable {
 
   @override
   List<Object?> get props =>
-      [playingAyahId, status, errorAyahId, speed, repeat, continuousPlay];
+      [playingAyahId, status, errorAyahId, speed, repeat];
 }

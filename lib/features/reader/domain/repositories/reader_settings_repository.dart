@@ -19,17 +19,8 @@ abstract interface class ReaderSettingsRepository {
   /// honoured everywhere. null until the reader picks (then seeded from locale).
   List<String>? get selectedTranslations;
 
-  /// Whether the Reading-view peek card shows the translation text (and its
-  /// language chips). Defaults to true; the reader can collapse it from the peek
-  /// to read/listen to the Arabic alone. Reading-only — Detailed is unaffected.
-  bool get readingTranslationVisible;
-
   /// Recitation playback rate (1.0 = normal); defaults to [defaultRecitationSpeed].
   double get recitationSpeed;
-
-  /// Whether recitation rolls into the next verse automatically (continuous play)
-  /// vs. stopping after one verse. Defaults to true.
-  bool get continuousRecitation;
 
   /// Whether tapping a verse in Reading opens the translation peek card. Defaults
   /// to **false** — the always-on player owns playback, so a tap just selects the
@@ -40,9 +31,7 @@ abstract interface class ReaderSettingsRepository {
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setSelectedTranslations(List<String> languageCodes);
-  Future<void> setReadingTranslationVisible(bool value);
   Future<void> setRecitationSpeed(double value);
-  Future<void> setContinuousRecitation(bool value);
   Future<void> setShowTranslationPeek(bool value);
 
   static const double defaultFontSize = 28;
