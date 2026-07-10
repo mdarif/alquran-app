@@ -119,8 +119,8 @@ class CreditsPage extends StatelessWidget {
               children: [
                 _Credit(
                   name: 'Mishary Rashid Alafasy',
-                  detail: 'Audio via islamic.network.',
-                  url: 'https://islamic.network',
+                  detail: 'Audio via everyayah.com.',
+                  url: 'https://everyayah.com',
                 ),
               ],
             ),

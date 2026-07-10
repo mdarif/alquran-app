@@ -60,7 +60,8 @@ abstract final class FeatureFlags {
   static const bool sunnahOccasions = true;
 
   /// In-app, single-ayah audio recitation (Mishary Rashid Alafasy), streamed
-  /// from the islamic.network CDN and cached to disk for offline replay. ON
+  /// from the project's self-hosted R2 (audio.alquranreader.com, sourced from
+  /// everyayah.com) and cached to disk for offline replay. ON
   /// for v1 (owner decision 2026-06-28, foreground-only accepted; licensing
   /// check stays on the pre-submission list). While false the reader shows no
   /// play affordance, the audio cubit/player is never constructed, and zero
