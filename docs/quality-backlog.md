@@ -11,27 +11,6 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Open
 
-### 1. Last Read trails the reciter during Reading-view playback — MINOR
-- **Area:** reader · audio · last-read
-- **Symptom:** Listen in **Reading**, then leave/background the app → "Continue
-  reading" resumes at the *page top*, up to ~7 verses (one Mushaf page) **above**
-  the verse you were actually hearing. **Detailed** view is unaffected (per-verse
-  accurate).
-- **Root cause:** Same page-granularity as the (now-fixed) viewport-switch bug.
-  Reading's reciter-follow scrolls a whole page chunk, and the debounced
-  `_reportTopmost` records the topmost-**visible** verse (page top, minus the 0.04
-  focus-alignment sliver → often the *previous* page's top). The reciter's exact
-  verse is known — it drives the tint + peek card — but is not what gets saved as
-  progress.
-- **Suggested fix:** While `audioState.isSounding`, record the reciting verse as
-  Last Read — e.g. a `BlocListener<AyahAudioCubit>` at `_ReaderView` level calling
-  `_cubit.saveProgress(playingAyah)` on each verse change, instead of relying on the
-  scroll-position report. Additive; avoids touching MushafView's flush/pin logic.
-  Add a regression test (resume verse == last-heard verse, both viewports).
-- **Why deferred:** Interacts with the delicate flush/pin/report machinery (many
-  existing tests); kept out of the pre-build viewport-switch fix to keep that change
-  tight. Flagged 2026-07-08.
-
 ### 2. Now-playing tint clears on pause (Reading view) — MINOR · decision needed
 - **Area:** reader · audio
 - **Symptom:** Pausing removes the sticky now-playing highlight from the Reading
@@ -79,7 +58,8 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   Before any major Flutter upgrade, re-validate Arabic (kashida carriers, waqf marks,
   elongated madd) on Impeller across both faces; if still broken, pin Flutter or find
   a per-text workaround.
-- **Not a blocker for 1.1.0** — informational log only; rendering is correct today.
+- **Not a release blocker** — informational log only; rendering is correct today
+  (shipped fine through 1.1.1).
 
 ### 7. Continuous "play from here" stops at the surah end (no roll to next surah) — ENHANCEMENT
 - **Area:** reader · audio
@@ -90,35 +70,29 @@ Started 2026-07-08 during the audio / viewport-switch pass.
   surah needs loading the next section + repushing the sequence, and a product call
   on auto-advancing chapters. Deferred.
 
-### 10. Reading verse-follow is page-granular, not per-verse (reciter drift + stepper) — UX
-- **Area:** reader · reading-view · audio · peek card
-- **(d) matters most — it degrades the core listening follow, not just manual stepping.**
-- **Symptoms (owner, on-device):**
-  - (d) **Reciter drift:** during audio playback the now-playing highlight drifts down
-    the page as verses advance and slips **below the reading area / behind the peek
-    card**, only re-centring at the next page (after ~2–4 verses). It should
-    auto-scroll the playing verse up to the top edge for the best view.
+### 10. Reading ‹/› stepper is still page-granular (reciter drift (d) now fixed) — UX
+- **Area:** reader · reading-view · peek card
+- **(d) reciter drift is RESOLVED** (2026-07-10) — the reciter-follow now scrolls the
+  playing verse to the top **within the flowing paragraph** (measured negative-alignment,
+  no chunk split); see Resolved below. These three **stepper** items were deliberately
+  left out to keep that change tight:
   - (a) With the translation panel open, stepping ‹/› to the next verse doesn't scroll
     the surah up to reveal it — the selected verse can sit behind the (tall) card.
   - (b) With the panel minimized, stepping ‹/› across a page boundary doesn't carry the
     page + selection across gracefully.
   - (c) Tapping next repeatedly doesn't scroll progressively — the highlight advances
     but the page only moves when a chunk goes fully off screen (static, then jumps).
-- **Root cause:** the Reading view scrolls at page-CHUNK granularity (`_ayahRowIndex`
-  → chunk row), so `_scrollToFocus` aligns the whole page's top to 0.04, never the
-  followed verse. The reciter-follow (`didUpdateWidget` → `_selectVerse(scroll:true)`)
-  and the stepper both go through it; within a page consecutive verses map to the SAME
-  chunk row, so `scrollTo` no-ops and the highlight drifts (d). A verse low in its page
-  lands behind the card (a); the item-9 `_rowVisible` skip is too lenient — ANY viewport
-  overlap counts as visible (a/c); cross-page hard-aligns the next chunk (b).
-- **Approach (needs care):** make the follow per-verse — split the chunk at the FOLLOWED
-  verse (the playing verse for the reciter, the selected verse for the stepper) as the
-  initial verse-jump does (LEARNINGS §3 "split the chunk AT the verse"), rebuilding rows
-  on advance, and scroll it to the top edge above the card. Splitting keeps the same
-  total height (≈no visual jump on rebuild), then the scroll eases the verse up. Must
-  not re-introduce the item-9 jump; needs on-device tuning (jank + card-height).
-- **Status:** (d) reciter-follow is the priority — decide fix-now vs fast-follow; (a)–(c)
-  stepper polish can trail it. All share the one per-verse-scroll change.
+- **Root cause:** the ‹/› stepper still scrolls at page-CHUNK granularity via
+  `_scrollToFocus(onlyIfNeeded:true)` — within a page consecutive verses map to the SAME
+  chunk row, and the `_rowVisible` skip is lenient (ANY viewport overlap counts as
+  visible), so the stepped verse can sit low/behind the card (a/c); cross-page
+  hard-aligns the next chunk (b).
+- **Approach:** route the ‹/› stepper through the same `_scrollFollowVerse` the
+  reciter-follow now uses (measured negative-alignment scroll to the verse's position
+  *within* the flowing paragraph, above the peek card) instead of the page-chunk
+  `_scrollToFocus`. Must not re-introduce the item-9 jump (the "stepper does not
+  re-scroll a visible verse" test); needs on-device tuning for card-height. Lower
+  priority now that the core listening follow (d) is fixed.
 
 ---
 
@@ -134,6 +108,39 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Resolved
 
+- **2026-07-10 — Reciter-follow drift + Last Read trailing in Reading (was item
+  10d + item 1).** In Reading view, audio playback followed the reciter only a whole
+  Mushaf PAGE at a time (`_ayahRowIndex` collapses every verse on a page to one chunk
+  row, so a chunk-level `scrollTo` no-ops as the reciter advances within the page) — the
+  now-playing highlight drifted down and behind the bottom peek card until the next page;
+  and "Continue reading" resumed at the page top. **Shipped after two on-device
+  iterations** (a per-verse chunk-split reshaped the page into blocks — rejected; details
+  in LEARNINGS §3): the follow now keeps the **flowing paragraph** and scrolls the playing
+  verse to the top *within* it via `_scrollFollowVerse` — SPL honors a **negative
+  alignment** for a visible chunk, so `alignment = 0.04 − verseTopFraction·chunkHeightFraction`
+  brings a mid-paragraph verse to the top with no split. The verse's top is **measured from
+  the medallion boxes** (`rects[i-1].top`), NOT `getBoxesForSelection` on the first char
+  (empty box on combining-mark Uthmani text → offset 0 → scrolls to page top; that was the
+  "playing v15 shows v10" report). A ~480ms corrective re-scroll fixes off-screen targets
+  (page cross / big jump). The reciter is pinned (`_heldFocusId`, released on stop/finger-
+  scroll) so Last Read saves the heard verse. Kept the `_rects` reset in `_computeOffsets`
+  (a latent shrink-group `RangeError` the earlier split exposed). Covered by
+  `reader_audio_viewport_test.dart` (steady near-top follow across a page; the Al-Kahf
+  tall-page "play v15 scrolls past v10" regression) + `mushaf_view_test.dart`. Bug 1 of two.
+- **2026-07-10 — Horizontal swipe hijacked vertical scroll.** The section `PageView`
+  (horizontal) wrapped the vertical reading list with no axis disambiguation — a
+  diagonal/curved finger-drag won the arena on its ~18px sideways lead and turned the page
+  when the reader meant to scroll. **Shipped after two dead ends** (an asymmetric
+  `MediaQuery.gestureSettings` slop — an absolute threshold can't tell a curved scroll from
+  a swipe at any value; and a physics-swap axis lock — the rebuild cancelled the in-flight
+  scroll, "takes a couple taps"; details in LEARNINGS §3): a custom **directional**
+  `_HorizontalSwipeRecognizer` (overrides `hasSufficientGlobalDistanceToAccept` to win only
+  when `|dx| > _kSwipeAcceptSlop` AND `|dx| > |dy|`), so a vertical/diagonal drag never
+  claims the swipe and the list always scrolls it. The PageView is `NeverScrollable` and
+  driven by us (`jumpTo` on drag, `animateToPage` on release). Covered by
+  `reader_swipe_test.dart` → "curved/diagonal drag scrolls, not page-turn" (multi-phase
+  `TestGesture`s incl. a big-sideways-component diagonal) + the existing fling/threshold
+  tests. `_kSwipeAcceptSlop` is tunable. Bug 2 of two.
 - **2026-07-08 — Reading ‹/› stepper jumped the whole page (was item 9).** The
   peek card's next/prev buttons called `_scrollToFocus` unconditionally, re-aligning
   the stepped verse's Mushaf-page chunk to the top even when the verse was already on

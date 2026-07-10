@@ -134,6 +134,35 @@ class _FakeAyahRepoEnOnly implements AyahRepository {
       ];
 }
 
+/// Repo with many verses per surah so the Reading list actually SCROLLS — the
+/// default one-ayah repo can't reproduce a scroll-vs-page-turn gesture conflict.
+class _ScrollableAyahRepository implements AyahRepository {
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async {
+    final surahId = target.value;
+    return [
+      for (var n = 1; n <= 40; n++)
+        Ayah(
+          id: surahId * 100 + n,
+          surahId: surahId,
+          ayahNumber: n,
+          textArabic: 'نص الآية رقم $n في هذه السورة الطويلة',
+          page: surahId * 100 + (n - 1) ~/ 8,
+          isSajda: false,
+        ),
+    ];
+  }
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => {
+        for (var i = 1; i <= 114; i++)
+          i: SurahHeading(number: i, nameEnglish: 'Chapter $i', totalAyahs: 40),
+      };
+
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async => const [];
+}
+
 class _FakeSettings implements ReaderSettingsRepository {
   _FakeSettings({
     this.fontSize = 28,
@@ -277,6 +306,94 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Chapter 114'), findsOneWidget); // unchanged
+    });
+  });
+
+  // A real thumb drag while reading is never perfectly vertical — it arcs and
+  // drifts sideways. Such a drag must SCROLL, not turn the page. The section swipe
+  // is a DIRECTIONAL recognizer (_HorizontalSwipeRecognizer): it only wins the
+  // gesture arena when the drag is decisively horizontal, so any vertical/diagonal
+  // scroll falls through to the reading list — however far it drifts sideways.
+  // A straight `tester.drag` can't exercise this (its synthetic first move resolves
+  // to one axis); these use multi-phase TestGestures pumped frame-by-frame.
+  group('Gesture disambiguation — curved/diagonal drag scrolls, not page-turn',
+      () {
+    Future<void> pumpScrollableReader(WidgetTester tester) async {
+      GetIt.I
+        ..unregister<ReaderCubit>()
+        ..registerFactory<ReaderCubit>(
+          () => ReaderCubit(
+            _ScrollableAyahRepository(),
+            _FakeLastReadRepository(),
+          ),
+        );
+      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
+      expect(find.byType(SurahHeaderCard), findsOneWidget);
+      expect(find.text('Chapter 2'), findsWidgets);
+    }
+
+    testWidgets('sideways drift then vertical → scrolls, stays on the surah',
+        (tester) async {
+      await pumpScrollableReader(tester);
+
+      // A pronounced sideways drift that then arcs down into a long vertical scroll.
+      final g = await tester.startGesture(
+        tester.getCenter(find.byType(MushafView)),
+      );
+      await g.moveBy(const Offset(-40, 12)); // sideways lead
+      await tester.pump();
+      await g.moveBy(const Offset(-10, -80)); // arcs downward
+      await tester.pump();
+      await g.moveBy(const Offset(0, -600)); // long vertical scroll
+      await g.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(SurahHeaderCard),
+        findsNothing,
+        reason:
+            'the vertical travel must scroll the surah (header off the top)',
+      );
+      expect(
+        find.text('Chapter 3'),
+        findsNothing,
+        reason: 'a mostly-vertical arc must not turn the page',
+      );
+    });
+
+    testWidgets('a diagonal drag (big sideways component) still scrolls',
+        (tester) async {
+      await pumpScrollableReader(tester);
+      // Vertical-DOMINANT but with a large, sustained sideways component — exactly
+      // the thumb arc that defeated an absolute slop. |dy| stays > |dx| throughout,
+      // so the swipe recognizer must never claim it; the list scrolls.
+      final g = await tester.startGesture(
+        tester.getCenter(find.byType(MushafView)),
+      );
+      for (var i = 0; i < 6; i++) {
+        await g.moveBy(const Offset(-30, -80)); // dx grows, but dy grows faster
+        await tester.pump();
+      }
+      await g.up();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(SurahHeaderCard),
+        findsNothing,
+        reason:
+            'a diagonal (vertical-dominant) drag must scroll, not page-turn',
+      );
+      expect(find.text('Chapter 3'), findsNothing);
+    });
+
+    testWidgets('a deliberate horizontal swipe still turns the page',
+        (tester) async {
+      await pumpScrollableReader(tester);
+      // Clearly-horizontal fling — must still navigate (the recognizer must not
+      // over-reject a genuine swipe).
+      await tester.fling(find.byType(MushafView), const Offset(-500, 0), 1400);
+      await tester.pumpAndSettle();
+      expect(find.text('Chapter 3'), findsWidgets);
     });
   });
 

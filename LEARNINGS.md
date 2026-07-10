@@ -860,6 +860,68 @@ Ver18 for v1 (correct + quran.com-Unicode parity); exact-Mushaf (QCF) is schedul
   release) — deferred, because text doesn't scale linearly with font size, so line
   breaks "snap" on commit.
 
+### Per-verse reciter follow in a page-chunked list — scroll INSIDE the paragraph via negative alignment (2026-07-10)
+
+The Reading view chunks verses by Mushaf **page** for lazy layout, and scrolls with
+`ScrollablePositionedList` (SPL), which aligns by **item (chunk)**, not a point inside an
+item. Following the reciter by `scrollTo(_ayahRowIndex[playingAyahId], 0.04)` no-ops
+*within a page* (every verse shares one chunk row) — the highlight drifts down and behind
+the peek card until the next page. **What we shipped after two dead ends:**
+- ❌ **Splitting the page-chunk at the playing verse** (give the verse its own chunk so SPL
+  can align it) — worked mechanically but **reshaped the page into per-verse blocks during
+  playback**, which the owner rejected as a jarring layout change. (It also exposed a latent
+  bug: a per-paragraph widget caching medallion boxes `_rects` must reset them when its verse
+  list changes, or a shrunk group reads past stale `_rects` → `RangeError`; `_computeOffsets`
+  reset `_lastMeasuredSize` but not `_rects`. Keep that reset regardless.)
+- ✅ **Scroll to a verse INSIDE the flowing paragraph via a NEGATIVE alignment.** SPL's
+  `scrollTo(index, alignment)` for an **already-visible** item is pure arithmetic
+  (`offset + (leadingEdge − alignment)·viewport`) with **no clamp** — so a *negative*
+  alignment places the chunk's top above the viewport, bringing a mid-paragraph verse to the
+  top **without splitting**. Compute `alignment = 0.04 − (verseTopFraction · chunkHeightFraction)`
+  where `chunkHeightFraction = trailingEdge − leadingEdge` (from `itemPositions`) and
+  `verseTopFraction` is the verse's measured top ÷ paragraph height. (SPL only honors this for
+  a *visible* chunk; for an off-screen target — a page cross / big jump — fall back to chunk-top
+  then re-scroll once measured, via a ~480ms corrective timer.)
+- ⚠️ **Measure the verse position from the MEDALLION boxes, not the verse's first character.**
+  `getBoxesForSelection` on a verse's first *char* returns an **empty box on real Uthmani text**
+  (the char is often a combining mark) → the verse's offset collapses to **0** → the follow
+  scrolls to the *page top* instead of the verse. Symptom on-device: "playing v15 shows v10"
+  (v10 was the split chunk's top after a resume). Derive each verse's top from the previous
+  verse's medallion box (`rects[i-1].top`, verse 0 = 0) — the same measurement the verse-number
+  badges use, which renders reliably. Never let a mid-chunk verse's fraction be 0.
+
+Also pin the reciter (`_heldFocusId = playingAyahId`) after the follow-scroll so **Last Read**
+tracks it (released on stop / finger-scroll). And the badge (verse *end*) is a **misleading
+test metric** — it moves with line-wrapping; assert the follow via the chunk leading-edge math
+or a range, not the badge position.
+
+### PageView-over-vertical-list: a DIRECTIONAL custom recognizer, not a slop (2026-07-10)
+
+A horizontal `PageView` (section nav) wrapping a vertical `ScrollablePositionedList` delegates
+single-finger scroll-vs-swipe **to Flutter's default gesture arena**, which a curved/diagonal
+thumb defeats (a sideways lead crosses the 18px slop first → the page turns when the reader
+meant to scroll). **Two dead ends before the fix:**
+- ❌ **Asymmetric touch-slop** (enlarge the PageView's slop via nested `MediaQuery.gestureSettings`,
+  reset the inner list in the itemBuilder). An **absolute distance threshold can't distinguish a
+  curved vertical scroll from a horizontal swipe at any value** — a scroll with enough sideways
+  drift always crosses it. Failed on-device at 2×, 3×, 4×.
+- ❌ **Physics-swap axis lock** (a root `Listener` detects a vertical drag and swaps the PageView
+  to `NeverScrollableScrollPhysics` mid-gesture). The rebuild **cancels the in-flight scroll** →
+  "swipe takes a couple of taps."
+- ✅ **A custom `HorizontalDragGestureRecognizer` that is DIRECTIONAL.** Override
+  `hasSufficientGlobalDistanceToAccept` to return true only when the accumulated drag is
+  **both** clearly sideways (`|dx| > _kSwipeAcceptSlop`, ~48px) **and** horizontally dominant
+  (`|dx| > |dy|`). A vertical-or-diagonal drag *never* satisfies it → the inner list's vertical
+  recognizer wins, however far the finger drifts sideways. It competes in the arena from
+  touch-down (no physics swap → never interrupts a scroll). Drive the PageView yourself:
+  `physics: NeverScrollableScrollPhysics()` + `_pageController.jumpTo` on drag (NeverScrollable
+  doesn't block programmatic scroll) + `animateToPage` on release (fling velocity → ±1 page).
+
+**Test gotchas (still apply):** (1) a straight `tester.drag(Offset(-40,400))` can't reproduce
+the bug — its synthetic first move resolves to one axis; use a multi-phase `TestGesture` (a
+sideways lead, *then* vertical, pumped between). (2) Assert the DIAGONAL case (big sideways
+component but `|dy| > |dx|` throughout) scrolls — that's the owner's real failure mode.
+
 ---
 
 ## 4. Flutter project & build mechanics

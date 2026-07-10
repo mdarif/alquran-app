@@ -563,6 +563,60 @@ void main() {
     });
   });
 
+  group('MushafView — reciter follow across advances', () {
+    // The Reading view follows the reciter by scrolling the playing verse to the
+    // top of its flowing page-paragraph (no splitting), measuring each verse's
+    // position as the paragraph lays out. This drives continuous playback across a
+    // page boundary and asserts the follow + per-verse measurement never throws.
+    testWidgets('advancing the playing verse across a page never throws',
+        (tester) async {
+      var audio = const AyahAudioState();
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahs(1, 24), // 3 Mushaf pages (1–8, 9–16, 17–24)
+                headings: _headings(1, 'Al-Fatihah', 24),
+                arabicFontSize: 28,
+                resources: const [],
+                onVisibleAyah: (_) {},
+                audioState: audio,
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Play a MID-page verse, then advance verse-by-verse across the page
+      // boundary (5,6,7,8 on page 0, then 9 on page 1) — each advance re-splits.
+      for (final n in [5, 6, 7, 8, 9]) {
+        setOuter(
+          () => audio = AyahAudioState(
+            playingAyahId: 1000 + n,
+            status: RecitationStatus.playing,
+          ),
+        );
+        // Let the re-chunk build, the follow-scroll run, and re-measure settle.
+        for (var i = 0; i < 40; i++) {
+          if (!tester.binding.hasScheduledFrame) break;
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'the per-verse re-split for verse $n threw',
+        );
+      }
+
+      // Drain the one-shot highlight-flash timer so teardown is clean.
+      await tester.pump(const Duration(seconds: 2));
+    });
+  });
+
   group('MushafView — verse stepping during recitation', () {
     // The ‹/› buttons are _PeekStepButtons keyed by peekPrev/NextButton, each
     // wrapping an IconButton whose onPressed is null when disabled.

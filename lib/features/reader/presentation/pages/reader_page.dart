@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -159,19 +160,30 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Reading-only — Detailed is the translation view and ignores this.
   late bool _readingTranslation = _settings.readingTranslationVisible;
 
-  // Section paging is a standard PageView (one page per section in the active
-  // dimension). It gives native finger-tracking, momentum and snap, and keeps
-  // the neighbours mounted — so swiping is smooth and nothing remounts.
+  // Section paging is a PageView (one page per section in the active dimension),
+  // but WE drive it (the PageView's own scroll physics is NeverScrollable) via a
+  // directional swipe recognizer, so a scroll is never mistaken for a page turn.
+  // It keeps the neighbours mounted, so swiping is smooth and nothing remounts.
   late final PageController _pageController =
       PageController(initialPage: widget.initialTarget.value - 1);
 
   // Pinch-to-zoom rides on a raw Listener wrapping the PageView (it sees every
-  // pointer, even though the PageView claims horizontal drags in the arena).
-  // While two fingers are down the PageView is locked so a pinch never pans it.
+  // pointer). While two fingers are down the section swipe is suppressed so a
+  // pinch never doubles as a page turn.
   final Map<int, Offset> _pointers = {};
   double? _pinchBaseDistance;
   double _fontAtPinchStart = 28;
   bool _pageLocked = false;
+
+  // Section paging is DRIVEN BY US, not the PageView's own gesture. The PageView is
+  // NeverScrollable; a custom DIRECTIONAL recognizer (see [_HorizontalSwipeRecognizer])
+  // only wins the gesture arena when the drag is genuinely more horizontal than
+  // vertical, so a diagonal / curved SCROLL can never be mistaken for a page swipe —
+  // something an absolute touch-slop can't distinguish. While the swipe owns the
+  // gesture we drive the controller (live finger-follow), then settle on release.
+  double _swipeStartPage = 0;
+  // Fling speed (px/s) past which a flick turns the page regardless of distance.
+  static const double _kSwipeFlingVelocity = 350;
 
   @override
   void initState() {
@@ -267,8 +279,11 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
             // tick repaints the active page without extra plumbing.
             Widget pages(AyahAudioState? audio) => PageView.builder(
                   controller: _pageController,
-                  physics:
-                      _pageLocked ? const NeverScrollableScrollPhysics() : null,
+                  // The PageView never handles the drag itself — the directional
+                  // recognizer below does (so a vertical scroll is never stolen).
+                  // We drive the controller programmatically (jumpTo/animateToPage),
+                  // which NeverScrollable does not block.
+                  physics: const NeverScrollableScrollPhysics(),
                   // Only the on-screen section builds on open. Neighbour VERSES
                   // are still prefetched into the cubit cache (_prefetchNeighbours
                   // after every load), so the first swipe renders from memory in a
@@ -287,12 +302,32 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
             // initial page, silently jumping back to the surah the reader was
             // opened on (and to an endless spinner once that section had been
             // evicted from the cache after a long fling).
-            return FeatureFlags.audioRecitation
+            final pageArea = FeatureFlags.audioRecitation
                 ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
                     builder: (context, audio) =>
                         pages(isReading ? audio : null),
                   )
                 : pages(null);
+            // The section swipe: a directional recognizer that only claims the
+            // gesture when the drag is more horizontal than vertical, so a scroll
+            // (however curved/diagonal) always falls through to the vertical list.
+            // It competes in the arena from touch-down (no physics swap, no
+            // interrupted scroll); when it wins, we drive the PageController.
+            return RawGestureDetector(
+              behavior: HitTestBehavior.translucent,
+              gestures: {
+                _HorizontalSwipeRecognizer:
+                    GestureRecognizerFactoryWithHandlers<
+                        _HorizontalSwipeRecognizer>(
+                  () => _HorizontalSwipeRecognizer(debugOwner: this),
+                  (r) => r
+                    ..onStart = _onSwipeStart
+                    ..onUpdate = _onSwipeUpdate
+                    ..onEnd = _onSwipeEnd,
+                ),
+              },
+              child: pageArea,
+            );
           },
         ),
       ),
@@ -419,6 +454,43 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       _focusAyahId = null; // a swiped-to section opens at its top, not a resume
     });
     _cubit.load(next);
+  }
+
+  // --- Section swipe (driven by _HorizontalSwipeRecognizer) ------------------
+  // The recognizer wins the arena only for a clearly-horizontal drag, so these
+  // fire only for a real page swipe — never for a scroll.
+
+  void _onSwipeStart(DragStartDetails details) {
+    if (_pageController.hasClients) _swipeStartPage = _pageController.page ?? 0;
+  }
+
+  void _onSwipeUpdate(DragUpdateDetails details) {
+    // A pinch is in progress (two fingers) — never pan the page.
+    if (_pageLocked || !_pageController.hasClients) return;
+    final pos = _pageController.position;
+    // Follow the finger: dragging left (negative dx) advances the page (+pixels).
+    final next = (pos.pixels - (details.primaryDelta ?? 0))
+        .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+    pos.jumpTo(next);
+  }
+
+  void _onSwipeEnd(DragEndDetails details) {
+    if (!_pageController.hasClients) return;
+    final page = _pageController.page ?? _swipeStartPage;
+    final v = details.primaryVelocity ?? 0;
+    final int target;
+    if (v <= -_kSwipeFlingVelocity) {
+      target = _swipeStartPage.round() + 1; // flick left → next surah
+    } else if (v >= _kSwipeFlingVelocity) {
+      target = _swipeStartPage.round() - 1; // flick right → previous surah
+    } else {
+      target = page.round(); // slow drag → settle to whichever half it's past
+    }
+    _pageController.animateToPage(
+      target.clamp(0, _target.dimension.count - 1),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   /// The viewport reports its topmost-visible verse (on scroll-idle); record it
@@ -1347,6 +1419,55 @@ class _ScriptPreview extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// The sideways distance the section swipe must clearly travel before it may win
+/// the gesture arena. Larger than the list's ~18px vertical slop, so a scroll that
+/// only wobbles sideways at the start commits to vertical (the list wins) before
+/// the swipe can — while still requiring the drag to be horizontally DOMINANT.
+/// Tunable: raise if a scroll still turns the page; lower if a swipe feels heavy.
+const double _kSwipeAcceptSlop = 48;
+
+/// A horizontal drag recognizer for the section swipe that only wins the gesture
+/// arena when the drag is BOTH clearly horizontal in distance (> [_kSwipeAcceptSlop])
+/// AND more horizontal than vertical. A vertical / diagonal / curved scroll never
+/// satisfies that, so it falls through to the reading list's vertical recognizer —
+/// however far the finger drifts sideways. This is a directional test, which an
+/// absolute touch-slop cannot do; and it competes in the arena from touch-down, so
+/// it never interrupts an in-flight scroll (unlike swapping the PageView's physics).
+class _HorizontalSwipeRecognizer extends HorizontalDragGestureRecognizer {
+  _HorizontalSwipeRecognizer({super.debugOwner});
+
+  Offset _moved = Offset.zero;
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    _moved = Offset.zero;
+    super.addAllowedPointer(event);
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) _moved += event.delta;
+    super.handleEvent(event);
+  }
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    final dx = _moved.dx.abs();
+    final dy = _moved.dy.abs();
+    // Stay pending unless the drag is clearly horizontal AND has moved decisively
+    // sideways — a scroll (vertical or diagonal, or a small sideways lead) never
+    // claims it, so the list's vertical recognizer wins.
+    if (dx <= dy || dx < _kSwipeAcceptSlop) return false;
+    return super.hasSufficientGlobalDistanceToAccept(
+      pointerDeviceKind,
+      deviceTouchSlop,
     );
   }
 }

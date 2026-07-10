@@ -61,6 +61,21 @@ class _LongSurahRepo implements AyahRepository {
       ];
 }
 
+/// Serves a fixed ayah list (with real page numbers) — for the Kahf tall-page repro.
+class _StaticRepo implements AyahRepository {
+  _StaticRepo(this.ayahs);
+  final List<Ayah> ayahs;
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async => ayahs;
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => {
+        for (var s = 1; s <= 114; s++)
+          s: SurahHeading(number: s, nameEnglish: 'Surah $s', totalAyahs: 20),
+      };
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async => const [];
+}
+
 class _RecordingLastRead implements LastReadRepository {
   LastRead? saved;
   @override
@@ -184,14 +199,12 @@ void main() {
   tearDown(GetIt.I.reset);
 
   // Verse 2030 sits MID-page (page 203 spans verses 25–32), so the reciter's
-  // verse is deliberately NOT the page's first verse — the discrepancy the bug
-  // rode on. A section swipe never reaches 2030, so any Last Read of exactly
-  // 2030 can only have come from homing to the reciter. (Both views actually
-  // track a verse a little BEHIND the reciter while following — the focus verse
-  // sits a sliver below the top, leaving the previous verse/page peeking above —
-  // which is precisely why an imprecise hand-off across viewports lands wrong.)
+  // verse is deliberately NOT the page's first verse. A section swipe never
+  // reaches 2030, so any Last Read of exactly 2030 can only have come from
+  // following the reciter — which now happens PER VERSE in BOTH views: Reading
+  // splits the page-chunk at the playing verse and pins it as Last Read, so its
+  // tracked position is the exact verse sounding, not a trailing page top.
   const surah = ReaderTarget.surah(2, 'Al-Baqarah');
-  const firstVerse = 2001;
   const recitingVerse = 2030;
 
   Finder pauseIn(Finder button) =>
@@ -222,6 +235,138 @@ void main() {
         .pump(const Duration(milliseconds: 500)); // home scroll + report
   }
 
+  // Owner-reported (Al-Kahf): resumed to v10, then played v15 via audio selection
+  // — the screen stayed on v10 instead of scrolling to v15. Al-Kahf page 294 holds
+  // verses 5–15 (a tall chunk), and resuming to v10 SPLITS it at v10, so the v10–15
+  // chunk's TOP is v10. If the follow can't resolve v15's position inside that tall
+  // chunk it falls back to the chunk top (= v10) — the bug. This plays v15 in that
+  // exact state and asserts the follow scrolls PAST v10 to v15.
+  testWidgets('Kahf: playing a verse deep in a tall (split) page scrolls to IT',
+      (tester) async {
+    // Real Al-Kahf char lengths for verses 5–15 (from quran.db) so page 294's
+    // geometry matches the device: variable lengths, a chunk several viewports tall.
+    const realLen = {
+      5: 127,
+      6: 100,
+      7: 93,
+      8: 52,
+      9: 86,
+      10: 129,
+      11: 62,
+      12: 84,
+      13: 108,
+      14: 167,
+      15: 167,
+      16: 172,
+      17: 275,
+      18: 227,
+      19: 375,
+      20: 117,
+    };
+    String verse(int n) =>
+        List.filled(((realLen[n] ?? 40) / 6).ceil(), 'كلمة').join(' ');
+    final ayahs = [
+      for (var n = 1; n <= 20; n++)
+        Ayah(
+          id: 18000 + n,
+          surahId: 18,
+          ayahNumber: n,
+          textArabic: n <= 4 ? 'نص قصير $n' : verse(n),
+          page: n <= 4
+              ? 293
+              : n <= 15
+                  ? 294
+                  : 295,
+          isSajda: false,
+        ),
+    ];
+    GetIt.I
+      ..unregister<ReaderCubit>()
+      ..registerFactory<ReaderCubit>(
+        () => ReaderCubit(_StaticRepo(ayahs), lastRead),
+      );
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ReaderPage(
+          target: ReaderTarget.surah(18, 'Kahf'),
+          focusAyahId: 18010, // resumed to v10 (splits page 294 at v10)
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final vpTop = tester.getTopLeft(find.byType(MushafView)).dy;
+    final vpH = tester.getSize(find.byType(MushafView)).height;
+    double markerFrac(int v) =>
+        (tester.getTopLeft(find.text('$v').first).dy - vpTop) / vpH;
+
+    // Sitting at v10, JUMP to v15 (audio selection), then advance to v16 (new page).
+    for (final n in [10, 15, 16]) {
+      player.playing(18000 + n);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+    }
+    // After v15→v16 the reciter is on v16 (page 295's first verse), which must be at
+    // the top; the whole v10–15 chunk is above it.
+    expect(find.text('16'), findsOneWidget);
+    expect(
+      markerFrac(16),
+      inInclusiveRange(0.0, 0.6),
+      reason: 'v16 must be at the top',
+    );
+
+    // The core assertion: re-play v15 (deep in the tall v10–15 chunk) — it must
+    // scroll UP to v15, leaving v10 (the split chunk's top) above the viewport.
+    player.playing(18015);
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+    expect(find.text('15'), findsOneWidget, reason: 'v15 must be on screen');
+    expect(
+      markerFrac(15),
+      inInclusiveRange(0.0, 0.6),
+      reason: 'v15 must be near the top, not scrolled off',
+    );
+    expect(
+      markerFrac(10),
+      lessThan(0.0),
+      reason: 'the split chunk top (v10) must be scrolled ABOVE the viewport — '
+          'the follow reached v15, it did not fall back to the page top',
+    );
+  });
+
+  testWidgets('reading-view keeps the reciter\'s verse near the top',
+      (tester) async {
+    await open(tester, detailed: false);
+    final vpTop = tester.getTopLeft(find.byType(MushafView)).dy;
+    final vpHeight = tester.getSize(find.byType(MushafView)).height;
+
+    for (final n in [28, 29, 30, 31, 32, 33, 34, 35, 36]) {
+      player.playing(2000 + n);
+      await tester.pumpAndSettle(); // primary follow-scroll
+      await tester
+          .pump(const Duration(milliseconds: 500)); // fire the corrective
+      await tester
+          .pumpAndSettle(); // let the corrective settle (verses last seconds)
+      final badge = find.text('$n');
+      expect(
+        badge,
+        findsOneWidget,
+        reason: 'verse $n is off-screen — the follow lost it (or scrolled it '
+            'above the top)',
+      );
+      // The verse's marker sits in the upper band — verse ABOVE it starts at the
+      // very top; it must never be pushed off above, nor drift down mid-screen.
+      final frac = (tester.getTopLeft(badge.first).dy - vpTop) / vpHeight;
+      expect(
+        frac,
+        inInclusiveRange(0.0, 0.4),
+        reason: 'verse $n marker at ${frac.toStringAsFixed(2)} of the viewport '
+            '— must stay near the top',
+      );
+    }
+  });
+
   group('moving viewports while a verse is reciting', () {
     testWidgets(
         'Reading → Detailed lands on the reciter\'s verse, not the page top',
@@ -229,14 +374,14 @@ void main() {
       await open(tester, detailed: false);
       await startReciting(tester, recitingVerse);
 
-      // Reading follows the reciter only a whole Mushaf page at a time, so the
-      // outgoing view's tracked position trails BEHIND the mid-page reciter — it
-      // is emphatically not the verse sounding. That gap is the whole bug.
+      // Reading now follows the reciter PER VERSE: the page-chunk splits at the
+      // playing verse and that verse is pinned as Last Read, so the outgoing
+      // view already tracks the exact verse sounding — no trailing page top.
       expect(
         lastRead.saved?.ayahId,
-        lessThan(recitingVerse),
+        recitingVerse,
         reason:
-            'Reading tracks the page top, which trails the mid-page reciter',
+            'Reading tracks the reciting verse per-verse (chunk split + pin)',
       );
 
       await toggleViewport(tester);
@@ -366,16 +511,23 @@ void main() {
   });
 
   testWidgets(
-      'with no current verse (stopped), a switch keeps the reading place',
-      (tester) async {
-    // The override is bounded to when a verse is actually loaded in the player.
-    // Once audio fully stops (idle — end of surah, or a section swipe stops it),
-    // there is no "current verse", so a switch falls back to the flushed reading
-    // position instead of snapping to the verse that WAS playing.
+      'stopped, then scrolled away, homes to the reading position (not the '
+      'verse that was playing)', (tester) async {
+    // The force-home override is bounded to when a verse is actually loaded in
+    // the player. Once audio fully stops (idle — end of surah, or a section swipe
+    // stops it) there is no "current verse": the reciter pin releases and a switch
+    // homes to wherever the reader has since scrolled, NOT the last verse played.
+    // (Per-verse follow scrolls the heard verse to the top, so at the stop point
+    // the reading position IS 2030 — we scroll away first to tell the two apart.)
     await open(tester, detailed: false);
     await startReciting(tester, recitingVerse);
     player.controller.add(const RecitationPlayback()); // idle: no current verse
     await tester.pumpAndSettle();
+
+    // Scroll back up, away from verse 2030 (a plain vertical drag).
+    await tester.drag(find.byType(MushafView), const Offset(0, 2000));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500)); // settle + report
 
     await toggleViewport(tester);
 
@@ -386,8 +538,8 @@ void main() {
     );
     expect(
       lastRead.saved?.ayahId,
-      allOf(lessThan(recitingVerse), greaterThan(firstVerse)),
-      reason: 'stopped → keeps the reading position',
+      lessThan(recitingVerse),
+      reason: 'stopped → homes to the scrolled-to reading position',
     );
   });
 

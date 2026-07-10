@@ -135,6 +135,7 @@ class _MushafViewState extends State<MushafView>
   Timer? _hideTimer;
   Timer? _highlightTimer;
   Timer? _zoomTimer;
+  Timer? _followCorrectTimer;
   int? _highlightAyahId;
 
   // True for a short window after a font/script change (a pinch fires many).
@@ -169,6 +170,12 @@ class _MushafViewState extends State<MushafView>
   final List<_ReadingRow> _rows = [];
   final Map<int, int> _ayahRowIndex = {};
 
+  // Each verse's measured TOP as a fraction (0..1) of its page-chunk's height,
+  // reported by the paragraphs as they lay out. The reciter-follow uses this to
+  // scroll a verse to the top of its flowing paragraph precisely (no split); it
+  // falls back to a char-length estimate for a verse not yet measured.
+  final Map<int, double> _verseTops = {};
+
   // Where the list first lays out. For a resume/verse-jump open we position the
   // SPL AT the focus row via initialScrollIndex, not a post-build scrollTo — the
   // ItemScrollController isn't attached yet on the first post-frame after an
@@ -201,10 +208,10 @@ class _MushafViewState extends State<MushafView>
 
       for (final a in group) {
         if (page != null && a.page != page) flush();
-        // Start a fresh chunk exactly at the focus verse (resume / verse-jump), so
-        // it becomes a chunk's first row and initialScrollIndex lands it precisely
-        // at the top — no fragile off-screen measurement of where it sits inside a
-        // page. Only the focus page is split; every other page stays one paragraph.
+        // Start a fresh chunk exactly at the resume / verse-jump focus so it lands
+        // at the top via initialScrollIndex. The reciter-follow does NOT split — it
+        // keeps the page one flowing paragraph and scrolls to the verse's position
+        // WITHIN it (see _scrollFollowVerse), so playback never reshapes the page.
         if (a.id == widget.focusAyahId && chunk.isNotEmpty) flush();
         page = a.page;
         chunk.add(a);
@@ -265,16 +272,40 @@ class _MushafViewState extends State<MushafView>
     super.didUpdateWidget(old);
 
     // Follow the reciter: when the now-playing verse advances (continuous
-    // playback), bring it into view and advance the peek card to it. Only on a
-    // real verse change, deferred a frame so the scroll measures settled layout.
+    // playback), scroll it up near the top and advance the peek card to it —
+    // WITHOUT reshaping the page (the follow scrolls to the verse's position
+    // within its flowing paragraph, see _scrollFollowVerse). Deferred a frame so
+    // the scroll measures settled layout; re-run once more after the animation so
+    // a verse whose chunk was off-screen (a big jump / page turn) still homes.
     final playing = widget.audioState?.playingAyahId;
     if (playing != null && playing != old.audioState?.playingAyahId) {
       final ayah = _ayahById(playing);
       if (ayah != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _selectVerse(ayah, scroll: true);
+          if (!mounted) return;
+          _selectVerse(ayah); // highlight + peek card, no scroll
+          _scrollFollowVerse(ayah.id);
+          // Pin the reciter so the post-scroll report saves the PLAYING verse as
+          // Last Read — not whatever verse is topmost after the follow-scroll.
+          // Set AFTER the scroll, which clears the pin. A finger-scroll during
+          // playback still releases it (see the ScrollStartNotification handler);
+          // a pause keeps playingAyahId, so the pin holds the paused verse too.
+          _heldFocusId = ayah.id;
+        });
+        // If the verse's chunk was off-screen, the first scroll computes from an
+        // estimate; refine once it's on-screen and measured (within-page advances
+        // are already precise, so this second pass is a no-op there).
+        _followCorrectTimer?.cancel();
+        _followCorrectTimer = Timer(const Duration(milliseconds: 480), () {
+          if (!mounted) return;
+          _scrollFollowVerse(ayah.id);
+          _heldFocusId = ayah.id;
         });
       }
+    } else if (playing == null && old.audioState?.playingAyahId != null) {
+      // Audio fully stopped (idle / end-of-surah / error) — no current verse, so
+      // release the reciter pin and let Last Read track the reading position again.
+      _heldFocusId = null;
     }
 
     // The SPL holds a PIXEL offset across a rebuild, not a logical row — so a
@@ -294,6 +325,9 @@ class _MushafViewState extends State<MushafView>
       );
     }
     if (fontChanged || styleChanged || ayahsChanged) _reanchor();
+    // Rows only depend on the verses + the focus split; the reciter-follow never
+    // rebuilds them (it scrolls within the flowing paragraph), so playback never
+    // reshapes the page.
     if (ayahsChanged) _buildRows();
   }
 
@@ -331,6 +365,7 @@ class _MushafViewState extends State<MushafView>
     _hideTimer?.cancel();
     _highlightTimer?.cancel();
     _zoomTimer?.cancel();
+    _followCorrectTimer?.cancel();
     _positions.itemPositions.removeListener(_onPositions);
     _peekCtrl.dispose();
     super.dispose();
@@ -427,6 +462,65 @@ class _MushafViewState extends State<MushafView>
       );
     }
     _flash(ayahId);
+  }
+
+  /// Follow the reciter WITHOUT reshaping the page: scroll so the playing verse
+  /// sits near the top of its (unsplit) flowing Mushaf-page paragraph. The SPL
+  /// aligns a whole item (chunk), so to put a verse that lives INSIDE the chunk at
+  /// [_focusAlignment] we offset the alignment by the verse's position down the
+  /// chunk — estimated from its char offset (a good proxy in justified text) times
+  /// the chunk's measured on-screen height. A verse low in a tall page needs the
+  /// chunk's leading edge ABOVE the viewport top (a negative alignment), which SPL
+  /// honours for an already-visible item (it scrolls by pure arithmetic). If the
+  /// chunk is off-screen (a big jump), we can't measure it yet, so fall back to the
+  /// chunk top and let the follow's second pass refine it once it's on screen.
+  void _scrollFollowVerse(int ayahId) {
+    _heldFocusId = null;
+    final idx = _ayahRowIndex[ayahId];
+    if (idx == null || !mounted || !_scrollCtrl.isAttached) {
+      _flash(ayahId);
+      return;
+    }
+    var alignment = _focusAlignment;
+    final row = idx < _rows.length ? _rows[idx] : null;
+    ItemPosition? pos;
+    for (final p in _positions.itemPositions.value) {
+      if (p.index == idx) {
+        pos = p;
+        break;
+      }
+    }
+    if (row is _ChunkRow && pos != null) {
+      final chunkFraction =
+          pos.itemTrailingEdge - pos.itemLeadingEdge; // h / vp
+      // Prefer the paragraph's MEASURED verse top; fall back to a char estimate
+      // for a verse whose chunk hasn't laid out yet (a big jump / page turn).
+      final f = _verseTops[ayahId] ?? _verseTopFraction(row.ayahs, ayahId);
+      alignment = _focusAlignment - f * chunkFraction;
+    }
+    _scrollCtrl.scrollTo(
+      index: idx,
+      alignment: alignment,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+    );
+    _flash(ayahId);
+  }
+
+  /// Fraction of the chunk's text that precedes [ayahId] — a proxy for where the
+  /// verse starts down the flowing paragraph. Matches [_MarkedParagraph]'s layout
+  /// (each verse is followed by ' ۝ ', i.e. +3 chars).
+  static double _verseTopFraction(List<Ayah> ayahs, int ayahId) {
+    var total = 0;
+    var before = 0;
+    var reached = false;
+    for (final a in ayahs) {
+      if (a.id == ayahId) reached = true;
+      final len = a.textArabic.length + 3;
+      if (!reached) before += len;
+      total += len;
+    }
+    return total == 0 ? 0 : before / total;
   }
 
   /// Whether row [index] is currently within the viewport (even partially) — so a
@@ -670,6 +764,7 @@ class _MushafViewState extends State<MushafView>
                 ? widget.audioState!.playingAyahId
                 : null,
             onVerseTap: _onVerseTapped,
+            onVerseTops: (tops) => _verseTops.addAll(tops),
           ),
         ),
       ),
@@ -704,6 +799,7 @@ class _MarkedParagraph extends StatefulWidget {
     required this.selectedAyahId,
     required this.playingAyahId,
     required this.onVerseTap,
+    this.onVerseTops,
   });
 
   final List<Ayah> group;
@@ -719,6 +815,12 @@ class _MarkedParagraph extends StatefulWidget {
   /// render object so no GlobalKey escapes to the parent — a parent-held key
   /// would collide in ScrollablePositionedList's dual list mid-animation.
   final void Function(Ayah) onVerseTap;
+
+  /// Reports each verse's measured TOP as a fraction (0..1) of this paragraph's
+  /// height, whenever the paragraph (re)measures. Lets the reciter-follow scroll a
+  /// verse that lives inside the flowing paragraph precisely to the top without
+  /// splitting it. Keyed by ayah id.
+  final void Function(Map<int, double> tops)? onVerseTops;
 
   @override
   State<_MarkedParagraph> createState() => _MarkedParagraphState();
@@ -772,7 +874,12 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
       off += ayah.textArabic.length + 3;
     }
     // Force a re-measure: a new group may lay out to the same height as the old.
+    // Also drop the stale medallion boxes — the new group can have a DIFFERENT
+    // verse count (a page-chunk splits at the reciter's verse during playback),
+    // and the badge overlay indexes widget.group by _rects position, so keeping
+    // the old (longer) _rects would read past the new group. Re-measure repopulates.
     _lastMeasuredSize = null;
+    _rects = const [];
   }
 
   /// Resolve the tapped verse against this paragraph's own render object and
@@ -825,6 +932,27 @@ class _MarkedParagraphState extends State<_MarkedParagraph> {
           return boxes.isEmpty ? Rect.zero : boxes.first.toRect();
         }(),
     ];
+    // Report each verse's TOP (fraction of the paragraph height) for the reciter-
+    // follow. Derived from the MEDALLION boxes (rects) — the same measurement the
+    // verse-number badges use, so it's reliable on real Uthmani text where selecting
+    // a verse's first *character* (a combining mark) can return an empty box. Verse i
+    // begins on the line of verse i-1's medallion (rects[i-1].top); verse 0 at the
+    // top. A missing box reuses the previous top so a verse never collapses to 0
+    // (which would make the follow scroll to the page top instead of the verse).
+    final onTops = widget.onVerseTops;
+    final h = obj.size.height;
+    if (onTops != null && h > 0) {
+      final tops = <int, double>{};
+      var lastTop = 0.0;
+      for (var i = 0; i < widget.group.length; i++) {
+        final topPx = i == 0
+            ? 0.0
+            : (rects[i - 1] != Rect.zero ? rects[i - 1].top : lastTop);
+        lastTop = topPx;
+        tops[widget.group[i].id] = (topPx / h).clamp(0.0, 1.0);
+      }
+      onTops(tops);
+    }
     if (!_rectsClose(rects, _rects)) {
       setState(() => _rects = rects);
     }
