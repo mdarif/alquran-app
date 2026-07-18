@@ -48,6 +48,12 @@ class WidgetKeys {
   static const peekTranslationToggle = Key('reader-peek-translation-toggle');
   // Settings-sheet switch: open the translation peek on tap (default off).
   static const translationPeekToggle = Key('reader-translation-peek-toggle');
+  // Settings-sheet switch (Detailed): show the Arabic matn above translations
+  // (default on; off = translations-only reading).
+  static const showArabicToggle = Key('reader-show-arabic-toggle');
+  // The Arabic matn line inside a Detailed tile (shared by every verse); used to
+  // observe the "Show Arabic" toggle hiding it.
+  static const ayahArabicText = Key('ayah-arabic-text');
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');

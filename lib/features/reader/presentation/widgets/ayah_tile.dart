@@ -18,9 +18,11 @@ class AyahTile extends StatelessWidget {
     required this.arabicFontSize,
     this.arabicStyle = QuranTextStyle.madani,
     this.surahName,
+    this.showArabic = true,
     this.highlight = false,
     this.audioState,
     this.onTogglePlay,
+    this.onScreenshotPage,
     super.key,
   });
 
@@ -32,6 +34,10 @@ class AyahTile extends StatelessWidget {
   final TextStyle arabicStyle;
   final String? surahName;
 
+  /// Whether to render the Arabic matn above the translations. Off = a
+  /// translations-only reading (Detailed "Show Arabic" turned off).
+  final bool showArabic;
+
   /// Briefly tints the tile when the reader resumes on this verse (Last Read).
   final bool highlight;
 
@@ -42,6 +48,11 @@ class AyahTile extends StatelessWidget {
   /// Toggle recitation for this verse. Null hides the play control entirely
   /// (the flag-off path renders exactly as before).
   final VoidCallback? onTogglePlay;
+
+  /// Capture the whole visible page as an image and share it — wired from the
+  /// Detailed list (which owns the RepaintBoundary). Null hides the ⋯ menu's
+  /// Screenshot item.
+  final VoidCallback? onScreenshotPage;
 
   /// Neutral Arabic size: at this value translations keep their designed size.
   static const double _baseArabicFontSize = 28;
@@ -109,8 +120,8 @@ class AyahTile extends StatelessWidget {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
                 onSelected: (action) => _onAction(context, action),
-                itemBuilder: (_) => const [
-                  PopupMenuItem(
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
                     value: _AyahAction.copy,
                     child: ListTile(
                       leading: AppIcon(AppIcons.copy),
@@ -118,7 +129,7 @@ class AyahTile extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                  PopupMenuItem(
+                  const PopupMenuItem(
                     value: _AyahAction.share,
                     child: ListTile(
                       leading: AppIcon(AppIcons.share),
@@ -126,20 +137,34 @@ class AyahTile extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
+                  // Whole-page image, not just this verse — captures every verse
+                  // currently on screen (see [onScreenshotPage]).
+                  if (onScreenshotPage != null)
+                    const PopupMenuItem(
+                      value: _AyahAction.screenshot,
+                      child: ListTile(
+                        leading: AppIcon(AppIcons.screenshot),
+                        title: Text('Screenshot page'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // Arabic (RTL, scalable for low-vision accessibility — PRD 4.1)
-          Text(
-            ayah.textArabic,
-            textAlign: TextAlign.right,
-            textDirection: TextDirection.rtl,
-            // Tag the script so TalkBack/VoiceOver pick the Arabic speech engine.
-            locale: const Locale('ar'),
-            style: arabicStyle.copyWith(fontSize: arabicFontSize),
-          ),
+          if (showArabic) ...[
+            const SizedBox(height: 10),
+            // Arabic (RTL, scalable for low-vision accessibility — PRD 4.1)
+            Text(
+              ayah.textArabic,
+              key: WidgetKeys.ayahArabicText,
+              textAlign: TextAlign.right,
+              textDirection: TextDirection.rtl,
+              // Tag the script so TalkBack/VoiceOver pick the Arabic speech engine.
+              locale: const Locale('ar'),
+              style: arabicStyle.copyWith(fontSize: arabicFontSize),
+            ),
+          ],
           for (final r in resources)
             if (ayah.translations[r.id] != null)
               _Translation(
@@ -198,6 +223,13 @@ class AyahTile extends StatelessWidget {
   }
 
   Future<void> _onAction(BuildContext context, _AyahAction action) async {
+    // Screenshot captures the whole visible page, not this verse's text, so it's
+    // owned by the Detailed list (which holds the RepaintBoundary) — delegate and
+    // return; it does its own error handling.
+    if (action == _AyahAction.screenshot) {
+      onScreenshotPage?.call();
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     final text = buildAyahShareText(
       ayah: ayah,
@@ -216,6 +248,8 @@ class AyahTile extends StatelessWidget {
           );
         case _AyahAction.share:
           await SharePlus.instance.share(ShareParams(text: text));
+        case _AyahAction.screenshot:
+          break; // handled above
       }
     } catch (_) {
       // Never let a clipboard/share failure crash the reader.
@@ -231,7 +265,7 @@ class AyahTile extends StatelessWidget {
   }
 }
 
-enum _AyahAction { copy, share }
+enum _AyahAction { copy, share, screenshot }
 
 /// One translation: a small left-aligned attribution label over the text, which
 /// is aligned by its script (Urdu RTL → right, English LTR → left).

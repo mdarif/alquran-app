@@ -13,6 +13,7 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../cubit/ayah_audio_cubit.dart';
+import '../scroll_immersion.dart';
 import 'scroll_to_top_button.dart';
 import 'translation_chip.dart';
 
@@ -60,6 +61,8 @@ class MushafView extends StatefulWidget {
     required this.resources,
     this.arabicStyle = QuranTextStyle.madani,
     this.focusAyahId,
+    this.contentInsets = EdgeInsets.zero,
+    this.chromeHidden = false,
     this.onVisibleAyah,
     this.selectedLanguages = const {},
     this.onRegisterFlush,
@@ -67,6 +70,7 @@ class MushafView extends StatefulWidget {
     this.onToggleLanguage,
     this.showPeek = false,
     this.onSelectVerse,
+    this.onImmersionChanged,
     super.key,
   });
 
@@ -82,6 +86,14 @@ class MushafView extends StatefulWidget {
 
   /// Global ayah id to scroll to on open (Last Read resume); null starts at top.
   final int? focusAyahId;
+
+  /// Padding to keep the first/last verse clear of the (edge-to-edge) app bar and
+  /// player bar, which the immersive reader draws over the full-height body.
+  final EdgeInsets contentInsets;
+
+  /// True while the reader is in immersive (full-screen) mode — the page pill and
+  /// back-to-top button hide along with the chrome.
+  final bool chromeHidden;
 
   /// Reports the topmost-visible verse when scrolling settles (drives "Last
   /// Read"), so the resume point reflects where the reader actually stopped.
@@ -115,6 +127,10 @@ class MushafView extends StatefulWidget {
   /// a dismiss → null). The reader uses it to cue the always-on player's Play.
   final ValueChanged<Ayah?>? onSelectVerse;
 
+  /// Reports a sustained scroll direction for immersive reading: true = hide the
+  /// chrome (reading forward), false = show it (reverse scroll / at the top).
+  final ValueChanged<bool>? onImmersionChanged;
+
   @override
   State<MushafView> createState() => _MushafViewState();
 }
@@ -125,6 +141,9 @@ class _MushafViewState extends State<MushafView>
   // Mushaf-page chunks lay out, so a long surah opens as fast as a short one.
   final ItemScrollController _scrollCtrl = ItemScrollController();
   final ItemPositionsListener _positions = ItemPositionsListener.create();
+
+  // Turns scroll direction into chrome hide/show intents (immersive reading).
+  final ScrollImmersionDetector _immersion = ScrollImmersionDetector();
 
   Timer? _reportTimer;
   Timer? _hideTimer;
@@ -683,6 +702,12 @@ class _MushafViewState extends State<MushafView>
                   !_zooming) {
                 _heldFocusId = null;
               }
+              // A sustained drag direction hides/shows the chrome (immersive
+              // reading) — but never let a pinch's incidental scroll toggle it.
+              if (!_zooming) {
+                final hide = _immersion.update(n);
+                if (hide != null) widget.onImmersionChanged?.call(hide);
+              }
               // Report after the settle frame lays out — the item positions
               // update during layout, so reading them here (mid-notification)
               // would still see the pre-scroll top.
@@ -698,7 +723,8 @@ class _MushafViewState extends State<MushafView>
               initialScrollIndex: _initialIndex,
               initialAlignment: _initialAlignment,
               itemCount: _rows.length,
-              padding: const EdgeInsets.only(top: 8, bottom: 56),
+              padding: widget.contentInsets +
+                  const EdgeInsets.symmetric(vertical: 8),
               itemBuilder: _buildRow,
             ),
           ),
@@ -707,26 +733,31 @@ class _MushafViewState extends State<MushafView>
           Positioned(
             left: 0,
             right: 0,
-            bottom: 16,
+            bottom: 16 + widget.contentInsets.bottom,
             child: IgnorePointer(
               child: Center(
-                child: _PagePill(page: _currentPage!, visible: _showPage),
+                child: _PagePill(
+                  page: _currentPage!,
+                  visible: _showPage && !widget.chromeHidden,
+                ),
               ),
             ),
           ),
         Positioned(
           right: 16,
-          bottom: 16,
+          bottom: 16 + widget.contentInsets.bottom,
           child: ScrollToTopButton(
-            visible: _showTop,
+            visible: _showTop && !widget.chromeHidden,
             onPressed: _scrollToTop,
           ),
         ),
         // Tap-to-peek translation card — always in the tree so it can animate.
+        // Sits above the (edge-to-edge) player bar / gesture inset so it isn't
+        // occluded now the body runs full-height behind the chrome.
         Positioned(
           left: 0,
           right: 0,
-          bottom: 0,
+          bottom: widget.contentInsets.bottom,
           child: SlideTransition(
             position: _peekSlide,
             child: IgnorePointer(

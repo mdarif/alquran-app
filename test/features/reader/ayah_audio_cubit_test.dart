@@ -396,6 +396,10 @@ class _FakeSettings implements ReaderSettingsRepository {
   Future<void> setShowTranslationPeek(bool value) async =>
       showTranslationPeek = value;
   @override
+  bool showArabicMatn = true;
+  @override
+  Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
   Future<void> setScript(ArabicScript value) async => script = value;
   @override
   Future<void> setFontSize(double value) async => fontSize = value;

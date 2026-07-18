@@ -28,11 +28,17 @@ abstract interface class ReaderSettingsRepository {
   /// translation-only reading aid (no play control). Reading-only.
   bool get showTranslationPeek;
 
+  /// Whether the Detailed view renders the Arabic matn above each translation.
+  /// Defaults to **true**; turning it off gives a translations-only reading (the
+  /// Arabic line is hidden). Detailed-only.
+  bool get showArabicMatn;
+
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setSelectedTranslations(List<String> languageCodes);
   Future<void> setRecitationSpeed(double value);
   Future<void> setShowTranslationPeek(bool value);
+  Future<void> setShowArabicMatn(bool value);
 
   static const double defaultFontSize = 28;
   static const double defaultRecitationSpeed = 1.0;

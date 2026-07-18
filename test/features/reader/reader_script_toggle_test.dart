@@ -98,6 +98,10 @@ class _Settings implements ReaderSettingsRepository {
   @override
   Future<void> setShowTranslationPeek(bool value) async =>
       showTranslationPeek = value;
+  @override
+  bool showArabicMatn = true;
+  @override
+  Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
 }
 
 /// No-op player so ReaderPage's audio branch (behind FeatureFlags.audioRecitation)

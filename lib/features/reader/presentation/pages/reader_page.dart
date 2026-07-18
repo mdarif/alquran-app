@@ -1,10 +1,16 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
@@ -21,6 +27,7 @@ import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/ayah_audio_cubit.dart';
 import '../cubit/reader_cubit.dart';
+import '../scroll_immersion.dart';
 import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
 import '../widgets/reader_player_bar.dart';
@@ -89,6 +96,41 @@ class _ReaderView extends StatefulWidget {
 /// Dual viewport (PRD 3 / 4.3): Reading = Arabic-only Mushaf flow;
 /// Detailed = Arabic stacked over Urdu + Hindi translations.
 enum _Viewport { reading, detailed }
+
+/// How long the app bar / player bar take to slide away and back for immersive
+/// reading — short enough to feel responsive to the scroll that triggered it.
+const Duration _kChromeAnim = Duration(milliseconds: 220);
+
+/// The player bar's content height (a single 48pt transport row + 8pt padding),
+/// excluding the bottom safe-area inset. Used to pad the verses clear of it since
+/// the body now runs edge-to-edge behind the bar (see [_ReaderViewState.build]).
+const double _kPlayerBarHeight = 56;
+
+/// The reader's app bar, wrapped so it slides up out of view while the chrome is
+/// [hidden] (immersive reading) and back down when shown. It keeps the wrapped
+/// bar's [preferredSize], so the Scaffold reserves the app bar's real height for
+/// its own layout; with `extendBodyBehindAppBar: true` the body ignores that
+/// reserve and runs full-height behind it, so the slide reveals verses with no
+/// reflow.
+class _SlidingAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _SlidingAppBar({required this.hidden, required this.child});
+
+  final bool hidden;
+  final PreferredSizeWidget child;
+
+  @override
+  Size get preferredSize => child.preferredSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      offset: hidden ? const Offset(0, -1) : Offset.zero,
+      duration: _kChromeAnim,
+      curve: Curves.easeOut,
+      child: child,
+    );
+  }
+}
 
 class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Pinch-to-zoom font scaling is an accessibility requirement (PRD 4.1).
@@ -160,6 +202,15 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // the bar's Play). Opt-in from Settings; persisted.
   late bool _showTranslationPeek = _settings.showTranslationPeek;
 
+  // Whether the Detailed view shows the Arabic matn above each translation. On by
+  // default; off = a translations-only reading. Opt-out from Settings; persisted.
+  late bool _showArabicMatn = _settings.showArabicMatn;
+
+  // Immersive reading (both viewports): reading forward (swipe up) hides the app
+  // bar, player bar, and OS system bars; a reverse swipe (down) brings them back;
+  // the top always shows them. Driven by the active viewport's scroll direction.
+  bool _chromeHidden = false;
+
   // The verse the reader tapped in Reading — "queued" for the always-on player's
   // Play button (which has no per-verse buttons of its own). Drives the queued
   // highlight + the bar's idle label/Play target. Null = nothing queued yet.
@@ -221,6 +272,11 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       WidgetsBinding.instance.removeObserver(this);
       _audioCubit!.onSequenceEnd = null; // don't call into a disposed State
     }
+    // Leaving the reader always restores the OS bars — immersion is a reading-only
+    // mode, so the rest of the app (and a bar-less exit) never inherits it.
+    if (_chromeHidden) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     _pageController.dispose();
     super.dispose();
   }
@@ -240,42 +296,67 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final isReading = _viewport == _Viewport.reading;
+    // The body runs edge-to-edge behind both bars (immersive reading), so each
+    // list pads its own content by the bar heights — the status bar + app bar on
+    // top, and the player bar + gesture inset on the bottom — so the first/last
+    // verse still clears the bars when they're shown.
+    final media = MediaQuery.of(context);
+    final contentInsets = EdgeInsets.only(
+      top: media.padding.top + kToolbarHeight,
+      bottom: media.padding.bottom +
+          (FeatureFlags.audioRecitation ? _kPlayerBarHeight : 0),
+    );
     return Scaffold(
+      // Immersive reading: the body runs edge-to-edge behind both bars, so hiding
+      // them (sliding away on a forward scroll) reveals the verses underneath with
+      // no reflow. Each list adds the bar-height insets to its own padding so the
+      // first/last verse still clears the bars when they're shown.
+      extendBodyBehindAppBar: true,
+      extendBody: true,
       // The always-on player pins here (outside the body's pinch/swipe gesture
       // arena). It's the single playback surface in both viewports; when idle its
       // Play starts the queued verse (a tapped verse) or, failing that, the CURRENT
       // reading position (_focusAyahId — the Last Read resume verse, or the topmost
       // as you scroll) so it plays from where you are, not the surah's first verse.
-      // Behind the flag.
+      // Behind the flag. Slides down out of view while the chrome is hidden.
       bottomNavigationBar: FeatureFlags.audioRecitation
-          ? ReaderPlayerBar(queuedAyahId: _queuedAyahId ?? _focusAyahId)
+          ? AnimatedSlide(
+              offset: _chromeHidden ? const Offset(0, 1) : Offset.zero,
+              duration: _kChromeAnim,
+              curve: Curves.easeOut,
+              child:
+                  ReaderPlayerBar(queuedAyahId: _queuedAyahId ?? _focusAyahId),
+            )
           : null,
-      appBar: AppBar(
-        title: Text(_target.title),
-        actions: [
-          // Reading ⇄ Detailed in one tap (icon shows the view you'll switch to).
-          // The app-bar action set stays identical in both views so positions
-          // never shift; translation languages live in the Settings sheet (below),
-          // not here.
-          IconButton(
-            key: WidgetKeys.viewportToggle,
-            tooltip: isReading ? 'Detailed view' : 'Reading view',
-            icon: AppIcon(
-              isReading ? AppIcons.viewDetailed : AppIcons.viewReading,
+      appBar: _SlidingAppBar(
+        hidden: _chromeHidden,
+        child: AppBar(
+          title: Text(_target.title),
+          actions: [
+            // Reading ⇄ Detailed in one tap (icon shows the view you'll switch to).
+            // The app-bar action set stays identical in both views so positions
+            // never shift; translation languages live in the Settings sheet (below),
+            // not here.
+            IconButton(
+              key: WidgetKeys.viewportToggle,
+              tooltip: isReading ? 'Detailed view' : 'Reading view',
+              icon: AppIcon(
+                isReading ? AppIcons.viewDetailed : AppIcons.viewReading,
+              ),
+              onPressed: () => _setDetailed(isReading),
             ),
-            onPressed: () => _setDetailed(isReading),
-          ),
-          if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
-          // Settings sits last (rightmost): reading size, Arabic font +
-          // translation, in a bottom sheet. (Prayer times live on the Home bar,
-          // so there's no indicator here — keeps the reader calm.)
-          IconButton(
-            key: WidgetKeys.settingsButton,
-            tooltip: 'Settings',
-            icon: const AppIcon(AppIcons.settings),
-            onPressed: _openSettingsSheet,
-          ),
-        ],
+            if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
+            // Settings sits last (rightmost): reading size, Arabic font +
+            // translation, in a bottom sheet. (Prayer times live on the Home bar,
+            // so there's no indicator here — keeps the reader calm.)
+            IconButton(
+              key: WidgetKeys.settingsButton,
+              tooltip: 'Settings',
+              icon: const AppIcon(AppIcons.settings),
+              onPressed: _openSettingsSheet,
+            ),
+          ],
+        ),
       ),
       body: Listener(
         onPointerDown: _onPointerDown,
@@ -328,7 +409,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
                   allowImplicitScrolling: false,
                   itemCount: _target.dimension.count,
                   onPageChanged: _onPageChanged,
-                  itemBuilder: (context, i) => _sectionPage(i, state, audio),
+                  itemBuilder: (context, i) =>
+                      _sectionPage(i, state, audio, contentInsets),
                 );
             // The tree shape must be IDENTICAL in both viewports: the
             // BlocBuilder wraps the PageView whenever audio is on, and
@@ -380,6 +462,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     required Map<int, SurahHeading> headings,
     required List<TranslationResource> resources,
     required bool interactive,
+    required EdgeInsets contentInsets,
     AyahAudioState? audio,
   }) {
     // Key by the section's first ayah so a new section starts at the top, while
@@ -404,6 +487,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         arabicStyle: _arabicStyle,
         resources: resources,
         focusAyahId: focus,
+        contentInsets: contentInsets,
+        chromeHidden: _chromeHidden,
         onVisibleAyah: interactive ? _onVisibleAyah : null,
         selectedLanguages: _activeLangs(resources),
         onRegisterFlush:
@@ -415,6 +500,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         showPeek: _showTranslationPeek,
         // A tap always selects/queues the verse for the player, peek or not.
         onSelectVerse: interactive ? _onSelectVerse : null,
+        // Only the live page drives immersion (forward-scroll hides the chrome).
+        onImmersionChanged: interactive ? _setChromeHidden : null,
       );
     } else {
       // Copy/share in Detailed is per-verse (the tile's ⋯ menu) — no
@@ -430,9 +517,14 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         arabicFontSize: _arabicFont,
         arabicStyle: _arabicStyle,
         focusAyahId: focus,
+        contentInsets: contentInsets,
+        showArabic: _showArabicMatn,
+        chromeHidden: _chromeHidden,
         onVisibleAyah: interactive ? _onVisibleAyah : null,
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
+        // Only the live page drives immersion (forward-scroll hides the chrome).
+        onImmersionChanged: interactive ? _setChromeHidden : null,
       );
     }
     return view;
@@ -442,7 +534,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   /// the active dimension. Off-screen pages read their verses from the warm
   /// cache (the active section + its neighbours are always cached); the rare
   /// uncached page shows a spinner and warms itself for next time.
-  Widget _sectionPage(int i, ReaderState state, AyahAudioState? audio) {
+  Widget _sectionPage(
+    int i,
+    ReaderState state,
+    AyahAudioState? audio,
+    EdgeInsets contentInsets,
+  ) {
     final target = _targetForIndex(i);
     final ayahs = _cubit.cachedAyahs(target);
     if (ayahs == null || ayahs.isEmpty) {
@@ -456,6 +553,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       resources: state.resources,
       interactive: active,
       audio: active ? audio : null,
+      contentInsets: contentInsets,
     );
   }
 
@@ -481,6 +579,10 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void _onPageChanged(int i) {
     final next = _targetForIndex(i);
     if (next == _target) return;
+    // Swiping to a new section reveals the chrome (the new surah's title), and
+    // re-syncs with the incoming list's fresh immersion detector — which starts
+    // from "shown", so leaving it hidden would strand the bars off-screen.
+    _setChromeHidden(false);
     // A user swipe stops the recitation; an autoplay-driven advance keeps it
     // rolling (the incoming section's first verse plays via the setSequence
     // listener above).
@@ -629,6 +731,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         isReading: _viewport == _Viewport.reading,
         showTranslationPeek: _showTranslationPeek,
         onToggleTranslationPeek: _toggleShowTranslationPeek,
+        showArabicMatn: _showArabicMatn,
+        onToggleShowArabic: _toggleShowArabicMatn,
       ),
     );
   }
@@ -708,6 +812,24 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     unawaited(_settings.setShowTranslationPeek(value));
   }
 
+  /// Show/hide the Arabic matn in Detailed (translations-only reading). On by
+  /// default; persisted.
+  void _toggleShowArabicMatn(bool value) {
+    setState(() => _showArabicMatn = value);
+    unawaited(_settings.setShowArabicMatn(value));
+  }
+
+  /// The active viewport reported a sustained scroll direction: hide the chrome
+  /// (app bar + player bar + OS system bars) while reading forward, show it on a
+  /// reverse scroll or at the top. Only the interactive page drives this.
+  void _setChromeHidden(bool hidden) {
+    if (hidden == _chromeHidden) return;
+    setState(() => _chromeHidden = hidden);
+    SystemChrome.setEnabledSystemUIMode(
+      hidden ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+    );
+  }
+
   /// The reader tapped (or stepped to) a verse in Reading — queue it for the
   /// always-on player's Play. Null clears the queue (tap-off / dismiss).
   void _onSelectVerse(Ayah? ayah) {
@@ -755,10 +877,14 @@ class _DetailedList extends StatefulWidget {
     required this.enabledLanguages,
     required this.headings,
     required this.arabicFontSize,
+    required this.contentInsets,
     this.arabicStyle = QuranTextStyle.madani,
+    this.showArabic = true,
+    this.chromeHidden = false,
     this.focusAyahId,
     this.onVisibleAyah,
     this.onRegisterFlush,
+    this.onImmersionChanged,
     super.key,
   });
 
@@ -774,11 +900,25 @@ class _DetailedList extends StatefulWidget {
   final Map<int, SurahHeading> headings;
   final double arabicFontSize;
   final TextStyle arabicStyle;
+
+  /// Padding to keep the first/last verse clear of the (edge-to-edge) bars.
+  final EdgeInsets contentInsets;
+
+  /// Whether each tile renders the Arabic matn (off = translations-only).
+  final bool showArabic;
+
+  /// True in immersive (full-screen) mode — the back-to-top button hides with the
+  /// chrome.
+  final bool chromeHidden;
+
   final int? focusAyahId;
   final ValueChanged<Ayah>? onVisibleAyah;
 
   /// See [MushafView.onRegisterFlush] — same contract.
   final void Function(VoidCallback?)? onRegisterFlush;
+
+  /// See [MushafView.onImmersionChanged] — forward-scroll hides the chrome.
+  final ValueChanged<bool>? onImmersionChanged;
 
   /// The editions actually rendered in each tile: the enabled ones, falling back
   /// to all if a stale saved selection matches nothing available.
@@ -813,6 +953,13 @@ class _DetailedListState extends State<_DetailedList> {
 
   // "Back to top" appears once the list is roughly a screen deep.
   bool _showTop = false;
+
+  // Turns scroll direction into chrome hide/show intents (immersive reading).
+  final ScrollImmersionDetector _immersion = ScrollImmersionDetector();
+
+  // Wraps just the verses so "Screenshot page" captures the visible verses (not
+  // the back-to-top FAB, and not the app bar / player bar — they're outside it).
+  final GlobalKey _pageBoundaryKey = GlobalKey();
 
   @override
   void initState() {
@@ -988,12 +1135,15 @@ class _DetailedListState extends State<_DetailedList> {
       children: [
         // A finger-driven scroll (dragDetails set) releases the resume pin so
         // reporting tracks the top again; the programmatic scroll-to-focus and
-        // reciter-follow scrolls carry no dragDetails.
+        // reciter-follow scrolls carry no dragDetails. A sustained drag direction
+        // also hides/shows the reader chrome (immersive reading).
         NotificationListener<ScrollNotification>(
           onNotification: (n) {
             if (n is ScrollStartNotification && n.dragDetails != null) {
               _heldFocusId = null;
             }
+            final hide = _immersion.update(n);
+            if (hide != null) widget.onImmersionChanged?.call(hide);
             return false;
           },
           // No SelectionArea here (mirrors Reading): on Android its touch
@@ -1002,18 +1152,29 @@ class _DetailedListState extends State<_DetailedList> {
           // selected text instead of turning the PageView's page — Detailed
           // couldn't be swiped at all. Copy/share stays available per verse
           // via the tile's ⋯ menu.
-          child: ScrollablePositionedList.builder(
-            itemScrollController: _scrollController,
-            itemPositionsListener: _positions,
-            itemCount: _rows.length,
-            itemBuilder: _buildRow,
+          //
+          // A ColoredBox inside the RepaintBoundary gives "Screenshot page" an
+          // opaque background (the boundary captures only what it paints — the
+          // Scaffold's page colour sits outside it).
+          child: RepaintBoundary(
+            key: _pageBoundaryKey,
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: ScrollablePositionedList.builder(
+                itemScrollController: _scrollController,
+                itemPositionsListener: _positions,
+                itemCount: _rows.length,
+                padding: widget.contentInsets,
+                itemBuilder: _buildRow,
+              ),
+            ),
           ),
         ),
         Positioned(
           right: 16,
-          bottom: 16,
+          bottom: 16 + widget.contentInsets.bottom,
           child: ScrollToTopButton(
-            visible: _showTop,
+            visible: _showTop && !widget.chromeHidden,
             onPressed: _scrollToTop,
           ),
         ),
@@ -1044,12 +1205,48 @@ class _DetailedListState extends State<_DetailedList> {
       arabicFontSize: widget.arabicFontSize,
       arabicStyle: widget.arabicStyle,
       surahName: widget.headings[ayah.surahId]?.nameEnglish,
+      showArabic: widget.showArabic,
       highlight: _highlightAyahId == ayah.id,
       audioState: audio,
       onTogglePlay: audio == null
           ? null
           : () => context.read<AyahAudioCubit>().toggle(ayah.id),
+      // The ⋯ menu's Screenshot captures the whole visible page (this list's
+      // RepaintBoundary), not this one verse.
+      onScreenshotPage: _shareVisiblePage,
     );
+  }
+
+  /// Renders the currently-visible verses to a PNG and opens the share sheet.
+  /// The RepaintBoundary wraps just the verse list, so the app bar, player bar,
+  /// and back-to-top FAB never appear in the image. Any failure is swallowed with
+  /// a SnackBar — a screenshot must never crash the reader.
+  Future<void> _shareVisiblePage() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final boundary = _pageBoundaryKey.currentContext?.findRenderObject()
+          as RenderRepaintBoundary?;
+      if (boundary == null) return;
+      final image = await boundary.toImage(
+        pixelRatio: MediaQuery.of(context).devicePixelRatio,
+      );
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (data == null) throw StateError('PNG encode failed');
+      final dir = await getTemporaryDirectory();
+      final file = File(
+        '${dir.path}/alquran_page_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not create screenshot'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Widget _buildRow(BuildContext context, int i) {
@@ -1143,6 +1340,8 @@ class _SettingsSheet extends StatefulWidget {
     required this.isReading,
     required this.showTranslationPeek,
     required this.onToggleTranslationPeek,
+    required this.showArabicMatn,
+    required this.onToggleShowArabic,
   });
 
   final double fontSize;
@@ -1159,6 +1358,10 @@ class _SettingsSheet extends StatefulWidget {
   final bool isReading;
   final bool showTranslationPeek;
   final ValueChanged<bool> onToggleTranslationPeek;
+  // The mirror image: "Show Arabic" is a Detailed-only toggle (translations-only
+  // reading when off), hidden in Reading (which is Arabic-only anyway).
+  final bool showArabicMatn;
+  final ValueChanged<bool> onToggleShowArabic;
 
   @override
   State<_SettingsSheet> createState() => _SettingsSheetState();
@@ -1172,6 +1375,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
   late ArabicScript _script = widget.script;
   late Set<String> _selectedLangs = {...widget.selectedLanguages};
   late bool _showPeek = widget.showTranslationPeek;
+  late bool _showArabic = widget.showArabicMatn;
 
   void _setFont(double value) {
     final v = value.clamp(widget.minFont, widget.maxFont).roundToDouble();
@@ -1356,6 +1560,23 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Show translation'),
                   subtitle: const Text('Tap a verse to see its translation.'),
+                ),
+              ],
+              // Detailed-only mirror: hide the Arabic matn for a translations-only
+              // reading. Hidden in Reading (which is Arabic-only anyway).
+              if (!widget.isReading && widget.resources.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const _SectionLabel('Detailed'),
+                SwitchListTile.adaptive(
+                  key: WidgetKeys.showArabicToggle,
+                  value: _showArabic,
+                  onChanged: (v) {
+                    setState(() => _showArabic = v);
+                    widget.onToggleShowArabic(v);
+                  },
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show Arabic'),
+                  subtitle: const Text('Turn off to read translations only.'),
                 ),
               ],
             ],

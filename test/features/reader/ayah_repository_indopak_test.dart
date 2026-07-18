@@ -35,6 +35,10 @@ class _Settings implements ReaderSettingsRepository {
   bool get showTranslationPeek => false;
   @override
   Future<void> setShowTranslationPeek(bool value) async {}
+  @override
+  bool get showArabicMatn => true;
+  @override
+  Future<void> setShowArabicMatn(bool value) async {}
 }
 
 void main() {

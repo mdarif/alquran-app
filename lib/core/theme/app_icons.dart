@@ -110,6 +110,10 @@ class AppIcons {
     0xe80d,
     fontFamily: _kSymbolFamily,
   ); // share_rounded
+  static const IconData screenshot = IconData(
+    0xf056,
+    fontFamily: _kSymbolFamily,
+  ); // screenshot_rounded
 
   // ── Audio recitation ──────────────────────────────────────────────────────
   /// Inline (Detailed tile) arrow controls.
