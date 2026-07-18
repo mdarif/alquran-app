@@ -142,7 +142,7 @@ Follow Al-Tawheed's `docs/store-assets/feature-graphic-spec.md` approach:
    feature graphic from §3, app icon 512×512 (export from
    `assets/icon/icon.png`).
 3. **Privacy policy URL** — <https://kitabattawheed.com/privacy/> (live; shared
-   with Sharah Kitab al-Tawheed). Support/contact email: hello@almarfa.co.
+   with Sharah Kitab at-Tawheed). Support/contact email: hello@almarfa.co.
 4. **App content declarations:**
    - **Data safety:** declare **no data collected, no data shared**. Rationale:
      no analytics/ads/accounts; prayer-time location is processed on-device

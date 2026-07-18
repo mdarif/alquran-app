@@ -3,7 +3,7 @@
 **Al Marfa Technologies** · Effective 3 July 2026
 
 > **Published (canonical) version:** the live policy — shared by Al Quran and
-> Sharah Kitab al-Tawheed — is hosted at <https://kitabattawheed.com/privacy/>
+> Sharah Kitab at-Tawheed — is hosted at <https://kitabattawheed.com/privacy/>
 > (source: `Al-Tawheed-Web/src/pages/privacy.astro`). **That is the URL to enter
 > in the app stores.** This file is the Al-Quran-specific working draft, kept for
 > reference; keep the two in sync if either changes.
