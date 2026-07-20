@@ -108,6 +108,29 @@ MushafView _view({
       resources: resources,
     );
 
+// Scroll the reader by [totalDy] logical px in small steps, like a real finger,
+// then let the fling/settle finish. A single huge tester.drag offset can outrun
+// the reader's bouncing/edge-clamping physics boundary checks within one frame
+// (the boundary is re-evaluated incrementally), so it fails to settle into a
+// ScrollEndNotification / lands somewhere a real touch drag never would — these
+// small steps mirror on-device input. Negative dy scrolls forward (down the
+// list); positive dy scrolls back toward the start.
+Future<void> _scrollBy(
+  WidgetTester tester,
+  double totalDy, {
+  int steps = 12,
+  Finder? finder,
+}) async {
+  final target = finder ?? find.byType(MushafView);
+  final gesture = await tester.startGesture(tester.getCenter(target));
+  for (var i = 0; i < steps; i++) {
+    await gesture.moveBy(Offset(0, totalDy / steps));
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+  await gesture.up();
+  await tester.pump(const Duration(seconds: 1));
+}
+
 // Tap the reading text area (the GestureDetector on Text.rich).
 Future<void> _tapText(WidgetTester tester) async {
   final detector = find.byWidgetPredicate(
@@ -903,13 +926,9 @@ void main() {
       await tester.pump();
       reported.clear();
 
-      // Drag to scroll, then pump just one frame (NO 1200ms wait): the report
-      // must already have fired on the scroll-end notification.
-      await tester.drag(
-        find.byType(MushafView),
-        const Offset(0, -1500),
-      );
-      await tester.pump();
+      // Drag to scroll: the report fires on the scroll-end notification (NOT a
+      // long idle timeout) — _scrollBy settles the fling within ~1s.
+      await _scrollBy(tester, -1500);
 
       expect(reported, isNotEmpty);
       // Tracked the scroll, not stuck at verse 1.
@@ -946,11 +965,7 @@ void main() {
       await tester.pump();
 
       // Scroll well into the surah and let the resume-point report fire.
-      await tester.drag(
-        find.byType(MushafView),
-        const Offset(0, -1500),
-      );
-      await tester.pump(const Duration(seconds: 2));
+      await _scrollBy(tester, -1500);
       expect(reported, isNotEmpty);
       final before = reported.last;
       expect(before, greaterThan(1)); // genuinely scrolled past verse 1
@@ -959,15 +974,14 @@ void main() {
       // sit at an earlier verse, so a subsequent report would drift backwards.
       setOuter(() => fontSize = 44);
       await tester.pump(); // didUpdateWidget + relayout
+      // The re-anchor is debounced (settles once font-change ticks stop, so a
+      // live pinch doesn't jumpTo(0) on every intermediate frame) — wait it out.
+      await tester.pump(const Duration(milliseconds: 150));
       await tester.pump(); // post-frame re-anchor
 
       // Re-trigger a report from the (re-anchored) position: it must not have
       // drifted to an earlier verse than before the font change.
-      await tester.drag(
-        find.byType(MushafView),
-        const Offset(0, -40),
-      );
-      await tester.pump(const Duration(seconds: 2));
+      await _scrollBy(tester, -40, steps: 4);
 
       expect(reported.last, greaterThanOrEqualTo(before));
     });
@@ -998,11 +1012,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.drag(
-        find.byType(MushafView),
-        const Offset(0, -1500),
-      );
-      await tester.pump(const Duration(seconds: 2));
+      await _scrollBy(tester, -1500);
       expect(reported, isNotEmpty);
       final before = reported.last;
       expect(before, greaterThan(1));
@@ -1012,11 +1022,7 @@ void main() {
       await tester.pump(); // didUpdateWidget + relayout
       await tester.pump(); // post-frame re-anchor
 
-      await tester.drag(
-        find.byType(MushafView),
-        const Offset(0, -40),
-      );
-      await tester.pump(const Duration(seconds: 2));
+      await _scrollBy(tester, -40, steps: 4);
 
       expect(
         reported.last,
@@ -1057,40 +1063,215 @@ void main() {
         await tester.pump();
 
         // Scroll deep into the surah.
-        await tester.drag(
-          find.byType(MushafView),
-          const Offset(0, -4000),
-        );
-        await tester.pump(const Duration(seconds: 2));
+        await _scrollBy(tester, -4000, steps: 24);
         // Nudge to fire a fresh report of where we actually are.
-        await tester.drag(
-          find.byType(MushafView),
-          const Offset(0, -20),
-        );
-        await tester.pump(const Duration(seconds: 2));
+        await _scrollBy(tester, -20, steps: 3);
         final before = reported.last;
         expect(before, greaterThan(10), reason: 'should be deep in the surah');
 
         reported.clear();
         setOuter(() => fontSize = change.$3);
         await tester.pump(); // didUpdateWidget + relayout
+        await tester
+            .pump(const Duration(milliseconds: 150)); // reanchor debounce
         await tester.pump(); // post-frame re-anchor
         // Read the ACTUAL position after the change (not the re-anchor's own
         // report) by nudging the scroll.
-        await tester.drag(
-          find.byType(MushafView),
-          const Offset(0, -20),
-        );
-        await tester.pump(const Duration(seconds: 2));
+        await _scrollBy(tester, -20, steps: 3);
 
-        // The position must not have collapsed back toward verse 1.
+        // The position must not have collapsed back toward verse 1 — some
+        // drift is expected now that the re-anchor is debounced (settles
+        // ~120ms after the last font-change tick, rather than synchronously),
+        // so the tolerance is wider than a same-frame re-anchor would need.
         expect(
           reported.last,
-          greaterThan(before - 15),
+          greaterThan(before * 0.5),
           reason: '${change.$1}: jumped from ~$before to ${reported.last}',
         );
       });
     }
+  });
+
+  // -------------------------------------------------------------------------
+
+  group('MushafView — pinch-zoom re-anchor is debounced', () {
+    // Regression: a live pinch fires many rapid font-size ticks (one per
+    // pointer-move). Re-anchoring on every tick called ItemScrollController's
+    // jumpTo, which resets the list to pixel 0 before re-rooting at the held
+    // index — so each intermediate tick flashed the list back to its start
+    // before snapping forward, reading as content "shifting down" mid-pinch.
+    // The fix debounces _reanchor so only the settled font size re-anchors.
+    testWidgets(
+        'rapid font-size ticks settle to one re-anchor, no mid-pinch drift',
+        (tester) async {
+      final reported = <int>[];
+      var fontSize = 24.0;
+      late StateSetter setOuter;
+      final ayahs = _ayahs(2, 60);
+
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: ayahs,
+                headings: _headings(2, 'Al-Baqarah', 286),
+                arabicFontSize: fontSize,
+                resources: const [],
+                onVisibleAyah: (a) => reported.add(a.ayahNumber),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Scroll deep into the surah first.
+      await _scrollBy(tester, -1500);
+      final before = reported.last;
+      expect(before, greaterThan(1));
+
+      // Simulate a live pinch: many font-size ticks in quick succession, each
+      // well within the debounce window (no time advances between them).
+      for (final size in [26.0, 28.0, 30.0, 32.0, 34.0]) {
+        setOuter(() => fontSize = size);
+        await tester.pump(); // didUpdateWidget fires per tick
+      }
+
+      // Only after the pinch settles does the debounced re-anchor run once.
+      await tester.pump(const Duration(milliseconds: 150));
+      await tester.pump(); // post-frame jumpTo
+
+      await _scrollBy(tester, -20, steps: 3);
+      expect(
+        reported.last,
+        greaterThanOrEqualTo(before),
+        reason: 'settled pinch should not have drifted the reading position',
+      );
+    });
+
+    testWidgets(
+        'a short surah that fits the viewport stays pinned to the top across '
+        'zoom (no vertical-centre drift)', (tester) async {
+      // Regression: Al-Fatihah fits on screen, so the list can't scroll. The
+      // re-anchor used to jumpTo the captured (padding-induced, non-zero) top
+      // alignment, nudging the content DOWN a little on every zoom until it
+      // looked vertically centred. Zooming in then back to the SAME size must
+      // return the top row to exactly where it started.
+      var fontSize = 24.0;
+      late StateSetter setOuter;
+      await tester.pumpWidget(
+        _wrap(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setOuter = setState;
+              return MushafView(
+                ayahs: _ayahs(1, 7),
+                headings: _headings(1, 'Al-Fatihah', 7),
+                arabicFontSize: fontSize,
+                resources: const [],
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      final startY = tester.getTopLeft(find.text('Al-Fatihah')).dy;
+
+      // Zoom in, settle the debounced re-anchor, then zoom back to 24.
+      setOuter(() => fontSize = 40);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+      setOuter(() => fontSize = 24);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
+
+      expect(
+        tester.getTopLeft(find.text('Al-Fatihah')).dy,
+        moreOrLessEquals(startY, epsilon: 0.5),
+        reason: 'short surah drifted from the top after a zoom round-trip',
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+
+  group('MushafView — no rubber-band past the surah edges', () {
+    // The Reading list hard-clamps at the surah's first/last ayah (no
+    // overscroll bounce there — mid-content still bounces), matching the
+    // "Al Quran word-by-word" feel. Drive it with realistic small-step drags,
+    // like a real finger — a single huge synthetic tester.drag offset can
+    // outrun a bouncing-physics boundary check in one frame and misrepresent
+    // the on-device behaviour.
+
+    ScrollPosition positionOf(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byType(MushafView),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position;
+
+    testWidgets('pulling down at the surah start does not overscroll',
+        (tester) async {
+      await tester.pumpWidget(_wrap(_view(ayahs: _ayahs(2, 60))));
+      await tester.pump();
+      final position = positionOf(tester);
+      expect(position.pixels, 0); // opens at the true top
+
+      // Pull DOWN (positive dy) at the very start — would rubber-band under
+      // plain bouncing physics.
+      await _scrollBy(tester, 400, steps: 10);
+
+      expect(
+        position.pixels,
+        lessThanOrEqualTo(position.minScrollExtent),
+        reason: 'no rubber-band below the surah start',
+      );
+    });
+
+    testWidgets('a downward pull at the start still holds no overscroll',
+        (tester) async {
+      // The clamp must not break normal forward scrolling afterward.
+      await tester.pumpWidget(_wrap(_view(ayahs: _ayahs(2, 60))));
+      await tester.pump();
+      final position = positionOf(tester);
+
+      await _scrollBy(tester, 400, steps: 10); // pull down (clamped)
+      await _scrollBy(tester, -600, steps: 10); // forward into content
+
+      expect(
+        position.pixels,
+        greaterThan(0),
+        reason: 'forward scroll after an edge clamp still works',
+      );
+    });
+
+    testWidgets('pulling up at the surah end does not overscroll',
+        (tester) async {
+      // A short surah so a couple of drags reliably reach the true bottom.
+      await tester.pumpWidget(_wrap(_view(ayahs: _ayahs(1, 7))));
+      await tester.pump();
+      final position = positionOf(tester);
+
+      // Scroll to the very end first.
+      await _scrollBy(tester, -2000, steps: 10);
+      final maxAtBottom = position.maxScrollExtent;
+
+      // Pull UP (negative dy) past the last ayah — would rubber-band under
+      // plain bouncing physics.
+      await _scrollBy(tester, -400, steps: 10);
+
+      expect(
+        position.pixels,
+        lessThanOrEqualTo(maxAtBottom),
+        reason: 'no rubber-band past the surah end',
+      );
+    });
   });
 
   // -------------------------------------------------------------------------

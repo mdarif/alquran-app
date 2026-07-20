@@ -1,7 +1,10 @@
 # CLAUDE.md — Al Quran (Flutter app)
 
 Context for Claude Code working in this repo. Companion data repo:
-`../alquran-data` (read its `HANDOFF.md` and `CLAUDE.md` for how `quran.db` is built).
+`../alquran-data` (read its `HANDOFF.md` and `CLAUDE.md` for how `quran.db` is
+built). New translation editions (e.g. a second English edition) are tracked
+in `../alquran-data/TRANSLATIONS-ROADMAP.md` — shared with `../al-quran-web`
+since both read the same DB; add candidates there, not here.
 
 ## What this is
 

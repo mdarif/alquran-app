@@ -26,6 +26,44 @@ class QuranScrollPhysics extends BouncingScrollPhysics {
       );
 }
 
+/// [QuranScrollPhysics] that keeps the fling glide/settle feel of bouncing
+/// physics but HARD-CLAMPS at the true content edges — no rubber-band when you
+/// pull down at a surah's first ayah, nor up at its last (like the "Al Quran
+/// word-by-word" reader). Mid-content scrolling is unaffected.
+///
+/// Used for the reader's page list ([ScrollablePositionedList]). That widget
+/// lays its slivers out around a moving center anchor, so [ScrollMetrics.pixels]
+/// is NOT an absolute offset — but at every moment `min`/`maxScrollExtent` are
+/// reported RELATIVE to the current anchor (e.g. min=0/max=1800 at the top,
+/// min=-1720/max=80 at the bottom). So `pixels <= minScrollExtent` and
+/// `pixels >= maxScrollExtent` are still exact "at the true top / bottom" tests,
+/// and clamping in [applyBoundaryConditions] (as [ClampingScrollPhysics] does)
+/// works without any external position tracking. [applyBoundaryConditions] is
+/// the amount of the requested delta to REFUSE; returning `value - pixels`
+/// refuses all of it (a full clamp), matching [ClampingScrollPhysics].
+class QuranClampEdgesPhysics extends QuranScrollPhysics {
+  const QuranClampEdgesPhysics({super.parent});
+
+  @override
+  QuranClampEdgesPhysics applyTo(ScrollPhysics? ancestor) =>
+      QuranClampEdgesPhysics(parent: buildParent(ancestor));
+
+  @override
+  double applyBoundaryConditions(ScrollMetrics position, double value) {
+    // Underscroll: moving toward, and already at/past, the top edge.
+    if (value < position.pixels &&
+        position.pixels <= position.minScrollExtent) {
+      return value - position.pixels;
+    }
+    // Overscroll: moving toward, and already at/past, the bottom edge.
+    if (value > position.pixels &&
+        position.pixels >= position.maxScrollExtent) {
+      return value - position.pixels;
+    }
+    return super.applyBoundaryConditions(position, value);
+  }
+}
+
 /// Applies [QuranScrollPhysics] globally and lets pointer/trackpad drag scroll
 /// too (so the same feel carries to desktop/web if the app expands there).
 class QuranScrollBehavior extends MaterialScrollBehavior {

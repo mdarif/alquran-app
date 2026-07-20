@@ -13,6 +13,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/feature_flags.dart';
+import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -1163,6 +1164,9 @@ class _DetailedListState extends State<_DetailedList> {
               child: ScrollablePositionedList.builder(
                 itemScrollController: _scrollController,
                 itemPositionsListener: _positions,
+                // Hard-clamp at the surah's first/last ayah — no rubber-band
+                // past the true content edges (mid-content still bounces).
+                physics: const QuranClampEdgesPhysics(),
                 itemCount: _rows.length,
                 padding: widget.contentInsets,
                 itemBuilder: _buildRow,

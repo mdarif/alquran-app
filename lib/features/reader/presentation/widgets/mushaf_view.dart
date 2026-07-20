@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
@@ -149,6 +150,7 @@ class _MushafViewState extends State<MushafView>
   Timer? _hideTimer;
   Timer? _highlightTimer;
   Timer? _zoomTimer;
+  Timer? _reanchorTimer;
   Timer? _followCorrectTimer;
   int? _highlightAyahId;
 
@@ -364,35 +366,111 @@ class _MushafViewState extends State<MushafView>
         () => _zooming = false,
       );
     }
-    if (fontChanged || styleChanged || ayahsChanged) _reanchor();
+    // Capture the pre-reflow anchor NOW (this build's layout, before _buildRows
+    // below reshapes it) — even though the jumpTo that USES it is debounced.
+    // Capturing late (inside a debounced callback) would read the ALREADY
+    // reflowed layout on the next font tick, anchoring to the wrong row. Only
+    // the FIRST tick of a burst gets a trustworthy capture: a live pinch fires
+    // many ticks before the debounce fires, and every tick after the first
+    // already reflowed (unanchored) under the previous tick's font size — so
+    // re-capturing on tick 2+ would read that already-corrupted layout. Skip
+    // the capture while a reanchor is still pending; the first tick's capture
+    // (pre-pinch layout) remains the one _applyAnchor uses when it finally runs.
+    if ((fontChanged || styleChanged) && _reanchorTimer == null) {
+      _captureAnchor();
+    } else if (ayahsChanged) {
+      _captureAnchor();
+    }
+    // A live pinch drives many rapid font-size ticks (one per pointer-move);
+    // applying the jump on every tick was the bug — ItemScrollController.jumpTo
+    // resets the list to pixel 0 before re-rooting at the held index, so each
+    // intermediate tick flashed the list back to its start before snapping
+    // forward, reading as content "shifting down" mid-pinch. Debounce so only
+    // the settled font size actually jumps (using the first tick's capture).
+    if (fontChanged || styleChanged) {
+      _reanchorTimer?.cancel();
+      _reanchorTimer = Timer(const Duration(milliseconds: 120), _applyAnchor);
+    } else if (ayahsChanged) {
+      _applyAnchor();
+    }
     // Rows only depend on the verses + the focus split; the reciter-follow never
     // rebuilds them (it scrolls within the flowing paragraph), so playback never
     // reshapes the page.
     if (ayahsChanged) _buildRows();
   }
 
-  /// Hold the current top verse across a reflow (font/script change): capture the
-  /// topmost row and its alignment from the pre-reflow layout, then jump back to
-  /// it once the new layout settles. Runs before [_buildRows] so it reads the old
-  /// rows; the post-frame jump resolves the verse's NEW row index.
-  void _reanchor() {
+  int? _anchorRawIndex;
+  int? _anchorAyahId;
+  double _anchorAlign = 0;
+  bool _anchorHeld = false;
+
+  /// Capture the topmost row and its alignment from the CURRENT (pre-reflow)
+  /// layout. Must run synchronously in [didUpdateWidget], before [_buildRows]
+  /// reshapes the rows — a debounced capture would read an already-reflowed
+  /// layout on the next tick of a live pinch, anchoring to the wrong row.
+  void _captureAnchor() {
     final visible = _positions.itemPositions.value
         .where((p) => p.itemTrailingEdge > 0 && p.itemLeadingEdge < 1);
     if (visible.isEmpty) return;
     final top = visible
         .reduce((a, b) => a.itemLeadingEdge <= b.itemLeadingEdge ? a : b);
-    final align = top.itemLeadingEdge;
     final held = _heldFocusId;
     final topRow = top.index < _rows.length ? _rows[top.index] : null;
-    final anchorAyahId =
+    _anchorRawIndex = top.index;
+    _anchorAyahId =
         held ?? (topRow is _ChunkRow ? topRow.ayahs.first.id : null);
-    final rawIndex = top.index;
+    _anchorAlign = top.itemLeadingEdge;
+    _anchorHeld = held != null;
+  }
+
+  /// Jump back to the most recently [_captureAnchor]-ed verse once the new
+  /// layout settles. The post-frame jump resolves the verse's NEW row index.
+  void _applyAnchor() {
+    _reanchorTimer?.cancel();
+    _reanchorTimer = null;
+    final rawIndex = _anchorRawIndex;
+    if (rawIndex == null) return;
+    final anchorAyahId = _anchorAyahId;
+    final align = _anchorAlign;
+    final held = _anchorHeld;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollCtrl.isAttached) return;
+      // A short surah (e.g. Al-Fatihah) fits the viewport and can't scroll —
+      // re-anchoring it is pointless, and a jumpTo with the captured (padding-
+      // induced, non-zero) alignment would push the content DOWN a little each
+      // zoom, drifting it toward the vertical centre. Skip the jump entirely
+      // when the whole section already fits on screen.
+      if (_fitsViewport()) return;
       final idx = (anchorAyahId != null ? _ayahRowIndex[anchorAyahId] : null) ??
           rawIndex;
-      _scrollCtrl.jumpTo(index: idx, alignment: held != null ? 0.04 : align);
+      // Anchoring to the very first row means "pin to the top", so ignore the
+      // captured fractional alignment (it only reflects the top padding) and
+      // snap flush to the start.
+      final resolvedAlign = held
+          ? 0.04
+          : idx == 0
+              ? 0.0
+              : align;
+      _scrollCtrl.jumpTo(index: idx, alignment: resolvedAlign);
     });
+  }
+
+  /// Whether the whole section currently fits the viewport (row 0 at/below the
+  /// top and the last row at/above the bottom) — i.e. the list can't scroll.
+  bool _fitsViewport() {
+    final positions = _positions.itemPositions.value;
+    if (positions.isEmpty || _rows.isEmpty) return false;
+    final lastIndex = _rows.length - 1;
+    ItemPosition? first;
+    ItemPosition? last;
+    for (final p in positions) {
+      if (p.index == 0) first = p;
+      if (p.index == lastIndex) last = p;
+    }
+    return first != null &&
+        last != null &&
+        first.itemLeadingEdge >= 0 &&
+        last.itemTrailingEdge <= 1;
   }
 
   @override
@@ -405,6 +483,7 @@ class _MushafViewState extends State<MushafView>
     _hideTimer?.cancel();
     _highlightTimer?.cancel();
     _zoomTimer?.cancel();
+    _reanchorTimer?.cancel();
     _followCorrectTimer?.cancel();
     _positions.itemPositions.removeListener(_onPositions);
     _peekCtrl.dispose();
@@ -722,6 +801,9 @@ class _MushafViewState extends State<MushafView>
               itemPositionsListener: _positions,
               initialScrollIndex: _initialIndex,
               initialAlignment: _initialAlignment,
+              // Hard-clamp at the surah's first/last ayah — no rubber-band
+              // past the true content edges (mid-content still bounces).
+              physics: const QuranClampEdgesPhysics(),
               itemCount: _rows.length,
               padding: widget.contentInsets +
                   const EdgeInsets.symmetric(vertical: 8),
