@@ -18,6 +18,16 @@ dependencies:
   # Data (PRD 7.1: Drift over embedded SQLite)
   drift: ^2.18.0
   sqlite3_flutter_libs: ^0.5.24
+  # Runtime, not just dev: a downloadable edition arrives as a SQLite file and
+  # is opened directly to import its rows into editions.db.
+  sqlite3: ^3.3.3
+
+  # Downloadable translation editions — fetch the catalogue + artifacts from R2,
+  # and verify each against the sha256 the catalogue records before installing.
+  # A truncated download is otherwise indistinguishable from a short edition and
+  # would render partial scripture with no error.
+  http: ^1.2.2
+  crypto: ^3.0.5
 
   # Dependency injection (PRD 7.1: GetIt)
   get_it: ^7.7.0
@@ -68,9 +78,6 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^4.0.0
   drift_dev: ^2.18.0
-  # Direct import in test/quran_text_constants_test.dart (opens the bundled
-  # quran.db to guard hardcoded Qur'an literals); already transitive via drift.
-  sqlite3: ^3.3.3
   build_runner: ^2.4.11
   flutter_launcher_icons: ^0.14.1
   patrol: ^4.6.1

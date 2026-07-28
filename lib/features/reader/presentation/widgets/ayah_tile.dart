@@ -166,10 +166,10 @@ class AyahTile extends StatelessWidget {
             ),
           ],
           for (final r in resources)
-            if (ayah.translations[r.id] != null)
+            if (ayah.translations[r.slug] != null)
               _Translation(
                 resource: r,
-                text: ayah.translations[r.id]!,
+                text: ayah.translations[r.slug]!,
                 fontSize: translationFontSize,
               ),
         ],

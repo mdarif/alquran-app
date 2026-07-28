@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/navigation/data/repositories/index_repository_impl.dart';
@@ -16,6 +17,9 @@ import '../../features/reader/domain/repositories/last_read_repository.dart';
 import '../../features/reader/domain/repositories/reader_settings_repository.dart';
 import '../../features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
+import '../../features/translations/data/repositories/edition_repository_impl.dart';
+import '../../features/translations/domain/repositories/edition_repository.dart';
+import '../../features/translations/presentation/cubit/translations_cubit.dart';
 import '../../features/reminders/data/repositories/reminder_settings_repository_impl.dart';
 import '../../features/reminders/data/scheduling/local_notification_scheduler.dart';
 import '../../features/reminders/domain/repositories/reminder_settings_repository.dart';
@@ -26,6 +30,8 @@ import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
 import '../audio/ayah_recitation_player.dart';
 import '../database/app_database.dart';
+import '../database/editions_database.dart';
+import '../editions_config.dart';
 import '../feature_flags.dart';
 import '../database/db_seeder.dart';
 import '../home_widget/widget_bridge.dart';
@@ -43,9 +49,15 @@ Future<void> configureDependencies() async {
   // Copy/refresh the bundled seed DB before opening it, so an updated quran.db
   // (corrections, new translations) replaces the stale on-device copy.
   final dbFile = await ensureSeedDatabase(prefs);
+  // Downloaded editions live in their OWN database, which the seeder above
+  // never touches. Merging them into quran.db would destroy every download on
+  // the next app update, silently. → EditionsDatabase
+  final editionsFile = await editionsDatabaseFile();
+  final supportDir = await getApplicationSupportDirectory();
   getIt
     // Data sources
     ..registerSingleton<AppDatabase>(AppDatabase(dbFile))
+    ..registerSingleton<EditionsDatabase>(EditionsDatabase(editionsFile))
     ..registerSingleton<SharedPreferences>(prefs)
     // Repositories
     ..registerLazySingleton<SurahRepository>(
@@ -55,6 +67,23 @@ Future<void> configureDependencies() async {
       () => AyahRepositoryImpl(
         getIt<AppDatabase>(),
         getIt<ReaderSettingsRepository>(),
+        getIt<EditionsDatabase>(),
+      ),
+    )
+    ..registerLazySingleton<EditionRepository>(
+      () => EditionRepositoryImpl(
+        db: getIt<EditionsDatabase>(),
+        supportDir: supportDir,
+        catalogueUrl: Uri.parse(editionCatalogueUrl),
+      ),
+    )
+    // A factory, not a singleton: the Translations screen re-reads what is
+    // installed every time it opens, so a stale list can't linger after a
+    // download or a removal.
+    ..registerFactory<TranslationsCubit>(
+      () => TranslationsCubit(
+        getIt<EditionRepository>(),
+        const [],
       ),
     )
     ..registerLazySingleton<IndexRepository>(

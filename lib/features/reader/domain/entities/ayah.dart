@@ -28,8 +28,10 @@ class Ayah extends Equatable {
   final int? rubElHizb;
   final int? ruku;
 
-  /// resourceId -> translated text.
-  final Map<int, String> translations;
+  /// Edition SLUG -> translated text. Slug, not resource id: a downloaded
+  /// edition has no row in `resources`, and ids shift when the data pipeline
+  /// reorders its sources.
+  final Map<String, String> translations;
 
   @override
   List<Object?> get props => [

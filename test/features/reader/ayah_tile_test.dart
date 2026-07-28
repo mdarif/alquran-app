@@ -47,7 +47,7 @@ void main() {
         ayahNumber: 1,
         textArabic: 'بِسْمِ ٱللَّهِ',
         isSajda: false,
-        translations: {1: 'اللہ کے نام', 2: 'अल्लाह के नाम'},
+        translations: {'ur-test': 'اللہ کے نام', 'hi-test': 'अल्लाह के नाम'},
       );
 
       await tester.pumpWidget(
@@ -128,7 +128,7 @@ void main() {
         ayahNumber: 1,
         textArabic: 'نص',
         isSajda: false,
-        translations: {1: 'اردو فقط'}, // Urdu only, no Hindi
+        translations: {'ur-test': 'اردو فقط'}, // Urdu only, no Hindi
       );
 
       await tester.pumpWidget(
@@ -154,7 +154,7 @@ void main() {
         ayahNumber: 1,
         textArabic: 'الٓمٓ',
         isSajda: false,
-        translations: {1: 'اردو', 3: 'english'},
+        translations: {'ur-test': 'اردو', 'en-test': 'english'},
       );
 
       await tester.pumpWidget(
@@ -219,7 +219,7 @@ void main() {
         ayahNumber: 1,
         textArabic: 'الٓمٓ',
         isSajda: false,
-        translations: {1: 'اردو'},
+        translations: {'ur-test': 'اردو'},
       );
 
       String? copied;
@@ -301,7 +301,7 @@ void main() {
         ayahNumber: 1,
         textArabic: 'الٓمٓ',
         isSajda: false,
-        translations: {1: 'اردو ترجمہ'},
+        translations: {'ur-test': 'اردو ترجمہ'},
       );
 
       await tester.pumpWidget(

@@ -43,7 +43,10 @@ class _LongSurahRepo implements AyahRepository {
           // 8 verses per Mushaf page → several lazy paragraphs per section.
           page: s * 100 + (n - 1) ~/ 8,
           isSajda: false,
-          translations: {1: 'اردو ترجمہ $n', 2: 'हिंदी अनुवाद $n'},
+          translations: {
+            'ur-test': 'اردو ترجمہ $n',
+            'hi-test': 'हिंदी अनुवाद $n',
+          },
         ),
     ];
   }

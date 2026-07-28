@@ -22,7 +22,7 @@ const _ayah = Ayah(
   ayahNumber: 1,
   textArabic: 'الٓمٓ',
   isSajda: false,
-  translations: {1: 'الف لام میم', 3: 'Alif Lam Mim'},
+  translations: {'ur-test': 'الف لام میم', 'en-test': 'Alif Lam Mim'},
 );
 
 void main() {
@@ -60,7 +60,7 @@ void main() {
         ayahNumber: 2,
         textArabic: 'نص',
         isSajda: false,
-        translations: {1: 'اردو'}, // no English
+        translations: {'ur-test': 'اردو'}, // no English
       );
       final text = buildAyahShareText(
         ayah: ayah,

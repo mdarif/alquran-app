@@ -51,6 +51,26 @@ Future<File> ensureSeedDatabase(SharedPreferences prefs) async {
   return file;
 }
 
+/// Filename of the writable copy of the bundled seed DB.
+const String seedDatabaseFilename = 'quran.db';
+
+/// Filename of the downloaded-editions store.
+///
+/// Deliberately a **different file** from [seedDatabaseFilename]:
+/// [ensureSeedDatabase] overwrites the seed DB wholesale whenever the bundled
+/// version marker changes, so an edition written into it would be destroyed by
+/// the next app update — silently, the reader simply finding their downloaded
+/// translations gone. Nothing may ever be merged into `quran.db`.
+/// → `EditionsDatabase`
+const String editionsDatabaseFilename = 'editions.db';
+
+/// Writable path of the downloaded-editions store. Created on demand by Drift;
+/// the seeder never writes here.
+Future<File> editionsDatabaseFile() async {
+  final dir = await getApplicationDocumentsDirectory();
+  return File(p.join(dir.path, editionsDatabaseFilename));
+}
+
 Future<String> _bundledVersion() async {
   try {
     return (await rootBundle.loadString(_assetVersion)).trim();

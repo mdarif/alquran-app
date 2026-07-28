@@ -1489,7 +1489,7 @@ class _MushafPeekCard extends StatelessWidget {
     // Editions that actually have a translation for this verse, in resource order.
     final available = [
       for (final r in resources)
-        if (current.translations[r.id] != null) r,
+        if (current.translations[r.slug] != null) r,
     ];
     // Show the selected editions; if none of the selected ones apply here, fall
     // back to the first available so the card is never empty.
@@ -1579,7 +1579,7 @@ class _MushafPeekCard extends StatelessWidget {
                       for (var i = 0; i < shown.length; i++) ...[
                         if (i > 0) const SizedBox(height: 18),
                         Text(
-                          current.translations[shown[i].id]!,
+                          current.translations[shown[i].slug]!,
                           textAlign: shown[i].languageCode == 'ur'
                               ? TextAlign.right
                               : TextAlign.left,

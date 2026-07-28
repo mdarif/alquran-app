@@ -53,8 +53,8 @@ List<Ayah> _ayahsWithTranslations(int surahId, int count) => [
           textArabic: 'نص$n',
           isSajda: false,
           translations: const {
-            1: 'اردو ترجمہ',
-            2: 'हिंदी अनुवाद',
+            'ur-test': 'اردو ترجمہ',
+            'hi-test': 'हिंदी अनुवाद',
           },
         ),
     ];
@@ -379,7 +379,7 @@ void main() {
           ayahNumber: 1,
           textArabic: 'بِسْمِ اللَّهِ',
           isSajda: false,
-          translations: {1: 'ترجمہ', 2: 'अनुवाद'},
+          translations: {'ur-test': 'ترجمہ', 'hi-test': 'अनुवाद'},
         ),
       ];
       await tester.pumpWidget(reader(singleAyah));
@@ -809,7 +809,7 @@ void main() {
             ayahNumber: n,
             textArabic: 'نص$n',
             isSajda: false,
-            translations: {1: 'ترجمہ $n'},
+            translations: {'ur-test': 'ترجمہ $n'},
           ),
       ];
       await tester.pumpWidget(

@@ -48,7 +48,7 @@ String buildAyahShareText({
 
   final parts = <String>[ayah.textArabic];
   for (final r in resources) {
-    final text = ayah.translations[r.id];
+    final text = ayah.translations[r.slug];
     if (text != null) parts.add(text);
   }
   parts.add('— $reference');

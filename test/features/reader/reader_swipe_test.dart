@@ -63,7 +63,7 @@ class _FakeAyahRepoWithTranslations implements AyahRepository {
           ayahNumber: 1,
           textArabic: 'نص',
           isSajda: false,
-          translations: {1: 'اردو متن', 3: 'english body'},
+          translations: {'ur-test': 'اردو متن', 'en-test': 'english body'},
         ),
       ];
 
@@ -106,7 +106,7 @@ class _FakeAyahRepoEnOnly implements AyahRepository {
           ayahNumber: 1,
           textArabic: 'نص',
           isSajda: false,
-          translations: {3: 'english body', 2: 'हिंदी अनुवाद'},
+          translations: {'en-test': 'english body', 'hi-test': 'हिंदी अनुवाद'},
         ),
       ];
 

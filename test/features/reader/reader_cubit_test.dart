@@ -88,7 +88,7 @@ const _ayah = Ayah(
   ayahNumber: 1,
   textArabic: 'بِسْمِ ٱللَّهِ',
   isSajda: false,
-  translations: {1: 'اللہ کے نام سے'},
+  translations: {'ur-test': 'اللہ کے نام سے'},
 );
 
 void main() {

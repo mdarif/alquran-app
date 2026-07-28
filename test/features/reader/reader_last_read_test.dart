@@ -34,7 +34,10 @@ class _LongSurahRepo implements AyahRepository {
           // paragraphs, as it does against the real page-numbered DB.
           page: s * 100 + (n - 1) ~/ 8,
           isSajda: false,
-          translations: {1: 'اردو ترجمہ $n', 2: 'हिंदी अनुवाद $n'},
+          translations: {
+            'ur-test': 'اردو ترجمہ $n',
+            'hi-test': 'हिंदी अनुवाद $n',
+          },
         ),
     ];
   }

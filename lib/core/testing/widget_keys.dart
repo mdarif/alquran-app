@@ -38,12 +38,14 @@ class WidgetKeys {
   static const peekCard = Key('reader-peek-card');
   static const peekPrevButton = Key('reader-peek-prev-button');
   static const peekNextButton = Key('reader-peek-next-button');
-  // Translation language rows in the Display sheet ('ur' | 'hi' | 'en').
-  static Key langOption(String languageCode) =>
-      Key('lang-option-$languageCode');
-  // Inline translation chips in the Reading peek card ('ur' | 'hi' | 'en').
-  static Key peekLangOption(String languageCode) =>
-      Key('peek-lang-option-$languageCode');
+  // Translation rows in the Display sheet. Keyed by edition SLUG, not language
+  // code — a language may carry several editions.
+  static Key langOption(String slug) => Key('lang-option-$slug');
+  // Inline translation chips in the Reading peek card, keyed by edition slug.
+  static Key peekLangOption(String slug) => Key('peek-lang-option-$slug');
+  // Translations screen: download / remove a downloadable edition.
+  static Key editionDownload(String slug) => Key('edition-download-$slug');
+  static Key editionRemove(String slug) => Key('edition-remove-$slug');
   // Collapse/expand the peek card's translation (read/listen to Arabic alone).
   static const peekTranslationToggle = Key('reader-peek-translation-toggle');
   // Settings-sheet switch: open the translation peek on tap (default off).

@@ -1,4 +1,5 @@
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/editions_database.dart';
 import '../../../../core/feature_flags.dart';
 import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
@@ -9,10 +10,16 @@ import '../../domain/repositories/ayah_repository.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 
 class AyahRepositoryImpl implements AyahRepository {
-  AyahRepositoryImpl(this._db, this._settings);
+  AyahRepositoryImpl(this._db, this._settings, [this._editions]);
 
   final AppDatabase _db;
   final ReaderSettingsRepository _settings;
+
+  /// Downloaded editions, in their own database so an app update's re-seed of
+  /// `quran.db` cannot destroy them. Null where the feature isn't wired (tests,
+  /// and any build without downloads), in which case only bundled editions
+  /// exist and every code path below degrades to its previous behaviour.
+  final EditionsDatabase? _editions;
 
   // Surah headers + translation editions are mushaf-wide constants that never
   // change with the script or section — but the ReaderCubit is a per-page
@@ -57,6 +64,20 @@ class AyahRepositoryImpl implements AyahRepository {
     final translations =
         await _db.translationsForAyahIds([for (final r in rows) r.id]);
 
+    // Fold in any downloaded editions. They are addressed by (surah, ayah)
+    // rather than the global ayah id: an installed edition outlives the build
+    // that produced it, so it must not depend on an id space a later data
+    // refresh could renumber.
+    final downloaded = await _downloadedTexts(rows);
+    if (downloaded.isNotEmpty) {
+      for (final r in rows) {
+        final forAyah = downloaded[(r.surahId, r.ayahNumber)];
+        if (forAyah != null) {
+          (translations[r.id] ??= <String, String>{}).addAll(forAyah);
+        }
+      }
+    }
+
     final ayahs = [
       for (final r in rows)
         Ayah(
@@ -77,6 +98,31 @@ class AyahRepositoryImpl implements AyahRepository {
     ];
     _storeAyahCache(cacheKey, ayahs);
     return ayahs;
+  }
+
+  /// Downloaded-edition text for these ayahs: (surah, ayah) -> (slug -> text).
+  Future<Map<(int, int), Map<String, String>>> _downloadedTexts(
+    List<AyahRow> rows,
+  ) async {
+    final editions = _editions;
+    if (editions == null || rows.isEmpty) return const {};
+    final installed = await editions.installed();
+    if (installed.isEmpty) return const {};
+    final slugs = [for (final e in installed) e.slug];
+    final surahIds = {for (final r in rows) r.surahId};
+    final out = <(int, int), Map<String, String>>{};
+    // A section can span surahs (juz/hizb/page/ruku), so query each one it
+    // touches — usually exactly one.
+    for (final surahId in surahIds) {
+      final bySlug = await editions.textsForSurahAll(slugs, surahId);
+      for (final entry in bySlug.entries) {
+        for (final verse in entry.value.entries) {
+          (out[(surahId, verse.key)] ??= <String, String>{})[entry.key] =
+              verse.value;
+        }
+      }
+    }
+    return out;
   }
 
   void _touchAyahCache(String key) {
@@ -117,7 +163,7 @@ class AyahRepositoryImpl implements AyahRepository {
 
   Future<List<TranslationResource>> _fetchTranslationResources() async {
     final rows = await _db.translationResources();
-    return [
+    final bundled = [
       for (final r in rows)
         TranslationResource(
           id: r.id,
@@ -133,5 +179,37 @@ class AyahRepositoryImpl implements AyahRepository {
           sourceUrl: r.sourceUrl,
         ),
     ];
+
+    final editions = _editions;
+    if (editions == null) return bundled;
+
+    // Downloaded editions are presented exactly like bundled ones, so nothing
+    // downstream needs to know where a given text came from. Merged into the
+    // same global sort order, which is what groups a language's editions
+    // together in the picker.
+    final installed = await editions.installed();
+    if (installed.isEmpty) return bundled;
+    final merged = [
+      ...bundled,
+      for (final e in installed)
+        TranslationResource(
+          // No row in `resources`, so no meaningful id. Nothing may key on it —
+          // the reader addresses editions by slug throughout.
+          id: -1,
+          slug: e.slug,
+          languageCode: e.languageCode,
+          name: e.name,
+          nativeName: e.nativeName,
+          author: e.author,
+          direction: e.direction,
+          sortOrder: e.sortOrder,
+          license: e.license,
+          sourceUrl: e.sourceUrl,
+        ),
+    ]..sort((a, b) {
+        final byOrder = a.sortOrder.compareTo(b.sortOrder);
+        return byOrder != 0 ? byOrder : a.slug.compareTo(b.slug);
+      });
+    return merged;
   }
 }

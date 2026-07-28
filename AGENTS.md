@@ -115,7 +115,52 @@ Commands:
 `surahs(id, name_arabic, name_english, revelation_place, total_ayahs)` ·
 `ayahs(id, surah_id, ayah_number, text_arabic_uthmani, text_arabic_indopak,
 page_number, juz_number, hizb_number, rub_el_hizb, ruku_number, sajda)` ·
-`resources(id, type, language_code, name, author, license, source_url)` ·
+`resources(id, slug, type, language_code, name, native_name, author, direction,
+sort_order, default_on, license, source_url)` ·
 `translations(id, ayah_id, resource_id, text_content)` · `db_meta(key, value)`.
 
-114 surahs / 6236 ayahs; ur + hi translations complete; all nav indices populated.
+114 surahs / 6236 ayahs; ur + hi + en translations complete; all nav indices populated.
+
+## Editions — several per language, keyed by slug
+
+A language may carry several editions (two Hindi translations), so **nothing may
+key on `language_code`** — it groups only. The stable identity is
+`resources.slug` (`ur-junagarhi`, `hi-suhel-farooq-nadwi`).
+
+- **Never persist `resources.id`.** The data pipeline assigns it from
+  `cur.lastrowid`, so every id shifts when an edition is added to or reordered
+  in its `sources.yaml`. A saved id silently points at a different edition after
+  the next data refresh. The reader's saved selection holds slugs, migrated once
+  from the old language codes (`reader_settings_repository_impl.dart`).
+- **`sort_order` is a GLOBAL display order**, not per-language: it fixes the
+  reading order under each verse (Urdu first) and the picker's grouping falls
+  out of it. Ordering by id instead reshuffles the page when an edition is
+  inserted upstream.
+- `Ayah.translations` is keyed by **slug**, so bundled and downloaded editions
+  share one map.
+
+### Downloadable editions
+
+Bundled editions live in `quran.db`. Downloaded ones live in **`editions.db`, a
+separate file** — and this is not a preference. `db_seeder.dart` overwrites
+`quran.db` wholesale whenever the bundled version marker changes, so anything
+written into it is **destroyed on the next app update**, silently, with the
+reader simply finding their downloads gone. Never merge the two.
+
+Artifacts come from `alquran-data/pipeline/build_editions.py` → Cloudflare R2:
+`catalogue.json` plus one gzipped SQLite file per slug (~4:1; Hindi 3.2 MB →
+612 KB). `lib/core/editions_config.dart` holds the base URL, overridable with
+`--dart-define=EDITIONS_CATALOGUE_URL` for staging.
+
+Install verifies **two** sha256 digests — the transferred file before expanding
+it, and the expanded DB before installing — and checks the artifact declares the
+slug that was asked for. A truncated download is otherwise indistinguishable
+from a short edition and would render blank verses with no error. Nothing
+installs on a mismatch. → `test/features/translations/edition_install_test.dart`
+
+Rows are addressed by `(slug, surah, ayah)`, never the global ayah id: an
+installed edition outlives the build that produced it.
+
+**Not yet wired:** the R2 bucket is not provisioned, and `TranslationsPage` has
+no navigation entry (its natural home, `home_overflow_menu.dart`, had
+uncommitted owner WIP at the time).

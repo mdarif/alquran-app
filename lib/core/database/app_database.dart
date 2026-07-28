@@ -58,18 +58,26 @@ class AppDatabase extends _$AppDatabase {
             ..orderBy([(a) => OrderingTerm.asc(a.id)]))
           .get();
 
-  /// Translations for an arbitrary set of ayahs, keyed by ayahId -> (resourceId
-  /// -> text). Used when a reader section spans surahs (juz/hizb/page/ruku).
-  Future<Map<int, Map<int, String>>> translationsForAyahIds(
+  /// Translations for an arbitrary set of ayahs, keyed by ayahId -> (edition
+  /// SLUG -> text). Used when a reader section spans surahs (juz/hizb/page/ruku).
+  ///
+  /// Keyed by slug rather than resource id so bundled and downloaded editions
+  /// can share one map: a downloaded edition has no row in `resources` and so no
+  /// meaningful id, and ids shift upstream anyway.
+  Future<Map<int, Map<String, String>>> translationsForAyahIds(
     List<int> ayahIds,
   ) async {
     if (ayahIds.isEmpty) return {};
-    final rows = await (select(translations)
-          ..where((t) => t.ayahId.isIn(ayahIds)))
-        .get();
-    final out = <int, Map<int, String>>{};
-    for (final t in rows) {
-      out.putIfAbsent(t.ayahId, () => {})[t.resourceId] = t.textContent;
+    final query = select(translations).join([
+      innerJoin(resources, resources.id.equalsExp(translations.resourceId)),
+    ])
+      ..where(translations.ayahId.isIn(ayahIds));
+    final rows = await query.get();
+    final out = <int, Map<String, String>>{};
+    for (final row in rows) {
+      final t = row.readTable(translations);
+      final r = row.readTable(resources);
+      out.putIfAbsent(t.ayahId, () => {})[r.slug] = t.textContent;
     }
     return out;
   }
