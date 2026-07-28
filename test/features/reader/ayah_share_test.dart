@@ -3,9 +3,18 @@ import 'package:al_quran/features/reader/domain/entities/ayah.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-const _urdu = TranslationResource(id: 1, languageCode: 'ur', name: 'Junagarhi');
-const _english =
-    TranslationResource(id: 3, languageCode: 'en', name: 'Hilali & Khan');
+const _urdu = TranslationResource(
+  id: 1,
+  slug: 'ur-test',
+  languageCode: 'ur',
+  name: 'Junagarhi',
+);
+const _english = TranslationResource(
+  id: 3,
+  slug: 'en-test',
+  languageCode: 'en',
+  name: 'Hilali & Khan',
+);
 
 const _ayah = Ayah(
   id: 8,

@@ -76,7 +76,12 @@ class _CountingAyahRepository implements AyahRepository {
   Future<List<TranslationResource>> getTranslationResources() async => const [];
 }
 
-const _urdu = TranslationResource(id: 1, languageCode: 'ur', name: 'Junagarhi');
+const _urdu = TranslationResource(
+  id: 1,
+  slug: 'ur-test',
+  languageCode: 'ur',
+  name: 'Junagarhi',
+);
 const _ayah = Ayah(
   id: 1,
   surahId: 1,

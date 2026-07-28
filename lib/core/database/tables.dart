@@ -34,13 +34,32 @@ class Ayahs extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// A text edition — one translation or transliteration of the Qur'an.
+///
+/// [slug] is the STABLE identity and the only value safe to persist (in
+/// SharedPreferences, in a download filename). [id] is NOT: the data pipeline
+/// assigns it from `cur.lastrowid`, so every id shifts when an edition is added
+/// to or reordered in its `sources.yaml`.
+///
+/// [languageCode] GROUPS editions; it does not identify one. Several editions
+/// may share a language, so nothing may assume one row per language.
 @DataClassName('ResourceRow')
 class Resources extends Table {
   IntColumn get id => integer()();
+  TextColumn get slug => text()(); // stable id, e.g. "ur-junagarhi"
   TextColumn get type => text()(); // translation | tafsir | transliteration
-  TextColumn get languageCode => text()(); // ur | hi
+  TextColumn get languageCode => text()(); // ur | hi  (grouping only)
   TextColumn get name => text()();
+  TextColumn get nativeName => text().nullable()(); // اردو, हिन्दी
   TextColumn get author => text().nullable()();
+  TextColumn get direction => text().nullable()(); // rtl | ltr
+
+  /// Global display order across all editions, not per-language: it fixes the
+  /// reading order under each verse (Urdu first) and the picker's grouping.
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  /// Shown to a reader who has never chosen. At least one edition has this.
+  IntColumn get defaultOn => integer().withDefault(const Constant(0))();
   TextColumn get license => text().nullable()();
   TextColumn get sourceUrl => text().nullable()();
 

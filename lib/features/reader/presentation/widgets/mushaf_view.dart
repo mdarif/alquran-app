@@ -9,7 +9,7 @@ import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
-import '../../domain/ayah_share.dart' show nativeLanguageName;
+import '../../domain/ayah_share.dart' show editionChipLabel;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
@@ -1493,9 +1493,12 @@ class _MushafPeekCard extends StatelessWidget {
     ];
     // Show the selected editions; if none of the selected ones apply here, fall
     // back to the first available so the card is never empty.
+    // Matched on SLUG, not languageCode: a language may carry several editions,
+    // so matching by language would render every Hindi edition when the reader
+    // picked one.
     var shown = [
       for (final r in available)
-        if (selected.contains(r.languageCode)) r,
+        if (selected.contains(r.slug)) r,
     ];
     if (shown.isEmpty && available.isNotEmpty) shown = [available.first];
 
@@ -1556,10 +1559,10 @@ class _MushafPeekCard extends StatelessWidget {
                           children: [
                             for (final r in available)
                               TranslationChip(
-                                key: WidgetKeys.peekLangOption(r.languageCode),
-                                label: nativeLanguageName(r.languageCode),
-                                selected: selected.contains(r.languageCode),
-                                onTap: () => onToggleLanguage!(r.languageCode),
+                                key: WidgetKeys.peekLangOption(r.slug),
+                                label: editionChipLabel(r, available),
+                                selected: selected.contains(r.slug),
+                                onTap: () => onToggleLanguage!(r.slug),
                               ),
                           ],
                         ),

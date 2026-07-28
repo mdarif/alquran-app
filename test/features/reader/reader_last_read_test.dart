@@ -47,8 +47,18 @@ class _LongSurahRepo implements AyahRepository {
 
   @override
   Future<List<TranslationResource>> getTranslationResources() async => const [
-        TranslationResource(id: 1, languageCode: 'ur', name: 'Urdu'),
-        TranslationResource(id: 2, languageCode: 'hi', name: 'Hindi'),
+        TranslationResource(
+          id: 1,
+          slug: 'ur-test',
+          languageCode: 'ur',
+          name: 'Urdu',
+        ),
+        TranslationResource(
+          id: 2,
+          slug: 'hi-test',
+          languageCode: 'hi',
+          name: 'Hindi',
+        ),
       ];
 }
 
@@ -61,6 +71,10 @@ class _RecordingLastRead implements LastReadRepository {
 }
 
 class _FakeSettings implements ReaderSettingsRepository {
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
   @override
   double fontSize = 22;
   @override

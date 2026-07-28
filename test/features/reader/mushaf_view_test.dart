@@ -79,12 +79,14 @@ Map<int, SurahHeading> _headings(
 const _kResources = <TranslationResource>[
   TranslationResource(
     id: 1,
+    slug: 'ur-test',
     languageCode: 'ur',
     name: 'Urdu',
     author: 'Junagarhi',
   ),
   TranslationResource(
     id: 2,
+    slug: 'hi-test',
     languageCode: 'hi',
     name: 'Hindi',
     author: 'al-Umari',
@@ -328,7 +330,7 @@ void main() {
     Widget reader(
       List<Ayah> ayahs, {
       List<TranslationResource> resources = _kResources,
-      Set<String> selected = const {'ur'},
+      Set<String> selected = const {'ur-test'},
       ValueChanged<String>? onToggleLanguage,
     }) =>
         _wrap(
@@ -398,14 +400,16 @@ void main() {
       await tester.pump();
       await _tapText(tester);
 
-      // Both available editions appear as inline chips in the peek card.
-      expect(find.byKey(WidgetKeys.peekLangOption('ur')), findsOneWidget);
-      expect(find.byKey(WidgetKeys.peekLangOption('hi')), findsOneWidget);
+      // Both available editions appear as inline chips, keyed by SLUG — a
+      // language may carry several editions, so a per-language key could not
+      // address them individually.
+      expect(find.byKey(WidgetKeys.peekLangOption('ur-test')), findsOneWidget);
+      expect(find.byKey(WidgetKeys.peekLangOption('hi-test')), findsOneWidget);
 
-      // Tapping one reports it up (the reader persists the shared selection).
-      await tester.tap(find.byKey(WidgetKeys.peekLangOption('hi')));
+      // Tapping one reports its slug up (the reader persists the selection).
+      await tester.tap(find.byKey(WidgetKeys.peekLangOption('hi-test')));
       await tester.pump();
-      expect(toggled, ['hi']);
+      expect(toggled, ['hi-test']);
     });
 
     testWidgets('no inline chips when the toggle is not wired', (tester) async {
@@ -430,7 +434,10 @@ void main() {
     testWidgets('shows multiple translations when multiple are selected',
         (tester) async {
       await tester.pumpWidget(
-        reader(_ayahsWithTranslations(1, 1), selected: const {'ur', 'hi'}),
+        reader(
+          _ayahsWithTranslations(1, 1),
+          selected: const {'ur-test', 'hi-test'},
+        ),
       );
       await tester.pump();
       await _tapText(tester);
@@ -498,7 +505,7 @@ void main() {
                 headings: _headings(1, 'Al-Fatihah', 7),
                 arabicFontSize: 28,
                 resources: _kResources,
-                selectedLanguages: const {'ur'},
+                selectedLanguages: const {'ur-test'},
                 onToggleLanguage: (_) {},
                 showPeek: true,
                 onVisibleAyah: (_) {},
@@ -677,7 +684,7 @@ void main() {
                 headings: _headings(1, 'Al-Fatihah', 7),
                 arabicFontSize: 28,
                 resources: _kResources,
-                selectedLanguages: const {'ur'},
+                selectedLanguages: const {'ur-test'},
                 onToggleLanguage: (_) {},
                 audioState: audio,
               );
@@ -734,7 +741,7 @@ void main() {
                 headings: _headings(1, 'Al-Fatihah', 7),
                 arabicFontSize: 28,
                 resources: _kResources,
-                selectedLanguages: const {'ur'},
+                selectedLanguages: const {'ur-test'},
                 onToggleLanguage: (_) {},
                 audioState: audio,
               );
@@ -815,7 +822,7 @@ void main() {
                 headings: _headings(1, 'Al-Fatihah', 7),
                 arabicFontSize: 28,
                 resources: _kResources,
-                selectedLanguages: const {'ur'},
+                selectedLanguages: const {'ur-test'},
                 onToggleLanguage: (_) {},
                 showPeek: true,
                 audioState: audio,
@@ -874,7 +881,7 @@ void main() {
                 headings: _headings(1, 'Al-Fatihah', 7),
                 arabicFontSize: 28,
                 resources: _kResources,
-                selectedLanguages: const {'ur'},
+                selectedLanguages: const {'ur-test'},
                 onToggleLanguage: (_) {},
                 // Mirrors the reader: a selection cues a parent rebuild.
                 onSelectVerse: (a) => setState(() => queued = a?.id),

@@ -6,10 +6,15 @@ import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Settings fake — only [script] drives column selection; the rest is inert.
 class _Settings implements ReaderSettingsRepository {
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
   _Settings(this.script);
   @override
   ArabicScript script;

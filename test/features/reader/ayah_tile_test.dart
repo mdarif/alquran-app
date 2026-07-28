@@ -11,18 +11,21 @@ import 'package:flutter_test/flutter_test.dart';
 // already makes the language obvious.
 const _urdu = TranslationResource(
   id: 1,
+  slug: 'ur-test',
   languageCode: 'ur',
   name: 'Urdu',
   author: 'Junagarhi',
 );
 const _hindi = TranslationResource(
   id: 2,
+  slug: 'hi-test',
   languageCode: 'hi',
   name: 'Hindi',
   author: 'al-Umari',
 );
 const _english = TranslationResource(
   id: 3,
+  slug: 'en-test',
   languageCode: 'en',
   name: 'English',
   author: 'Hilali & Khan',

@@ -4,6 +4,7 @@ import 'package:al_quran/core/audio/ayah_recitation_player.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
+import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Records what the cubit asks of the player and lets a test push playback
@@ -374,6 +375,10 @@ void main() {
 /// In-memory settings fake for the persistence tests — mutable fields so the
 /// cubit's writes are observable (mirrors the fake used across the reader tests).
 class _FakeSettings implements ReaderSettingsRepository {
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
   _FakeSettings({double speed = 1.0}) : recitationSpeed = speed;
 
   @override

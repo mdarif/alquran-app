@@ -80,12 +80,14 @@ class _FakeAyahRepoWithTranslations implements AyahRepository {
   Future<List<TranslationResource>> getTranslationResources() async => const [
         TranslationResource(
           id: 1,
+          slug: 'ur-test',
           languageCode: 'ur',
           name: 'Urdu',
           author: 'Junagarhi',
         ),
         TranslationResource(
           id: 3,
+          slug: 'en-test',
           languageCode: 'en',
           name: 'English',
           author: 'Khan',
@@ -121,12 +123,14 @@ class _FakeAyahRepoEnOnly implements AyahRepository {
   Future<List<TranslationResource>> getTranslationResources() async => const [
         TranslationResource(
           id: 3,
+          slug: 'en-test',
           languageCode: 'en',
           name: 'English',
           author: 'Khan',
         ),
         TranslationResource(
           id: 2,
+          slug: 'hi-test',
           languageCode: 'hi',
           name: 'Hindi',
           author: 'al-Umari',
@@ -164,6 +168,10 @@ class _ScrollableAyahRepository implements AyahRepository {
 }
 
 class _FakeSettings implements ReaderSettingsRepository {
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
   _FakeSettings({
     this.fontSize = 28,
     this.detailed = false,
@@ -446,7 +454,7 @@ void main() {
     // selected (the default is a single language), then open Detailed view.
     Future<void> openDetailed(
       WidgetTester tester, {
-      List<String> selected = const ['ur', 'en'],
+      List<String> selected = const ['ur-test', 'en-test'],
     }) async {
       // A phone-height surface so the (now taller, with About at the bottom)
       // Settings sheet doesn't fill the screen — keeps the scrim tappable to
@@ -490,7 +498,7 @@ void main() {
       expect(find.text('اردو متن'), findsOneWidget);
       expect(find.text('english body'), findsOneWidget);
 
-      await toggleLanguages(tester, ['en']); // turn English off
+      await toggleLanguages(tester, ['en-test']); // turn English off
 
       expect(find.text('english body'), findsNothing);
       expect(find.text('اردو متن'), findsOneWidget); // Urdu stays
@@ -501,7 +509,7 @@ void main() {
       await openDetailed(tester);
 
       // Turn English off, then try Urdu too — the last one must stay on.
-      await toggleLanguages(tester, ['en', 'ur']);
+      await toggleLanguages(tester, ['en-test', 'ur-test']);
 
       expect(find.text('اردو متن'), findsOneWidget);
     });
@@ -510,7 +518,7 @@ void main() {
         (tester) async {
       await openDetailed(tester);
 
-      await toggleLanguages(tester, ['en']); // Urdu only
+      await toggleLanguages(tester, ['en-test']); // Urdu only
       expect(find.text('english body'), findsNothing);
 
       // Back to Reading, tap the verse — the peek shows Urdu only (shared).

@@ -1,4 +1,5 @@
 import '../entities/arabic_script.dart';
+import '../entities/translation_resource.dart';
 
 /// Persists the user's global reading preferences (zoom level + viewport) so
 /// they survive app restarts. Reads are synchronous (defaulted); writes async.
@@ -14,10 +15,19 @@ abstract interface class ReaderSettingsRepository {
   /// Whether the Detailed (translation) viewport is preferred over Mushaf.
   bool get detailed;
 
-  /// The reader's chosen translation editions, shared by BOTH the Reading-view
-  /// peek card and the Detailed view (e.g. ['ur'] or ['ur','en']) — set once,
-  /// honoured everywhere. null until the reader picks (then seeded from locale).
+  /// The reader's chosen editions as stable SLUGS, shared by BOTH the
+  /// Reading-view peek card and the Detailed view (e.g. `['ur-junagarhi']` or
+  /// `['ur-junagarhi','en-hilali-khan']`) — set once, honoured everywhere. null
+  /// until the reader picks (then seeded from the editions marked default).
+  ///
+  /// Slugs, not language codes: a language may carry several editions, and a
+  /// resource id shifts whenever the data pipeline reorders its sources.
   List<String>? get selectedTranslations;
+
+  /// Rewrites a pre-slug selection (language codes) into edition slugs, once.
+  /// Call before first read on launch. A no-op after it has run, and for a
+  /// fresh install with nothing saved.
+  Future<void> migrateSelectedTranslations(List<TranslationResource> available);
 
   /// Recitation playback rate (1.0 = normal); defaults to [defaultRecitationSpeed].
   double get recitationSpeed;
@@ -35,7 +45,7 @@ abstract interface class ReaderSettingsRepository {
 
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
-  Future<void> setSelectedTranslations(List<String> languageCodes);
+  Future<void> setSelectedTranslations(List<String> slugs);
   Future<void> setRecitationSpeed(double value);
   Future<void> setShowTranslationPeek(bool value);
   Future<void> setShowArabicMatn(bool value);

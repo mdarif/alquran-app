@@ -65,6 +65,10 @@ class _LastRead implements LastReadRepository {
 }
 
 class _Settings implements ReaderSettingsRepository {
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
   ArabicScript _script = ArabicScript.uthmani;
   int setScriptCalls = 0;
   @override

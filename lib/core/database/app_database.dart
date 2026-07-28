@@ -95,12 +95,19 @@ class AppDatabase extends _$AppDatabase {
     ];
   }
 
-  /// All active translation resources (Urdu, Hindi, English), ordered by id so
-  /// the reader shows them in a stable, intentional order (matches the build
-  /// order in the data pipeline's sources.yaml).
+  /// All translation editions, in the pipeline's global display order.
+  ///
+  /// Ordered by `sortOrder`, not by id: id comes from `cur.lastrowid` upstream
+  /// and shifts whenever an edition is inserted into or reordered in
+  /// `sources.yaml`, which would silently reshuffle the reader's page.
+  /// `sortOrder` is the deliberate order (Urdu first), and the picker's
+  /// language grouping falls out of it.
   Future<List<ResourceRow>> translationResources() => (select(resources)
         ..where((r) => r.type.equals('translation'))
-        ..orderBy([(r) => OrderingTerm.asc(r.id)]))
+        ..orderBy([
+          (r) => OrderingTerm.asc(r.sortOrder),
+          (r) => OrderingTerm.asc(r.id),
+        ]))
       .get();
 
   /// Translations for one ayah keyed by resource id.

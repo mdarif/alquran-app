@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -17,7 +18,7 @@ import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../domain/ayah_share.dart' show nativeLanguageName;
+import '../../domain/ayah_share.dart' show editionChipLabel;
 import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -383,6 +384,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
             if (state.status == ReaderStatus.error) {
               return Center(child: Text(state.error ?? 'Failed to load'));
             }
+            // The saved selection used to hold language codes and now holds
+            // edition slugs. Migrate as soon as the editions are known — this
+            // is the first point where both are in hand. Without it a returning
+            // reader's extra languages fall silently back to the default, since
+            // no saved language code matches any slug.
+            _migrateSelectionOnce(state.resources);
             // Spinner only before the very first section loads.
             if (state.ayahs.isEmpty) {
               return const Center(child: CircularProgressIndicator());
@@ -775,32 +782,59 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     _cubit.setViewportDetailed(detailed);
   }
 
-  /// The reader's active translation editions — shared by the Reading peek and
-  /// Detailed view. The saved selection (validated against what's available),
-  /// or a sensible default when nothing is saved: a SINGLE language — Urdu (the
-  /// flagship translation), regardless of device language, per owner decision;
-  /// only as a last resort (no Urdu edition) the first available edition.
+  /// The reader's active editions, as SLUGS — shared by the Reading peek and
+  /// Detailed view. The saved selection (validated against what is installed),
+  /// or, when nothing is saved, the edition(s) the data marks `default_on`
+  /// (Urdu — the flagship — regardless of device language, per owner decision).
+  /// Only as a last resort, the first available edition.
+  ///
+  /// Slugs rather than language codes: a language may carry several editions,
+  /// so a per-language selection could not say *which* Hindi to show.
   Set<String> _activeLangs(List<TranslationResource> all) {
-    final available = [for (final r in all) r.languageCode];
-    if (available.isEmpty) return {};
+    if (all.isEmpty) return {};
+    final available = {for (final r in all) r.slug};
     final saved = _selected;
     if (saved != null) {
+      // Drop anything no longer present — an edition can be retired upstream or
+      // removed by the reader. A stale slug must not survive as a selection
+      // that silently renders nothing.
       final valid = saved.where(available.contains).toSet();
       if (valid.isNotEmpty) return valid;
     }
-    if (available.contains('ur')) return {'ur'};
-    return {available.first};
+    final defaults = {for (final r in all.where((r) => r.defaultOn)) r.slug};
+    if (defaults.isNotEmpty) return defaults;
+    return {all.first.slug};
   }
 
-  /// Toggle a language in the shared selection, keeping at least one on, and
+  bool _selectionMigrated = false;
+
+  /// Rewrite a pre-slug selection (language codes) into edition slugs, once per
+  /// launch. Cheap and idempotent; the repository itself no-ops after the first
+  /// successful run, so the guard here only avoids the redundant async hop on
+  /// every rebuild.
+  void _migrateSelectionOnce(List<TranslationResource> resources) {
+    if (_selectionMigrated || resources.isEmpty) return;
+    _selectionMigrated = true;
+    unawaited(
+      _settings.migrateSelectedTranslations(resources).then((_) {
+        if (!mounted) return;
+        final restored = _settings.selectedTranslations?.toSet();
+        if (restored != null && !setEquals(restored, _selected)) {
+          setState(() => _selected = restored);
+        }
+      }),
+    );
+  }
+
+  /// Toggle an edition in the shared selection, keeping at least one on, and
   /// persist it (so both views and a future launch see the same choice).
-  void _toggleLang(String code, List<TranslationResource> all) {
+  void _toggleLang(String slug, List<TranslationResource> all) {
     final current = {..._activeLangs(all)};
-    if (current.contains(code)) {
+    if (current.contains(slug)) {
       if (current.length <= 1) return; // never hide the last translation
-      current.remove(code);
+      current.remove(slug);
     } else {
-      current.add(code);
+      current.add(slug);
     }
     setState(() => _selected = current);
     unawaited(_settings.setSelectedTranslations(current.toList()));
@@ -923,10 +957,14 @@ class _DetailedList extends StatefulWidget {
 
   /// The editions actually rendered in each tile: the enabled ones, falling back
   /// to all if a stale saved selection matches nothing available.
+  ///
+  /// Matched on SLUG. Matching on `languageCode` would show every edition of a
+  /// selected language — so choosing one Hindi translation would silently
+  /// render both.
   List<TranslationResource> get shownResources {
     final shown = [
       for (final r in resources)
-        if (enabledLanguages.contains(r.languageCode)) r,
+        if (enabledLanguages.contains(r.slug)) r,
     ];
     return shown.isEmpty ? resources : shown;
   }
@@ -1539,10 +1577,10 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   children: [
                     for (final r in widget.resources)
                       TranslationChip(
-                        key: WidgetKeys.langOption(r.languageCode),
-                        label: nativeLanguageName(r.languageCode),
-                        selected: _selectedLangs.contains(r.languageCode),
-                        onTap: () => _toggleLang(r.languageCode),
+                        key: WidgetKeys.langOption(r.slug),
+                        label: editionChipLabel(r, widget.resources),
+                        selected: _selectedLangs.contains(r.slug),
+                        onTap: () => _toggleLang(r.slug),
                       ),
                   ],
                 ),

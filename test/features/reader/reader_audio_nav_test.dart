@@ -109,6 +109,10 @@ class _FakeLastRead implements LastReadRepository {
 
 class _FakeSettings implements ReaderSettingsRepository {
   @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
+  @override
   double fontSize = 24;
   @override
   bool detailed = false;

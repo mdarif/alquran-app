@@ -121,9 +121,16 @@ class AyahRepositoryImpl implements AyahRepository {
       for (final r in rows)
         TranslationResource(
           id: r.id,
+          slug: r.slug,
           languageCode: r.languageCode,
           name: r.name,
+          nativeName: r.nativeName,
           author: r.author,
+          direction: r.direction,
+          sortOrder: r.sortOrder,
+          defaultOn: r.defaultOn == 1,
+          license: r.license,
+          sourceUrl: r.sourceUrl,
         ),
     ];
   }

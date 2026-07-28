@@ -5,6 +5,7 @@ import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The reader opens are fast because the singleton repo serves a session cache
@@ -13,6 +14,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// cubit — costs no DB round-trip. These tests pin that caching, and that a
 /// script switch keys to a fresh entry rather than serving stale text.
 class _Settings implements ReaderSettingsRepository {
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
   _Settings(this.script);
   @override
   ArabicScript script;
@@ -134,6 +139,7 @@ void main() {
     await db.into(db.resources).insert(
           ResourcesCompanion.insert(
             id: const Value(1),
+            slug: 'ur-test',
             type: 'translation',
             languageCode: 'ur',
             name: 'Urdu',
@@ -145,6 +151,7 @@ void main() {
     await db.into(db.resources).insert(
           ResourcesCompanion.insert(
             id: const Value(2),
+            slug: 'hi-test',
             type: 'translation',
             languageCode: 'hi',
             name: 'Hindi',
