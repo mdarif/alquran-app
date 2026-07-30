@@ -34,14 +34,14 @@ void main() {
     expect(find.text('alquranreader.com'), findsOneWidget);
     expect(find.text('Al Marfa Technologies'), findsOneWidget);
 
-    // The credits + open-source licenses now live one tap deeper, on Credits.
+    // Source attributions live one tap deeper, on Credits.
     expect(find.byKey(WidgetKeys.aboutCredits), findsOneWidget);
     expect(find.byKey(WidgetKeys.aboutLicenses), findsNothing);
     expect(find.textContaining('tanzil.net'), findsNothing);
     expect(find.textContaining('Junagarhi'), findsNothing);
   });
 
-  testWidgets('the Licenses & credits link opens the Credits screen',
+  testWidgets('the Credits & Sources link opens the Credits screen',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(800, 1400));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -52,6 +52,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(WidgetKeys.creditsPage), findsOneWidget);
+    expect(find.text('Credits & Sources'), findsOneWidget);
     expect(find.textContaining('tanzil.net'), findsWidgets);
   });
 }

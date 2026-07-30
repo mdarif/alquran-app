@@ -63,19 +63,25 @@ class HomeOverflowMenu extends StatelessWidget {
     // MenuAnchor (not PopupMenuButton) so the menu hugs its content — the popup
     // menu rounds its width up in fixed steps, leaving a blank strip on the right.
     return MenuAnchor(
-      alignmentOffset: const Offset(0, 4),
+      alignmentOffset: const Offset(-18, 4),
       style: MenuStyle(
         padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(vertical: 4),
+          EdgeInsets.symmetric(vertical: 6),
         ),
+        elevation: const WidgetStatePropertyAll(4),
+        shadowColor: WidgetStatePropertyAll(
+          Colors.black.withValues(alpha: 0.16),
+        ),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         ),
       ),
       builder: (context, controller, _) => IconButton(
         key: WidgetKeys.homeOverflowMenu,
         tooltip: 'More',
         icon: const AppIcon(AppIcons.overflow),
+        iconSize: AppIconSize.bar,
         onPressed: () =>
             controller.isOpen ? controller.close() : controller.open(),
       ),
@@ -192,18 +198,43 @@ class _MenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return MenuItemButton(
-      leadingIcon: Badge(
-        isLabelVisible: badge,
-        child: AppIcon(
-          icon,
-          filled: filled,
-          size: AppIconSize.action,
-          color: cs.onSurfaceVariant,
+    final iconColor = cs.onSurface.withValues(alpha: 0.70);
+    return SizedBox(
+      width: 252,
+      child: MenuItemButton(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsetsDirectional.fromSTEB(18, 8, 18, 8),
+          ),
+          overlayColor: WidgetStatePropertyAll(
+            cs.primary.withValues(alpha: 0.08),
+          ),
+          foregroundColor: WidgetStatePropertyAll(cs.onSurface),
+          textStyle: WidgetStatePropertyAll(
+            Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  height: 1.1,
+                ),
+          ),
         ),
+        leadingIcon: SizedBox.square(
+          dimension: 24,
+          child: Center(
+            child: Badge(
+              isLabelVisible: badge,
+              child: AppIcon(
+                icon,
+                filled: filled,
+                size: AppIconSize.action,
+                color: iconColor,
+              ),
+            ),
+          ),
+        ),
+        onPressed: onPressed,
+        child: Text(label),
       ),
-      onPressed: onPressed,
-      child: Text(label),
     );
   }
 }

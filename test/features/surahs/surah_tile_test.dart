@@ -47,7 +47,7 @@ void main() {
         ),
       );
 
-      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 28);
+      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 30);
     });
 
     testWidgets('shows no subtitle when revelationPlace is null',

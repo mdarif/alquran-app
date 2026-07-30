@@ -54,7 +54,10 @@ class PrayerTimesSheet extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text('Prayer Times', style: theme.textTheme.titleMedium),
+                Text(
+                  "Today's Prayer Times",
+                  style: theme.textTheme.titleMedium,
+                ),
                 if (times.location.label != null) ...[
                   const Spacer(),
                   Flexible(
@@ -70,13 +73,13 @@ class PrayerTimesSheet extends StatelessWidget {
               ],
             ),
             if (hijriBaseDate != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               _HijriDateLabel(
                 baseDate: hijriBaseDate!,
                 gregorianDate: gregorianDate ?? hijriBaseDate!,
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq — not a
             // salah, so never highlighted), then the remaining four prayers.
             _PrayerRow(
@@ -133,16 +136,17 @@ class _PrayerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final fg = muted ? cs.onSurfaceVariant : cs.onSurface;
+    final fg =
+        muted ? cs.onSurfaceVariant.withValues(alpha: 0.62) : cs.onSurface;
     final weight =
         isNext ? FontWeight.w700 : (muted ? FontWeight.w400 : FontWeight.w500);
     final window = forbidden;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 1),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
         color: isNext
-            ? cs.primaryContainer.withValues(alpha: 0.45)
+            ? cs.primaryContainer.withValues(alpha: 0.55)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
       ),
@@ -166,12 +170,21 @@ class _PrayerRow extends StatelessWidget {
                 AppIcon(AppIcons.sunrise, size: AppIconSize.inline, color: fg),
                 const SizedBox(width: 8),
               ],
-              Text(
-                label,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: fg,
-                  fontWeight: weight,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isNext) ...[
+                    const _StatusBadge(label: 'Next'),
+                    const SizedBox(height: 2),
+                  ],
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: fg,
+                      fontWeight: weight,
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
               Text(
@@ -191,7 +204,35 @@ class _PrayerRow extends StatelessWidget {
   }
 }
 
-/// The small gold "no prayer" caption beneath a row that bounds a forbidden
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.primary,
+                fontWeight: FontWeight.w700,
+                height: 1,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The small gold prohibited-time caption beneath a row that bounds a forbidden
 /// window (e.g. just after Sunrise, around Dhuhr, just before Maghrib).
 class _ForbiddenNote extends StatelessWidget {
   const _ForbiddenNote({required this.window});
@@ -208,13 +249,17 @@ class _ForbiddenNote extends StatelessWidget {
       padding: const EdgeInsets.only(top: 2, left: 14),
       child: Row(
         children: [
-          AppIcon(AppIcons.forbidden, size: AppIconSize.dense, color: gold),
+          AppIcon(
+            AppIcons.forbidden,
+            size: AppIconSize.dense,
+            color: gold.withValues(alpha: 0.78),
+          ),
           const SizedBox(width: 5),
           Text(
-            'No prayer · ${formatPrayerTime(window.start)}'
+            '${window.reason.shortLabel} · ${formatPrayerTime(window.start)}'
             '–${formatPrayerTime(window.end)}',
             style: theme.textTheme.labelSmall?.copyWith(
-              color: gold,
+              color: gold.withValues(alpha: 0.78),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -222,6 +267,14 @@ class _ForbiddenNote extends StatelessWidget {
       ),
     );
   }
+}
+
+extension on ForbiddenReason {
+  String get shortLabel => switch (this) {
+        ForbiddenReason.afterSunrise => 'After Sunrise',
+        ForbiddenReason.zenith => 'Before Dhuhr',
+        ForbiddenReason.beforeSunset => 'Before Maghrib',
+      };
 }
 
 /// The Islamic date for the audience: the Hijri date (e.g. `07 Muharram

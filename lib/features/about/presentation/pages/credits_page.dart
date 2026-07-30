@@ -17,11 +17,11 @@ Future<void> _openSource(BuildContext context, String url) async {
   }
 }
 
-/// Credits & licenses. Holds the attributions our content licenses require — the
+/// Credits & sources. Holds the attributions our content licenses require — the
 /// Qur'an text + page layout (KFGQPC), the translations (Tanzil / King Fahd), the
-/// bundled fonts (KFGQPC / CC-BY-NC / OFL), and the recitation source — plus a
-/// link to the bundled open-source package licenses. Reached from the (deliberately
-/// minimal) About screen via a single subtle link. Static content.
+/// bundled fonts (KFGQPC / CC-BY-NC / OFL), and the recitation source. Reached
+/// from the (deliberately minimal) About screen via a single subtle link. Static
+/// content.
 class CreditsPage extends StatelessWidget {
   const CreditsPage({required this.version, super.key});
 
@@ -34,12 +34,12 @@ class CreditsPage extends StatelessWidget {
     final cs = theme.colorScheme;
     return Scaffold(
       key: WidgetKeys.creditsPage,
-      appBar: AppBar(title: const Text('Credits & licenses')),
+      appBar: AppBar(title: const Text('Credits & Sources')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
           Text(
-            'The Qur’an deserves clarity about where its text and translations come from.',
+            'A clear record of the Qur’an text, translations, fonts, and sources used in Al Quran.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: cs.onSurfaceVariant,
               height: 1.45,
@@ -124,28 +124,6 @@ class CreditsPage extends StatelessWidget {
                 ),
               ],
             ),
-          Card(
-            margin: EdgeInsets.zero,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: cs.outlineVariant),
-            ),
-            child: ListTile(
-              key: WidgetKeys.aboutLicenses,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              leading: Icon(Icons.code_rounded, color: cs.primary),
-              title: const Text('Open-source licenses'),
-              subtitle:
-                  const Text('Libraries that help make Al Quran possible'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => showLicensePage(
-                context: context,
-                applicationName: 'Al Quran',
-                applicationVersion: version,
-              ),
-            ),
-          ),
         ],
       ),
     );

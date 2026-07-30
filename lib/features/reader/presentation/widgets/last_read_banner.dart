@@ -65,16 +65,16 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
     final lastRead = _lastRead;
     if (lastRead == null) return const SizedBox.shrink();
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final onColor = theme.colorScheme.onPrimaryContainer;
     final reference =
         '${_surahName ?? lastRead.target.title} · Ayah ${lastRead.ayahNumber}';
 
     return Padding(
-      // No top padding: the app bar already provides the breathing room, so the
-      // card sits snug under it instead of leaving a gap.
+      // Keep the resume action compact so the first surah stays visually close.
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
       child: Material(
-        color: theme.colorScheme.primaryContainer,
+        color: cs.primaryContainer.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           key: WidgetKeys.lastReadCard,
@@ -100,12 +100,13 @@ class _LastReadBannerState extends State<LastReadBanner> with RouteAware {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Last Read',
+                  'Continue Reading',
                   style: theme.textTheme.labelMedium?.copyWith(
                     // Full token colour (not a reduced alpha): keeps the AA
                     // contrast the M3 pair guarantees. Hierarchy vs the bold
                     // reference comes from weight, not lower opacity.
                     color: onColor,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(width: 8),

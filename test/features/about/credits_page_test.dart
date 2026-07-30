@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Credits surfaces the license-required attributions + licenses',
+  testWidgets('Credits surfaces the license-required sources and attributions',
       (tester) async {
     // Tall surface so the lazy ListView builds every credit row.
     await tester.binding.setSurfaceSize(const Size(800, 2000));
@@ -23,10 +23,11 @@ void main() {
     expect(find.textContaining('Hilali'), findsOneWidget);
     expect(find.textContaining('tanzil.net'), findsWidgets);
 
-    // Fonts + the open-source licenses entry point.
+    // Fonts.
     expect(find.text('Noorehuda (IndoPak)'), findsOneWidget);
     expect(find.textContaining('Open Font License'), findsWidgets);
-    expect(find.byKey(WidgetKeys.aboutLicenses), findsOneWidget);
+    expect(find.byKey(WidgetKeys.aboutLicenses), findsNothing);
+    expect(find.text('Open-source licenses'), findsNothing);
 
     // Attributions link out to their sources (external-link affordance).
     expect(find.byIcon(Icons.open_in_new_rounded), findsWidgets);

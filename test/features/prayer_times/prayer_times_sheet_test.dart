@@ -37,7 +37,7 @@ Future<void> _pumpSheet(WidgetTester tester, {required DateTime base}) {
 void main() {
   testWidgets('shows the title-cased heading', (tester) async {
     await _pumpSheet(tester, base: DateTime(2000, 1, 1));
-    expect(find.text('Prayer Times'), findsOneWidget);
+    expect(find.text("Today's Prayer Times"), findsOneWidget);
   });
 
   testWidgets('shows the Hijri over the Gregorian date', (tester) async {
@@ -79,14 +79,13 @@ void main() {
     );
   });
 
-  testWidgets('shows the three tightened "no prayer" window captions',
+  testWidgets('shows the three tightened prohibited-time window captions',
       (tester) async {
     await _pumpSheet(tester, base: DateTime(2000, 1, 1));
     // afterSunrise 6:30–6:45, zenith 11:55–12:00, beforeSunset 5:15–5:30.
-    expect(find.textContaining('No prayer'), findsNWidgets(3));
-    expect(find.textContaining('No prayer · 6:30'), findsOneWidget);
-    expect(find.textContaining('No prayer · 11:55'), findsOneWidget);
-    expect(find.textContaining('No prayer · 5:15'), findsOneWidget);
+    expect(find.textContaining('After Sunrise · 6:30'), findsOneWidget);
+    expect(find.textContaining('Before Dhuhr · 11:55'), findsOneWidget);
+    expect(find.textContaining('Before Maghrib · 5:15'), findsOneWidget);
   });
 
   testWidgets('gilds the Hijri date on a Sunnah occasion', (tester) async {

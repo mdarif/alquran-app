@@ -57,9 +57,20 @@ class SurahListBody extends StatelessWidget {
             final hits = state.visibleHits;
             if (hits.isEmpty) return _NoMatch(query: state.query);
             return ListView.separated(
+              padding: const EdgeInsets.only(top: 4, bottom: 20),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               itemCount: hits.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (context, _) {
+                final cs = Theme.of(context).colorScheme;
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 78, end: 20),
+                  child: Divider(
+                    height: 1,
+                    thickness: 0.6,
+                    color: cs.outlineVariant.withValues(alpha: 0.42),
+                  ),
+                );
+              },
               itemBuilder: (context, i) {
                 final hit = hits[i];
                 final surah = hit.surah;

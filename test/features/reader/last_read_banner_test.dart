@@ -47,7 +47,7 @@ Future<void> _pump(WidgetTester tester, LastRead? value) async {
 void main() {
   tearDown(GetIt.I.reset);
 
-  testWidgets('shows "Last Read" with the exact verse reference',
+  testWidgets('shows "Continue Reading" with the exact verse reference',
       (tester) async {
     await _pump(
       tester,
@@ -59,14 +59,14 @@ void main() {
       ),
     );
 
-    expect(find.text('Last Read'), findsOneWidget);
+    expect(find.text('Continue Reading'), findsOneWidget);
     expect(find.text('Al-Baqarah · Ayah 255'), findsOneWidget);
   });
 
   testWidgets('is hidden when nothing has been read', (tester) async {
     await _pump(tester, null);
 
-    expect(find.text('Last Read'), findsNothing);
+    expect(find.text('Continue Reading'), findsNothing);
     expect(find.byType(InkWell), findsNothing);
   });
 }

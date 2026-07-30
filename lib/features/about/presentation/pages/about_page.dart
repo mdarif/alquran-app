@@ -22,8 +22,8 @@ Future<void> _openExternal(BuildContext context, String url) async {
 
 /// About / Credits. Surfaces the attributions our content licenses require —
 /// the Qur'an text + page layout (KFGQPC), the translations (Tanzil / King Fahd),
-/// the bundled fonts (KFGQPC / CC-BY-NC / OFL), and the recitation source — plus
-/// a link to the bundled open-source package licenses. Static content.
+/// the bundled fonts (KFGQPC / CC-BY-NC / OFL), and the recitation source.
+/// Static content.
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
 
@@ -100,8 +100,8 @@ class _AboutPageState extends State<AboutPage> {
             ),
           ),
           const SizedBox(height: 20),
-          // One discreet door to the legally-required attributions + the bundled
-          // open-source licenses, kept off the main, brand-forward About screen.
+          // One discreet door to the legally-required attributions, kept off
+          // the main, brand-forward About screen.
           Center(
             child: TextButton(
               key: WidgetKeys.aboutCredits,
@@ -114,7 +114,7 @@ class _AboutPageState extends State<AboutPage> {
                 foregroundColor: cs.onSurfaceVariant,
                 textStyle: theme.textTheme.bodySmall,
               ),
-              child: const Text('Credits & Licenses'),
+              child: const Text('Credits & Sources'),
             ),
           ),
         ],
