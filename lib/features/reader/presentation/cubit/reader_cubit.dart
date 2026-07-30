@@ -65,6 +65,14 @@ class ReaderCubit extends Cubit<ReaderState> {
     _cacheOrder.clear();
   }
 
+  Future<void> refreshTranslations() async {
+    _resources = null;
+    clearCache();
+    final target = _target;
+    if (target == null) return;
+    await load(target);
+  }
+
   Future<void> load(ReaderTarget target) async {
     _target = target;
     final key = _key(target);

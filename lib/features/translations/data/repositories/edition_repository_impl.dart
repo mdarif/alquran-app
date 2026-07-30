@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sq;
 
 import '../../../../core/database/editions_database.dart';
+import '../../../../core/translations/translation_metadata_overrides.dart';
 import '../../domain/entities/catalogue_entry.dart';
 import '../../domain/entities/installed_edition.dart';
 import '../../domain/repositories/edition_repository.dart';
@@ -92,7 +93,7 @@ class EditionRepositoryImpl implements EditionRepository {
           languageCode: r.languageCode,
           name: r.name,
           nativeName: r.nativeName,
-          author: r.author,
+          author: TranslationMetadataOverrides.author(r.slug, r.author),
           direction: r.direction,
           sortOrder: r.sortOrder,
           license: r.license,
@@ -152,7 +153,9 @@ class EditionRepositoryImpl implements EditionRepository {
           languageCode: entry.languageCode,
           name: entry.name,
           nativeName: Value(entry.nativeName),
-          author: Value(entry.author),
+          author: Value(
+            TranslationMetadataOverrides.author(entry.slug, entry.author),
+          ),
           direction: Value(entry.direction),
           sortOrder: Value(entry.sortOrder),
           license: Value(entry.license),

@@ -1,3 +1,8 @@
+import 'package:get_it/get_it.dart';
+
+import 'hijri_anchor.dart';
+import 'hijri_anchor_repository.dart';
+
 /// An Islamic (Hijri) calendar date, converted from a Gregorian date with the
 /// standard tabular (Kuwaiti) algorithm — pure, offline, deterministic. The
 /// tabular calendar can differ from a local moon-sighting by a day, so callers
@@ -11,6 +16,26 @@ class HijriDate {
     final d = DateTime(date.year, date.month, date.day)
         .add(Duration(days: adjustmentDays));
     return _fromJdn(_gregorianToJdn(d.year, d.month, d.day));
+  }
+
+  /// Like [fromGregorian], but the adjustment comes from the manually
+  /// verified moon-sighting anchor table (see [HijriAnchorRepository]) instead
+  /// of a caller-supplied constant — this is what display call sites should
+  /// use. Falls back to the raw tabular date (adjustment 0) when no
+  /// [HijriAnchorRepository] is registered (e.g. a widget test with a bare
+  /// GetIt instance) — never throws.
+  factory HijriDate.fromGregorianCorrected(
+    DateTime date, {
+    String region = HijriAnchor.defaultRegion,
+  }) {
+    int correction = 0;
+    try {
+      correction = GetIt.instance<HijriAnchorRepository>()
+          .correctionDaysFor(date, region: region);
+    } catch (_) {
+      correction = 0;
+    }
+    return HijriDate.fromGregorian(date, adjustmentDays: correction);
   }
 
   final int year; // Hijri year (AH)

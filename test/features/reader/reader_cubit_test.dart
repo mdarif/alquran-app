@@ -76,6 +76,33 @@ class _CountingAyahRepository implements AyahRepository {
   Future<List<TranslationResource>> getTranslationResources() async => const [];
 }
 
+class _MutableAyahRepository implements AyahRepository {
+  _MutableAyahRepository({
+    required this.ayahs,
+    required this.resources,
+  });
+
+  List<Ayah> ayahs;
+  List<TranslationResource> resources;
+  int ayahFetches = 0;
+  int resourceFetches = 0;
+
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async {
+    ayahFetches++;
+    return ayahs;
+  }
+
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => const {};
+
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async {
+    resourceFetches++;
+    return resources;
+  }
+}
+
 const _urdu = TranslationResource(
   id: 1,
   slug: 'ur-test',
@@ -257,6 +284,77 @@ void main() {
         2,
         reason:
             'surah 1 should be re-fetched after clearCache, not served stale',
+      );
+      await cubit.close();
+    });
+
+    test('refreshTranslations refetches resources and visible ayah texts',
+        () async {
+      const sahih = TranslationResource(
+        id: -1,
+        slug: 'en-sahih-international',
+        languageCode: 'en',
+        name: 'English',
+        author: 'Sahih International',
+      );
+      const azizul = TranslationResource(
+        id: -1,
+        slug: 'hi-al-umari',
+        languageCode: 'hi',
+        name: 'Hindi',
+        author: 'Azizul Haque al-Umari',
+      );
+      final repo = _MutableAyahRepository(
+        resources: const [sahih],
+        ayahs: const [
+          Ayah(
+            id: 1,
+            surahId: 1,
+            ayahNumber: 1,
+            textArabic: 'بِسْمِ ٱللَّهِ',
+            isSajda: false,
+            translations: {
+              'en-sahih-international': 'In the name of Allah',
+            },
+          ),
+        ],
+      );
+      final cubit = ReaderCubit(repo, _FakeLastReadRepository());
+
+      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+      expect(cubit.state.resources, const [sahih]);
+      expect(
+        cubit.state.ayahs.single.translations,
+        containsPair('en-sahih-international', 'In the name of Allah'),
+      );
+
+      repo
+        ..resources = const [azizul]
+        ..ayahs = const [
+          Ayah(
+            id: 1,
+            surahId: 1,
+            ayahNumber: 1,
+            textArabic: 'بِسْمِ ٱللَّهِ',
+            isSajda: false,
+            translations: {
+              'hi-al-umari': 'अल्लाह के नाम से',
+            },
+          ),
+        ];
+
+      await cubit.refreshTranslations();
+
+      expect(repo.resourceFetches, 2);
+      expect(repo.ayahFetches, greaterThanOrEqualTo(2));
+      expect(cubit.state.resources, const [azizul]);
+      expect(
+        cubit.state.ayahs.single.translations,
+        containsPair('hi-al-umari', 'अल्लाह के नाम से'),
+      );
+      expect(
+        cubit.state.ayahs.single.translations,
+        isNot(contains('en-sahih-international')),
       );
       await cubit.close();
     });

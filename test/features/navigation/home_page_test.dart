@@ -187,8 +187,8 @@ void main() {
       );
       expect(find.byType(HijriDateLine), findsNothing);
       expect(find.byType(LastReadBanner), findsNothing);
-      // No secondary controls → no overflow menu at all.
-      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsNothing);
+      // The overflow itself stays — Translations/Share/About are unconditional.
+      expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
       // The reading list itself is unaffected.
       expect(find.byType(SurahListBody), findsOneWidget);
     });

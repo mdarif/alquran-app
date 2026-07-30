@@ -19,7 +19,6 @@ import '../../features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
 import '../../features/translations/data/repositories/edition_repository_impl.dart';
 import '../../features/translations/domain/repositories/edition_repository.dart';
-import '../../features/translations/presentation/cubit/translations_cubit.dart';
 import '../../features/reminders/data/repositories/reminder_settings_repository_impl.dart';
 import '../../features/reminders/data/scheduling/local_notification_scheduler.dart';
 import '../../features/reminders/domain/repositories/reminder_settings_repository.dart';
@@ -34,6 +33,7 @@ import '../database/editions_database.dart';
 import '../editions_config.dart';
 import '../feature_flags.dart';
 import '../database/db_seeder.dart';
+import '../hijri/hijri_anchor_repository.dart';
 import '../home_widget/widget_bridge.dart';
 import '../home_widget/widget_publisher.dart';
 import '../theme/mushaf_palette.dart';
@@ -57,6 +57,9 @@ Future<void> configureDependencies() async {
   getIt
     // Data sources
     ..registerSingleton<AppDatabase>(AppDatabase(dbFile))
+    ..registerSingleton<HijriAnchorRepository>(
+      HijriAnchorRepository(getIt<AppDatabase>()),
+    )
     ..registerSingleton<EditionsDatabase>(EditionsDatabase(editionsFile))
     ..registerSingleton<SharedPreferences>(prefs)
     // Repositories
@@ -75,15 +78,6 @@ Future<void> configureDependencies() async {
         db: getIt<EditionsDatabase>(),
         supportDir: supportDir,
         catalogueUrl: Uri.parse(editionCatalogueUrl),
-      ),
-    )
-    // A factory, not a singleton: the Translations screen re-reads what is
-    // installed every time it opens, so a stale list can't linger after a
-    // download or a removal.
-    ..registerFactory<TranslationsCubit>(
-      () => TranslationsCubit(
-        getIt<EditionRepository>(),
-        const [],
       ),
     )
     ..registerLazySingleton<IndexRepository>(
@@ -191,4 +185,9 @@ Future<void> configureDependencies() async {
         getIt<ReaderSettingsRepository>(),
       ),
     );
+
+  // Best-effort: an older bundled DB without the anchor table, or any read
+  // failure, just leaves the repository's in-memory list empty (raw tabular
+  // dates), never blocks startup.
+  await getIt<HijriAnchorRepository>().preload();
 }

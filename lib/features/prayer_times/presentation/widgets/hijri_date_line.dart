@@ -33,7 +33,7 @@ class HijriDateLine extends StatelessWidget {
         theme.extension<MushafColors>()?.gold ?? const Color(0xFF9C6F02);
 
     return Text(
-      HijriDate.fromGregorian(base).formatted,
+      HijriDate.fromGregorianCorrected(base).formatted,
       key: WidgetKeys.hijriDateLine,
       style: theme.textTheme.labelSmall?.copyWith(
         color: isSunnah ? gold : theme.colorScheme.onSurfaceVariant,

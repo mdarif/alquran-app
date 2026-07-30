@@ -137,13 +137,12 @@ class _HomePageState extends State<HomePage> {
           icon: const AppIcon(AppIcons.search),
           onPressed: _openSearch,
         ),
-        // Reminders + Reading Light fold into one overflow so the bar stays
-        // uncrowded next to the title, prayer pill and search.
-        if (widget.sunnahReminders || widget.lightOfDay)
-          HomeOverflowMenu(
-            showReminders: widget.sunnahReminders,
-            showReadingLight: widget.lightOfDay,
-          ),
+        // Secondary sections and settings fold into one overflow so the bar
+        // stays uncrowded next to the title, prayer pill and search.
+        HomeOverflowMenu(
+          showReminders: widget.sunnahReminders,
+          showReadingLight: widget.lightOfDay,
+        ),
       ],
     );
   }

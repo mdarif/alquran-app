@@ -237,7 +237,7 @@ class _HijriDateLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final hijri = HijriDate.fromGregorian(baseDate);
+    final hijri = HijriDate.fromGregorianCorrected(baseDate);
     final muted =
         theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
     // On a Sunnah occasion the Hijri date itself is gilded (gold + bolder).

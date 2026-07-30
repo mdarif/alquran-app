@@ -1,6 +1,7 @@
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/editions_database.dart';
 import '../../../../core/feature_flags.dart';
+import '../../../../core/translations/translation_metadata_overrides.dart';
 import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -161,6 +162,12 @@ class AyahRepositoryImpl implements AyahRepository {
   Future<List<TranslationResource>> getTranslationResources() =>
       _resourcesFuture ??= _fetchTranslationResources();
 
+  void invalidateTranslations() {
+    _resourcesFuture = null;
+    _ayahCache.clear();
+    _ayahCacheOrder.clear();
+  }
+
   Future<List<TranslationResource>> _fetchTranslationResources() async {
     final rows = await _db.translationResources();
     final bundled = [
@@ -171,7 +178,7 @@ class AyahRepositoryImpl implements AyahRepository {
           languageCode: r.languageCode,
           name: r.name,
           nativeName: r.nativeName,
-          author: r.author,
+          author: TranslationMetadataOverrides.author(r.slug, r.author),
           direction: r.direction,
           sortOrder: r.sortOrder,
           defaultOn: r.defaultOn == 1,
@@ -186,27 +193,32 @@ class AyahRepositoryImpl implements AyahRepository {
     // Downloaded editions are presented exactly like bundled ones, so nothing
     // downstream needs to know where a given text came from. Merged into the
     // same global sort order, which is what groups a language's editions
-    // together in the picker.
+    // together in the picker. Key by slug while merging: an updated edition can
+    // exist in `editions.db` with the same slug as a bundled edition, and the
+    // reader must render that selected slug once.
     final installed = await editions.installed();
     if (installed.isEmpty) return bundled;
-    final merged = [
-      ...bundled,
-      for (final e in installed)
-        TranslationResource(
-          // No row in `resources`, so no meaningful id. Nothing may key on it —
-          // the reader addresses editions by slug throughout.
-          id: -1,
-          slug: e.slug,
-          languageCode: e.languageCode,
-          name: e.name,
-          nativeName: e.nativeName,
-          author: e.author,
-          direction: e.direction,
-          sortOrder: e.sortOrder,
-          license: e.license,
-          sourceUrl: e.sourceUrl,
-        ),
-    ]..sort((a, b) {
+    final bySlug = <String, TranslationResource>{
+      for (final r in bundled) r.slug: r,
+    };
+    for (final e in installed) {
+      bySlug[e.slug] = TranslationResource(
+        // No row in `resources`, so no meaningful id. Nothing may key on it —
+        // the reader addresses editions by slug throughout.
+        id: -1,
+        slug: e.slug,
+        languageCode: e.languageCode,
+        name: e.name,
+        nativeName: e.nativeName,
+        author: TranslationMetadataOverrides.author(e.slug, e.author),
+        direction: e.direction,
+        sortOrder: e.sortOrder,
+        license: e.license,
+        sourceUrl: e.sourceUrl,
+      );
+    }
+    final merged = bySlug.values.toList()
+      ..sort((a, b) {
         final byOrder = a.sortOrder.compareTo(b.sortOrder);
         return byOrder != 0 ? byOrder : a.slug.compareTo(b.slug);
       });

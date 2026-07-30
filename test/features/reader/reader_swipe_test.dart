@@ -213,7 +213,12 @@ class _FakeSettings implements ReaderSettingsRepository {
 }
 
 Future<void> _pumpReader(WidgetTester tester, ReaderTarget target) async {
-  await tester.pumpWidget(MaterialApp(home: ReaderPage(target: target)));
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: ThemeData(splashFactory: NoSplash.splashFactory),
+      home: ReaderPage(target: target),
+    ),
+  );
   await tester.pumpAndSettle();
 }
 
@@ -446,92 +451,6 @@ void main() {
 
       await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
       expect(find.byType(MushafView), findsOneWidget);
-    });
-  });
-
-  group('Translation languages (Display sheet)', () {
-    // Register the translations repo + a settings fake with both editions
-    // selected (the default is a single language), then open Detailed view.
-    Future<void> openDetailed(
-      WidgetTester tester, {
-      List<String> selected = const ['ur-test', 'en-test'],
-    }) async {
-      // A phone-height surface so the (now taller, with About at the bottom)
-      // Settings sheet doesn't fill the screen — keeps the scrim tappable to
-      // close it, as on a real device.
-      await tester.binding.setSurfaceSize(const Size(800, 1400));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      GetIt.I
-        ..unregister<ReaderCubit>()
-        ..registerFactory<ReaderCubit>(
-          () => ReaderCubit(
-            _FakeAyahRepoWithTranslations(),
-            _FakeLastReadRepository(),
-          ),
-        )
-        ..unregister<ReaderSettingsRepository>()
-        ..registerLazySingleton<ReaderSettingsRepository>(
-          () => _FakeSettings(selectedTranslations: selected),
-        );
-      await _pumpReader(tester, const ReaderTarget.surah(2, 'Al-Baqarah'));
-      await tester.tap(find.byTooltip('Detailed view'));
-      await tester.pumpAndSettle();
-    }
-
-    // Open the Display sheet, tap each given language row, then close the sheet.
-    Future<void> toggleLanguages(
-      WidgetTester tester,
-      List<String> codes,
-    ) async {
-      await tester.tap(find.byKey(WidgetKeys.settingsButton)); // open Settings
-      await tester.pumpAndSettle();
-      for (final code in codes) {
-        await tester.tap(find.byKey(WidgetKeys.langOption(code)));
-        await tester.pumpAndSettle();
-      }
-      await tester.tapAt(const Offset(400, 20)); // tap the scrim to close
-      await tester.pumpAndSettle();
-    }
-
-    testWidgets('unticking a language hides that translation', (tester) async {
-      await openDetailed(tester);
-      expect(find.text('اردو متن'), findsOneWidget);
-      expect(find.text('english body'), findsOneWidget);
-
-      await toggleLanguages(tester, ['en-test']); // turn English off
-
-      expect(find.text('english body'), findsNothing);
-      expect(find.text('اردو متن'), findsOneWidget); // Urdu stays
-    });
-
-    testWidgets('the last remaining language cannot be turned off',
-        (tester) async {
-      await openDetailed(tester);
-
-      // Turn English off, then try Urdu too — the last one must stay on.
-      await toggleLanguages(tester, ['en-test', 'ur-test']);
-
-      expect(find.text('اردو متن'), findsOneWidget);
-    });
-
-    testWidgets('the selection is shared with the Reading peek card',
-        (tester) async {
-      await openDetailed(tester);
-
-      await toggleLanguages(tester, ['en-test']); // Urdu only
-      expect(find.text('english body'), findsNothing);
-
-      // Back to Reading, tap the verse — the peek shows Urdu only (shared).
-      await tester.tap(find.byTooltip('Reading view'));
-      await tester.pumpAndSettle();
-      final flow = find.byWidgetPredicate(
-        (w) => w is GestureDetector && w.onTapUp != null && w.onTap == null,
-      );
-      await tester.tap(flow.first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('اردو متن'), findsOneWidget);
-      expect(find.text('english body'), findsNothing);
     });
   });
 

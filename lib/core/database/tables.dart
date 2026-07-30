@@ -83,3 +83,31 @@ class DbMeta extends Table {
   @override
   Set<Column> get primaryKey => {key};
 }
+
+/// Manually verified local moon-sighting corrections for the Hijri date
+/// display, keyed by the Gregorian date FROM WHICH the correction applies
+/// (until superseded by the next anchor for the same [region]). Replaces a
+/// pure tabular (Kuwaiti) calendar, which is astronomically calculated and
+/// drifts from the region's actual sighting-based announcement by a variable
+/// (not constant) number of days — see HijriAnchorRepository.
+///
+/// SQL shape (mirrors this table, for reference/pipeline use):
+/// ```sql
+/// CREATE TABLE hijri_anchor_points (
+///   gregorian_date TEXT NOT NULL,   -- 'YYYY-MM-DD', from-date (inclusive)
+///   region TEXT NOT NULL,           -- e.g. 'PK', 'IN' — sighting authority
+///   correction_days INTEGER NOT NULL, -- applied to the tabular result
+///   source TEXT,                    -- e.g. 'Ruet-e-Hilal Committee PK'
+///   PRIMARY KEY (gregorian_date, region)
+/// );
+/// ```
+@DataClassName('HijriAnchorPointRow')
+class HijriAnchorPoints extends Table {
+  TextColumn get gregorianDate => text()(); // 'YYYY-MM-DD'
+  TextColumn get region => text()(); // 'PK' | 'IN' | ...
+  IntColumn get correctionDays => integer()();
+  TextColumn get source => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {gregorianDate, region};
+}

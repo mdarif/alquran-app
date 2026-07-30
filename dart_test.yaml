@@ -1,0 +1,14 @@
+# Test tags.
+#
+# `network` marks tests that hit the real internet (the live R2 edition host).
+# They are excluded from the default run so `flutter test` stays hermetic and
+# offline-safe; run them deliberately:
+#
+#     flutter test --tags network
+#
+# They exist because the download path is the one part of the editions feature
+# that unit tests can only simulate — the gzip handling, the digest checks and
+# the response headers all have to be right against the actual host.
+tags:
+  network:
+    skip: "network test — run explicitly with: flutter test --tags network"

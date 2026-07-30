@@ -1,8 +1,13 @@
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
+import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
+import 'package:al_quran/core/testing/widget_keys.dart';
 import 'package:al_quran/features/translations/domain/entities/catalogue_entry.dart';
 import 'package:al_quran/features/translations/domain/entities/installed_edition.dart';
 import 'package:al_quran/features/translations/domain/repositories/edition_repository.dart';
 import 'package:al_quran/features/translations/presentation/cubit/translations_cubit.dart';
+import 'package:al_quran/features/translations/presentation/pages/translations_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeRepo implements EditionRepository {
@@ -40,12 +45,16 @@ class _FakeRepo implements EditionRepository {
     if (installThrows != null) throw installThrows!;
     onProgress?.call(1);
     local = [
-      ...local,
+      for (final e in local)
+        if (e.slug != entry.slug) e,
       InstalledEdition(
         slug: entry.slug,
         type: entry.type,
         languageCode: entry.languageCode,
         name: entry.name,
+        author: entry.author,
+        bytes: entry.uncompressedBytes,
+        sha256: entry.sha256,
         installedAt: DateTime(2026),
       ),
     ];
@@ -59,6 +68,21 @@ class _FakeRepo implements EditionRepository {
         if (e.slug != slug) e,
     ];
   }
+}
+
+class _FakeSettings implements ReaderSettingsRepository {
+  _FakeSettings({this.selectedTranslations});
+
+  @override
+  List<String>? selectedTranslations;
+
+  @override
+  Future<void> setSelectedTranslations(List<String> slugs) async {
+    selectedTranslations = slugs;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 CatalogueEntry _entry(String slug, String lang, String name) => CatalogueEntry(
@@ -83,6 +107,22 @@ const _bundledUrdu = TranslationResource(
 );
 
 void main() {
+  Future<void> pumpTranslationsPage(
+    WidgetTester tester,
+    TranslationsCubit cubit,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(splashFactory: NoSplash.splashFactory),
+        home: BlocProvider.value(
+          value: cubit,
+          child: const TranslationsPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
   test('bundled editions are listed but offer no action', () async {
     final cubit = TranslationsCubit(_FakeRepo(), const [_bundledUrdu]);
     await cubit.load();
@@ -92,10 +132,10 @@ void main() {
     // Bundled: there is no download to undo, and removing it would leave the
     // reader with nothing.
     expect(item.state, EditionState.bundled);
+    expect(item.selected, isTrue);
   });
 
-  test('an edition already bundled is not offered again for download',
-      () async {
+  test('a default bundled edition is not offered again for download', () async {
     final repo = _FakeRepo(
       available: [_entry('ur-junagarhi', 'ur', 'Junagarhi')],
     );
@@ -104,6 +144,29 @@ void main() {
 
     expect(cubit.state.items, hasLength(1));
     expect(cubit.state.items.single.state, EditionState.bundled);
+    expect(cubit.state.items.single.bytes, 1024);
+  });
+
+  test('a non-default bundled edition remains available for CDN install',
+      () async {
+    const bundledHindi = TranslationResource(
+      id: 2,
+      slug: 'hi-suhel-farooq-nadwi',
+      languageCode: 'hi',
+      name: 'Suhel Farooq Khan',
+      defaultOn: false,
+    );
+    final repo = _FakeRepo(
+      available: [_entry('hi-suhel-farooq-nadwi', 'hi', 'Suhel Farooq Khan')],
+    );
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu, bundledHindi],
+    );
+    await cubit.load();
+
+    expect(cubit.state.downloaded.map((i) => i.slug), ['ur-junagarhi']);
+    expect(cubit.state.available.single.slug, 'hi-suhel-farooq-nadwi');
   });
 
   test('two editions of one language are both listed under it', () async {
@@ -131,6 +194,205 @@ void main() {
 
     expect(repo.installCalls, ['hi-ahsanul-kalam']);
     expect(cubit.state.items.single.state, EditionState.installed);
+  });
+
+  test('installing selects the edition for the reader and refreshes caches',
+      () async {
+    final repo = _FakeRepo(
+      available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+    );
+    final settings = _FakeSettings(selectedTranslations: ['ur-junagarhi']);
+    var invalidations = 0;
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu],
+      settings: settings,
+      onTranslationsChanged: () => invalidations += 1,
+    );
+    await cubit.load();
+
+    await cubit.install('hi-ahsanul-kalam');
+
+    expect(settings.selectedTranslations, [
+      'ur-junagarhi',
+      'hi-ahsanul-kalam',
+    ]);
+    expect(invalidations, 1);
+  });
+
+  test('installing with no saved choice preserves default Urdu too', () async {
+    final repo = _FakeRepo(
+      available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+    );
+    final settings = _FakeSettings();
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu],
+      settings: settings,
+    );
+    await cubit.load();
+
+    await cubit.install('hi-ahsanul-kalam');
+
+    expect(settings.selectedTranslations, [
+      'ur-junagarhi',
+      'hi-ahsanul-kalam',
+    ]);
+  });
+
+  test('toggling a downloaded edition hides it without uninstalling', () async {
+    final repo = _FakeRepo(
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final settings = _FakeSettings(
+      selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+    );
+    var invalidations = 0;
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu],
+      settings: settings,
+      onTranslationsChanged: () => invalidations += 1,
+    );
+    await cubit.load();
+
+    await cubit.toggleSelected('hi-ahsanul-kalam');
+
+    expect(settings.selectedTranslations, ['ur-junagarhi']);
+    expect(repo.removeCalls, isEmpty);
+    expect(
+      cubit.state.items
+          .singleWhere((i) => i.slug == 'hi-ahsanul-kalam')
+          .selected,
+      isFalse,
+    );
+    expect(invalidations, 1);
+  });
+
+  test('Ahsanul Kalam author metadata is corrected for older installs',
+      () async {
+    final repo = _FakeRepo(
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          author: 'Shaikh Muhammad Rais Qureshi',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
+    expect(
+      cubit.state.items.singleWhere((i) => i.slug == 'hi-ahsanul-kalam').author,
+      'Muhammad Rais Qureshi Salafi',
+    );
+  });
+
+  test('an installed edition with newer catalogue bytes shows update available',
+      () async {
+    final repo = _FakeRepo(
+      available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          sha256: 'older-sha',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
+    final item = cubit.state.items.singleWhere(
+      (i) => i.slug == 'hi-ahsanul-kalam',
+    );
+    expect(item.state, EditionState.updateAvailable);
+    expect(cubit.state.downloaded.map((i) => i.slug), contains(item.slug));
+    expect(
+      cubit.state.available.map((i) => i.slug),
+      isNot(contains(item.slug)),
+    );
+  });
+
+  test('toggling the last selected edition keeps it visible', () async {
+    final repo = _FakeRepo(
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final settings = _FakeSettings(selectedTranslations: ['hi-ahsanul-kalam']);
+    var invalidations = 0;
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu],
+      settings: settings,
+      onTranslationsChanged: () => invalidations += 1,
+    );
+    await cubit.load();
+
+    await cubit.toggleSelected('hi-ahsanul-kalam');
+
+    expect(settings.selectedTranslations, ['hi-ahsanul-kalam']);
+    expect(repo.removeCalls, isEmpty);
+    expect(
+      cubit.state.items
+          .singleWhere((i) => i.slug == 'hi-ahsanul-kalam')
+          .selected,
+      isTrue,
+    );
+    expect(invalidations, 0);
+  });
+
+  test('removing deselects the edition for the reader and refreshes caches',
+      () async {
+    final repo = _FakeRepo(
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final settings = _FakeSettings(
+      selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+    );
+    var invalidations = 0;
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu],
+      settings: settings,
+      onTranslationsChanged: () => invalidations += 1,
+    );
+    await cubit.load();
+
+    await cubit.remove('hi-ahsanul-kalam');
+
+    expect(settings.selectedTranslations, ['ur-junagarhi']);
+    expect(invalidations, 1);
   });
 
   test('a checksum failure is reported as such, not as a network error',
@@ -195,5 +457,297 @@ void main() {
 
     expect(repo.removeCalls, ['hi-ahsanul-kalam']);
     expect(cubit.state.items, isEmpty);
+  });
+
+  group('TranslationsPage selection contract', () {
+    testWidgets(
+        'checked row tap hides a downloaded edition without uninstalling',
+        (tester) async {
+      final repo = _FakeRepo(
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            author: 'Muhammad Rais Qureshi Salafi',
+            bytes: 2900000,
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(
+        selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+      );
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(WidgetKeys.editionSelected('hi-ahsanul-kalam')),
+            )
+            .icon,
+        Icons.check_box_rounded,
+      );
+      expect(find.text('Experimental'), findsOneWidget);
+      expect(find.text('Muhammad Rais Qureshi Salafi'), findsOneWidget);
+
+      await tester.tap(find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')));
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedTranslations, ['ur-junagarhi']);
+      expect(repo.removeCalls, isEmpty);
+      expect(repo.local.map((e) => e.slug), ['hi-ahsanul-kalam']);
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(WidgetKeys.editionSelected('hi-ahsanul-kalam')),
+            )
+            .icon,
+        Icons.check_box_outline_blank_rounded,
+      );
+    });
+
+    testWidgets(
+        'unchecked row tap shows a downloaded edition without reinstalling',
+        (tester) async {
+      final repo = _FakeRepo(
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(selectedTranslations: ['ur-junagarhi']);
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(WidgetKeys.editionSelected('hi-ahsanul-kalam')),
+            )
+            .icon,
+        Icons.check_box_outline_blank_rounded,
+      );
+
+      await tester.tap(find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')));
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedTranslations, [
+        'ur-junagarhi',
+        'hi-ahsanul-kalam',
+      ]);
+      expect(repo.installCalls, isEmpty);
+      expect(repo.removeCalls, isEmpty);
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(WidgetKeys.editionSelected('hi-ahsanul-kalam')),
+            )
+            .icon,
+        Icons.check_box_rounded,
+      );
+    });
+
+    testWidgets('delete icon uninstalls a downloaded edition', (tester) async {
+      final repo = _FakeRepo(
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(
+        selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+      );
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      await tester
+          .tap(find.byKey(WidgetKeys.editionRemove('hi-ahsanul-kalam')));
+      await tester.pumpAndSettle();
+
+      expect(repo.removeCalls, ['hi-ahsanul-kalam']);
+      expect(settings.selectedTranslations, ['ur-junagarhi']);
+      expect(
+        find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('tapping the last checked row leaves it checked',
+        (tester) async {
+      final repo = _FakeRepo(
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings =
+          _FakeSettings(selectedTranslations: ['hi-ahsanul-kalam']);
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      expect(find.text('Done'), findsNothing);
+      await tester.tap(find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')));
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedTranslations, ['hi-ahsanul-kalam']);
+      expect(repo.removeCalls, isEmpty);
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(WidgetKeys.editionSelected('hi-ahsanul-kalam')),
+            )
+            .icon,
+        Icons.check_box_rounded,
+      );
+    });
+
+    testWidgets('row tap on an updateable edition toggles visibility only',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            sha256: 'older-sha',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(
+        selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+      );
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      await tester.tap(find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')));
+      await tester.pumpAndSettle();
+
+      expect(settings.selectedTranslations, ['ur-junagarhi']);
+      expect(repo.installCalls, isEmpty);
+      expect(repo.removeCalls, isEmpty);
+      expect(
+        find.byKey(WidgetKeys.editionDownload('hi-ahsanul-kalam')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('update icon reinstalls a newer installed edition',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            sha256: 'older-sha',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(
+        selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+      );
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      expect(find.text('Update'), findsOneWidget);
+      await tester.tap(
+        find.byKey(WidgetKeys.editionDownload('hi-ahsanul-kalam')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.installCalls, ['hi-ahsanul-kalam']);
+      expect(settings.selectedTranslations, [
+        'ur-junagarhi',
+        'hi-ahsanul-kalam',
+      ]);
+    });
+
+    testWidgets('download icon installs and selects an available edition',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+      );
+      final settings = _FakeSettings(selectedTranslations: ['ur-junagarhi']);
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      await tester.tap(
+        find.byKey(WidgetKeys.editionDownload('hi-ahsanul-kalam')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(repo.installCalls, ['hi-ahsanul-kalam']);
+      expect(settings.selectedTranslations, [
+        'ur-junagarhi',
+        'hi-ahsanul-kalam',
+      ]);
+      expect(
+        tester
+            .widget<Icon>(
+              find.byKey(WidgetKeys.editionSelected('hi-ahsanul-kalam')),
+            )
+            .icon,
+        Icons.check_box_rounded,
+      );
+    });
   });
 }

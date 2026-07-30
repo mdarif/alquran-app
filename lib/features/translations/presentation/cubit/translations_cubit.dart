@@ -1,7 +1,10 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/widgets.dart' show VoidCallback;
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/translations/translation_metadata_overrides.dart';
 import '../../../reader/domain/entities/translation_resource.dart';
+import '../../../reader/domain/repositories/reader_settings_repository.dart';
 import '../../domain/entities/catalogue_entry.dart';
 import '../../domain/entities/installed_edition.dart';
 import '../../domain/repositories/edition_repository.dart';
@@ -18,6 +21,7 @@ class EditionItem extends Equatable {
     this.license,
     this.sourceUrl,
     this.bytes = 0,
+    this.selected = false,
     this.progress,
     this.error,
   });
@@ -33,6 +37,7 @@ class EditionItem extends Equatable {
   /// Download size for an available edition; on-disk size once installed.
   final int bytes;
   final EditionState state;
+  final bool selected;
 
   /// 0..1 while downloading.
   final double? progress;
@@ -40,6 +45,7 @@ class EditionItem extends Equatable {
 
   EditionItem copyWith({
     EditionState? state,
+    bool? selected,
     double? progress,
     String? error,
     bool clearError = false,
@@ -53,13 +59,14 @@ class EditionItem extends Equatable {
         license: license,
         sourceUrl: sourceUrl,
         bytes: bytes,
+        selected: selected ?? this.selected,
         state: state ?? this.state,
         progress: progress,
         error: clearError ? null : (error ?? this.error),
       );
 
   @override
-  List<Object?> get props => [slug, state, progress, error, bytes];
+  List<Object?> get props => [slug, state, selected, progress, error, bytes];
 }
 
 enum EditionState {
@@ -67,6 +74,7 @@ enum EditionState {
   /// and removing it would leave nothing to read.
   bundled,
   installed,
+  updateAvailable,
   available,
   downloading,
   failed,
@@ -97,6 +105,22 @@ class TranslationsState extends Equatable {
     return out;
   }
 
+  List<EditionItem> get downloaded => [
+        for (final i in items)
+          if (i.state == EditionState.bundled ||
+              i.state == EditionState.installed ||
+              i.state == EditionState.updateAvailable)
+            i,
+      ];
+
+  List<EditionItem> get available => [
+        for (final i in items)
+          if (i.state == EditionState.available ||
+              i.state == EditionState.downloading ||
+              i.state == EditionState.failed)
+            i,
+      ];
+
   TranslationsState copyWith({
     List<EditionItem>? items,
     bool? loading,
@@ -116,10 +140,18 @@ class TranslationsState extends Equatable {
 }
 
 class TranslationsCubit extends Cubit<TranslationsState> {
-  TranslationsCubit(this._repo, this._bundled)
-      : super(const TranslationsState());
+  TranslationsCubit(
+    this._repo,
+    this._bundled, {
+    ReaderSettingsRepository? settings,
+    VoidCallback? onTranslationsChanged,
+  })  : _settings = settings,
+        _onTranslationsChanged = onTranslationsChanged,
+        super(const TranslationsState());
 
   final EditionRepository _repo;
+  final ReaderSettingsRepository? _settings;
+  final VoidCallback? _onTranslationsChanged;
 
   /// Editions compiled into the app. Listed but never removable.
   final List<TranslationResource> _bundled;
@@ -145,43 +177,46 @@ class TranslationsCubit extends Cubit<TranslationsState> {
       unavailable = true;
     }
 
+    final defaultBundledSlugs = {
+      for (final r in _bundled)
+        if (r.defaultOn) r.slug,
+    };
+    final selectedSlugs =
+        (_settings?.selectedTranslations ?? defaultBundledSlugs.toList())
+            .toSet();
     final installedSlugs = {for (final e in installed) e.slug};
-    final bundledSlugs = {for (final r in _bundled) r.slug};
+    final catalogueBySlug = {for (final c in available) c.slug: c};
 
     final items = <EditionItem>[
       for (final r in _bundled)
-        EditionItem(
-          slug: r.slug,
-          languageCode: r.languageCode,
-          languageLabel: r.languageLabel,
-          name: r.name,
-          author: r.author,
-          license: r.license,
-          sourceUrl: r.sourceUrl,
-          state: EditionState.bundled,
-        ),
+        if (r.defaultOn)
+          EditionItem(
+            slug: r.slug,
+            languageCode: r.languageCode,
+            languageLabel: r.languageLabel,
+            name: r.name,
+            author: TranslationMetadataOverrides.author(r.slug, r.author),
+            license: r.license,
+            sourceUrl: r.sourceUrl,
+            bytes: catalogueBySlug[r.slug]?.bytes ?? 0,
+            selected: selectedSlugs.contains(r.slug),
+            state: EditionState.bundled,
+          ),
       for (final e in installed)
-        EditionItem(
-          slug: e.slug,
-          languageCode: e.languageCode,
-          languageLabel: e.nativeName ?? e.languageCode,
-          name: e.name,
-          author: e.author,
-          license: e.license,
-          sourceUrl: e.sourceUrl,
-          bytes: e.bytes,
-          state: EditionState.installed,
-        ),
+        _installedItem(e, catalogueBySlug[e.slug], selectedSlugs),
       for (final c in available)
-        // Skip anything already present, from either source, so an edition
-        // never appears twice with contradictory actions.
-        if (!installedSlugs.contains(c.slug) && !bundledSlugs.contains(c.slug))
+        // Skip only what is already active on the device. Non-default bundled
+        // editions are deliberately still presented as CDN downloads: future
+        // seed DBs keep only Urdu bundled, and this keeps the UX model stable
+        // while older/dev DBs still carry Hindi or English rows.
+        if (!installedSlugs.contains(c.slug) &&
+            !defaultBundledSlugs.contains(c.slug))
           EditionItem(
             slug: c.slug,
             languageCode: c.languageCode,
             languageLabel: c.languageLabel,
             name: c.name,
-            author: c.author,
+            author: TranslationMetadataOverrides.author(c.slug, c.author),
             license: c.license,
             sourceUrl: c.sourceUrl,
             bytes: c.bytes,
@@ -189,7 +224,7 @@ class TranslationsCubit extends Cubit<TranslationsState> {
           ),
     ];
 
-    _catalogue = {for (final c in available) c.slug: c};
+    _catalogue = catalogueBySlug;
     emit(
       TranslationsState(
         items: items,
@@ -221,6 +256,8 @@ class TranslationsCubit extends Cubit<TranslationsState> {
           (i) => i.copyWith(state: EditionState.downloading, progress: p),
         ),
       );
+      await _selectInstalled(slug);
+      _onTranslationsChanged?.call();
       await load();
     } on EditionIntegrityException catch (e) {
       // Say plainly that the file did not match, rather than offering a retry
@@ -247,7 +284,95 @@ class TranslationsCubit extends Cubit<TranslationsState> {
 
   Future<void> remove(String slug) async {
     await _repo.remove(slug);
+    await _deselectRemoved(slug);
+    _onTranslationsChanged?.call();
     await load();
+  }
+
+  Future<bool> _selectInstalled(String slug) => _selectInstalledSlugs({slug});
+
+  Future<void> toggleSelected(String slug) async {
+    EditionItem? item;
+    for (final i in state.items) {
+      if (i.slug == slug) {
+        item = i;
+        break;
+      }
+    }
+    if (item == null ||
+        (item.state != EditionState.bundled &&
+            item.state != EditionState.installed &&
+            item.state != EditionState.updateAvailable)) {
+      return;
+    }
+    final settings = _settings;
+    if (settings == null) return;
+    final defaults = [
+      for (final r in _bundled)
+        if (r.defaultOn) r.slug,
+    ];
+    final current = (settings.selectedTranslations ?? defaults).toSet();
+    if (current.contains(slug)) {
+      if (current.length == 1) return;
+      current.remove(slug);
+    } else {
+      current.add(slug);
+    }
+    await settings.setSelectedTranslations(current.toList());
+    _onTranslationsChanged?.call();
+    _update(slug, (i) => i.copyWith(selected: current.contains(slug)));
+  }
+
+  EditionItem _installedItem(
+    InstalledEdition edition,
+    CatalogueEntry? catalogue,
+    Set<String> selectedSlugs,
+  ) {
+    final updateAvailable = catalogue != null &&
+        edition.sha256 != null &&
+        edition.sha256 != catalogue.sha256;
+    return EditionItem(
+      slug: edition.slug,
+      languageCode: edition.languageCode,
+      languageLabel: edition.nativeName ?? edition.languageCode,
+      name: edition.name,
+      author: TranslationMetadataOverrides.author(edition.slug, edition.author),
+      license: edition.license,
+      sourceUrl: edition.sourceUrl,
+      bytes: updateAvailable ? catalogue.bytes : edition.bytes,
+      selected: selectedSlugs.contains(edition.slug),
+      state: updateAvailable
+          ? EditionState.updateAvailable
+          : EditionState.installed,
+    );
+  }
+
+  Future<bool> _selectInstalledSlugs(Set<String> slugs) async {
+    final settings = _settings;
+    if (settings == null) return false;
+    final current = settings.selectedTranslations ??
+        [
+          for (final r in _bundled)
+            if (r.defaultOn) r.slug,
+        ];
+    final missing = [
+      for (final slug in slugs)
+        if (!current.contains(slug)) slug,
+    ];
+    if (missing.isEmpty) return false;
+    await settings.setSelectedTranslations([...current, ...missing]);
+    return true;
+  }
+
+  Future<void> _deselectRemoved(String slug) async {
+    final settings = _settings;
+    if (settings == null) return;
+    final current = settings.selectedTranslations;
+    if (current == null || !current.contains(slug)) return;
+    await settings.setSelectedTranslations([
+      for (final s in current)
+        if (s != slug) s,
+    ]);
   }
 
   void _update(String slug, EditionItem Function(EditionItem) f) {

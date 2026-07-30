@@ -1,4 +1,5 @@
 import 'package:al_quran/core/database/app_database.dart';
+import 'package:al_quran/core/database/editions_database.dart';
 import 'package:al_quran/features/reader/data/repositories/ayah_repository_impl.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
@@ -51,6 +52,7 @@ class _Settings implements ReaderSettingsRepository {
 
 void main() {
   late AppDatabase db;
+  late EditionsDatabase editionsDb;
   late _Settings settings;
   late AyahRepositoryImpl repo;
 
@@ -68,11 +70,16 @@ void main() {
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     await db.createMigrator().createAll();
+    editionsDb = EditionsDatabase.forTesting(NativeDatabase.memory());
+    await editionsDb.createMigrator().createAll();
     settings = _Settings(ArabicScript.uthmani);
     repo = AyahRepositoryImpl(db, settings);
     await insertAyah(1, uthmani: 'UTHMANI-1', indopak: 'INDOPAK-1');
   });
-  tearDown(() => db.close());
+  tearDown(() async {
+    await editionsDb.close();
+    await db.close();
+  });
 
   const surah = ReaderTarget.surah(1, 'Al-Fatihah');
 
@@ -162,6 +169,44 @@ void main() {
       hasLength(1),
       reason: 'editions are session constants, memoised like the headings',
     );
+  });
+
+  test('downloaded update of a bundled edition does not duplicate its resource',
+      () async {
+    await db.into(db.resources).insert(
+          ResourcesCompanion.insert(
+            id: const Value(1),
+            slug: 'en-hilali-khan',
+            type: 'translation',
+            languageCode: 'en',
+            name: 'English',
+            author: const Value('Bundled author'),
+            sortOrder: const Value(30),
+          ),
+        );
+    await editionsDb.into(editionsDb.installedEditions).insert(
+          InstalledEditionsCompanion.insert(
+            slug: 'en-hilali-khan',
+            type: 'translation',
+            languageCode: 'en',
+            name: 'English',
+            author: const Value('Installed author'),
+            sortOrder: const Value(40),
+            installedAt: DateTime(2026),
+          ),
+        );
+
+    final repoWithEditions = AyahRepositoryImpl(db, settings, editionsDb);
+    final resources = await repoWithEditions.getTranslationResources();
+
+    expect(
+      resources.where((r) => r.slug == 'en-hilali-khan'),
+      hasLength(1),
+      reason: 'one selected slug must render once even when an update is '
+          'installed over a bundled edition',
+    );
+    expect(resources.single.slug, 'en-hilali-khan');
+    expect(resources.single.author, 'Installed author');
   });
 
   test('a non-surah dimension (juz) reads by its index column', () async {

@@ -15,6 +15,7 @@ class WidgetKeys {
   static const surahSearchField = Key('home-surah-search');
   static const surahSearchBack = Key('home-surah-search-back');
   static const homeOverflowMenu = Key('home-overflow-menu');
+  static const translationsMenuButton = Key('home-translations-menu-button');
   static const shareAppButton = Key('home-share-app-button');
   static const aboutMenuButton = Key('home-about-menu-button');
 
@@ -44,6 +45,8 @@ class WidgetKeys {
   // Inline translation chips in the Reading peek card, keyed by edition slug.
   static Key peekLangOption(String slug) => Key('peek-lang-option-$slug');
   // Translations screen: download / remove a downloadable edition.
+  static Key editionRow(String slug) => Key('edition-row-$slug');
+  static Key editionSelected(String slug) => Key('edition-selected-$slug');
   static Key editionDownload(String slug) => Key('edition-download-$slug');
   static Key editionRemove(String slug) => Key('edition-remove-$slug');
   // Collapse/expand the peek card's translation (read/listen to Arabic alone).

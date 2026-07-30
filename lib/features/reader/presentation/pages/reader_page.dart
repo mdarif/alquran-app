@@ -18,7 +18,7 @@ import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../domain/ayah_share.dart' show editionChipLabel;
+import '../../../translations/presentation/translations_sheet.dart';
 import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -34,7 +34,6 @@ import '../widgets/ayah_tile.dart';
 import '../widgets/mushaf_view.dart';
 import '../widgets/reader_player_bar.dart';
 import '../widgets/scroll_to_top_button.dart';
-import '../widgets/translation_chip.dart';
 
 class ReaderPage extends StatelessWidget {
   const ReaderPage({
@@ -717,9 +716,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
 
   // --------------------------------------------------------------------------
 
-  /// Opens the Settings bottom sheet (reading size, Arabic font, translations).
+  /// Opens the Settings bottom sheet (reading size + reading behavior).
   /// Changes apply live to the verses behind the sheet and persist, via
-  /// _applyFont / _applyScript / _toggleLang.
+  /// _applyFont / _applyScript.
   void _openSettingsSheet() {
     final resources = _cubit.state.resources;
     showModalBottomSheet<void>(
@@ -734,14 +733,48 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         script: _script,
         onScriptChanged: _applyScript,
         resources: resources,
-        selectedLanguages: _activeLangs(resources),
-        onToggleLanguage: (code) => _toggleLang(code, resources),
+        activeTranslationSummary: _translationSummary(resources),
+        onOpenTranslations: () {
+          Navigator.of(context).pop();
+          _openTranslationsSheet();
+        },
         isReading: _viewport == _Viewport.reading,
         showTranslationPeek: _showTranslationPeek,
         onToggleTranslationPeek: _toggleShowTranslationPeek,
         showArabicMatn: _showArabicMatn,
         onToggleShowArabic: _toggleShowArabicMatn,
       ),
+    );
+  }
+
+  String _translationSummary(List<TranslationResource> resources) {
+    final active = _activeLangs(resources);
+    final names = [
+      for (final r in resources)
+        if (active.contains(r.slug)) _languageName(r),
+    ];
+    if (names.isEmpty) return 'None';
+    return names.join(', ');
+  }
+
+  String _languageName(TranslationResource r) {
+    if (r.languageCode == 'ur') return 'Urdu';
+    if (r.languageCode == 'hi') return 'Hindi';
+    if (r.languageCode == 'en') return 'English';
+    return r.languageLabel;
+  }
+
+  void _openTranslationsSheet() {
+    showTranslationsSheet(
+      context,
+      onTranslationsChanged: () {
+        unawaited(_cubit.refreshTranslations());
+        if (mounted) {
+          setState(() {
+            _selected = _settings.selectedTranslations?.toSet();
+          });
+        }
+      },
     );
   }
 
@@ -1377,8 +1410,8 @@ class _SettingsSheet extends StatefulWidget {
     required this.script,
     required this.onScriptChanged,
     required this.resources,
-    required this.selectedLanguages,
-    required this.onToggleLanguage,
+    required this.activeTranslationSummary,
+    required this.onOpenTranslations,
     required this.isReading,
     required this.showTranslationPeek,
     required this.onToggleTranslationPeek,
@@ -1393,8 +1426,8 @@ class _SettingsSheet extends StatefulWidget {
   final ArabicScript script;
   final ValueChanged<ArabicScript> onScriptChanged;
   final List<TranslationResource> resources;
-  final Set<String> selectedLanguages;
-  final ValueChanged<String> onToggleLanguage;
+  final String activeTranslationSummary;
+  final VoidCallback onOpenTranslations;
   // The sheet's "Show translation" toggle is a Reading-only aid, so it's hidden in
   // Detailed (which always shows translations). Captured at open time.
   final bool isReading;
@@ -1415,7 +1448,6 @@ class _SettingsSheetState extends State<_SettingsSheet> {
 
   late double _fontSize = widget.fontSize;
   late ArabicScript _script = widget.script;
-  late Set<String> _selectedLangs = {...widget.selectedLanguages};
   late bool _showPeek = widget.showTranslationPeek;
   late bool _showArabic = widget.showArabicMatn;
 
@@ -1430,19 +1462,6 @@ class _SettingsSheetState extends State<_SettingsSheet> {
     if (value == _script) return;
     setState(() => _script = value);
     widget.onScriptChanged(value); // reload behind the sheet + persist
-  }
-
-  void _toggleLang(String code) {
-    final next = {..._selectedLangs};
-    if (next.contains(code)) {
-      if (next.length <= 1) return; // never hide the last translation
-      next.remove(code);
-    } else {
-      next.add(code);
-    }
-    setState(() => _selectedLangs = next);
-    widget
-        .onToggleLanguage(code); // re-render verses behind the sheet + persist
   }
 
   @override
@@ -1564,25 +1583,17 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ],
                 ),
               ],
-              if (widget.resources.length > 1) ...[
+              if (widget.resources.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 const _SectionLabel('Translation'),
-                const SizedBox(height: 10),
-                // The same constant-width pills as the Reading peek card, so the
-                // row never reflows ("jumps") when you toggle a language. The
-                // parent keeps at least one translation on.
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final r in widget.resources)
-                      TranslationChip(
-                        key: WidgetKeys.langOption(r.slug),
-                        label: editionChipLabel(r, widget.resources),
-                        selected: _selectedLangs.contains(r.slug),
-                        onTap: () => _toggleLang(r.slug),
-                      ),
-                  ],
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Translations'),
+                  subtitle: Text(widget.activeTranslationSummary),
+                  trailing: const AppIcon(AppIcons.chevronRight),
+                  onTap: () {
+                    widget.onOpenTranslations();
+                  },
                 ),
               ],
               // Reading-only: opt in to the translation peek on tap (off by

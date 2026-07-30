@@ -11,7 +11,9 @@ part 'app_database.g.dart';
 /// pipeline and shipped as an asset). The writable copy is created/refreshed by
 /// `ensureSeedDatabase` (see db_seeder.dart) and passed in here; the tables
 /// already exist and are populated, so the Drift migration is a no-op.
-@DriftDatabase(tables: [Surahs, Ayahs, Resources, Translations, DbMeta])
+@DriftDatabase(
+  tables: [Surahs, Ayahs, Resources, Translations, DbMeta, HijriAnchorPoints],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(File file) : super(_openFile(file));
 
@@ -117,30 +119,6 @@ class AppDatabase extends _$AppDatabase {
           (r) => OrderingTerm.asc(r.id),
         ]))
       .get();
-
-  /// Translations for one ayah keyed by resource id.
-  Future<Map<int, String>> translationsForAyah(int ayahId) async {
-    final rows = await (select(translations)
-          ..where((t) => t.ayahId.equals(ayahId)))
-        .get();
-    return {for (final r in rows) r.resourceId: r.textContent};
-  }
-
-  /// All translations for a surah in one query, keyed by ayahId -> (resourceId
-  /// -> text). Avoids a per-ayah round trip when rendering a whole surah.
-  Future<Map<int, Map<int, String>>> translationsForSurah(int surahId) async {
-    final query = select(translations).join([
-      innerJoin(ayahs, ayahs.id.equalsExp(translations.ayahId)),
-    ])
-      ..where(ayahs.surahId.equals(surahId));
-    final rows = await query.get();
-    final out = <int, Map<int, String>>{};
-    for (final row in rows) {
-      final t = row.readTable(translations);
-      out.putIfAbsent(t.ayahId, () => {})[t.resourceId] = t.textContent;
-    }
-    return out;
-  }
 }
 
 /// Where an index value (juz/hizb/page/ruku) first begins.

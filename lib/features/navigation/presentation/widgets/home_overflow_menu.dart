@@ -10,6 +10,7 @@ import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
+import '../../../translations/presentation/translations_sheet.dart';
 
 /// The app's download page — a funnel that lands on a download screen and routes
 /// to the store. Deliberately distinct from the About screen's homepage link.
@@ -56,7 +57,6 @@ class HomeOverflowMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final reminders = showReminders ? _cubit<RemindersCubit>(context) : null;
     final theme = showReadingLight ? _cubit<ThemeCubit>(context) : null;
-    if (reminders == null && theme == null) return const SizedBox.shrink();
 
     // MenuAnchor (not PopupMenuButton) so the menu hugs its content — the popup
     // menu rounds its width up in fixed steps, leaving a blank strip on the right.
@@ -92,6 +92,12 @@ class HomeOverflowMenu extends StatelessWidget {
             label: 'Reading Light',
             onPressed: () => _openReadingLight(context, theme),
           ),
+        _MenuItem(
+          key: WidgetKeys.translationsMenuButton,
+          icon: AppIcons.viewReading,
+          label: 'Translations',
+          onPressed: () => showTranslationsSheet(context),
+        ),
         // Always available — a "tell a friend" share of the app via its website.
         _MenuItem(
           key: WidgetKeys.shareAppButton,
@@ -125,7 +131,7 @@ class HomeOverflowMenu extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           text: 'Read. Reflect. Remember. 🌙\n\n'
-              'Al Quran — a calm, distraction-free app for reading the Qur’an '
+              'Al Quran — a calm, distraction-free app for reading the Quran '
               'offline, with Urdu, Hindi & English translations and recitation. '
               'Free, no ads.\n\n'
               'Download the app:\n'
