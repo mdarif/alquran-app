@@ -17,6 +17,7 @@ import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
 import 'features/reminders/domain/scheduling/notification_scheduler.dart';
 import 'features/reminders/presentation/cubit/reminders_cubit.dart';
+import 'features/translations/presentation/cubit/translations_cubit.dart';
 
 class AlQuranApp extends StatefulWidget {
   const AlQuranApp({super.key});
@@ -46,6 +47,12 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
             await GetIt.I<NotificationScheduler>().consumeLaunchPayload();
         routeFromPayload(payload);
       });
+    }
+    if (FeatureFlags.proactiveTranslationSync) {
+      // Best-effort: fetches the CDN catalogue so a newly published edition
+      // (and the Home overflow's "new edition" dot) is up to date without the
+      // reader having to open the Translations screen first.
+      unawaited(GetIt.I<TranslationsCubit>().load());
     }
     // Prime the reader's caches shortly after the first frame — off the launch
     // critical path (the TOC loads first), so "Continue reading" and the first
@@ -100,6 +107,9 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
         ),
         BlocProvider<RemindersCubit>.value(
           value: GetIt.I<RemindersCubit>(),
+        ),
+        BlocProvider<TranslationsCubit>.value(
+          value: GetIt.I<TranslationsCubit>(),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeState>(

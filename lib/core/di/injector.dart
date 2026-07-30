@@ -15,10 +15,12 @@ import '../../features/reader/data/repositories/reader_settings_repository_impl.
 import '../../features/reader/domain/repositories/ayah_repository.dart';
 import '../../features/reader/domain/repositories/last_read_repository.dart';
 import '../../features/reader/domain/repositories/reader_settings_repository.dart';
+import '../../features/reader/domain/entities/translation_resource.dart';
 import '../../features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import '../../features/reader/presentation/cubit/reader_cubit.dart';
 import '../../features/translations/data/repositories/edition_repository_impl.dart';
 import '../../features/translations/domain/repositories/edition_repository.dart';
+import '../../features/translations/presentation/cubit/translations_cubit.dart';
 import '../../features/reminders/data/repositories/reminder_settings_repository_impl.dart';
 import '../../features/reminders/data/scheduling/local_notification_scheduler.dart';
 import '../../features/reminders/domain/repositories/reminder_settings_repository.dart';
@@ -170,6 +172,24 @@ Future<void> configureDependencies() async {
       () => IndexListCubit(getIt<IndexRepository>()),
     );
 
+  // Translations screen: an app-lifetime singleton (like RemindersCubit /
+  // ThemeCubit) so it can be refreshed proactively at launch and carry a
+  // "new edition available" signal even when the screen isn't open. The
+  // bundled list is resolved once, here, so the registration below stays a
+  // plain sync closure like every other lazy-singleton cubit.
+  final bundledTranslations = await _bundledTranslations(getIt<AppDatabase>());
+  getIt.registerLazySingleton<TranslationsCubit>(
+    () => TranslationsCubit(
+      getIt<EditionRepository>(),
+      bundledTranslations,
+      settings: getIt<ReaderSettingsRepository>(),
+      prefs: getIt<SharedPreferences>(),
+      onTranslationsChanged: () =>
+          (getIt<AyahRepository>() as AyahRepositoryImpl)
+              .invalidateTranslations(),
+    ),
+  );
+
   // Audio recitation. Registered UNCONDITIONALLY but LAZILY: the player (lazy
   // singleton) and cubit (factory) aren't constructed until the reader actually
   // reads them, which only happens behind FeatureFlags.audioRecitation. So while
@@ -190,4 +210,26 @@ Future<void> configureDependencies() async {
   // failure, just leaves the repository's in-memory list empty (raw tabular
   // dates), never blocks startup.
   await getIt<HijriAnchorRepository>().preload();
+}
+
+/// Editions compiled into the app (as opposed to downloaded ones), for
+/// [TranslationsCubit]'s bundled/default-on filtering.
+Future<List<TranslationResource>> _bundledTranslations(AppDatabase db) async {
+  final rows = await db.translationResources();
+  return [
+    for (final r in rows)
+      TranslationResource(
+        id: r.id,
+        slug: r.slug,
+        languageCode: r.languageCode,
+        name: r.name,
+        nativeName: r.nativeName,
+        author: r.author,
+        direction: r.direction,
+        sortOrder: r.sortOrder,
+        defaultOn: r.defaultOn == 1,
+        license: r.license,
+        sourceUrl: r.sourceUrl,
+      ),
+  ];
 }

@@ -32,7 +32,7 @@ abstract interface class EditionRepository {
   /// still lists what the reader already knows about instead of appearing
   /// empty. Throws [EditionDownloadException] only when there is no cache
   /// either.
-  Future<EditionCatalogue> catalogue({bool forceRefresh = false});
+  Future<EditionCatalogue> catalogue();
 
   /// Editions currently on this device (excluding the bundled ones).
   Future<List<InstalledEdition>> installed();

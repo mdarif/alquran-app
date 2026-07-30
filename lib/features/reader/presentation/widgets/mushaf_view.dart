@@ -72,6 +72,7 @@ class MushafView extends StatefulWidget {
     this.showPeek = false,
     this.onSelectVerse,
     this.onImmersionChanged,
+    this.focusAlignment = 0.04,
     super.key,
   });
 
@@ -131,6 +132,13 @@ class MushafView extends StatefulWidget {
   /// Reports a sustained scroll direction for immersive reading: true = hide the
   /// chrome (reading forward), false = show it (reverse scroll / at the top).
   final ValueChanged<bool>? onImmersionChanged;
+
+  /// The SPL alignment fraction (of the FULL screen height — this list runs
+  /// edge-to-edge behind the chrome) used to scroll-to-focus a selected/playing
+  /// verse. Default 0.04 ("near the top of the paragraph") assumes no reserved
+  /// chrome; pass [safeFocusAlignment] (computed from the real app-bar inset)
+  /// so the verse never scrolls to a point that renders BEHIND the app bar.
+  final double focusAlignment;
 
   @override
   State<MushafView> createState() => _MushafViewState();
@@ -205,9 +213,10 @@ class _MushafViewState extends State<MushafView>
   int _initialIndex = 0;
   double _initialAlignment = 0;
 
-  /// A focused verse sits just below the very top (4%), so a sliver of the
-  /// preceding verse shows it's mid-surah, not the chapter start.
-  static const double _focusAlignment = 0.04;
+  /// A focused verse sits just below the top — enough that a sliver of the
+  /// preceding verse shows it's mid-surah, not the chapter start, and (per
+  /// [MushafView.focusAlignment]) clear of the app bar when it's reserved.
+  double get _focusAlignment => widget.focusAlignment;
 
   void _buildRows() {
     _rows.clear();

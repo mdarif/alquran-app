@@ -18,7 +18,9 @@ import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../translations/presentation/translations_sheet.dart';
+import '../safe_focus_alignment.dart';
 import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -416,8 +418,13 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
                   allowImplicitScrolling: false,
                   itemCount: _target.dimension.count,
                   onPageChanged: _onPageChanged,
-                  itemBuilder: (context, i) =>
-                      _sectionPage(i, state, audio, contentInsets),
+                  itemBuilder: (context, i) => _sectionPage(
+                    i,
+                    state,
+                    audio,
+                    contentInsets,
+                    media.size.height,
+                  ),
                 );
             // The tree shape must be IDENTICAL in both viewports: the
             // BlocBuilder wraps the PageView whenever audio is on, and
@@ -470,6 +477,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     required List<TranslationResource> resources,
     required bool interactive,
     required EdgeInsets contentInsets,
+    required double viewportHeight,
     AyahAudioState? audio,
   }) {
     // Key by the section's first ayah so a new section starts at the top, while
@@ -509,6 +517,13 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         onSelectVerse: interactive ? _onSelectVerse : null,
         // Only the live page drives immersion (forward-scroll hides the chrome).
         onImmersionChanged: interactive ? _setChromeHidden : null,
+        // Never let the selected/playing verse scroll to a point that renders
+        // BEHIND the app bar — Reading runs edge-to-edge, so a bare small
+        // fraction (the "near the top of the paragraph" default) isn't enough.
+        focusAlignment: safeFocusAlignment(
+          contentInsetTop: contentInsets.top,
+          viewportHeight: viewportHeight,
+        ),
       );
     } else {
       // Copy/share in Detailed is per-verse (the tile's ⋯ menu) — no
@@ -546,6 +561,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     ReaderState state,
     AyahAudioState? audio,
     EdgeInsets contentInsets,
+    double viewportHeight,
   ) {
     final target = _targetForIndex(i);
     final ayahs = _cubit.cachedAyahs(target);
@@ -561,6 +577,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       interactive: active,
       audio: active ? audio : null,
       contentInsets: contentInsets,
+      viewportHeight: viewportHeight,
     );
   }
 
@@ -716,34 +733,83 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
 
   // --------------------------------------------------------------------------
 
-  /// Opens the Settings bottom sheet (reading size + reading behavior).
-  /// Changes apply live to the verses behind the sheet and persist, via
+  /// Opens the Settings screen (reading size + reading behavior) as a
+  /// full-screen page sliding in from the right — there's enough here now
+  /// (size, script, translation, peek/matn toggles, Reset) that a bottom sheet
+  /// was getting cramped, and this leaves room to grow denser without
+  /// crowding. Changes apply live to the verses behind it and persist, via
   /// _applyFont / _applyScript.
   void _openSettingsSheet() {
     final resources = _cubit.state.resources;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _SettingsSheet(
-        fontSize: _arabicFont,
-        minFont: _minFont,
-        maxFont: _maxFont,
-        onFontChanged: _applyFont,
-        script: _script,
-        onScriptChanged: _applyScript,
-        resources: resources,
-        activeTranslationSummary: _translationSummary(resources),
-        onOpenTranslations: () {
-          Navigator.of(context).pop();
-          _openTranslationsSheet();
-        },
-        isReading: _viewport == _Viewport.reading,
-        showTranslationPeek: _showTranslationPeek,
-        onToggleTranslationPeek: _toggleShowTranslationPeek,
-        showArabicMatn: _showArabicMatn,
-        onToggleShowArabic: _toggleShowArabicMatn,
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (_, __, ___) => _SettingsSheet(
+          fontSize: _arabicFont,
+          minFont: _minFont,
+          maxFont: _maxFont,
+          onFontChanged: _applyFont,
+          script: _script,
+          onScriptChanged: _applyScript,
+          resources: resources,
+          activeTranslationSummary: _translationSummary(resources),
+          // Opens as a bottom sheet ON TOP of this Settings page — it must NOT
+          // pop Settings first (that was right when Settings was itself a
+          // bottom sheet, to avoid stacking two; now Settings is a full page,
+          // popping it here closed the whole Settings screen the moment
+          // Translations was dismissed, not just Translations).
+          onOpenTranslations: _openTranslationsSheet,
+          isReading: _viewport == _Viewport.reading,
+          showTranslationPeek: _showTranslationPeek,
+          onToggleTranslationPeek: _toggleShowTranslationPeek,
+          showArabicMatn: _showArabicMatn,
+          onToggleShowArabic: _toggleShowArabicMatn,
+          onReset: _resetReadingPreferences,
+        ),
+        transitionsBuilder: (_, animation, __, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          ),
+          child: child,
+        ),
       ),
+    );
+  }
+
+  /// Confirms, then clears font size, script, translation selection and the
+  /// peek/matn toggles back to default — and, since the reader is open right
+  /// now, resyncs this page's own state and reloads the Arabic if the script
+  /// changed, rather than waiting for a future re-open to notice.
+  Future<void> _resetReadingPreferences() async {
+    final confirmed = await confirmAction(
+      context,
+      title: 'Reset reading preferences?',
+      message: 'Font size, script, translations shown, and the reading '
+          'aids below all return to their defaults.',
+      confirmLabel: 'Reset',
+    );
+    if (!confirmed) return;
+    await _settings.resetToDefaults();
+    if (!mounted) return;
+    final scriptChanged = _settings.script != _script;
+    setState(() {
+      _arabicFont = _settings.fontSize.clamp(_minFont, _maxFont);
+      _script = _settings.script;
+      _selected = _settings.selectedTranslations?.toSet();
+      _showTranslationPeek = _settings.showTranslationPeek;
+      _showArabicMatn = _settings.showArabicMatn;
+    });
+    if (scriptChanged) {
+      _cubit.clearCache();
+      unawaited(_cubit.load(_target));
+    }
+    Navigator.of(context).pop(); // back to the reader — the reset applies live
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Reading preferences reset.')),
     );
   }
 
@@ -1395,12 +1461,12 @@ class _HeaderMarker {
 const String _uthmaniSample = 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ';
 const String _indopakSample = 'بِسۡمِ اللّٰهِ الرَّحۡمٰنِ الرَّحِيۡمِ';
 
-/// The reader's "Settings" bottom sheet: reading size, Arabic font + translation.
-/// Stateful so
-/// the slider thumb and selected card update instantly; every change is also
-/// forwarded to the reader (onFontChanged / onScriptChanged) so the verses reflow
-/// live behind the sheet and the choice persists. Matches the app's other modal
-/// sheets (drag handle + SafeArea + titleMedium header).
+/// The reader's Settings screen: reading size, Arabic font + translation.
+/// A full-screen page (not a bottom sheet) — there's room to grow denser as
+/// more reading options land. Stateful so the slider thumb and selected card
+/// update instantly; every change is also forwarded to the reader
+/// (onFontChanged / onScriptChanged) so the verses reflow live behind it and
+/// the choice persists.
 class _SettingsSheet extends StatefulWidget {
   const _SettingsSheet({
     required this.fontSize,
@@ -1417,6 +1483,7 @@ class _SettingsSheet extends StatefulWidget {
     required this.onToggleTranslationPeek,
     required this.showArabicMatn,
     required this.onToggleShowArabic,
+    required this.onReset,
   });
 
   final double fontSize;
@@ -1437,6 +1504,7 @@ class _SettingsSheet extends StatefulWidget {
   // reading when off), hidden in Reading (which is Arabic-only anyway).
   final bool showArabicMatn;
   final ValueChanged<bool> onToggleShowArabic;
+  final VoidCallback onReset;
 
   @override
   State<_SettingsSheet> createState() => _SettingsSheetState();
@@ -1468,20 +1536,25 @@ class _SettingsSheetState extends State<_SettingsSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
+    // Match the Translations screen's row typography — plain ListTile/
+    // SwitchListTile defaults (titleMedium/bodyLarge) read noticeably larger.
+    final rowTitleStyle =
+        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700);
+    final rowSubtitleStyle = theme.textTheme.labelLarge
+        ?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w400);
+    return Scaffold(
+      key: WidgetKeys.readerSettingsPage,
+      appBar: AppBar(title: const Text('Settings')),
+      body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Settings', style: theme.textTheme.titleMedium),
-              const SizedBox(height: 18),
               // Text size — header with a live point readout on the right.
               _SectionLabel(
-                'Text size',
+                'Text Size',
                 trailing: Text(
                   '${_fontSize.round()}',
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -1533,14 +1606,31 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                         : null,
                   ),
                   Expanded(
-                    child: Slider(
-                      value: _fontSize.clamp(widget.minFont, widget.maxFont),
-                      min: widget.minFont,
-                      max: widget.maxFont,
-                      divisions:
-                          ((widget.maxFont - widget.minFont) / _step).round(),
-                      semanticFormatterCallback: (v) => '${v.round()} points',
-                      onChanged: _setFont,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 3,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 9,
+                          elevation: 1,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 18,
+                        ),
+                        // The 2pt-step snapping still holds (divisions below) —
+                        // only the row of tick dots along the track is hidden,
+                        // for a cleaner, less busy rail.
+                        activeTickMarkColor: Colors.transparent,
+                        inactiveTickMarkColor: Colors.transparent,
+                      ),
+                      child: Slider(
+                        value: _fontSize.clamp(widget.minFont, widget.maxFont),
+                        min: widget.minFont,
+                        max: widget.maxFont,
+                        divisions:
+                            ((widget.maxFont - widget.minFont) / _step).round(),
+                        semanticFormatterCallback: (v) => '${v.round()} points',
+                        onChanged: _setFont,
+                      ),
                     ),
                   ),
                   _StepButton(
@@ -1555,9 +1645,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               ),
               // Arabic script — only while the IndoPak feature is enabled.
               if (FeatureFlags.indopakScript) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: 26),
                 const _SectionLabel('Arabic Script'),
-                const SizedBox(height: 2),
+                const SizedBox(height: 8),
                 Column(
                   key: WidgetKeys.scriptToggle,
                   children: [
@@ -1570,7 +1660,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                       selected: _script == ArabicScript.uthmani,
                       onTap: () => _setScript(ArabicScript.uthmani),
                     ),
-                    const Divider(height: 1),
+                    const SizedBox(height: 8),
                     _ScriptPreview(
                       script: ArabicScript.indopak,
                       label: 'IndoPak/Asian',
@@ -1584,12 +1674,16 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 ),
               ],
               if (widget.resources.isNotEmpty) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: 26),
                 const _SectionLabel('Translation'),
                 ListTile(
+                  dense: true,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Translations'),
-                  subtitle: Text(widget.activeTranslationSummary),
+                  title: Text('Translations', style: rowTitleStyle),
+                  subtitle: Text(
+                    widget.activeTranslationSummary,
+                    style: rowSubtitleStyle,
+                  ),
                   trailing: const AppIcon(AppIcons.chevronRight),
                   onTap: () {
                     widget.onOpenTranslations();
@@ -1601,7 +1695,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               // just cues the verse). Hidden in Detailed, which always shows
               // translations, and when there's no translation to peek.
               if (widget.isReading && widget.resources.isNotEmpty) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: 26),
                 const _SectionLabel('Reading'),
                 SwitchListTile.adaptive(
                   key: WidgetKeys.translationPeekToggle,
@@ -1610,15 +1704,19 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                     setState(() => _showPeek = v);
                     widget.onToggleTranslationPeek(v);
                   },
+                  dense: true,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Show translation'),
-                  subtitle: const Text('Tap a verse to see its translation.'),
+                  title: Text('Show translation', style: rowTitleStyle),
+                  subtitle: Text(
+                    'Tap a verse to see its translation.',
+                    style: rowSubtitleStyle,
+                  ),
                 ),
               ],
               // Detailed-only mirror: hide the Arabic matn for a translations-only
               // reading. Hidden in Reading (which is Arabic-only anyway).
               if (!widget.isReading && widget.resources.isNotEmpty) ...[
-                const SizedBox(height: 18),
+                const SizedBox(height: 26),
                 const _SectionLabel('Detailed'),
                 SwitchListTile.adaptive(
                   key: WidgetKeys.showArabicToggle,
@@ -1627,11 +1725,33 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                     setState(() => _showArabic = v);
                     widget.onToggleShowArabic(v);
                   },
+                  dense: true,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Show Arabic'),
-                  subtitle: const Text('Turn off to read translations only.'),
+                  title: Text('Show Arabic', style: rowTitleStyle),
+                  subtitle: Text(
+                    'Turn off to read translations only.',
+                    style: rowSubtitleStyle,
+                  ),
                 ),
               ],
+              // Whitespace, not a rule, sets this apart — a destructive-leaning
+              // action reads clearly enough from its red tint alone.
+              const SizedBox(height: 40),
+              ListTile(
+                key: WidgetKeys.readerSettingsReset,
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: AppIcon(AppIcons.reset, color: cs.error),
+                title: Text(
+                  'Reset Reading Preferences',
+                  style: rowTitleStyle?.copyWith(color: cs.error),
+                ),
+                subtitle: Text(
+                  'Font size, script, translations shown and reading aids.',
+                  style: rowSubtitleStyle,
+                ),
+                onTap: widget.onReset,
+              ),
             ],
           ),
         ),
@@ -1675,11 +1795,9 @@ class _StepButton extends StatelessWidget {
   }
 }
 
-/// A full-width selectable row previewing an Arabic [script] in its real font
-/// (the Bismillah) with the name + a one-line [description], so the
-/// Uthmani↔IndoPak difference is large and each option explains itself.
-/// Apple-style settings section header: small, UPPERCASE, muted, letter-spaced,
-/// with an optional trailing widget (e.g. the live text-size readout).
+/// Settings section header: small, Title Case (not shouty all-caps — reads
+/// warmer while still clearly a header), muted, with an optional trailing
+/// widget (e.g. the live text-size readout).
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text, {this.trailing});
 
@@ -1692,11 +1810,11 @@ class _SectionLabel extends StatelessWidget {
     return Row(
       children: [
         Text(
-          text.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
+          text,
+          style: theme.textTheme.labelMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w600,
-            letterSpacing: 0.8,
+            letterSpacing: 0.1,
           ),
         ),
         if (trailing != null) ...[const Spacer(), trailing!],
@@ -1706,8 +1824,10 @@ class _SectionLabel extends StatelessWidget {
 }
 
 /// A typography preview of one Arabic face: the Bismillah specimen is the hero,
-/// the face's name a quiet caption, and a checkmark marks the active one — no
-/// card fill or border (Apple font-picker style).
+/// the face's name a quiet caption, a checkmark marks the active one, and a
+/// subtle tinted fill + border on the selected card back that up with more
+/// than colour alone — a glance (not just a careful look) finds the active
+/// script.
 class _ScriptPreview extends StatelessWidget {
   const _ScriptPreview({
     required this.script,
@@ -1733,63 +1853,83 @@ class _ScriptPreview extends StatelessWidget {
     final cs = theme.colorScheme;
     return Semantics(
       selected: selected,
-      child: InkWell(
-        key: WidgetKeys.scriptCard(script.name),
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  // The specimen — full-strength, the hero of the row.
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: selected
+              ? cs.primaryContainer.withValues(alpha: 0.32)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected
+                ? cs.primary.withValues(alpha: 0.55)
+                : Colors.transparent,
+            width: 1.2,
+          ),
+        ),
+        child: InkWell(
+          key: WidgetKeys.scriptCard(script.name),
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    // The specimen — full-strength, the hero of the row.
+                    Expanded(
+                      child: Align(
                         alignment: Alignment.centerRight,
-                        child: Text(
-                          sample,
-                          textDirection: TextDirection.rtl,
-                          locale: const Locale('ar'),
-                          style: sampleStyle.copyWith(
-                            fontSize: 28,
-                            color: cs.onSurface,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            sample,
+                            textDirection: TextDirection.rtl,
+                            locale: const Locale('ar'),
+                            style: sampleStyle.copyWith(
+                              fontSize: 28,
+                              color: cs.onSurface,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Fixed-width slot so the specimen never shifts.
-                  SizedBox(
-                    width: 22,
-                    child: selected
-                        ? Icon(Icons.check_rounded, size: 20, color: cs.primary)
-                        : null,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: label,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    const SizedBox(width: 10),
+                    // Fixed-width slot so the specimen never shifts.
+                    SizedBox(
+                      width: 22,
+                      child: selected
+                          ? Icon(
+                              Icons.check_rounded,
+                              size: 20,
+                              color: cs.primary,
+                            )
+                          : null,
                     ),
-                    TextSpan(text: '  ·  $description'),
                   ],
                 ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: selected ? cs.onSurface : cs.onSurfaceVariant,
+                const SizedBox(height: 6),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: label,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      TextSpan(text: '  ·  $description'),
+                    ],
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: selected ? cs.onSurface : cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

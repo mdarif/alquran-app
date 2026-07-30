@@ -106,6 +106,17 @@ class _Settings implements ReaderSettingsRepository {
   bool showArabicMatn = true;
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+
+  int resetCalls = 0;
+  @override
+  Future<void> resetToDefaults() async {
+    resetCalls++;
+    _script = ArabicScript.uthmani;
+    fontSize = ReaderSettingsRepository.defaultFontSize;
+    selectedTranslations = null;
+    showTranslationPeek = false;
+    showArabicMatn = true;
+  }
 }
 
 /// No-op player so ReaderPage's audio branch (behind FeatureFlags.audioRecitation)
@@ -167,17 +178,24 @@ void main() {
 
   // The Arabic font the reader is currently driving the Mushaf with — read off
   // the MushafView's threaded style (unambiguous; the rendering uses it).
-  String? readerFont(WidgetTester tester) =>
-      tester.widget<MushafView>(find.byType(MushafView)).arabicStyle.fontFamily;
+  // skipOffstage: false — Settings is now a full-screen page ON TOP of the
+  // reader, not a bottom sheet, so the reader route is offstage while it's open.
+  String? readerFont(WidgetTester tester) => tester
+      .widget<MushafView>(find.byType(MushafView, skipOffstage: false))
+      .arabicStyle
+      .fontFamily;
 
   // The Arabic text the Detailed view is actually rendering — read off the first
   // AyahTile's ayah, proving the verses re-render (not just the font swaps).
-  String detailedText(WidgetTester tester) =>
-      tester.widget<AyahTile>(find.byType(AyahTile).first).ayah.textArabic;
+  String detailedText(WidgetTester tester) => tester
+      .widget<AyahTile>(find.byType(AyahTile, skipOffstage: false).first)
+      .ayah
+      .textArabic;
 
   // The Arabic reading size the reader is currently driving the Mushaf with.
-  double readerFontSize(WidgetTester tester) =>
-      tester.widget<MushafView>(find.byType(MushafView)).arabicFontSize;
+  double readerFontSize(WidgetTester tester) => tester
+      .widget<MushafView>(find.byType(MushafView, skipOffstage: false))
+      .arabicFontSize;
 
   // Tap one of the two script preview cards (Uthmani / IndoPak).
   Future<void> tapScript(WidgetTester tester, ArabicScript script) async {
@@ -277,9 +295,8 @@ void main() {
         await pump(tester, 2);
         await openPanel(tester);
         await tapScript(tester, ArabicScript.indopak);
-        // close the Display sheet (tap the scrim above it), then swipe RIGHT
-        // (RTL → next surah)
-        await tester.tapAt(const Offset(400, 100));
+        // Back to the reader, then swipe RIGHT (RTL → next surah).
+        await tester.pageBack();
         await tester.pumpAndSettle();
         await tester.fling(
           find.byType(MushafView),
@@ -372,4 +389,47 @@ void main() {
     },
     skip: skip,
   );
+
+  group('Reset reading preferences', () {
+    testWidgets('confirming Reset restores font size, pops back, and confirms',
+        (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.tap(find.byKey(WidgetKeys.fontIncrease));
+      await tester.pumpAndSettle();
+      expect(readerFontSize(tester), 30);
+
+      await tester.tap(find.byKey(WidgetKeys.readerSettingsReset));
+      await tester.pumpAndSettle();
+      expect(find.text('Reset reading preferences?'), findsOneWidget);
+
+      await tester.tap(find.text('Reset'));
+      await tester.pumpAndSettle();
+
+      // Back on the reader — the settings page is gone, defaults restored.
+      expect(find.byKey(WidgetKeys.readerSettingsPage), findsNothing);
+      expect(settings.resetCalls, 1);
+      expect(settings.fontSize, 28);
+      expect(readerFontSize(tester), 28);
+      expect(find.text('Reading preferences reset.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'cancelling Reset leaves the panel open and the font size untouched',
+        (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+      await tester.tap(find.byKey(WidgetKeys.fontIncrease));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(WidgetKeys.readerSettingsReset));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.readerSettingsPage), findsOneWidget);
+      expect(settings.resetCalls, 0);
+      expect(settings.fontSize, 30);
+    });
+  });
 }

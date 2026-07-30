@@ -48,7 +48,7 @@ class EditionRepositoryImpl implements EditionRepository {
   File get _cachedCatalogue => File(p.join(_supportDir.path, _cacheFile));
 
   @override
-  Future<EditionCatalogue> catalogue({bool forceRefresh = false}) async {
+  Future<EditionCatalogue> catalogue() async {
     try {
       final res = await _client.get(_catalogueUrl);
       if (res.statusCode != 200) {

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/translations/translation_metadata_overrides.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../cubit/translations_cubit.dart';
 
 class TranslationsPage extends StatefulWidget {
@@ -15,6 +18,16 @@ class TranslationsPage extends StatefulWidget {
 
 class _TranslationsPageState extends State<TranslationsPage> {
   final TextEditingController _search = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Clear the Home overflow's "new edition" dot the moment this screen is
+    // actually opened — not merely because a silent background load ran.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => context.read<TranslationsCubit>().markCatalogueSeen(),
+    );
+  }
 
   @override
   void dispose() {
@@ -407,6 +420,21 @@ class _Leading extends StatelessWidget {
   }
 }
 
+/// Confirms before actually uninstalling — removing a downloaded edition
+/// deletes its text outright, and a stray tap on the small delete icon
+/// shouldn't be able to do that silently.
+Future<void> _confirmRemove(BuildContext context, EditionItem item) async {
+  final confirmed = await confirmAction(
+    context,
+    title: 'Remove ${item.name}?',
+    message: 'This deletes the downloaded text. You can download it again '
+        'later from this screen.',
+    confirmLabel: 'Remove',
+  );
+  if (!confirmed || !context.mounted) return;
+  unawaited(context.read<TranslationsCubit>().remove(item.slug));
+}
+
 class _Action extends StatelessWidget {
   const _Action({required this.item});
 
@@ -424,7 +452,7 @@ class _Action extends StatelessWidget {
           constraints: const BoxConstraints.tightFor(width: 34, height: 34),
           padding: EdgeInsets.zero,
           icon: Icon(Icons.delete_outline_rounded, color: cs.onSurfaceVariant),
-          onPressed: () => context.read<TranslationsCubit>().remove(item.slug),
+          onPressed: () => _confirmRemove(context, item),
         ),
       EditionState.updateAvailable => Row(
           mainAxisSize: MainAxisSize.min,
@@ -457,8 +485,7 @@ class _Action extends StatelessWidget {
                 Icons.delete_outline_rounded,
                 color: cs.onSurfaceVariant,
               ),
-              onPressed: () =>
-                  context.read<TranslationsCubit>().remove(item.slug),
+              onPressed: () => _confirmRemove(context, item),
             ),
           ],
         ),

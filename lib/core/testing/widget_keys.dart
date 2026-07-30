@@ -22,6 +22,9 @@ class WidgetKeys {
   // Reader chrome
   static const viewportToggle = Key('reader-viewport-toggle');
   static const settingsButton = Key('reader-settings-button');
+  // The full-screen Settings page itself, and its Reset row.
+  static const readerSettingsPage = Key('reader-settings-page');
+  static const readerSettingsReset = Key('reader-settings-reset');
   static const themeToggle = Key('reader-theme-toggle');
   // Uthmani/IndoPak script switch, inside the text-size panel (only rendered
   // while FeatureFlags.indopakScript is on) — this keys the two-card row.

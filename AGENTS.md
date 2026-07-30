@@ -161,6 +161,17 @@ installs on a mismatch. → `test/features/translations/edition_install_test.dar
 Rows are addressed by `(slug, surah, ayah)`, never the global ayah id: an
 installed edition outlives the build that produced it.
 
-**Not yet wired:** the R2 bucket is not provisioned, and `TranslationsPage` has
-no navigation entry (its natural home, `home_overflow_menu.dart`, had
-uncommitted owner WIP at the time).
+**Live and wired.** The R2 bucket is provisioned (`editions.alquranreader.com`)
+and the catalogue routinely lists more editions than are bundled — that's the
+intended, ongoing state, not a gap to close. `TranslationsPage` opens from the
+Home overflow's "Translations" entry (`home_overflow_menu.dart`).
+`TranslationsCubit` is an app-lifetime singleton (registered in
+`injector.dart`, provided at `app.dart`'s root, like `RemindersCubit`/
+`ThemeCubit`): `FeatureFlags.proactiveTranslationSync` fetches the catalogue
+once at launch, so a newly published edition needs no app-store release to
+reach readers. A small unseen-edition dot on that menu entry
+(`TranslationsState.hasUnseenEditions`, cleared by `markCatalogueSeen()` when
+the screen is actually opened — never by a silent background `load()`) is the
+passive discovery signal for it. An edition retracted from the catalogue stays
+installed and usable for readers who already have it; it just stops appearing
+under "Available for download" for everyone else.

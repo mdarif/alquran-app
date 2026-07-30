@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter/widgets.dart' show VoidCallback;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/translations/translation_metadata_overrides.dart';
 import '../../../reader/domain/entities/translation_resource.dart';
@@ -85,6 +88,7 @@ class TranslationsState extends Equatable {
     this.items = const [],
     this.loading = true,
     this.catalogueUnavailable = false,
+    this.newSlugs = const {},
     this.error,
   });
 
@@ -95,7 +99,15 @@ class TranslationsState extends Equatable {
   /// cached. The screen still lists bundled and installed editions — being
   /// offline must not make the reader's own translations disappear.
   final bool catalogueUnavailable;
+
+  /// Available-for-download slugs the reader hasn't opened this screen since
+  /// seeing — cleared by [TranslationsCubit.markCatalogueSeen], never by
+  /// [TranslationsCubit.load] itself (which also runs silently at launch and
+  /// must not clear a badge the reader hasn't actually looked at).
+  final Set<String> newSlugs;
   final String? error;
+
+  bool get hasUnseenEditions => newSlugs.isNotEmpty;
 
   Map<String, List<EditionItem>> get byLanguage {
     final out = <String, List<EditionItem>>{};
@@ -125,6 +137,7 @@ class TranslationsState extends Equatable {
     List<EditionItem>? items,
     bool? loading,
     bool? catalogueUnavailable,
+    Set<String>? newSlugs,
     String? error,
     bool clearError = false,
   }) =>
@@ -132,11 +145,13 @@ class TranslationsState extends Equatable {
         items: items ?? this.items,
         loading: loading ?? this.loading,
         catalogueUnavailable: catalogueUnavailable ?? this.catalogueUnavailable,
+        newSlugs: newSlugs ?? this.newSlugs,
         error: clearError ? null : (error ?? this.error),
       );
 
   @override
-  List<Object?> get props => [items, loading, catalogueUnavailable, error];
+  List<Object?> get props =>
+      [items, loading, catalogueUnavailable, newSlugs, error];
 }
 
 class TranslationsCubit extends Cubit<TranslationsState> {
@@ -144,17 +159,40 @@ class TranslationsCubit extends Cubit<TranslationsState> {
     this._repo,
     this._bundled, {
     ReaderSettingsRepository? settings,
+    SharedPreferences? prefs,
     VoidCallback? onTranslationsChanged,
   })  : _settings = settings,
+        _prefs = prefs,
         _onTranslationsChanged = onTranslationsChanged,
         super(const TranslationsState());
 
+  static const String _kSeenSlugs = 'translations_seen_slugs';
+
   final EditionRepository _repo;
   final ReaderSettingsRepository? _settings;
+  final SharedPreferences? _prefs;
   final VoidCallback? _onTranslationsChanged;
 
   /// Editions compiled into the app. Listed but never removable.
   final List<TranslationResource> _bundled;
+
+  /// Fires exactly on a real mutation (install/remove/toggle) — never on a
+  /// routine [load], so a caller (e.g. the reader screen, re-opening this same
+  /// shared cubit's sheet) can react only to an actual change, not to the
+  /// background refresh that also calls [load] at launch.
+  final StreamController<void> _mutations = StreamController<void>.broadcast();
+  Stream<void> get mutations => _mutations.stream;
+
+  @override
+  Future<void> close() {
+    unawaited(_mutations.close());
+    return super.close();
+  }
+
+  void _notifyChanged() {
+    _onTranslationsChanged?.call();
+    _mutations.add(null);
+  }
 
   Future<void> load() async {
     emit(state.copyWith(loading: true, clearError: true));
@@ -224,17 +262,39 @@ class TranslationsCubit extends Cubit<TranslationsState> {
           ),
     ];
 
+    final seenSlugs = _prefs?.getStringList(_kSeenSlugs)?.toSet() ?? const {};
+    final newSlugs = {
+      for (final i in items)
+        if (i.state == EditionState.available && !seenSlugs.contains(i.slug))
+          i.slug,
+    };
+
     _catalogue = catalogueBySlug;
     emit(
       TranslationsState(
         items: items,
         loading: false,
         catalogueUnavailable: unavailable,
+        newSlugs: newSlugs,
       ),
     );
   }
 
   Map<String, CatalogueEntry> _catalogue = const {};
+
+  /// Call when the Translations screen is actually opened, so the "new
+  /// edition" badge clears the moment the reader sees the list — not merely
+  /// because a silent background [load] happened to run.
+  Future<void> markCatalogueSeen() async {
+    final prefs = _prefs;
+    if (prefs == null || state.newSlugs.isEmpty) return;
+    final currentlyAvailable = {
+      for (final i in state.items)
+        if (i.state == EditionState.available) i.slug,
+    };
+    await prefs.setStringList(_kSeenSlugs, currentlyAvailable.toList());
+    emit(state.copyWith(newSlugs: const {}));
+  }
 
   Future<void> install(String slug) async {
     final entry = _catalogue[slug];
@@ -257,7 +317,7 @@ class TranslationsCubit extends Cubit<TranslationsState> {
         ),
       );
       await _selectInstalled(slug);
-      _onTranslationsChanged?.call();
+      _notifyChanged();
       await load();
     } on EditionIntegrityException catch (e) {
       // Say plainly that the file did not match, rather than offering a retry
@@ -285,7 +345,7 @@ class TranslationsCubit extends Cubit<TranslationsState> {
   Future<void> remove(String slug) async {
     await _repo.remove(slug);
     await _deselectRemoved(slug);
-    _onTranslationsChanged?.call();
+    _notifyChanged();
     await load();
   }
 
@@ -319,7 +379,7 @@ class TranslationsCubit extends Cubit<TranslationsState> {
       current.add(slug);
     }
     await settings.setSelectedTranslations(current.toList());
-    _onTranslationsChanged?.call();
+    _notifyChanged();
     _update(slug, (i) => i.copyWith(selected: current.contains(slug)));
   }
 

@@ -133,6 +133,8 @@ class _FakeSettings implements ReaderSettingsRepository {
   bool showArabicMatn = true;
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
+  Future<void> resetToDefaults() async {}
 }
 
 /// A fake player: the test pushes playback states onto the stream the cubit

@@ -112,4 +112,17 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   @override
   Future<void> setShowArabicMatn(bool value) =>
       _prefs.setBool(_kShowArabicMatn, value);
+
+  @override
+  Future<void> resetToDefaults() async {
+    await Future.wait([
+      _prefs.remove(_kFontSize),
+      _prefs.remove(_kDetailed),
+      _prefs.remove(_kSelectedLangs),
+      _prefs.remove(_kScript),
+      _prefs.remove(_kRecitationSpeed),
+      _prefs.remove(_kShowTranslationPeek),
+      _prefs.remove(_kShowArabicMatn),
+    ]);
+  }
 }

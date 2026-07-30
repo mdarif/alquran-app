@@ -109,6 +109,8 @@ class _FakeSettings implements ReaderSettingsRepository {
   bool showArabicMatn = true;
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
+  Future<void> resetToDefaults() async {}
 }
 
 class _SilentPlayer implements AyahRecitationPlayer {

@@ -48,6 +48,11 @@ class AppIcons {
     0xe8b8,
     fontFamily: _kSymbolFamily,
   ); // settings_rounded
+  /// The Settings screen's "Reset reading preferences" row.
+  static const IconData reset = IconData(
+    0xf053,
+    fontFamily: _kSymbolFamily,
+  ); // restart_alt_rounded
   static const IconData close = IconData(
     0xe5cd,
     fontFamily: _kSymbolFamily,

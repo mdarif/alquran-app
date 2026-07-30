@@ -10,9 +10,14 @@
 ///
 ///     flutter run --dart-define=EDITIONS_CATALOGUE_URL=https://…/catalogue.json
 ///
-/// NOTE: the bucket is not provisioned yet. Until it is, the Translations
-/// screen will list only what is bundled and report the catalogue as
-/// unavailable — which is the correct, honest behaviour rather than an error.
+/// The bucket is live in production. New editions published there appear on
+/// the Translations screen without an app-store release — see
+/// FeatureFlags.proactiveTranslationSync for the launch-time fetch, and note
+/// the catalogue is expected to list more editions than are bundled in the
+/// app binary; that's the intended, ongoing state, not a bug. If the bucket
+/// is ever unreachable (no network, or genuinely down) the screen still lists
+/// bundled and installed editions and reports the catalogue as unavailable —
+/// the correct, honest behaviour rather than an error.
 const String editionCatalogueUrl = String.fromEnvironment(
   'EDITIONS_CATALOGUE_URL',
   defaultValue: 'https://editions.alquranreader.com/catalogue.json',

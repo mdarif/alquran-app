@@ -67,4 +67,12 @@ abstract final class FeatureFlags {
   /// play affordance, the audio cubit/player is never constructed, and zero
   /// network code runs — the app stays fully offline.
   static const bool audioRecitation = true;
+
+  /// Proactive translation-catalogue sync: fetches the CDN catalogue once on
+  /// app launch so a newly published edition shows up on the Translations
+  /// screen without the reader manually opening it first. ON: best-effort,
+  /// never blocks startup. OFF: the cubit still exists and the screen still
+  /// fetches on open/pull-to-refresh exactly as before — this flag only
+  /// controls the *unprompted* background fetch.
+  static const bool proactiveTranslationSync = true;
 }

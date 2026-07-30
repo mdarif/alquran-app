@@ -10,6 +10,7 @@ import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
+import '../../../translations/presentation/cubit/translations_cubit.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 
 /// The app's download page — a funnel that lands on a download screen and routes
@@ -57,6 +58,7 @@ class HomeOverflowMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final reminders = showReminders ? _cubit<RemindersCubit>(context) : null;
     final theme = showReadingLight ? _cubit<ThemeCubit>(context) : null;
+    final translations = _cubit<TranslationsCubit>(context);
 
     // MenuAnchor (not PopupMenuButton) so the menu hugs its content — the popup
     // menu rounds its width up in fixed steps, leaving a blank strip on the right.
@@ -95,6 +97,7 @@ class HomeOverflowMenu extends StatelessWidget {
         _MenuItem(
           key: WidgetKeys.translationsMenuButton,
           icon: AppIcons.viewReading,
+          badge: translations?.state.hasUnseenEditions ?? false,
           label: 'Translations',
           onPressed: () => showTranslationsSheet(context),
         ),
@@ -174,6 +177,7 @@ class _MenuItem extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.filled = false,
+    this.badge = false,
     super.key,
   });
 
@@ -182,15 +186,21 @@ class _MenuItem extends StatelessWidget {
   final VoidCallback onPressed;
   final bool filled;
 
+  /// A small dot on the icon — "something changed here since you last looked".
+  final bool badge;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return MenuItemButton(
-      leadingIcon: AppIcon(
-        icon,
-        filled: filled,
-        size: AppIconSize.action,
-        color: cs.onSurfaceVariant,
+      leadingIcon: Badge(
+        isLabelVisible: badge,
+        child: AppIcon(
+          icon,
+          filled: filled,
+          size: AppIconSize.action,
+          color: cs.onSurfaceVariant,
+        ),
       ),
       onPressed: onPressed,
       child: Text(label),

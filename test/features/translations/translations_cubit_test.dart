@@ -9,6 +9,7 @@ import 'package:al_quran/features/translations/presentation/pages/translations_p
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _FakeRepo implements EditionRepository {
   _FakeRepo({
@@ -26,7 +27,7 @@ class _FakeRepo implements EditionRepository {
   final List<String> removeCalls = [];
 
   @override
-  Future<EditionCatalogue> catalogue({bool forceRefresh = false}) async {
+  Future<EditionCatalogue> catalogue() async {
     if (catalogueThrows) {
       throw const EditionDownloadException('offline');
     }
@@ -329,6 +330,71 @@ void main() {
     );
   });
 
+  test('an edition removed from the catalogue stays installed and usable',
+      () async {
+    final repo = _FakeRepo(
+      available: const [], // the CDN no longer lists it
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          sha256: 'some-sha',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
+    final item = cubit.state.items.singleWhere(
+      (i) => i.slug == 'hi-ahsanul-kalam',
+    );
+    expect(item.state, EditionState.installed);
+    expect(cubit.state.catalogueUnavailable, isFalse);
+    expect(cubit.state.downloaded.map((i) => i.slug), contains(item.slug));
+  });
+
+  test('a newly available edition is flagged unseen until marked seen',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final repo = _FakeRepo(
+      available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu], prefs: prefs);
+    await cubit.load();
+
+    expect(cubit.state.hasUnseenEditions, isTrue);
+    expect(cubit.state.newSlugs, {'hi-ahsanul-kalam'});
+
+    await cubit.markCatalogueSeen();
+    expect(cubit.state.hasUnseenEditions, isFalse);
+
+    // Persisted — a later refresh doesn't resurrect the badge for the same
+    // edition.
+    await cubit.load();
+    expect(cubit.state.hasUnseenEditions, isFalse);
+  });
+
+  test('a silent load never clears the unseen badge on its own', () async {
+    // load() also runs as a launch-time background fetch (and a manual
+    // pull-to-refresh) — only actually opening the screen should clear it.
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final repo = _FakeRepo(
+      available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu], prefs: prefs);
+
+    await cubit.load();
+    expect(cubit.state.hasUnseenEditions, isTrue);
+
+    await cubit.load();
+    expect(cubit.state.hasUnseenEditions, isTrue);
+  });
+
   test('toggling the last selected edition keeps it visible', () async {
     final repo = _FakeRepo(
       local: [
@@ -565,7 +631,9 @@ void main() {
       );
     });
 
-    testWidgets('delete icon uninstalls a downloaded edition', (tester) async {
+    testWidgets(
+        'delete icon asks for confirmation before uninstalling a downloaded '
+        'edition', (tester) async {
       final repo = _FakeRepo(
         local: [
           InstalledEdition(
@@ -592,11 +660,64 @@ void main() {
           .tap(find.byKey(WidgetKeys.editionRemove('hi-ahsanul-kalam')));
       await tester.pumpAndSettle();
 
+      // Nothing removed yet — the dialog is up, asking to confirm.
+      expect(find.text('Remove Ahsanul Kalam?'), findsOneWidget);
+      expect(repo.removeCalls, isEmpty);
+      expect(
+        find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
       expect(repo.removeCalls, ['hi-ahsanul-kalam']);
       expect(settings.selectedTranslations, ['ur-junagarhi']);
       expect(
         find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')),
         findsNothing,
+      );
+    });
+
+    testWidgets('cancelling the removal confirmation keeps the edition',
+        (tester) async {
+      final repo = _FakeRepo(
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(
+        selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+      );
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      await tester
+          .tap(find.byKey(WidgetKeys.editionRemove('hi-ahsanul-kalam')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(repo.removeCalls, isEmpty);
+      expect(settings.selectedTranslations, [
+        'ur-junagarhi',
+        'hi-ahsanul-kalam',
+      ]);
+      expect(
+        find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')),
+        findsOneWidget,
       );
     });
 

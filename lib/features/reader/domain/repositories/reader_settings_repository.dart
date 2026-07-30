@@ -50,6 +50,13 @@ abstract interface class ReaderSettingsRepository {
   Future<void> setShowTranslationPeek(bool value);
   Future<void> setShowArabicMatn(bool value);
 
+  /// Resets every reading preference above back to its default: font size,
+  /// script, viewport, selected translations, recitation speed, and the
+  /// peek/matn toggles. Deliberately narrow — Reading Light theme, Sunnah
+  /// reminders, downloaded translation files, and Last Read position are
+  /// separate settings categories and are untouched.
+  Future<void> resetToDefaults();
+
   static const double defaultFontSize = 28;
   static const double defaultRecitationSpeed = 1.0;
 }
