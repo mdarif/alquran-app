@@ -97,7 +97,7 @@ class HomeOverflowMenu extends StatelessWidget {
           _MenuItem(
             icon: _phaseIcon(theme.activePhase),
             filled: _phaseFilled(theme.activePhase),
-            label: 'Reading Light',
+            label: 'Reading Theme',
             onPressed: () => _openReadingLight(context, theme),
           ),
         _MenuItem(
@@ -140,9 +140,10 @@ class HomeOverflowMenu extends StatelessWidget {
       await SharePlus.instance.share(
         ShareParams(
           text: 'Read. Reflect. Remember. 🌙\n\n'
-              'Al Quran — a calm, distraction-free app for reading the Quran '
-              'offline, with Urdu, Hindi & English translations and recitation. '
-              'Free, no ads.\n\n'
+              'Al Quran is a calm, distraction-free app for reading the Quran '
+              'offline, with Urdu, Hindi & English translations and beautiful '
+              'recitation.\n\n'
+              '100% free. No ads.\n\n'
               'Download the app:\n'
               '$_downloadUrl',
         ),

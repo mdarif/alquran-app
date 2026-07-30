@@ -41,19 +41,21 @@ void main() {
     expect(find.byIcon(AppIcons.phaseIsha), findsOneWidget);
   });
 
-  testWidgets('opens the light sheet with Light of Day + every phase',
+  testWidgets('opens the theme sheet with time-of-day + every phase',
       (tester) async {
     await _pump(tester, await _fixed(DayPhase.duha));
     await tester.tap(find.byType(ThemeToggleButton));
     await tester.pumpAndSettle();
 
-    expect(find.text('Light of Day'), findsOneWidget);
+    expect(find.text('Reading Theme'), findsOneWidget);
+    expect(find.text('Follow Time of Day'), findsOneWidget);
+    expect(find.text('Choose a fixed theme'), findsOneWidget);
     for (final p in DayPhase.values) {
       expect(find.text(p.label), findsOneWidget);
     }
   });
 
-  testWidgets('picking a light holds that phase', (tester) async {
+  testWidgets('picking a theme holds that phase', (tester) async {
     final cubit = await _fixed(DayPhase.duha);
     await _pump(tester, cubit);
     await tester.tap(find.byType(ThemeToggleButton));
@@ -64,6 +66,37 @@ void main() {
 
     expect(cubit.isAuto, isFalse);
     expect(cubit.activePhase, DayPhase.isha);
+  });
+
+  testWidgets('theme swatches fit narrow Android widths without wrapping',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(320, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pump(tester, await _fixed(DayPhase.duha));
+    await tester.tap(find.byType(ThemeToggleButton));
+    await tester.pumpAndSettle();
+
+    final rowTop = tester.getTopLeft(find.text('Fajr')).dy;
+    for (final p in DayPhase.values) {
+      expect(find.text(p.label), findsOneWidget);
+      expect(tester.getTopLeft(find.text(p.label)).dy, rowTop);
+    }
+  });
+
+  testWidgets('theme swatches still fit extra-narrow surfaces', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(300, 720));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pump(tester, await _fixed(DayPhase.isha));
+    await tester.tap(find.byType(ThemeToggleButton));
+    await tester.pumpAndSettle();
+
+    final rowTop = tester.getTopLeft(find.text('Fajr')).dy;
+    for (final p in DayPhase.values) {
+      expect(find.text(p.label), findsOneWidget);
+      expect(tester.getTopLeft(find.text(p.label)).dy, rowTop);
+    }
   });
 
   testWidgets('the auto card shows the live phase when following the day',
@@ -79,7 +112,7 @@ void main() {
     await tester.tap(find.byType(ThemeToggleButton));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('Following the day'), findsOneWidget);
+    expect(find.textContaining('Changes automatically'), findsOneWidget);
     // "now Duha" on the auto card + the Duha swatch label.
     expect(find.textContaining('Duha'), findsWidgets);
 

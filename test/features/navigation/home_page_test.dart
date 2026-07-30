@@ -142,19 +142,19 @@ void main() {
       await _pumpHome(tester); // all default to on
       expect(find.byType(HijriDateLine), findsOneWidget);
       expect(find.byType(LastReadBanner), findsOneWidget);
-      // Reminders + Reading Light now live behind the app-bar overflow.
+      // Reminders + Reading Theme now live behind the app-bar overflow.
       expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
     });
 
-    testWidgets('the overflow menu opens Reading Light (and reveals its items)',
+    testWidgets('the overflow menu opens Reading Theme (and reveals its items)',
         (tester) async {
-      await _pumpHome(tester); // ThemeCubit is provided → Reading Light shows
+      await _pumpHome(tester); // ThemeCubit is provided → Reading Theme shows
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
       await tester.pumpAndSettle();
-      expect(find.text('Reading Light'), findsOneWidget);
-      await tester.tap(find.text('Reading Light'));
+      expect(find.text('Reading Theme'), findsOneWidget);
+      await tester.tap(find.text('Reading Theme'));
       await tester.pumpAndSettle();
-      // The Reading-Light sheet opened.
+      // The Reading Theme sheet opened.
       expect(find.byType(ReadingLightSheet), findsOneWidget);
     });
 

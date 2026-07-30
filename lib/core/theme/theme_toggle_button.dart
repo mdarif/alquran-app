@@ -17,8 +17,8 @@ IconData _phaseIcon(DayPhase phase) => switch (phase) {
 /// light, distinct from the rising-dawn twilight it shares a glyph with.
 bool _phaseFilled(DayPhase phase) => phase == DayPhase.maghrib;
 
-/// App-bar entry to the **Light of Day** picker. The icon reflects the current
-/// light (dawn → sun → dusk → moon); tapping opens the reading-light sheet.
+/// App-bar entry to the reading theme picker. The icon reflects the current
+/// theme (dawn → sun → dusk → moon); tapping opens the reading-theme sheet.
 class ThemeToggleButton extends StatelessWidget {
   const ThemeToggleButton({super.key});
 
@@ -36,7 +36,7 @@ class ThemeToggleButton extends StatelessWidget {
       cubit = null;
     }
     return IconButton(
-      tooltip: 'Reading Light',
+      tooltip: 'Reading Theme',
       icon: AppIcon(
         _phaseIcon(cubit?.activePhase ?? DayPhase.duha),
         filled: _phaseFilled(cubit?.activePhase ?? DayPhase.duha),
@@ -57,9 +57,9 @@ class ThemeToggleButton extends StatelessWidget {
   }
 }
 
-/// The "Reading Light" picker: choose **Light of Day** (auto) or hold a single
-/// phase. Reusable — the app-bar button shows it as a sheet; a settings screen
-/// could embed it inline.
+/// The "Reading Theme" picker: follow the time of day or choose a fixed phase.
+/// Reusable — the app-bar button shows it as a sheet; a settings screen could
+/// embed it inline.
 class ReadingLightSheet extends StatelessWidget {
   const ReadingLightSheet({super.key});
 
@@ -71,49 +71,63 @@ class ReadingLightSheet extends StatelessWidget {
         final cubit = context.read<ThemeCubit>();
         return SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Reading Light', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  'Light of Day lets the page follow the rhythm of the day.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Reading Theme', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Choose how the reading page looks while you read.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                // Auto — Light of Day.
-                _AutoCard(
-                  active: state.auto,
-                  currentPhase: state.phase,
-                  onTap: cubit.setAuto,
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Or hold a single light',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 16),
+                  // Auto — Follow Time of Day.
+                  _AutoCard(
+                    active: state.auto,
+                    currentPhase: state.phase,
+                    onTap: cubit.setAuto,
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    for (final p in MushafPalette.ordered)
-                      _Swatch(
-                        palette: p,
-                        // A swatch is "selected" only when the reader is holding
-                        // it (not in auto — auto highlights the Auto card).
-                        selected: !state.auto && state.phase == p.phase,
-                        onTap: () => cubit.setPhase(p.phase),
-                      ),
-                  ],
-                ),
-              ],
+                  const SizedBox(height: 18),
+                  Text(
+                    'Choose a fixed theme',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final slotWidth =
+                          constraints.maxWidth / MushafPalette.ordered.length;
+                      final cardWidth = (slotWidth - 6).clamp(42.0, 50.0);
+                      final cardHeight = (cardWidth * 1.24).clamp(52.0, 62.0);
+                      return Row(
+                        children: [
+                          for (final p in MushafPalette.ordered)
+                            SizedBox(
+                              width: slotWidth,
+                              child: _Swatch(
+                                palette: p,
+                                cardWidth: cardWidth,
+                                cardHeight: cardHeight,
+                                // A swatch is "selected" only when the reader
+                                // is holding it (not in auto).
+                                selected: !state.auto && state.phase == p.phase,
+                                onTap: () => cubit.setPhase(p.phase),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -157,7 +171,7 @@ class _AutoCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Light of Day',
+                      'Follow Time of Day',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             color:
                                 active ? cs.onPrimaryContainer : cs.onSurface,
@@ -165,8 +179,8 @@ class _AutoCard extends StatelessWidget {
                     ),
                     Text(
                       active
-                          ? 'Following the day · now ${currentPhase.label}'
-                          : 'Follow the time of day',
+                          ? 'Changes automatically · now ${currentPhase.label}'
+                          : 'Changes automatically as the day passes',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: active
                                 ? cs.onPrimaryContainer.withValues(alpha: 0.8)
@@ -189,11 +203,15 @@ class _AutoCard extends StatelessWidget {
 class _Swatch extends StatelessWidget {
   const _Swatch({
     required this.palette,
+    required this.cardWidth,
+    required this.cardHeight,
     required this.selected,
     required this.onTap,
   });
 
   final MushafPalette palette;
+  final double cardWidth;
+  final double cardHeight;
   final bool selected;
   final VoidCallback onTap;
 
@@ -206,14 +224,14 @@ class _Swatch extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 46,
-            height: 56,
+            width: cardWidth,
+            height: cardHeight,
             decoration: BoxDecoration(
               color: palette.background,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: selected ? cs.primary : cs.outlineVariant,
-                width: selected ? 2 : 1,
+                width: selected ? 2.5 : 1,
               ),
             ),
             alignment: Alignment.center,
@@ -221,18 +239,18 @@ class _Swatch extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _miniLine(palette.ink, 22),
-                const SizedBox(height: 3),
+                _miniLine(palette.ink, 25),
+                const SizedBox(height: 4),
                 Container(
-                  width: 12,
-                  height: 12,
+                  width: 13,
+                  height: 13,
                   decoration: BoxDecoration(
                     color: palette.accentContainer,
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(height: 3),
-                _miniLine(palette.ink, 16),
+                const SizedBox(height: 4),
+                _miniLine(palette.ink, 18),
               ],
             ),
           ),
@@ -242,7 +260,11 @@ class _Swatch extends StatelessWidget {
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: selected ? cs.primary : cs.onSurfaceVariant,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 11,
+                  height: 1.1,
                 ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
