@@ -203,28 +203,35 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('the text-size preview resizes with the size controls',
+  testWidgets('the text-size controls update the reader without a preview card',
       (tester) async {
     await pump(tester);
     await openPanel(tester);
 
-    double previewSize() => tester
-        .widget<Text>(
-          find.descendant(
-            of: find.byKey(WidgetKeys.textSizePreview),
-            matching: find.byType(Text),
-          ),
-        )
-        .style!
-        .fontSize!;
-
-    final before = previewSize();
+    expect(find.byKey(WidgetKeys.textSizePreview), findsNothing);
+    final before = readerFontSize(tester);
     await tester.tap(find.byKey(WidgetKeys.fontIncrease));
     await tester.pumpAndSettle();
-    expect(previewSize(), greaterThan(before));
+    expect(readerFontSize(tester), greaterThan(before));
   });
 
   const skip = !FeatureFlags.indopakScript; // feature shipped dark
+
+  testWidgets(
+    'settings uses compact script rows',
+    (tester) async {
+      await pump(tester);
+      await openPanel(tester);
+
+      final uthmaniCard =
+          tester.getSize(find.byKey(WidgetKeys.scriptCard('uthmani')));
+      final indopakCard =
+          tester.getSize(find.byKey(WidgetKeys.scriptCard('indopak')));
+      expect(uthmaniCard.height, lessThan(92));
+      expect(indopakCard.height, lessThan(92));
+    },
+    skip: skip,
+  );
 
   group('IndoPak script toggle', () {
     testWidgets(

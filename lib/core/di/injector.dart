@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/navigation/data/repositories/index_repository_impl.dart';
 import '../../features/navigation/domain/repositories/index_repository.dart';
 import '../../features/navigation/presentation/cubit/index_list_cubit.dart';
+import '../../features/app_update/data/repositories/app_update_repository_impl.dart';
+import '../../features/app_update/domain/repositories/app_update_repository.dart';
 import '../../features/prayer_times/data/location/geolocator_location_provider.dart';
 import '../../features/prayer_times/data/repositories/prayer_times_repository_impl.dart';
 import '../../features/prayer_times/domain/repositories/prayer_times_repository.dart';
@@ -32,6 +34,7 @@ import '../../features/surahs/data/repositories/surah_repository_impl.dart';
 import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
 import '../audio/ayah_recitation_player.dart';
+import '../app_update_config.dart';
 import '../database/app_database.dart';
 import '../database/editions_database.dart';
 import '../editions_config.dart';
@@ -86,6 +89,12 @@ Future<void> configureDependencies() async {
     )
     ..registerLazySingleton<IndexRepository>(
       () => IndexRepositoryImpl(getIt<AppDatabase>()),
+    )
+    ..registerLazySingleton<AppUpdateRepository>(
+      () => AppUpdateRepositoryImpl(
+        prefs: getIt<SharedPreferences>(),
+        configUrl: Uri.parse(appUpdateConfigUrl),
+      ),
     )
     // Prayer times: location (geolocator) + on-device adhan calc. Registered
     // before ThemeCubit since its resolver reads this repo.

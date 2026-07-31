@@ -75,4 +75,9 @@ abstract final class FeatureFlags {
   /// fetches on open/pull-to-refresh exactly as before — this flag only
   /// controls the *unprompted* background fetch.
   static const bool proactiveTranslationSync = true;
+
+  /// Soft app-update reminder: Home checks a tiny remote JSON config and, when
+  /// the installed version is older than `latestVersion`, shows a dismissible
+  /// update nudge. Optional only for now; forced updates need a separate UX pass.
+  static const bool softUpdateReminder = true;
 }

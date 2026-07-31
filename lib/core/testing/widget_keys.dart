@@ -18,6 +18,10 @@ class WidgetKeys {
   static const translationsMenuButton = Key('home-translations-menu-button');
   static const bookmarksMenuButton = Key('home-bookmarks-menu-button');
   static const bookmarksPage = Key('bookmarks-page');
+  static const appUpdateBanner = Key('app-update-banner');
+  static const appUpdateNowButton = Key('app-update-now-button');
+  static const appUpdateLaterButton = Key('app-update-later-button');
+  static const appUpdateMenuButton = Key('home-app-update-menu-button');
   static const shareAppButton = Key('home-share-app-button');
   static const aboutMenuButton = Key('home-about-menu-button');
 

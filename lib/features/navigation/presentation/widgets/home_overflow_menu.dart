@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
+import '../../../app_update/domain/repositories/app_update_repository.dart';
 import '../../../reader/domain/repositories/ayah_bookmark_repository.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/presentation/pages/bookmarks_page.dart';
@@ -114,6 +117,13 @@ class HomeOverflowMenu extends StatelessWidget {
           label: 'Share Al Quran',
           onPressed: _shareApp,
         ),
+        if (FeatureFlags.softUpdateReminder)
+          _MenuItem(
+            key: WidgetKeys.appUpdateMenuButton,
+            icon: AppIcons.autoSelected,
+            label: 'Check for update',
+            onPressed: () => _checkForUpdate(context),
+          ),
         // About screen — also reachable via the discreet title tap, surfaced here
         // as a visible entry.
         _MenuItem(
@@ -124,6 +134,35 @@ class HomeOverflowMenu extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _checkForUpdate(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    if (!GetIt.I.isRegistered<AppUpdateRepository>()) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Could not check for updates'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+    final prompt = await GetIt.I<AppUpdateRepository>().check();
+    if (!context.mounted) return;
+    if (prompt == null) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Al Quran is up to date'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+    await launchUrl(prompt.storeUrl, mode: LaunchMode.externalApplication);
   }
 
   void _openAbout(BuildContext context) {

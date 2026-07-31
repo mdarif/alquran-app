@@ -1569,6 +1569,8 @@ class _SettingsSheet extends StatefulWidget {
 class _SettingsSheetState extends State<_SettingsSheet> {
   // One size step — matches the slider's 2pt divisions and the size grid.
   static const double _step = 2;
+  static const double _sectionGap = 18;
+  static const double _labelGap = 7;
 
   late double _fontSize = widget.fontSize;
   late ArabicScript _script = widget.script;
@@ -1603,7 +1605,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
       appBar: AppBar(title: const Text('Settings')),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1619,37 +1621,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              // Live preview (above the slider) — the current Arabic face at the
-              // chosen size. Fixed height so dragging the slider never reflows the
-              // sheet; the line is RTL-aligned and clips on the left at the largest
-              // sizes (you still see the true size, not a scaled-to-fit one).
-              Container(
-                key: WidgetKeys.textSizePreview,
-                height: 72,
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                clipBehavior: Clip.hardEdge,
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _script == ArabicScript.indopak
-                      ? _indopakSample
-                      : _uthmaniSample,
-                  maxLines: 1,
-                  softWrap: false,
-                  overflow: TextOverflow.clip,
-                  textDirection: TextDirection.rtl,
-                  locale: const Locale('ar'),
-                  style: (_script == ArabicScript.indopak
-                          ? QuranTextStyle.indopak
-                          : QuranTextStyle.madani)
-                      .copyWith(fontSize: _fontSize),
-                ),
-              ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 4),
               // A− / A+ steppers flank the slider (each nudges one grid step).
               Row(
                 children: [
@@ -1701,9 +1673,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               ),
               // Arabic script — only while the IndoPak feature is enabled.
               if (FeatureFlags.indopakScript) ...[
-                const SizedBox(height: 26),
+                const SizedBox(height: _sectionGap),
                 const _SectionLabel('Arabic Script'),
-                const SizedBox(height: 8),
+                const SizedBox(height: _labelGap),
                 Column(
                   key: WidgetKeys.scriptToggle,
                   children: [
@@ -1716,7 +1688,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                       selected: _script == ArabicScript.uthmani,
                       onTap: () => _setScript(ArabicScript.uthmani),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     _ScriptPreview(
                       script: ArabicScript.indopak,
                       label: 'IndoPak/Asian',
@@ -1730,10 +1702,11 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 ),
               ],
               if (widget.resources.isNotEmpty) ...[
-                const SizedBox(height: 26),
+                const SizedBox(height: _sectionGap),
                 const _SectionLabel('Translation'),
                 ListTile(
                   dense: true,
+                  minVerticalPadding: 4,
                   contentPadding: EdgeInsets.zero,
                   title: Text('Translations', style: rowTitleStyle),
                   subtitle: Text(
@@ -1751,7 +1724,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               // just cues the verse). Hidden in Detailed, which always shows
               // translations, and when there's no translation to peek.
               if (widget.isReading && widget.resources.isNotEmpty) ...[
-                const SizedBox(height: 26),
+                const SizedBox(height: _sectionGap),
                 const _SectionLabel('Reading'),
                 SwitchListTile.adaptive(
                   key: WidgetKeys.translationPeekToggle,
@@ -1761,6 +1734,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                     widget.onToggleTranslationPeek(v);
                   },
                   dense: true,
+                  minVerticalPadding: 4,
                   contentPadding: EdgeInsets.zero,
                   title: Text('Show translation', style: rowTitleStyle),
                   subtitle: Text(
@@ -1772,7 +1746,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               // Detailed-only mirror: hide the Arabic matn for a translations-only
               // reading. Hidden in Reading (which is Arabic-only anyway).
               if (!widget.isReading && widget.resources.isNotEmpty) ...[
-                const SizedBox(height: 26),
+                const SizedBox(height: _sectionGap),
                 const _SectionLabel('Detailed'),
                 SwitchListTile.adaptive(
                   key: WidgetKeys.showArabicToggle,
@@ -1782,6 +1756,7 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                     widget.onToggleShowArabic(v);
                   },
                   dense: true,
+                  minVerticalPadding: 4,
                   contentPadding: EdgeInsets.zero,
                   title: Text('Show Arabic', style: rowTitleStyle),
                   subtitle: Text(
@@ -1792,10 +1767,11 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               ],
               // Whitespace, not a rule, sets this apart — a destructive-leaning
               // action reads clearly enough from its red tint alone.
-              const SizedBox(height: 40),
+              const SizedBox(height: 26),
               ListTile(
                 key: WidgetKeys.readerSettingsReset,
                 dense: true,
+                minVerticalPadding: 4,
                 contentPadding: EdgeInsets.zero,
                 leading: AppIcon(AppIcons.reset, color: cs.error),
                 title: Text(
@@ -1929,7 +1905,7 @@ class _ScriptPreview extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
@@ -1948,7 +1924,7 @@ class _ScriptPreview extends StatelessWidget {
                             textDirection: TextDirection.rtl,
                             locale: const Locale('ar'),
                             style: sampleStyle.copyWith(
-                              fontSize: 28,
+                              fontSize: 25,
                               color: cs.onSurface,
                             ),
                           ),
@@ -1969,7 +1945,7 @@ class _ScriptPreview extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text.rich(
                   TextSpan(
                     children: [

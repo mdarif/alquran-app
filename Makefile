@@ -1,10 +1,13 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry ci-logs version apk aab ipa
+.PHONY: help setup get gen watch analyze format format-check test coverage run run-update-local serve-update-config android-update-reverse android-update-reverse-clear clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry ci-logs version apk aab ipa
 
 # Release defaults — override on the command line, e.g. `make release BUMP=minor`.
 REPO ?= mdarif/alquran-app
 BUMP ?= patch
+UPDATE_CONFIG ?= update-available.json
+UPDATE_CONFIG_HOST ?= 127.0.0.1
+UPDATE_CONFIG_PORT ?= 8787
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -50,6 +53,21 @@ coverage: ## Run tests with coverage and print the lcov path
 
 run: ## Run the app (pick a device when prompted)
 	flutter run
+
+serve-update-config: ## Serve local app-update fixtures: make serve-update-config UPDATE_CONFIG=update-available.json
+	@cp dev/app-update/$(UPDATE_CONFIG) /tmp/app-update.json
+	@echo "Serving /tmp/app-update.json at http://127.0.0.1:$(UPDATE_CONFIG_PORT)/app-update.json"
+	python3 -m http.server $(UPDATE_CONFIG_PORT) --directory /tmp
+
+android-update-reverse: ## Forward Android device localhost:8787 to this Mac for update testing
+	adb reverse tcp:$(UPDATE_CONFIG_PORT) tcp:$(UPDATE_CONFIG_PORT)
+	@echo "Android reverse set: device http://127.0.0.1:$(UPDATE_CONFIG_PORT) -> Mac http://127.0.0.1:$(UPDATE_CONFIG_PORT)"
+
+android-update-reverse-clear: ## Clear the Android update-testing adb reverse
+	adb reverse --remove tcp:$(UPDATE_CONFIG_PORT)
+
+run-update-local: ## Run app pointed at the local app-update fixture server
+	flutter run --dart-define=APP_UPDATE_CONFIG_URL=http://$(UPDATE_CONFIG_HOST):$(UPDATE_CONFIG_PORT)/app-update.json
 
 # Release artifact builds. --no-tree-shake-icons is REQUIRED: we bundle our own
 # correct Material Symbols subset (assets/fonts/), and Flutter's icon tree-shaking

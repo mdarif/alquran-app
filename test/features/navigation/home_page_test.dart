@@ -1,7 +1,10 @@
 import 'package:al_quran/core/testing/widget_keys.dart';
+import 'package:al_quran/core/app_update_config.dart';
 import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/core/theme/theme_cubit.dart';
 import 'package:al_quran/core/theme/theme_toggle_button.dart';
+import 'package:al_quran/features/app_update/domain/entities/app_update_prompt.dart';
+import 'package:al_quran/features/app_update/domain/repositories/app_update_repository.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_entry.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_kind.dart';
 import 'package:al_quran/features/navigation/domain/repositories/index_repository.dart';
@@ -73,6 +76,22 @@ class _FakeIndexRepository implements IndexRepository {
   Future<List<IndexEntry>> entries(IndexKind kind) async => const [];
 }
 
+class _FakeAppUpdateRepository implements AppUpdateRepository {
+  _FakeAppUpdateRepository([this.prompt]);
+
+  AppUpdatePrompt? prompt;
+  String? dismissedVersion;
+
+  @override
+  Future<AppUpdatePrompt?> check() async => prompt;
+
+  @override
+  Future<void> dismiss(String latestVersion) async {
+    dismissedVersion = latestVersion;
+    prompt = null;
+  }
+}
+
 Future<void> _pumpHome(
   WidgetTester tester, {
   bool advancedNavigation = true,
@@ -80,6 +99,7 @@ Future<void> _pumpHome(
   bool sunnahReminders = true,
   bool lastReadBanner = true,
   bool lightOfDay = true,
+  bool softUpdateReminder = true,
 }) async {
   // A fixed light (not auto) so there's no Light-of-Day ticker to leak in tests.
   SharedPreferences.setMockInitialValues(const {'theme_choice': 'duha'});
@@ -95,6 +115,7 @@ Future<void> _pumpHome(
           sunnahReminders: sunnahReminders,
           lastReadBanner: lastReadBanner,
           lightOfDay: lightOfDay,
+          softUpdateReminder: softUpdateReminder,
         ),
       ),
     ),
@@ -117,6 +138,9 @@ void main() {
       ..registerLazySingleton<IndexRepository>(_FakeIndexRepository.new)
       ..registerFactory<IndexListCubit>(
         () => IndexListCubit(GetIt.I<IndexRepository>()),
+      )
+      ..registerLazySingleton<AppUpdateRepository>(
+        _FakeAppUpdateRepository.new,
       );
   });
   tearDown(GetIt.I.reset);
@@ -214,6 +238,85 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.bookmarksMenuButton));
       await tester.pumpAndSettle();
       expect(find.byType(BookmarksPage), findsOneWidget);
+    });
+
+    testWidgets('shows and dismisses the optional app update reminder',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      final updates = _FakeAppUpdateRepository(
+        AppUpdatePrompt(
+          currentVersion: '1.2.1',
+          latestVersion: '1.2.2',
+          storeUrl: Uri.parse(androidPlayStoreUrl),
+          message: 'A newer version is available.',
+        ),
+      );
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(() => updates);
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsOneWidget);
+      expect(find.text('Update available'), findsOneWidget);
+      expect(
+        find.text('A newer version is available.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(WidgetKeys.appUpdateLaterButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
+      expect(updates.dismissedVersion, '1.2.2');
+    });
+
+    testWidgets('does not show the update banner when the app is current',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository(),
+      );
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
+    });
+
+    testWidgets('the overflow always offers a manual update check',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
+      expect(find.text('Check for update'), findsOneWidget);
+    });
+
+    testWidgets('the overflow places update check after Share Al Quran',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+
+      final shareTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.shareAppButton),
+          )
+          .dy;
+      final updateTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.appUpdateMenuButton),
+          )
+          .dy;
+      final aboutTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.aboutMenuButton),
+          )
+          .dy;
+
+      expect(updateTop, greaterThan(shareTop));
+      expect(updateTop, lessThan(aboutTop));
     });
 
     testWidgets('the home overflow does not expose reader-only Translations',
