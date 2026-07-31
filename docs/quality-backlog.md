@@ -11,6 +11,25 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Open
 
+### 13. Post-release: replace bundled Suhel Hindi with Rais Salafi translation (2026-07-31) · **MEDIUM / data hygiene**
+- **Area:** translations · bundled seed DB · editions catalogue
+- **Decision:** after this release, remove `hi-suhel-farooq-nadwi` from the
+  bundled app database and make the authentic Salafi Hindi translation
+  (`hi-rais-qureshi-salafi`) the Hindi edition we surface by default.
+- **Why:** Suhel Khan's Hindi translation is currently present in the bundled
+  `quran.db` as a non-default legacy/seed row. Even though the reader now hides
+  non-`default_on` bundled editions, keeping it in the shipped DB can still
+  confuse QA and future data work.
+- **Implementation path:** update `../alquran-data` sources, rebuild
+  `quran.db`, copy it into `assets/db/quran.db`, run `make seed-version`, and
+  verify old saved selections degrade safely to the available/default editions.
+- **Catalogue policy:** if the owner decision is to remove Suhel completely
+  from the app experience, also retract `hi-suhel-farooq-nadwi` from the
+  downloadable editions catalogue/R2. If the decision is only "not bundled",
+  leave it downloadable but not selected by default.
+- **Release note:** do this after the current release, not as a same-day data
+  swap.
+
 ### 12. Impeller opt-out is DEPRECATED — our Arabic rendering depends on it (2026-07-31) · **HIGH / time-bomb**
 - **Area:** rendering · Arabic text · Flutter upgrades · both platforms
 - **The risk:** we disable Impeller on **both** platforms
