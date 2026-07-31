@@ -9,12 +9,14 @@ Future<AppUpdateRepositoryImpl> _repo({
   required String body,
   int status = 200,
   String currentVersion = '1.2.1',
+  DateTime? now,
 }) async {
   SharedPreferences.setMockInitialValues(const {});
   return AppUpdateRepositoryImpl(
     prefs: await SharedPreferences.getInstance(),
     configUrl: Uri.parse('https://example.test/app-update.json'),
     currentVersion: () async => currentVersion,
+    now: () => now ?? DateTime.utc(2026, 7, 31),
     client: MockClient((_) async => http.Response(body, status)),
   );
 }
@@ -61,14 +63,49 @@ void main() {
       expect(prompt.required, isFalse);
     });
 
-    test('suppresses a dismissed optional version', () async {
+    test('suppresses a dismissed optional version inside the reminder window',
+        () async {
       final repo = await _repo(
-        body: '{"latestVersion":"1.2.2","storeUrl":"https://example.test"}',
+        body: '''
+          {
+            "latestVersion": "1.2.2",
+            "storeUrl": "https://example.test",
+            "remindAfterDays": 30
+          }
+        ''',
       );
 
       await repo.dismiss('1.2.2');
 
       expect(await repo.check(), isNull);
+    });
+
+    test('shows a dismissed optional version after the reminder window',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'dismissed_update_version': '1.2.2',
+        'dismissed_update_at': DateTime.utc(2026, 7, 1).toIso8601String(),
+      });
+      final repo = AppUpdateRepositoryImpl(
+        prefs: await SharedPreferences.getInstance(),
+        configUrl: Uri.parse('https://example.test/app-update.json'),
+        currentVersion: () async => '1.2.1',
+        now: () => DateTime.utc(2026, 7, 31, 0, 0, 1),
+        client: MockClient(
+          (_) async => http.Response(
+            '''
+              {
+                "latestVersion": "1.2.2",
+                "storeUrl": "https://example.test",
+                "remindAfterDays": 30
+              }
+            ''',
+            200,
+          ),
+        ),
+      );
+
+      expect(await repo.check(), isNotNull);
     });
 
     test('does not suppress a required update after dismissal', () async {
@@ -98,6 +135,7 @@ void main() {
         prefs: await SharedPreferences.getInstance(),
         configUrl: Uri.parse('https://example.test/app-update.json'),
         currentVersion: () async => '1.2.1',
+        now: () => DateTime.utc(2026, 7, 31),
         client: MockClient(
           (_) async => http.Response(
             '{"latestVersion":"1.2.3","storeUrl":"https://example.test"}',

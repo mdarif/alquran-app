@@ -9,6 +9,7 @@ import '../../domain/entities/app_update_prompt.dart';
 import '../../domain/repositories/app_update_repository.dart';
 
 typedef CurrentVersionLoader = Future<String> Function();
+typedef DateTimeLoader = DateTime Function();
 
 class AppUpdateRepositoryImpl implements AppUpdateRepository {
   AppUpdateRepositoryImpl({
@@ -16,17 +17,22 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
     required Uri configUrl,
     http.Client? client,
     CurrentVersionLoader? currentVersion,
+    DateTimeLoader? now,
   })  : _prefs = prefs,
         _configUrl = configUrl,
         _client = client ?? http.Client(),
-        _currentVersion = currentVersion ?? _packageVersion;
+        _currentVersion = currentVersion ?? _packageVersion,
+        _now = now ?? DateTime.now;
 
   final SharedPreferences _prefs;
   final Uri _configUrl;
   final http.Client _client;
   final CurrentVersionLoader _currentVersion;
+  final DateTimeLoader _now;
 
   static const String _dismissedVersionKey = 'dismissed_update_version';
+  static const String _dismissedAtKey = 'dismissed_update_at';
+  static const int _defaultRemindAfterDays = 30;
   static const String _fallbackMessage = 'A newer version is available.';
 
   @override
@@ -46,7 +52,8 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
       final requiredVersion = json['minimumSupportedVersion'];
       final required =
           requiredVersion is String && _isNewer(requiredVersion, current);
-      if (!required && _prefs.getString(_dismissedVersionKey) == latest) {
+      final remindAfterDays = _remindAfterDays(json['remindAfterDays']);
+      if (!required && _isDismissed(latest, remindAfterDays)) {
         return null;
       }
       final parsedStoreUrl = storeUrl is String ? Uri.tryParse(storeUrl) : null;
@@ -71,6 +78,7 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
   @override
   Future<void> dismiss(String latestVersion) async {
     await _prefs.setString(_dismissedVersionKey, latestVersion);
+    await _prefs.setString(_dismissedAtKey, _now().toUtc().toIso8601String());
   }
 
   static Future<String> _packageVersion() async {
@@ -97,5 +105,24 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
         .split('.')
         .map((part) => int.tryParse(part.trim()) ?? 0)
         .toList(growable: false);
+  }
+
+  bool _isDismissed(String latestVersion, int remindAfterDays) {
+    if (_prefs.getString(_dismissedVersionKey) != latestVersion) {
+      return false;
+    }
+    final dismissedAt = DateTime.tryParse(
+      _prefs.getString(_dismissedAtKey) ?? '',
+    );
+    if (dismissedAt == null) {
+      return true;
+    }
+    final remindAt = dismissedAt.toUtc().add(Duration(days: remindAfterDays));
+    return _now().toUtc().isBefore(remindAt);
+  }
+
+  static int _remindAfterDays(Object? value) {
+    if (value is int && value > 0) return value;
+    return _defaultRemindAfterDays;
   }
 }

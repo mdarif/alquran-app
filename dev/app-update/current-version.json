@@ -2,5 +2,6 @@
   "latestVersion": "1.2.1",
   "minimumSupportedVersion": "1.0.0",
   "storeUrl": "https://play.google.com/store/apps/details?id=com.almarfa.alquran",
-  "message": "You are already on the latest version."
+  "message": "You are already on the latest version.",
+  "remindAfterDays": 30
 }

@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run run-update-local serve-update-config android-update-reverse android-update-reverse-clear clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry ci-logs version apk aab ipa
+.PHONY: help setup get gen watch analyze format format-check test coverage run run-update-local serve-update-config generate-update-config android-update-reverse android-update-reverse-clear clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry ci-logs version apk aab ipa
 
 # Release defaults — override on the command line, e.g. `make release BUMP=minor`.
 REPO ?= mdarif/alquran-app
@@ -8,6 +8,7 @@ BUMP ?= patch
 UPDATE_CONFIG ?= update-available.json
 UPDATE_CONFIG_HOST ?= 127.0.0.1
 UPDATE_CONFIG_PORT ?= 8787
+UPDATE_VERSION ?= 1.2.2
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -28,10 +29,10 @@ analyze: ## Static analysis (warnings are fatal, as in CI)
 	flutter analyze --fatal-warnings
 
 format: ## Format all Dart sources
-	dart format lib test
+	dart format lib test tool
 
 format-check: ## Verify formatting without writing (CI gate)
-	dart format --output=none --set-exit-if-changed lib test
+	dart format --output=none --set-exit-if-changed lib test tool
 
 test: ## Run unit + widget tests
 	flutter test
@@ -58,6 +59,10 @@ serve-update-config: ## Serve local app-update fixtures: make serve-update-confi
 	@cp dev/app-update/$(UPDATE_CONFIG) /tmp/app-update.json
 	@echo "Serving /tmp/app-update.json at http://127.0.0.1:$(UPDATE_CONFIG_PORT)/app-update.json"
 	python3 -m http.server $(UPDATE_CONFIG_PORT) --directory /tmp
+
+generate-update-config: ## Generate app-update.json locally: make generate-update-config UPDATE_VERSION=1.2.2
+	dart run tool/generate_app_update_config.dart --latest-version=$(UPDATE_VERSION) --output=/tmp/app-update.json
+	@cat /tmp/app-update.json
 
 android-update-reverse: ## Forward Android device localhost:8787 to this Mac for update testing
 	adb reverse tcp:$(UPDATE_CONFIG_PORT) tcp:$(UPDATE_CONFIG_PORT)

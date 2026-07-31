@@ -3,6 +3,9 @@
 The soft update reminder is controlled by `FeatureFlags.softUpdateReminder` and
 reads a tiny JSON file from `APP_UPDATE_CONFIG_URL`.
 
+Production releases generate this file automatically from the bumped release
+version. The checked-in files under `dev/app-update/` are local fixtures only.
+
 ## Serve a Local Config
 
 Terminal 1:
@@ -36,6 +39,12 @@ make run-update-local UPDATE_CONFIG_HOST=10.0.2.2
 ```
 
 For iOS simulator, the default `127.0.0.1` is fine.
+
+To inspect the generated production shape locally:
+
+```bash
+make generate-update-config UPDATE_VERSION=1.2.2
+```
 
 ## Scenarios
 
@@ -75,8 +84,10 @@ Dismiss behavior:
 2. Launch with `make run-update-local`.
 3. Tap `Later`.
 4. Relaunch with the same config: the banner should stay hidden.
-5. Increase `latestVersion` in `dev/app-update/update-available.json`.
-6. Restart the fixture server and app: the banner should appear again.
+5. The same version appears again only after `remindAfterDays` expires
+   (production uses 30 days).
+6. Increase `latestVersion` in `dev/app-update/update-available.json`.
+7. Restart the fixture server and app: the banner should appear again.
 
 The local fixture's `latestVersion` is intentionally ahead of `pubspec.yaml`
 (`1.2.1+5` at the time this doc was written).

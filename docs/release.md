@@ -34,9 +34,10 @@ back so the version-bump commit lands on both branches.
 ## One-time setup
 
 The release workflow needs a few **repository secrets**. Set them once with the
-GitHub CLI (`gh auth login` first). Signing is **required**; Play upload and
-Codecov are **optional** — the pipeline skips them cleanly when their secret is
-absent, so you can ship GitHub Releases today and wire up Play later.
+GitHub CLI (`gh auth login` first). Signing is **required**; Play upload,
+soft-update config publishing, and Codecov are **optional** — the pipeline skips
+them cleanly when their secret is absent, so you can ship GitHub Releases today
+and wire up the rest later.
 
 ### 1. Signing secrets (required)
 
@@ -91,7 +92,35 @@ Play Console gate.
 Public-repo coverage uploads are tokenless. If the repo is private, add
 `CODECOV_TOKEN` (from codecov.io) the same way.
 
-### 4. Branch protection (none, by design)
+### 4. Soft-update config publishing (optional, recommended)
+
+Every release generates `app-update.json` from the bumped semver:
+
+```json
+{
+  "latestVersion": "1.2.2",
+  "minimumSupportedVersion": "1.0.0",
+  "storeUrl": "https://play.google.com/store/apps/details?id=com.almarfa.alquran",
+  "message": "A newer version is available.",
+  "remindAfterDays": 30
+}
+```
+
+The Android app reads `https://alquranreader.com/app-update.json`. Host that
+path from the R2 bucket named in `APP_UPDATE_R2_BUCKET`, then set:
+
+```bash
+gh secret set CLOUDFLARE_API_TOKEN --repo mdarif/alquran-app
+gh secret set CLOUDFLARE_ACCOUNT_ID --repo mdarif/alquran-app --body "..."
+gh secret set APP_UPDATE_R2_BUCKET --repo mdarif/alquran-app --body "..."
+```
+
+After that, release runs publish the config automatically after the Play upload
+step succeeds. Older app versions show the banner on Home, `Later` hides the
+same version for 30 days, and the banner stops once the installed version is
+current or newer.
+
+### 5. Branch protection (none, by design)
 
 Neither `main` nor `develop` carries GitHub protection rules — the promote /
 bump / sync pushes all run on the default `GITHUB_TOKEN`. If you ever protect
@@ -141,11 +170,14 @@ the release build succeeds.
 3. Decodes the keystore from secrets and builds a signed APK + AAB.
 4. Generates the changelog (git-cliff, [cliff.toml](../cliff.toml)) and Play
    "What's new" text.
-5. Commits the bump, tags `vX.Y.Z`, pushes both to `main`.
-6. Creates the GitHub Release with the APK, AAB, and Play notes attached.
-7. If `GOOGLE_PLAY_SERVICE_ACCOUNT` is set: uploads the AAB to the Play internal
+5. Generates `app-update.json` from the bumped semver and publishes it when the
+   Cloudflare secrets are configured.
+6. Commits the bump, tags `vX.Y.Z`, pushes both to `main`.
+7. Creates the GitHub Release with the APK, AAB, Play notes, and update config
+   attached.
+8. If `GOOGLE_PLAY_SERVICE_ACCOUNT` is set: uploads the AAB to the Play internal
    track.
-8. **Sync**: fast-forwards `develop` back to `main` so the bump commit exists
+9. **Sync**: fast-forwards `develop` back to `main` so the bump commit exists
    on both branches.
 
 ## Troubleshooting

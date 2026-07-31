@@ -34,6 +34,10 @@
 #     If either branch is ever protected, add github-actions[bot] to its
 #     bypass list — and a *required status check* on develop would need a PAT
 #     for the sync push (see Al-Tawheed's DEVELOP_SYNC_TOKEN pattern).
+#   - Repo secrets for soft-update config publish (optional): CLOUDFLARE_API_TOKEN,
+#     CLOUDFLARE_ACCOUNT_ID, APP_UPDATE_R2_BUCKET. When set, every real release
+#     publishes app-update.json automatically; when absent, the file is still
+#     attached to the GitHub Release.
 
 name: Release
 
@@ -193,6 +197,7 @@ jobs:
 
           {
             echo "new_version=${NEW_VERSION}"
+            echo "new_semver=${NEW_SEMVER}"
             echo "tag=${TAG}"
             echo "apk=al-quran-${TAG}.apk"
             echo "aab=al-quran-${TAG}.aab"
@@ -248,7 +253,7 @@ jobs:
       # 7. Quality gate — refuse to cut a release that fails format/analyze/test.
       # ------------------------------------------------------------------ #
       - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: dart format --output=none --set-exit-if-changed lib test tool
 
       - name: Analyze
         run: flutter analyze --fatal-warnings
@@ -339,7 +344,36 @@ jobs:
           echo "Play Store notes:"; cat play-store-notes.txt
 
       # ------------------------------------------------------------------ #
-      # 12. Play Store upload is OPTIONAL — gated on the service-account
+      # 12. Soft update config — generated from the release version so every
+      #     older app sees the Home update banner. The app suppresses "Later"
+      #     for remindAfterDays, then shows the same version again.
+      # ------------------------------------------------------------------ #
+      - name: Generate app update config
+        run: |
+          dart run tool/generate_app_update_config.dart \
+            --latest-version="${{ steps.version.outputs.new_semver }}" \
+            --minimum-supported-version="1.0.0" \
+            --remind-after-days="30" \
+            --output="app-update.json"
+          cat app-update.json
+
+      - name: Check app update config publish availability
+        id: app_update_publish
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APP_UPDATE_R2_BUCKET: ${{ secrets.APP_UPDATE_R2_BUCKET }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$APP_UPDATE_R2_BUCKET" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Soft-update config publish enabled — app-update.json will be uploaded to R2."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Soft-update config publish skipped. Set CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, and APP_UPDATE_R2_BUCKET to publish app-update.json automatically."
+          fi
+
+      # ------------------------------------------------------------------ #
+      # 13. Play Store upload is OPTIONAL — gated on the service-account
       #     secret. Absent (app not on Play yet) → skip, don't fail; the
       #     signed AAB is still attached to the GitHub Release.
       # ------------------------------------------------------------------ #
@@ -373,8 +407,20 @@ jobs:
           status: completed
           whatsNewDirectory: distribution/whatsnew
 
+      - name: Publish app update config
+        if: steps.play.outputs.enabled == 'true' && steps.app_update_publish.outputs.enabled == 'true' && inputs.dry_run != true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APP_UPDATE_R2_BUCKET: ${{ secrets.APP_UPDATE_R2_BUCKET }}
+        run: |
+          npx --yes wrangler r2 object put "${APP_UPDATE_R2_BUCKET}/app-update.json" \
+            --file app-update.json \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
+
       # ------------------------------------------------------------------ #
-      # 13. Commit the version bump, tag, and push. Skipped for dry runs.
+      # 14. Commit the version bump, tag, and push. Skipped for dry runs.
       # ------------------------------------------------------------------ #
       - name: Configure git identity
         if: inputs.dry_run != true
@@ -396,7 +442,7 @@ jobs:
           git push origin "${TAG}"
 
       # ------------------------------------------------------------------ #
-      # 14. GitHub Release — attach the signed APK + AAB + Play notes.
+      # 15. GitHub Release — attach the signed APK + AAB + Play notes.
       #     Skipped for dry runs.
       # ------------------------------------------------------------------ #
       - name: Create GitHub Release
@@ -414,6 +460,10 @@ jobs:
           [ -z "$CHANGELOG" ] && CHANGELOG="- Maintenance release"
           PLAY_NOTE="Play upload: skipped (no service account configured) — upload the AAB manually, or set GOOGLE_PLAY_SERVICE_ACCOUNT to automate it."
           [ "${{ steps.play.outputs.enabled }}" = "true" ] && PLAY_NOTE="Play upload: AAB pushed to the Play internal track."
+          UPDATE_NOTE="Soft-update config: generated and attached. Publish skipped (Cloudflare secrets missing)."
+          if [ "${{ steps.play.outputs.enabled }}" = "true" ] && [ "${{ steps.app_update_publish.outputs.enabled }}" = "true" ]; then
+            UPDATE_NOTE="Soft-update config: published to app-update.json."
+          fi
 
           {
             echo "## What's changed"
@@ -425,12 +475,14 @@ jobs:
             echo "**APK:** release build, signed with the production upload key — install via \`adb install ${APK}\`"
             echo "**AAB:** release bundle for the Play Store."
             echo "**${PLAY_NOTE}**"
+            echo "**${UPDATE_NOTE}**"
           } > release-notes.md
 
           gh release create "${TAG}" \
             "${APK}#Al Quran Android APK (release, signed)" \
             "${AAB}#Al Quran Android App Bundle (release, signed — Play upload)" \
             "play-store-notes.txt#Play Store release notes (plain text)" \
+            "app-update.json#Soft update config" \
             --title "Al Quran ${TAG}" \
             --notes-file release-notes.md
 
