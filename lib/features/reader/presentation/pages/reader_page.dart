@@ -226,7 +226,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Whether a Reading tap opens the translation peek at all. Off by default — the
   // always-on player owns playback, so a tap just SELECTS the verse (queues it for
   // the bar's Play). Opt-in from Settings; persisted.
-  late bool _showTranslationPeek = _settings.showTranslationPeek;
+  late bool _showTranslationPeek =
+      FeatureFlags.readingTranslationPeek && _settings.showTranslationPeek;
 
   // Whether the Detailed view shows the Arabic matn above each translation. On by
   // default; off = a translations-only reading. Opt-out from Settings; persisted.
@@ -534,8 +535,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         audioState: audio,
         onToggleLanguage:
             interactive ? (code) => _toggleLang(code, resources) : null,
-        // The peek only opens when the reader opts in (Settings); off by default.
-        showPeek: _showTranslationPeek,
+        // The peek only opens when the feature is enabled and the reader opts in
+        // (Settings); off by default.
+        showPeek: FeatureFlags.readingTranslationPeek && _showTranslationPeek,
         // A tap always selects/queues the verse for the player, peek or not.
         onSelectVerse: interactive ? _onSelectVerse : null,
         // Only the live page drives immersion (forward-scroll hides the chrome).
@@ -787,7 +789,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           // Translations was dismissed, not just Translations).
           onOpenTranslations: _openTranslationsSheet,
           isReading: _viewport == _Viewport.reading,
-          showTranslationPeek: _showTranslationPeek,
+          showTranslationPeek:
+              FeatureFlags.readingTranslationPeek && _showTranslationPeek,
           onToggleTranslationPeek: _toggleShowTranslationPeek,
           showArabicMatn: _showArabicMatn,
           onToggleShowArabic: _toggleShowArabicMatn,
@@ -826,7 +829,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       _arabicFont = _settings.fontSize.clamp(_minFont, _maxFont);
       _script = _settings.script;
       _selected = _settings.selectedTranslations?.toSet();
-      _showTranslationPeek = _settings.showTranslationPeek;
+      _showTranslationPeek =
+          FeatureFlags.readingTranslationPeek && _settings.showTranslationPeek;
       _showArabicMatn = _settings.showArabicMatn;
     });
     if (scriptChanged) {
@@ -983,6 +987,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   /// Opt in/out of the translation peek on tap (Reading). Off by default — a tap
   /// just queues the verse for the player; on, it also opens the translation card.
   void _toggleShowTranslationPeek(bool value) {
+    if (!FeatureFlags.readingTranslationPeek) return;
     setState(() => _showTranslationPeek = value);
     unawaited(_settings.setShowTranslationPeek(value));
   }
@@ -1723,7 +1728,9 @@ class _SettingsSheetState extends State<_SettingsSheet> {
               // default; the always-on player owns playback, so a tap otherwise
               // just cues the verse). Hidden in Detailed, which always shows
               // translations, and when there's no translation to peek.
-              if (widget.isReading && widget.resources.isNotEmpty) ...[
+              if (FeatureFlags.readingTranslationPeek &&
+                  widget.isReading &&
+                  widget.resources.isNotEmpty) ...[
                 const SizedBox(height: _sectionGap),
                 const _SectionLabel('Reading'),
                 SwitchListTile.adaptive(

@@ -23,12 +23,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
 class _Repo implements AyahRepository {
-  _Repo(this.settings);
+  _Repo(this.settings, {this.resources = const []});
 
   // The real repository reads the chosen script to pick the text column, so the
   // returned verse text differs per script — used to prove the view actually
   // re-renders the new script's text (not just swaps the font).
   final _Settings settings;
+  final List<TranslationResource> resources;
   int getAyahsCalls = 0;
   @override
   Future<List<Ayah>> getAyahs(ReaderTarget target) async {
@@ -41,6 +42,9 @@ class _Repo implements AyahRepository {
         surahId: s,
         ayahNumber: 1,
         textArabic: txt,
+        translations: {
+          for (final resource in resources) resource.slug: 'Meaning',
+        },
         isSajda: false,
       ),
     ];
@@ -53,7 +57,8 @@ class _Repo implements AyahRepository {
       };
 
   @override
-  Future<List<TranslationResource>> getTranslationResources() async => const [];
+  Future<List<TranslationResource>> getTranslationResources() async =>
+      resources;
 }
 
 class _LastRead implements LastReadRepository {
@@ -150,6 +155,20 @@ class _SilentPlayer implements AyahRecitationPlayer {
   Future<void> dispose() async {}
 }
 
+const List<TranslationResource> _translationResources = [
+  TranslationResource(
+    id: 1,
+    slug: 'ur-junagarhi',
+    languageCode: 'ur',
+    name: 'Muhammad Junagarhi',
+    nativeName: 'اردو',
+    author: 'Muhammad Junagarhi',
+    direction: 'rtl',
+    sortOrder: 1,
+    defaultOn: true,
+  ),
+];
+
 void main() {
   late _Repo repo;
   late _Settings settings;
@@ -213,6 +232,42 @@ void main() {
     await tester.tap(find.byKey(WidgetKeys.fontIncrease));
     await tester.pumpAndSettle();
     expect(readerFontSize(tester), greaterThan(before));
+  });
+
+  testWidgets('reading translation peek setting is hidden while flagged off',
+      (tester) async {
+    await GetIt.I.reset();
+    settings = _Settings();
+    repo = _Repo(settings, resources: _translationResources);
+    GetIt.I
+      ..registerFactory<ReaderCubit>(() => ReaderCubit(repo, _LastRead()))
+      ..registerLazySingleton<ReaderSettingsRepository>(() => settings)
+      ..registerFactory<AyahAudioCubit>(() => AyahAudioCubit(_SilentPlayer()));
+
+    await pump(tester);
+    await openPanel(tester);
+
+    expect(FeatureFlags.readingTranslationPeek, isFalse);
+    expect(find.text('Show translation'), findsNothing);
+    expect(find.byKey(WidgetKeys.translationPeekToggle), findsNothing);
+  });
+
+  testWidgets('saved translation peek preference is ignored while flagged off',
+      (tester) async {
+    await GetIt.I.reset();
+    settings = _Settings()..showTranslationPeek = true;
+    repo = _Repo(settings, resources: _translationResources);
+    GetIt.I
+      ..registerFactory<ReaderCubit>(() => ReaderCubit(repo, _LastRead()))
+      ..registerLazySingleton<ReaderSettingsRepository>(() => settings)
+      ..registerFactory<AyahAudioCubit>(() => AyahAudioCubit(_SilentPlayer()));
+
+    await pump(tester);
+    await tester.tap(find.byType(MushafView));
+    await tester.pumpAndSettle();
+
+    expect(FeatureFlags.readingTranslationPeek, isFalse);
+    expect(find.byKey(WidgetKeys.peekCard), findsNothing);
   });
 
   const skip = !FeatureFlags.indopakScript; // feature shipped dark

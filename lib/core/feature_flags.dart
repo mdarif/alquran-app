@@ -76,6 +76,11 @@ abstract final class FeatureFlags {
   /// controls the *unprompted* background fetch.
   static const bool proactiveTranslationSync = true;
 
+  /// Reading-mode tap-to-peek translations. Shipped DARK for now: Detailed mode
+  /// is the supported translation reading surface, and the peek sheet needs a
+  /// calmer redesign before release.
+  static const bool readingTranslationPeek = false;
+
   /// Soft app-update reminder: Home checks a tiny remote JSON config and, when
   /// the installed version is older than `latestVersion`, shows a dismissible
   /// update nudge. Optional only for now; forced updates need a separate UX pass.
