@@ -993,6 +993,73 @@ Two related calls from the on-device player redesign:
   ✕ stop (pause is the stop; swiping away clears the session). Less state to hold, less to explain,
   nothing to open — which is exactly what the owner meant by "super simple UX to play the verses."
 
+### Hard-clamped scroll physics can mask one overscroll bug behind two more — and OEM touch overlays can leave it permanently stuck (2026-07-31)
+
+Three layered bugs, each hiding the next, all from one starting point: killing the visible
+rubber-band at a list's true top/bottom (`QuranClampEdgesPhysics extends BouncingScrollPhysics`,
+overriding `applyBoundaryConditions` to fully refuse any delta that would move `pixels` past
+`minScrollExtent`/`maxScrollExtent` — no bounce, but the bounce feel is kept mid-content). Shipped
+first on the reader (`mushaf_view.dart`), then the Surah list (`surah_list_page.dart`).
+
+1. **Android's stock overscroll indicator doesn't know about the clamp.** `MaterialScrollBehavior`
+   wraps every scrollable in a `StretchingOverscrollIndicator` (Material 3) by default on Android.
+   It reacts to `OverscrollNotification.overscroll` — and `ScrollPosition.setPixels` still reports
+   that value even when the boundary condition fully refuses it (that's inherent to the clamp math:
+   `pixels = newPixels - overscroll`, so the refused amount IS the reported "overscroll"). Result:
+   the indicator visibly stretched/squashed list content on every pull-past-edge even though the
+   list itself never moved — read as "padding flickering in and out." **Fix:** override
+   `ScrollBehavior.buildOverscrollIndicator` to return `child` unchanged — we already supply our own
+   bounce/clamp feel via the physics, so skip the platform decoration entirely
+   (`lib/core/scroll/quran_scroll_behavior.dart`).
+2. **That fix *unmasked* a second bug instead of fixing everything** — after removing the indicator,
+   a real user still saw a large, *persistent* (not transient) blank gap above the first row on a
+   physical Android device, reproducible only by swiping down/up a few times. Not reproducible in
+   widget tests (pixel-position assertions all passed — this is a paint/gesture-layer bug) or on
+   emulator — **the stretch indicator had been visually papering over it the whole time**, since its
+   transform effect scales/fills the child seamlessly regardless of the underlying scroll offset.
+3. **THE ACTUAL ROOT CAUSE: `applyBoundaryConditions` has FOUR cases and we implemented two.**
+   Flutter's `ClampingScrollPhysics.applyBoundaryConditions` handles (1) underscroll — already at/past
+   the top and moving further past; (2) overscroll — same at the bottom; **(3) "hit top edge" — the
+   delta CROSSES the boundary from inside this frame; (4) "hit bottom edge"**. Our subclass had only
+   1 and 2. So a drag from *just inside* the edge (e.g. `pixels=5`, proposed `value=-300`) matched
+   neither case and fell through to `super` — `BouncingScrollPhysics`, which **refuses nothing
+   (returns `0.0`)**. The full out-of-range move was allowed, `pixels` landed at −300, and nothing
+   pulled it back except a later ballistic run. That is the gap. **Fix:** add the two missing cases,
+   refusing only the portion beyond the edge (`return value - position.minScrollExtent`), exactly as
+   `ClampingScrollPhysics` does. Unit-testable with plain `FixedScrollMetrics` — no device needed.
+   *If you subclass a physics class and override `applyBoundaryConditions`, port ALL FOUR cases or
+   inherit from `ClampingScrollPhysics`; a partial override silently delegates the gaps to a parent
+   whose contract is the opposite of what you want.*
+
+   The OEM angle was a **red herring as a root cause, though real as an amplifier**: this device's
+   logcat is full of ColorOS/OxygenOS touch-overlay hooks (`OplusViewDragTouchViewHelper`,
+   `OplusScrollToTopManager`). A dropped/delayed pointer-up means the ballistic spring that would
+   otherwise have hidden our bug never runs — which is why the gap looked *permanent* here and
+   merely flickery elsewhere. Don't stop at "the OEM did it": that framing produced a
+   `NotificationListener` + `jumpTo` "self-heal" band-aid which **broke Reading mode** (on a
+   `ScrollablePositionedList`, `jumpTo` resets the list to pixel 0 before re-rooting — a comment in
+   `mushaf_view.dart` already said so — causing a blank screen mid-scroll). Both band-aids were
+   reverted once the real cause was fixed in the physics class.
+
+**Process lesson (the expensive part).** The bug took far longer than it should have because of how it
+was chased, not how hard it was:
+- **Patching call sites instead of auditing the shared class.** Three screens showed it; the one thing
+  they shared was the physics class. The controlled experiment was sitting in git the whole time: the
+  reader had *already shipped* `QuranClampEdgesPhysics` and had the bug; Home didn't have the class and
+  didn't have the bug — until the class was added to Home, and the bug appeared with it. Run that
+  correlation *first*.
+- **Announcing "root cause found" for what was only a hypothesis** (twice). The stretch-indicator fix
+  was real but was only ever *a* cause; declaring victory hid the remaining bug and, by removing the
+  masking stretch, made it look worse.
+- **Trusting green widget tests as evidence of correctness.** They asserted final pixel positions after
+  `pumpAndSettle`, which is precisely when the ballistic run has already corrected the state — the
+  assertions could not see this bug by construction. Two tests even "passed" for wrong reasons (an
+  inverted matcher; a list too short to scroll). *A test that cannot fail is not evidence.* The unit
+  test on `applyBoundaryConditions` — pure function, no widgets, no settle — caught it instantly.
+- **What did work on-device:** `adb exec-out screencap -p` twice, a minute apart. Identical gap ⇒
+  persistent stuck state, not transient mis-paint ⇒ "the position value itself is wrong," which is
+  what finally pointed at the physics rather than the painting.
+
 ---
 
 ## 4. Flutter project & build mechanics

@@ -11,6 +11,54 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Open
 
+### 12. Impeller opt-out is DEPRECATED — our Arabic rendering depends on it (2026-07-31) · **HIGH / time-bomb**
+- **Area:** rendering · Arabic text · Flutter upgrades · both platforms
+- **The risk:** we disable Impeller on **both** platforms
+  (`io.flutter.embedding.android.EnableImpeller=false`, `FLTEnableImpeller=false`)
+  because Impeller does not apply the KFGQPC font's Arabic **GPOS mark/mkmk anchors**,
+  so the elongated madd (`يَـٰٓأَيُّهَا`) collapses; Skia renders it correctly
+  (LEARNINGS.md §1). Flutter now prints at every launch:
+  *"[Action Required]: Impeller opt-out deprecated … these options are going to go away
+  in an upcoming Flutter release."*
+- **Why it matters here more than in a normal app:** when that escape hatch is removed,
+  a routine Flutter upgrade will **silently corrupt the rendering of Qur'anic text** —
+  no crash, no test failure, just wrong glyphs in the one thing the app exists to show.
+- **Not blocking the next release** (current pin, Flutter 3.41.1 stable, still honours the
+  opt-out). **Blocking any Flutter upgrade.**
+
+**MEASURED 2026-07-31 on Flutter 3.41.1 — Android: the bug is GONE.**
+Method: flipped `EnableImpeller` to `true`, rebuilt, opened An-Nisa (4:1 begins with the
+exact failing cluster `يَـٰٓأَيُّهَا`) on the OnePlus CPH2767 (Adreno/Vulkan), captured via
+`adb exec-out screencap -p`, then repeated with the opt-out restored and diffed the two
+PNGs with PIL after auto-searching the best vertical alignment.
+- **Result: best `dy=0`, mean |diff| = 0.224/255, ZERO pixels differing by >30 levels,
+  max diff 16** (pure rasteriser antialiasing). Impeller ≡ Skia for this text.
+- **The toggle was proven live, not assumed:** Flutter logs *"Impeller opt-out deprecated"*
+  only when opted out — present in the Skia run, absent in the Impeller run.
+
+**iOS: NOT verified — treat as unknown.** The same experiment on the iPhone 17 **simulator**
+returned a *byte-identical* image (max diff level **0**) with **no** deprecation warning in
+either run — i.e. the simulator appears to ignore `FLTEnableImpeller` entirely, so it is a
+**null test**, not a pass. iOS was where the bug was *first* found, so it needs a **real
+iPhone** before the opt-out is removed there.
+
+- **Recommended sequencing (do NOT bundle with a same-day release):** the renderer swap is a
+  whole-app visual change; land it early in a cycle with soak time, not the night before a
+  build. Order: (1) verify on a physical iPhone using the probe method below; (2) remove the
+  Android opt-out first, ship, watch; (3) remove the iOS opt-out in a later build.
+- **Probe recipe (reusable, ~20 lines):** a throwaway `lib/main_impeller_probe.dart` entrypoint
+  that renders the hard clusters — `يَـٰٓأَيُّهَا ٱلنَّاسُ` (4:1), `وَءَاتُواْ ٱلۡيَتَٰمَىٰٓ` (4:2),
+  `ذَٰلِكَ ٱلۡكِتَٰبُ لَا` (2:2, also covers the lam-alef `liga` quirk), `حَتَّىٰ ٱلۡأَعۡمَىٰ` — at
+  `fontSize: 40` using the real `QuranTextStyle.madani` (so the production `fontFeatures` apply),
+  run with `flutter run -t lib/main_impeller_probe.dart -d <device>`. Isolates glyph positioning
+  far better than navigating the UI, and renders identically on both platforms for diffing.
+  **Always confirm the toggle actually took effect** (deprecation-log presence/absence) before
+  trusting a "no difference" result.
+- **Guard already in place (verified 2026-07-31):** both `flutter-ci.yml` and
+  `flutter-release.yml` pin `flutter-version: 3.41.1`, so this cannot land accidentally —
+  an upgrade is a deliberate, reviewed act. **Keep it pinned**; treat bumping that number
+  as the trigger for the visual diff above.
+
 ### 11. Lock-screen / background audio — DEFERRED to next release (owner decision 2026-07-10)
 - **Area:** reader · audio · platform
 - **Want:** recitation keeps playing when the app is backgrounded / the screen is

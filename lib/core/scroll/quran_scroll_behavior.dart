@@ -60,6 +60,23 @@ class QuranClampEdgesPhysics extends QuranScrollPhysics {
         position.pixels >= position.maxScrollExtent) {
       return value - position.pixels;
     }
+    // Hit the top edge THIS frame: a single delta can cross the boundary from
+    // inside (e.g. pixels=5 → value=-300). Without this case the call fell
+    // through to BouncingScrollPhysics, which refuses nothing (returns 0.0) —
+    // so `pixels` landed far out of range and STAYED there, since only a later
+    // ballistic run springs it back. On devices whose OEM touch layer drops the
+    // final pointer-up, that ballistic never runs, leaving a permanent gap above
+    // the first row until an unrelated scroll nudged it. Refuse only the part
+    // beyond the edge, exactly as [ClampingScrollPhysics] does.
+    if (value < position.minScrollExtent &&
+        position.minScrollExtent < position.pixels) {
+      return value - position.minScrollExtent;
+    }
+    // Hit the bottom edge this frame (mirror of the above).
+    if (position.pixels < position.maxScrollExtent &&
+        position.maxScrollExtent < value) {
+      return value - position.maxScrollExtent;
+    }
     return super.applyBoundaryConditions(position, value);
   }
 }
@@ -80,4 +97,21 @@ class QuranScrollBehavior extends MaterialScrollBehavior {
         PointerDeviceKind.trackpad,
         PointerDeviceKind.stylus,
       };
+
+  // Android's stock stretch/glow indicator reacts to the raw overscroll
+  // delta ScrollPosition reports on every boundary hit — including from
+  // QuranClampEdgesPhysics, which hard-clamps `pixels` but still reports the
+  // refused delta (that's how the clamp math works: pixels = newPixels -
+  // overscroll). So the indicator kept visibly stretching/squashing list
+  // content on pull-past-edge even though the list itself never moved,
+  // reading as flickering top padding on real Android devices. We already
+  // supply our own bounce/clamp feel via [QuranScrollPhysics], so skip the
+  // platform decoration entirely.
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../reader/domain/entities/reader_target.dart';
 import '../../../reader/presentation/pages/reader_page.dart';
@@ -58,6 +59,7 @@ class SurahListBody extends StatelessWidget {
             if (hits.isEmpty) return _NoMatch(query: state.query);
             return ListView.separated(
               padding: const EdgeInsets.only(top: 4, bottom: 20),
+              physics: const QuranClampEdgesPhysics(),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               itemCount: hits.length,
               separatorBuilder: (context, _) {
