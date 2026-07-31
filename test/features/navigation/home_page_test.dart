@@ -9,7 +9,14 @@ import 'package:al_quran/features/navigation/presentation/cubit/index_list_cubit
 import 'package:al_quran/features/navigation/presentation/pages/home_page.dart';
 import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_line.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
+import 'package:al_quran/features/reader/domain/entities/ayah.dart';
+import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
+import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
+import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
+import 'package:al_quran/features/reader/domain/repositories/ayah_bookmark_repository.dart';
+import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
+import 'package:al_quran/features/reader/presentation/pages/bookmarks_page.dart';
 import 'package:al_quran/features/reader/presentation/widgets/last_read_banner.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
@@ -39,6 +46,26 @@ class _FakeLastReadRepository implements LastReadRepository {
   Future<void> save(LastRead value) async {}
   @override
   Future<LastRead?> load() async => null; // banner stays hidden
+}
+
+class _FakeBookmarkRepository implements AyahBookmarkRepository {
+  @override
+  Set<int> get bookmarkedAyahIds => const {};
+  @override
+  Future<List<Ayah>> bookmarkedAyahs() async => const [];
+  @override
+  bool isBookmarked(int ayahId) => false;
+  @override
+  Future<void> setBookmarked(int ayahId, bool bookmarked) async {}
+}
+
+class _FakeAyahRepository implements AyahRepository {
+  @override
+  Future<List<Ayah>> getAyahs(ReaderTarget target) async => const [];
+  @override
+  Future<Map<int, SurahHeading>> getSurahHeadings() async => const {};
+  @override
+  Future<List<TranslationResource>> getTranslationResources() async => const [];
 }
 
 class _FakeIndexRepository implements IndexRepository {
@@ -83,6 +110,10 @@ void main() {
         () => SurahListCubit(GetIt.I<SurahRepository>()),
       )
       ..registerLazySingleton<LastReadRepository>(_FakeLastReadRepository.new)
+      ..registerLazySingleton<AyahBookmarkRepository>(
+        _FakeBookmarkRepository.new,
+      )
+      ..registerLazySingleton<AyahRepository>(_FakeAyahRepository.new)
       ..registerLazySingleton<IndexRepository>(_FakeIndexRepository.new)
       ..registerFactory<IndexListCubit>(
         () => IndexListCubit(GetIt.I<IndexRepository>()),
@@ -176,6 +207,25 @@ void main() {
       expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
     });
 
+    testWidgets('the overflow opens Bookmarks', (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.bookmarksMenuButton));
+      await tester.pumpAndSettle();
+      expect(find.byType(BookmarksPage), findsOneWidget);
+    });
+
+    testWidgets('the home overflow does not expose reader-only Translations',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.translationsMenuButton), findsNothing);
+      expect(find.text('Translations'), findsNothing);
+      expect(find.byKey(WidgetKeys.bookmarksMenuButton), findsOneWidget);
+    });
+
     testWidgets('hides each flagged feature when its flag is off',
         (tester) async {
       await _pumpHome(
@@ -187,7 +237,7 @@ void main() {
       );
       expect(find.byType(HijriDateLine), findsNothing);
       expect(find.byType(LastReadBanner), findsNothing);
-      // The overflow itself stays — Translations/Share/About are unconditional.
+      // The overflow itself stays — Bookmarks/Share/About are unconditional.
       expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
       // The reading list itself is unaffected.
       expect(find.byType(SurahListBody), findsOneWidget);

@@ -211,6 +211,97 @@ void main() {
       expect(find.text('Share'), findsOneWidget);
     });
 
+    testWidgets('ayah menu uses compact rows instead of padded ListTiles',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(ayah: ayah, resources: [], arabicFontSize: 24),
+        ),
+      );
+
+      await tester.tap(find.byIcon(AppIcons.more));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.ancestor(of: find.text('Copy'), matching: find.byType(ListTile)),
+        findsNothing,
+      );
+      expect(
+        find.ancestor(of: find.text('Share'), matching: find.byType(ListTile)),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Translations menu item opens the translation picker',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+      );
+      var opened = false;
+
+      await tester.pumpWidget(
+        _wrap(
+          AyahTile(
+            ayah: ayah,
+            resources: const [],
+            arabicFontSize: 24,
+            onOpenTranslations: () => opened = true,
+          ),
+        ),
+      );
+
+      await tester.tap(find.byIcon(AppIcons.more));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Translations'));
+      await tester.pumpAndSettle();
+
+      expect(opened, isTrue);
+    });
+
+    testWidgets('shows a visible bookmark affordance when bookmark is wired',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 2,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+      );
+      var toggled = false;
+
+      await tester.pumpWidget(
+        _wrap(
+          AyahTile(
+            ayah: ayah,
+            resources: const [],
+            arabicFontSize: 24,
+            isBookmarked: true,
+            onToggleBookmark: () => toggled = true,
+          ),
+        ),
+      );
+
+      final bookmark = find.byTooltip('Remove bookmark');
+      expect(bookmark, findsOneWidget);
+
+      await tester.tap(bookmark);
+      await tester.pump();
+
+      expect(toggled, isTrue);
+    });
+
     testWidgets('Copy puts the ayah text on the clipboard and confirms',
         (tester) async {
       const ayah = Ayah(

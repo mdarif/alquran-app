@@ -10,9 +10,11 @@ import '../../features/prayer_times/data/repositories/prayer_times_repository_im
 import '../../features/prayer_times/domain/repositories/prayer_times_repository.dart';
 import '../../features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import '../../features/reader/data/repositories/ayah_repository_impl.dart';
+import '../../features/reader/data/repositories/ayah_bookmark_repository_impl.dart';
 import '../../features/reader/data/repositories/last_read_repository_impl.dart';
 import '../../features/reader/data/repositories/reader_settings_repository_impl.dart';
 import '../../features/reader/domain/repositories/ayah_repository.dart';
+import '../../features/reader/domain/repositories/ayah_bookmark_repository.dart';
 import '../../features/reader/domain/repositories/last_read_repository.dart';
 import '../../features/reader/domain/repositories/reader_settings_repository.dart';
 import '../../features/reader/domain/entities/translation_resource.dart';
@@ -143,6 +145,12 @@ Future<void> configureDependencies() async {
     )
     ..registerLazySingleton<LastReadRepository>(
       () => LastReadRepositoryImpl(getIt<SharedPreferences>()),
+    )
+    ..registerLazySingleton<AyahBookmarkRepository>(
+      () => AyahBookmarkRepositoryImpl(
+        getIt<SharedPreferences>(),
+        getIt<AppDatabase>(),
+      ),
     )
     ..registerLazySingleton<ReaderSettingsRepository>(
       () => ReaderSettingsRepositoryImpl(getIt<SharedPreferences>()),

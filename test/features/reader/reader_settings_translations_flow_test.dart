@@ -6,6 +6,7 @@ import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
+import 'package:al_quran/features/reader/domain/repositories/ayah_bookmark_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
@@ -63,6 +64,28 @@ class _LastRead implements LastReadRepository {
   Future<void> save(LastRead value) async {}
   @override
   Future<LastRead?> load() async => null;
+}
+
+class _Bookmarks implements AyahBookmarkRepository {
+  final Set<int> _ids = {};
+
+  @override
+  Set<int> get bookmarkedAyahIds => {..._ids};
+
+  @override
+  bool isBookmarked(int ayahId) => _ids.contains(ayahId);
+
+  @override
+  Future<void> setBookmarked(int ayahId, bool bookmarked) async {
+    if (bookmarked) {
+      _ids.add(ayahId);
+    } else {
+      _ids.remove(ayahId);
+    }
+  }
+
+  @override
+  Future<List<Ayah>> bookmarkedAyahs() async => const [];
 }
 
 class _Settings implements ReaderSettingsRepository {
@@ -151,6 +174,7 @@ void main() {
   setUp(() {
     GetIt.I
       ..registerFactory<ReaderCubit>(() => ReaderCubit(_Repo(), _LastRead()))
+      ..registerLazySingleton<AyahBookmarkRepository>(_Bookmarks.new)
       ..registerLazySingleton<ReaderSettingsRepository>(_Settings.new)
       ..registerFactory<AyahAudioCubit>(() => AyahAudioCubit(_SilentPlayer()))
       ..registerLazySingleton<EditionRepository>(_FakeEditionRepo.new)
@@ -181,5 +205,24 @@ void main() {
 
     expect(find.byType(TranslationsPage), findsNothing);
     expect(find.byKey(WidgetKeys.readerSettingsPage), findsOneWidget);
+  });
+
+  testWidgets('bookmarking an ayah immediately renders the filled-state action',
+      (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: ReaderPage(
+          target: ReaderTarget.surah(2, 'S'),
+          initialDetailed: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(WidgetKeys.ayahBookmarkButton(1)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bookmark saved'), findsOneWidget);
+    expect(find.byTooltip('Remove bookmark'), findsOneWidget);
   });
 }

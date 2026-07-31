@@ -42,6 +42,14 @@ class AppDatabase extends _$AppDatabase {
         ..orderBy([(a) => OrderingTerm.asc(a.ayahNumber)]))
       .get();
 
+  Future<List<AyahRow>> ayahsByIds(List<int> ids) {
+    if (ids.isEmpty) return Future.value(const []);
+    return (select(ayahs)
+          ..where((a) => a.id.isIn(ids))
+          ..orderBy([(a) => OrderingTerm.asc(a.id)]))
+        .get();
+  }
+
   /// Ayahs of an index range (juz/hizb/page/ruku), in mushaf order. These
   /// indices are global and monotonic, so ordering by the running [Ayahs.id]
   /// yields the correct reading sequence even across surah boundaries.

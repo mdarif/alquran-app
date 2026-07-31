@@ -22,6 +22,9 @@ class AyahTile extends StatelessWidget {
     this.highlight = false,
     this.audioState,
     this.onTogglePlay,
+    this.isBookmarked = false,
+    this.onToggleBookmark,
+    this.onOpenTranslations,
     this.onScreenshotPage,
     super.key,
   });
@@ -48,6 +51,17 @@ class AyahTile extends StatelessWidget {
   /// Toggle recitation for this verse. Null hides the play control entirely
   /// (the flag-off path renders exactly as before).
   final VoidCallback? onTogglePlay;
+
+  /// Whether this verse is saved as an ayah bookmark. The storage layer owns the
+  /// truth; this tile only renders the affordance.
+  final bool isBookmarked;
+
+  /// Toggle this verse's bookmark. Null hides the visible bookmark affordance
+  /// until bookmark persistence is wired.
+  final VoidCallback? onToggleBookmark;
+
+  /// Opens the reader-wide translation picker from this ayah's menu.
+  final VoidCallback? onOpenTranslations;
 
   /// Capture the whole visible page as an image and share it — wired from the
   /// Detailed list (which owns the RepaintBoundary). Null hides the ⋯ menu's
@@ -112,8 +126,36 @@ class AyahTile extends StatelessWidget {
               ],
               const Spacer(),
               if (onTogglePlay != null) _playButton(theme),
+              if (onToggleBookmark != null)
+                IconButton(
+                  key: WidgetKeys.ayahBookmarkButton(ayah.id),
+                  tooltip: isBookmarked ? 'Remove bookmark' : 'Bookmark ayah',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onToggleBookmark,
+                  icon: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isBookmarked
+                          ? theme.colorScheme.primaryContainer
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: AppIcon(
+                        AppIcons.bookmark,
+                        filled: isBookmarked,
+                        size: AppIconSize.action,
+                        color: isBookmarked
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
               PopupMenuButton<_AyahAction>(
-                tooltip: 'Copy or share',
+                tooltip: 'Ayah options',
                 icon: AppIcon(
                   AppIcons.more,
                   size: AppIconSize.action,
@@ -123,29 +165,53 @@ class AyahTile extends StatelessWidget {
                 itemBuilder: (_) => [
                   const PopupMenuItem(
                     value: _AyahAction.copy,
-                    child: ListTile(
-                      leading: AppIcon(AppIcons.copy),
-                      title: Text('Copy'),
-                      contentPadding: EdgeInsets.zero,
+                    height: _CompactMenuItem.height,
+                    padding: EdgeInsets.zero,
+                    child: _CompactMenuItem(
+                      icon: AppIcons.copy,
+                      label: 'Copy',
                     ),
                   ),
                   const PopupMenuItem(
                     value: _AyahAction.share,
-                    child: ListTile(
-                      leading: AppIcon(AppIcons.share),
-                      title: Text('Share'),
-                      contentPadding: EdgeInsets.zero,
+                    height: _CompactMenuItem.height,
+                    padding: EdgeInsets.zero,
+                    child: _CompactMenuItem(
+                      icon: AppIcons.share,
+                      label: 'Share',
                     ),
                   ),
+                  if (onToggleBookmark != null)
+                    PopupMenuItem(
+                      value: _AyahAction.bookmark,
+                      height: _CompactMenuItem.height,
+                      padding: EdgeInsets.zero,
+                      child: _CompactMenuItem(
+                        icon: AppIcons.bookmark,
+                        filled: isBookmarked,
+                        label: isBookmarked ? 'Remove bookmark' : 'Bookmark',
+                      ),
+                    ),
+                  if (onOpenTranslations != null)
+                    const PopupMenuItem(
+                      value: _AyahAction.translations,
+                      height: _CompactMenuItem.height,
+                      padding: EdgeInsets.zero,
+                      child: _CompactMenuItem(
+                        icon: AppIcons.viewReading,
+                        label: 'Translations',
+                      ),
+                    ),
                   // Whole-page image, not just this verse — captures every verse
                   // currently on screen (see [onScreenshotPage]).
                   if (onScreenshotPage != null)
                     const PopupMenuItem(
                       value: _AyahAction.screenshot,
-                      child: ListTile(
-                        leading: AppIcon(AppIcons.screenshot),
-                        title: Text('Screenshot page'),
-                        contentPadding: EdgeInsets.zero,
+                      height: _CompactMenuItem.height,
+                      padding: EdgeInsets.zero,
+                      child: _CompactMenuItem(
+                        icon: AppIcons.screenshot,
+                        label: 'Screenshot page',
                       ),
                     ),
                 ],
@@ -230,6 +296,14 @@ class AyahTile extends StatelessWidget {
       onScreenshotPage?.call();
       return;
     }
+    if (action == _AyahAction.translations) {
+      onOpenTranslations?.call();
+      return;
+    }
+    if (action == _AyahAction.bookmark) {
+      onToggleBookmark?.call();
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     final text = buildAyahShareText(
       ayah: ayah,
@@ -248,6 +322,9 @@ class AyahTile extends StatelessWidget {
           );
         case _AyahAction.share:
           await SharePlus.instance.share(ShareParams(text: text));
+        case _AyahAction.bookmark:
+        case _AyahAction.translations:
+          break; // handled above
         case _AyahAction.screenshot:
           break; // handled above
       }
@@ -265,7 +342,53 @@ class AyahTile extends StatelessWidget {
   }
 }
 
-enum _AyahAction { copy, share, screenshot }
+enum _AyahAction { copy, share, bookmark, translations, screenshot }
+
+class _CompactMenuItem extends StatelessWidget {
+  const _CompactMenuItem({
+    required this.icon,
+    required this.label,
+    this.filled = false,
+  });
+
+  static const double height = 44;
+
+  final IconData icon;
+  final String label;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 28,
+            child: AppIcon(
+              icon,
+              filled: filled,
+              size: AppIconSize.label,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// One translation: a small left-aligned attribution label over the text, which
 /// is aligned by its script (Urdu RTL → right, English LTR → left).

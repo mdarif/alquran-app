@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/testing/widget_keys.dart';
@@ -8,10 +9,11 @@ import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
+import '../../../reader/domain/repositories/ayah_bookmark_repository.dart';
+import '../../../reader/domain/repositories/ayah_repository.dart';
+import '../../../reader/presentation/pages/bookmarks_page.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
-import '../../../translations/presentation/cubit/translations_cubit.dart';
-import '../../../translations/presentation/translations_sheet.dart';
 
 /// The app's download page — a funnel that lands on a download screen and routes
 /// to the store. Deliberately distinct from the About screen's homepage link.
@@ -58,7 +60,6 @@ class HomeOverflowMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final reminders = showReminders ? _cubit<RemindersCubit>(context) : null;
     final theme = showReadingLight ? _cubit<ThemeCubit>(context) : null;
-    final translations = _cubit<TranslationsCubit>(context);
 
     // MenuAnchor (not PopupMenuButton) so the menu hugs its content — the popup
     // menu rounds its width up in fixed steps, leaving a blank strip on the right.
@@ -101,11 +102,10 @@ class HomeOverflowMenu extends StatelessWidget {
             onPressed: () => _openReadingLight(context, theme),
           ),
         _MenuItem(
-          key: WidgetKeys.translationsMenuButton,
-          icon: AppIcons.viewReading,
-          badge: translations?.state.hasUnseenEditions ?? false,
-          label: 'Translations',
-          onPressed: () => showTranslationsSheet(context),
+          key: WidgetKeys.bookmarksMenuButton,
+          icon: AppIcons.bookmark,
+          label: 'Bookmarks',
+          onPressed: () => _openBookmarks(context),
         ),
         // Always available — a "tell a friend" share of the app via its website.
         _MenuItem(
@@ -129,6 +129,29 @@ class HomeOverflowMenu extends StatelessWidget {
   void _openAbout(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+    );
+  }
+
+  void _openBookmarks(BuildContext context) {
+    if (!GetIt.I.isRegistered<AyahBookmarkRepository>() ||
+        !GetIt.I.isRegistered<AyahRepository>()) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Restart Al Quran to finish enabling bookmarks'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookmarksPage(
+          bookmarks: GetIt.I<AyahBookmarkRepository>(),
+          ayahs: GetIt.I<AyahRepository>(),
+        ),
+      ),
     );
   }
 
@@ -184,7 +207,6 @@ class _MenuItem extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.filled = false,
-    this.badge = false,
     super.key,
   });
 
@@ -192,9 +214,6 @@ class _MenuItem extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
   final bool filled;
-
-  /// A small dot on the icon — "something changed here since you last looked".
-  final bool badge;
 
   @override
   Widget build(BuildContext context) {
@@ -222,14 +241,11 @@ class _MenuItem extends StatelessWidget {
         leadingIcon: SizedBox.square(
           dimension: 24,
           child: Center(
-            child: Badge(
-              isLabelVisible: badge,
-              child: AppIcon(
-                icon,
-                filled: filled,
-                size: AppIconSize.action,
-                color: iconColor,
-              ),
+            child: AppIcon(
+              icon,
+              filled: filled,
+              size: AppIconSize.action,
+              color: iconColor,
             ),
           ),
         ),

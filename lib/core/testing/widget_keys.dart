@@ -16,6 +16,8 @@ class WidgetKeys {
   static const surahSearchBack = Key('home-surah-search-back');
   static const homeOverflowMenu = Key('home-overflow-menu');
   static const translationsMenuButton = Key('home-translations-menu-button');
+  static const bookmarksMenuButton = Key('home-bookmarks-menu-button');
+  static const bookmarksPage = Key('bookmarks-page');
   static const shareAppButton = Key('home-share-app-button');
   static const aboutMenuButton = Key('home-about-menu-button');
 
@@ -62,6 +64,7 @@ class WidgetKeys {
   // The Arabic matn line inside a Detailed tile (shared by every verse); used to
   // observe the "Show Arabic" toggle hiding it.
   static const ayahArabicText = Key('ayah-arabic-text');
+  static Key ayahBookmarkButton(int ayahId) => Key('ayah-bookmark-$ayahId');
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');

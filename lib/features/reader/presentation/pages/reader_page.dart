@@ -28,6 +28,7 @@ import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
+import '../../domain/repositories/ayah_bookmark_repository.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/ayah_audio_cubit.dart';
 import '../cubit/reader_cubit.dart';
@@ -100,6 +101,22 @@ class _ReaderView extends StatefulWidget {
 /// Detailed = Arabic stacked over Urdu + Hindi translations.
 enum _Viewport { reading, detailed }
 
+class _NoopAyahBookmarkRepository implements AyahBookmarkRepository {
+  const _NoopAyahBookmarkRepository();
+
+  @override
+  Set<int> get bookmarkedAyahIds => const {};
+
+  @override
+  bool isBookmarked(int ayahId) => false;
+
+  @override
+  Future<void> setBookmarked(int ayahId, bool bookmarked) async {}
+
+  @override
+  Future<List<Ayah>> bookmarkedAyahs() async => const [];
+}
+
 /// How long the app bar / player bar take to slide away and back for immersive
 /// reading — short enough to feel responsive to the scroll that triggered it.
 const Duration _kChromeAnim = Duration(milliseconds: 220);
@@ -144,6 +161,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Reading preferences persist across launches (zoom + viewport).
   final ReaderSettingsRepository _settings =
       GetIt.I<ReaderSettingsRepository>();
+
+  // Ayah-level bookmarks are local/offline and keyed by the global ayah id.
+  final AyahBookmarkRepository _bookmarks =
+      GetIt.I.isRegistered<AyahBookmarkRepository>()
+          ? GetIt.I<AyahBookmarkRepository>()
+          : const _NoopAyahBookmarkRepository();
 
   // Cached so it can be used without a context lookup — notably from
   // _onVisibleAyah, which the Detailed list invokes from its dispose() (a
@@ -545,6 +568,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         onVisibleAyah: interactive ? _onVisibleAyah : null,
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
+        onOpenTranslations: interactive ? _openTranslationsSheet : null,
+        bookmarkedAyahIds: _bookmarks.bookmarkedAyahIds,
+        onToggleBookmark: interactive ? _toggleBookmark : null,
         // Only the live page drives immersion (forward-scroll hides the chrome).
         onImmersionChanged: interactive ? _setChromeHidden : null,
       );
@@ -844,6 +870,21 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _toggleBookmark(Ayah ayah) async {
+    final bookmarked = _bookmarks.isBookmarked(ayah.id);
+    await _bookmarks.setBookmarked(ayah.id, !bookmarked);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(bookmarked ? 'Bookmark removed' : 'Bookmark saved'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+  }
+
   void _setDetailed(bool detailed) {
     // Capture the current reading position from the active viewport NOW — before
     // setState tears it down — so the incoming viewport homes to where you were,
@@ -1018,6 +1059,9 @@ class _DetailedList extends StatefulWidget {
     this.focusAyahId,
     this.onVisibleAyah,
     this.onRegisterFlush,
+    this.onOpenTranslations,
+    this.onToggleBookmark,
+    this.bookmarkedAyahIds = const {},
     this.onImmersionChanged,
     super.key,
   });
@@ -1050,6 +1094,15 @@ class _DetailedList extends StatefulWidget {
 
   /// See [MushafView.onRegisterFlush] — same contract.
   final void Function(VoidCallback?)? onRegisterFlush;
+
+  /// Opens the shared reader translation picker from an ayah's ⋯ menu.
+  final VoidCallback? onOpenTranslations;
+
+  /// Toggles an ayah bookmark from the visible bookmark affordance or menu.
+  final ValueChanged<Ayah>? onToggleBookmark;
+
+  /// Current local bookmark ids, used to render filled/outlined state.
+  final Set<int> bookmarkedAyahIds;
 
   /// See [MushafView.onImmersionChanged] — forward-scroll hides the chrome.
   final ValueChanged<bool>? onImmersionChanged;
@@ -1352,6 +1405,9 @@ class _DetailedListState extends State<_DetailedList> {
       onTogglePlay: audio == null
           ? null
           : () => context.read<AyahAudioCubit>().toggle(ayah.id),
+      isBookmarked: widget.bookmarkedAyahIds.contains(ayah.id),
+      onToggleBookmark: () => widget.onToggleBookmark?.call(ayah),
+      onOpenTranslations: widget.onOpenTranslations,
       // The ⋯ menu's Screenshot captures the whole visible page (this list's
       // RepaintBoundary), not this one verse.
       onScreenshotPage: _shareVisiblePage,
