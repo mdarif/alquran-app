@@ -172,19 +172,20 @@ class AyahRepositoryImpl implements AyahRepository {
     final rows = await _db.translationResources();
     final bundled = [
       for (final r in rows)
-        TranslationResource(
-          id: r.id,
-          slug: r.slug,
-          languageCode: r.languageCode,
-          name: r.name,
-          nativeName: r.nativeName,
-          author: TranslationMetadataOverrides.author(r.slug, r.author),
-          direction: r.direction,
-          sortOrder: r.sortOrder,
-          defaultOn: r.defaultOn == 1,
-          license: r.license,
-          sourceUrl: r.sourceUrl,
-        ),
+        if (r.defaultOn == 1)
+          TranslationResource(
+            id: r.id,
+            slug: r.slug,
+            languageCode: r.languageCode,
+            name: r.name,
+            nativeName: r.nativeName,
+            author: TranslationMetadataOverrides.author(r.slug, r.author),
+            direction: r.direction,
+            sortOrder: r.sortOrder,
+            defaultOn: true,
+            license: r.license,
+            sourceUrl: r.sourceUrl,
+          ),
     ];
 
     final editions = _editions;

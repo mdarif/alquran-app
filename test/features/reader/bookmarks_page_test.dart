@@ -9,9 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Bookmarks implements AyahBookmarkRepository {
-  const _Bookmarks(this.ayahs);
+  _Bookmarks(this.ayahs);
 
   final List<Ayah> ayahs;
+  final removed = <int>[];
 
   @override
   Set<int> get bookmarkedAyahIds => {for (final ayah in ayahs) ayah.id};
@@ -23,7 +24,12 @@ class _Bookmarks implements AyahBookmarkRepository {
   bool isBookmarked(int ayahId) => bookmarkedAyahIds.contains(ayahId);
 
   @override
-  Future<void> setBookmarked(int ayahId, bool bookmarked) async {}
+  Future<void> setBookmarked(int ayahId, bool bookmarked) async {
+    if (!bookmarked) {
+      removed.add(ayahId);
+      ayahs.removeWhere((ayah) => ayah.id == ayahId);
+    }
+  }
 }
 
 class _Ayahs implements AyahRepository {
@@ -48,8 +54,8 @@ class _Ayahs implements AyahRepository {
 void main() {
   testWidgets('empty bookmarks explain how to save one', (tester) async {
     await tester.pumpWidget(
-      const MaterialApp(
-        home: BookmarksPage(bookmarks: _Bookmarks([]), ayahs: _Ayahs()),
+      MaterialApp(
+        home: BookmarksPage(bookmarks: _Bookmarks([]), ayahs: const _Ayahs()),
       ),
     );
     await tester.pumpAndSettle();
@@ -71,8 +77,9 @@ void main() {
     );
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: BookmarksPage(bookmarks: _Bookmarks([ayah]), ayahs: _Ayahs()),
+      MaterialApp(
+        home:
+            BookmarksPage(bookmarks: _Bookmarks([ayah]), ayahs: const _Ayahs()),
       ),
     );
     await tester.pumpAndSettle();
@@ -83,5 +90,40 @@ void main() {
     expect(find.text('2:1'), findsOneWidget);
     expect(find.text('الٓمٓ'), findsNothing);
     expect(find.text('اردو ترجمہ'), findsNothing);
+  });
+
+  testWidgets('long press only offers remove and removes the bookmark',
+      (tester) async {
+    const ayah = Ayah(
+      id: 8,
+      surahId: 2,
+      ayahNumber: 1,
+      textArabic: 'الٓمٓ',
+      isSajda: false,
+      page: 2,
+      juz: 1,
+    );
+    final bookmarks = _Bookmarks([ayah]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BookmarksPage(bookmarks: bookmarks, ayahs: const _Ayahs()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('Surah Al-Baqarah'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Share'), findsNothing);
+    expect(find.text('Remove bookmark'), findsOneWidget);
+
+    await tester.tap(find.text('Remove bookmark'));
+    await tester.pumpAndSettle();
+
+    expect(bookmarks.removed, [8]);
+    expect(find.text('Surah Al-Baqarah'), findsNothing);
+    expect(find.text('No bookmarks yet'), findsOneWidget);
+    expect(find.text('Bookmark removed'), findsOneWidget);
   });
 }

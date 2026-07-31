@@ -152,6 +152,7 @@ void main() {
             type: 'translation',
             languageCode: 'ur',
             name: 'Urdu',
+            defaultOn: const Value(1),
           ),
         );
     expect(await repo.getTranslationResources(), hasLength(1));
@@ -164,6 +165,7 @@ void main() {
             type: 'translation',
             languageCode: 'hi',
             name: 'Hindi',
+            defaultOn: const Value(1),
           ),
         );
     expect(
@@ -171,6 +173,33 @@ void main() {
       hasLength(1),
       reason: 'editions are session constants, memoised like the headings',
     );
+  });
+
+  test('non-default bundled editions are not reader resources', () async {
+    await db.into(db.resources).insert(
+          ResourcesCompanion.insert(
+            id: const Value(1),
+            slug: 'ur-junagarhi',
+            type: 'translation',
+            languageCode: 'ur',
+            name: 'Urdu',
+            defaultOn: const Value(1),
+          ),
+        );
+    await db.into(db.resources).insert(
+          ResourcesCompanion.insert(
+            id: const Value(2),
+            slug: 'hi-suhel-farooq-nadwi',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Suhel Farooq Khan',
+            defaultOn: const Value(0),
+          ),
+        );
+
+    final resources = await repo.getTranslationResources();
+
+    expect(resources.map((r) => r.slug), ['ur-junagarhi']);
   });
 
   test('downloaded update of a bundled edition does not duplicate its resource',

@@ -50,6 +50,37 @@ void main() {
       expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 30);
     });
 
+    testWidgets('keeps minimum row height compact enough for fast scanning',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          SurahTile(
+            surah: const Surah(
+              id: 1,
+              nameArabic: 'الفاتحة',
+              nameEnglish: 'Al-Fatihah',
+              totalAyahs: 7,
+              revelationPlace: 'makkah',
+            ),
+            onTap: () {},
+          ),
+        ),
+      );
+
+      final tileConstraint = find.byWidgetPredicate(
+        (widget) =>
+            widget is ConstrainedBox && widget.constraints.minHeight > 0,
+      );
+      final minHeights = [
+        for (final element in tileConstraint.evaluate())
+          (element.widget as ConstrainedBox).constraints.minHeight,
+      ];
+      expect(
+        minHeights,
+        contains(70),
+      );
+    });
+
     testWidgets('shows no subtitle when revelationPlace is null',
         (tester) async {
       await tester.pumpWidget(

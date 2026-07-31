@@ -34,9 +34,9 @@ class SurahTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 78),
+        constraints: const BoxConstraints(minHeight: 70),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(20, 9, 20, 9),
+          padding: const EdgeInsetsDirectional.fromSTEB(20, 6, 20, 6),
           child: Row(
             children: [
               _SurahNumberBadge(number: surah.id),

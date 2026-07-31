@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../domain/ayah_share.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
-import '../../domain/entities/translation_resource.dart';
 import '../../domain/repositories/ayah_bookmark_repository.dart';
 import '../../domain/repositories/ayah_repository.dart';
 import 'reader_page.dart';
@@ -32,11 +29,9 @@ class _BookmarksPageState extends State<BookmarksPage> {
   Future<_BookmarksData> _load() async {
     final bookmarked = await widget.bookmarks.bookmarkedAyahs();
     final headings = await widget.ayahs.getSurahHeadings();
-    final resources = await widget.ayahs.getTranslationResources();
     return _BookmarksData(
       ayahs: bookmarked,
       headings: headings,
-      resources: {for (final resource in resources) resource.slug: resource},
     );
   }
 
@@ -63,7 +58,6 @@ class _BookmarksPageState extends State<BookmarksPage> {
                 _BookmarkRow(
                   ayah: ayah,
                   heading: data.headings[ayah.surahId],
-                  resources: data.resources,
                   onTap: () {
                     _openAyah(context, ayah, data.headings[ayah.surahId]);
                   },
@@ -79,7 +73,9 @@ class _BookmarksPageState extends State<BookmarksPage> {
   Future<void> _removeBookmark(Ayah ayah) async {
     await widget.bookmarks.setBookmarked(ayah.id, false);
     if (!mounted) return;
-    setState(() => _bookmarksData = _load());
+    setState(() {
+      _bookmarksData = _load();
+    });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -110,12 +106,10 @@ class _BookmarksData {
   const _BookmarksData({
     required this.ayahs,
     required this.headings,
-    required this.resources,
   });
 
   final List<Ayah> ayahs;
   final Map<int, SurahHeading> headings;
-  final Map<String, TranslationResource> resources;
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -146,14 +140,12 @@ class _BookmarkRow extends StatelessWidget {
   const _BookmarkRow({
     required this.ayah,
     required this.heading,
-    required this.resources,
     required this.onTap,
     required this.onRemove,
   });
 
   final Ayah ayah;
   final SurahHeading? heading;
-  final Map<String, TranslationResource> resources;
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
@@ -234,14 +226,6 @@ class _BookmarkRow extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const AppIcon(AppIcons.share),
-                title: const Text('Share'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _share();
-                },
-              ),
-              ListTile(
                 leading: AppIcon(
                   AppIcons.bookmark,
                   filled: true,
@@ -258,22 +242,6 @@ class _BookmarkRow extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _share() async {
-    try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: buildAyahShareText(
-            ayah: ayah,
-            resources: resources.values.toList(growable: false),
-            surahName: heading?.nameEnglish,
-          ),
-        ),
-      );
-    } catch (_) {
-      // Best-effort: no share target, cancelled sheet, or platform failure.
-    }
   }
 }
 
