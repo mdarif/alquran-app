@@ -15,6 +15,8 @@ class WidgetKeys {
   static const surahSearchField = Key('home-surah-search');
   static const surahSearchBack = Key('home-surah-search-back');
   static const homeOverflowMenu = Key('home-overflow-menu');
+  static const homeSettingsMenuButton = Key('home-settings-menu-button');
+  static const appSettingsPage = Key('app-settings-page');
   static const translationsMenuButton = Key('home-translations-menu-button');
   static const bookmarksMenuButton = Key('home-bookmarks-menu-button');
   static const bookmarksPage = Key('bookmarks-page');

@@ -13,12 +13,14 @@ import 'package:al_quran/features/navigation/presentation/pages/home_page.dart';
 import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_line.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
+import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/entities/reader_target.dart';
 import 'package:al_quran/features/reader/domain/entities/surah_heading.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:al_quran/features/reader/domain/repositories/ayah_bookmark_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
+import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:al_quran/features/reader/presentation/pages/bookmarks_page.dart';
 import 'package:al_quran/features/reader/presentation/widgets/last_read_banner.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
@@ -69,6 +71,55 @@ class _FakeAyahRepository implements AyahRepository {
   Future<Map<int, SurahHeading>> getSurahHeadings() async => const {};
   @override
   Future<List<TranslationResource>> getTranslationResources() async => const [];
+}
+
+class _FakeReaderSettingsRepository implements ReaderSettingsRepository {
+  @override
+  ArabicScript script = ArabicScript.uthmani;
+  @override
+  double fontSize = ReaderSettingsRepository.defaultFontSize;
+  @override
+  bool detailed = false;
+  @override
+  List<String>? selectedTranslations;
+  @override
+  double recitationSpeed = ReaderSettingsRepository.defaultRecitationSpeed;
+  @override
+  bool showTranslationPeek = false;
+  @override
+  bool showArabicMatn = true;
+
+  @override
+  Future<void> setScript(ArabicScript value) async => script = value;
+  @override
+  Future<void> setFontSize(double value) async => fontSize = value;
+  @override
+  Future<void> setDetailed(bool value) async => detailed = value;
+  @override
+  Future<void> setSelectedTranslations(List<String> slugs) async =>
+      selectedTranslations = slugs;
+  @override
+  Future<void> setRecitationSpeed(double value) async =>
+      recitationSpeed = value;
+  @override
+  Future<void> setShowTranslationPeek(bool value) async =>
+      showTranslationPeek = value;
+  @override
+  Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
+  Future<void> migrateSelectedTranslations(
+    List<TranslationResource> available,
+  ) async {}
+  @override
+  Future<void> resetToDefaults() async {
+    script = ArabicScript.uthmani;
+    fontSize = ReaderSettingsRepository.defaultFontSize;
+    detailed = false;
+    selectedTranslations = null;
+    recitationSpeed = ReaderSettingsRepository.defaultRecitationSpeed;
+    showTranslationPeek = false;
+    showArabicMatn = true;
+  }
 }
 
 class _FakeIndexRepository implements IndexRepository {
@@ -135,6 +186,9 @@ void main() {
         _FakeBookmarkRepository.new,
       )
       ..registerLazySingleton<AyahRepository>(_FakeAyahRepository.new)
+      ..registerLazySingleton<ReaderSettingsRepository>(
+        _FakeReaderSettingsRepository.new,
+      )
       ..registerLazySingleton<IndexRepository>(_FakeIndexRepository.new)
       ..registerFactory<IndexListCubit>(
         () => IndexListCubit(GetIt.I<IndexRepository>()),
@@ -213,22 +267,13 @@ void main() {
       expect(find.byType(ReadingLightSheet), findsOneWidget);
     });
 
-    testWidgets('the overflow offers a Share Al Quran item', (tester) async {
+    testWidgets('the overflow opens Settings', (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
       await tester.pumpAndSettle();
-      // The share entry sits alongside the feature items (always available).
-      expect(find.byKey(WidgetKeys.shareAppButton), findsOneWidget);
-      expect(find.text('Share Al Quran'), findsOneWidget);
-    });
-
-    testWidgets('the overflow opens the About screen', (tester) async {
-      await _pumpHome(tester);
-      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(WidgetKeys.aboutMenuButton));
-      await tester.pumpAndSettle();
-      expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
+      expect(find.byKey(WidgetKeys.appSettingsPage), findsOneWidget);
     });
 
     testWidgets('the overflow opens Bookmarks', (tester) async {
@@ -283,20 +328,27 @@ void main() {
       expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
     });
 
-    testWidgets('the overflow always offers a manual update check',
+    testWidgets('Settings offers the moved app actions', (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.shareAppButton), findsOneWidget);
+      expect(find.text('Share Al Quran'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
+      expect(find.text('Check for update'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.aboutMenuButton), findsOneWidget);
+      expect(find.text('About'), findsOneWidget);
+    });
+
+    testWidgets('Settings places update check after Share Al Quran',
         (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
       await tester.pumpAndSettle();
-
-      expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
-      expect(find.text('Check for update'), findsOneWidget);
-    });
-
-    testWidgets('the overflow places update check after Share Al Quran',
-        (tester) async {
-      await _pumpHome(tester);
-      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
       await tester.pumpAndSettle();
 
       final shareTop = tester
@@ -319,14 +371,40 @@ void main() {
       expect(updateTop, lessThan(aboutTop));
     });
 
-    testWidgets('the home overflow does not expose reader-only Translations',
+    testWidgets('Settings opens the About screen', (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(WidgetKeys.aboutMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.aboutMenuButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
+    });
+
+    testWidgets('the home overflow exposes Translations before Bookmarks',
         (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
       await tester.pumpAndSettle();
-      expect(find.byKey(WidgetKeys.translationsMenuButton), findsNothing);
-      expect(find.text('Translations'), findsNothing);
+
+      expect(find.byKey(WidgetKeys.translationsMenuButton), findsOneWidget);
+      expect(find.text('Translations'), findsOneWidget);
       expect(find.byKey(WidgetKeys.bookmarksMenuButton), findsOneWidget);
+
+      final translationsTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.translationsMenuButton),
+          )
+          .dy;
+      final bookmarksTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.bookmarksMenuButton),
+          )
+          .dy;
+      expect(translationsTop, lessThan(bookmarksTop));
     });
 
     testWidgets('hides each flagged feature when its flag is off',

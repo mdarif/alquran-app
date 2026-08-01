@@ -6,8 +6,8 @@ import 'package:sqlite3/sqlite3.dart' show sqlite3;
 /// Guards the Qur'an text literals that are COPIED into source code against
 /// drifting from the bundled DB. Al-Fatihah 1:1 exists in two encodings
 /// (`text_arabic_uthmani` / `text_arabic_indopak`) and three widgets carry a
-/// verbatim copy: the script-picker samples in reader_page.dart and the surah
-/// Bismillah header in mushaf_view.dart. When a data fix rebuilds quran.db
+/// verbatim copy: the script-picker samples in reader_settings_page.dart and
+/// the surah Bismillah header in mushaf_view.dart. When a data fix rebuilds quran.db
 /// (e.g. the 2026-07-05 bare-Allah fix) these copies do NOT update themselves —
 /// this test is what fails instead of the owner's eyes in the settings sheet.
 ///
@@ -46,7 +46,7 @@ void main() {
 
   test('script-picker samples match Al-Fatihah 1:1 in the bundled DB', () {
     final source =
-        File('lib/features/reader/presentation/pages/reader_page.dart')
+        File('lib/features/reader/presentation/pages/reader_settings_page.dart')
             .readAsStringSync();
     expect(constant(source, '_uthmaniSample'), uthmani);
     expect(constant(source, '_indopakSample'), indopak);

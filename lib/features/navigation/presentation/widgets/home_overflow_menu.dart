@@ -1,26 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
 import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
-import '../../../about/presentation/pages/about_page.dart';
-import '../../../app_update/domain/repositories/app_update_repository.dart';
 import '../../../reader/domain/repositories/ayah_bookmark_repository.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/presentation/pages/bookmarks_page.dart';
 import '../../../reminders/presentation/cubit/reminders_cubit.dart';
 import '../../../reminders/presentation/widgets/reminders_sheet.dart';
-
-/// The app's download page — a funnel that lands on a download screen and routes
-/// to the store. Deliberately distinct from the About screen's homepage link.
-const String _downloadUrl = 'https://alquranreader.com/download';
+import '../../../translations/presentation/translations_sheet.dart';
+import '../pages/app_settings_page.dart';
 
 /// Phase → app-bar glyph (mirrors [ThemeToggleButton]'s private mapping); Dusk
 /// is the only filled one (the golden going-down light).
@@ -105,69 +98,24 @@ class HomeOverflowMenu extends StatelessWidget {
             onPressed: () => _openReadingLight(context, theme),
           ),
         _MenuItem(
+          key: WidgetKeys.translationsMenuButton,
+          icon: AppIcons.alKahf,
+          label: 'Translations',
+          onPressed: () => _openTranslations(context),
+        ),
+        _MenuItem(
           key: WidgetKeys.bookmarksMenuButton,
           icon: AppIcons.bookmark,
           label: 'Bookmarks',
           onPressed: () => _openBookmarks(context),
         ),
-        // Always available — a "tell a friend" share of the app via its website.
         _MenuItem(
-          key: WidgetKeys.shareAppButton,
-          icon: AppIcons.share,
-          label: 'Share Al Quran',
-          onPressed: _shareApp,
-        ),
-        if (FeatureFlags.softUpdateReminder)
-          _MenuItem(
-            key: WidgetKeys.appUpdateMenuButton,
-            icon: AppIcons.autoSelected,
-            label: 'Check for update',
-            onPressed: () => _checkForUpdate(context),
-          ),
-        // About screen — also reachable via the discreet title tap, surfaced here
-        // as a visible entry.
-        _MenuItem(
-          key: WidgetKeys.aboutMenuButton,
-          icon: AppIcons.about,
-          label: 'About',
-          onPressed: () => _openAbout(context),
+          key: WidgetKeys.homeSettingsMenuButton,
+          icon: AppIcons.settings,
+          label: 'Settings',
+          onPressed: () => _openSettings(context),
         ),
       ],
-    );
-  }
-
-  Future<void> _checkForUpdate(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    if (!GetIt.I.isRegistered<AppUpdateRepository>()) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Could not check for updates'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      return;
-    }
-    final prompt = await GetIt.I<AppUpdateRepository>().check();
-    if (!context.mounted) return;
-    if (prompt == null) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Al Quran is up to date'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      return;
-    }
-    await launchUrl(prompt.storeUrl, mode: LaunchMode.externalApplication);
-  }
-
-  void _openAbout(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AboutPage()),
     );
   }
 
@@ -194,25 +142,14 @@ class HomeOverflowMenu extends StatelessWidget {
     );
   }
 
-  /// Share the app via its website (there's no store link yet). Uses the same
-  /// share sheet as verse sharing; a missing share target is swallowed so opening
-  /// the sheet can never crash Home.
-  Future<void> _shareApp() async {
-    try {
-      await SharePlus.instance.share(
-        ShareParams(
-          text: 'Read. Reflect. Remember. 🌙\n\n'
-              'Al Quran is a calm, distraction-free app for reading the Quran '
-              'offline, with Urdu, Hindi & English translations and beautiful '
-              'recitation.\n\n'
-              '100% free. No ads.\n\n'
-              'Download the app:\n'
-              '$_downloadUrl',
-        ),
-      );
-    } catch (_) {
-      // best-effort: no share target, or the user dismissed the sheet
-    }
+  void _openTranslations(BuildContext context) {
+    showTranslationsSheet(context);
+  }
+
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AppSettingsPage()),
+    );
   }
 
   void _openReminders(BuildContext context, RemindersCubit cubit) {
