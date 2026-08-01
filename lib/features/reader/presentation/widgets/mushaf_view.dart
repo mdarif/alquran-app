@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../../core/format/surah_meta_labels.dart';
 import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -1387,32 +1388,15 @@ class SurahHeaderCard extends StatelessWidget {
     );
   }
 
-  /// "Meccan · 7 verses" — each part included only when known.
+  /// "Makki · 7 Ayah" — each part included only when known. Same wording as the
+  /// TOC row (shared labels in `core/format`).
   static String? _metaLine(SurahHeading? heading) {
     if (heading == null) return null;
-    final parts = <String>[];
-    final revelation = _revelationLabel(heading.revelationPlace);
-    if (revelation != null) parts.add(revelation);
-    if (heading.totalAyahs > 0) {
-      parts.add(
-        heading.totalAyahs == 1 ? '1 Verse' : '${heading.totalAyahs} Verses',
-      );
-    }
+    final parts = [
+      revelationLabel(heading.revelationPlace),
+      ayahCountLabel(heading.totalAyahs),
+    ].nonNulls;
     return parts.isEmpty ? null : parts.join(' · ');
-  }
-
-  /// Maps the DB's revelation_place ("makkah"/"madinah") to a reader label.
-  static String? _revelationLabel(String? place) {
-    switch (place?.toLowerCase()) {
-      case 'makkah':
-      case 'mecca':
-        return 'Meccan';
-      case 'madinah':
-      case 'medina':
-        return 'Medinan';
-      default:
-        return null;
-    }
   }
 }
 

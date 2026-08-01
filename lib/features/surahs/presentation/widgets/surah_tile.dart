@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/format/surah_meta_labels.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/surah.dart';
@@ -23,12 +24,15 @@ class SurahTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final place = surah.revelationPlace;
-    final placeLabel =
-        place == null ? '' : '${place[0].toUpperCase()}${place.substring(1)}';
+    final placeLabel = revelationLabel(surah.revelationPlace);
     final subtitle = [
-      if (placeLabel.isNotEmpty) placeLabel,
-      if (verse != null) 'Ayah $verse',
+      if (placeLabel != null) placeLabel,
+      // A verse hit ("18:5") replaces the ayah count — the row is about that
+      // one verse, and three segments would crowd the line.
+      if (verse != null)
+        'Ayah $verse'
+      else if (ayahCountLabel(surah.totalAyahs) case final count?)
+        count,
     ].join(' · ');
 
     return InkWell(

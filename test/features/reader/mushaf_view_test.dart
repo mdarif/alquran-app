@@ -180,7 +180,9 @@ void main() {
         ),
       );
       expect(find.text('الفاتحة'), findsOneWidget);
-      expect(find.text('Meccan · 7 Verses'), findsOneWidget);
+      // Same wording as the TOC row, so a surah describes itself identically
+      // wherever it appears.
+      expect(find.text('Makki · 7 Ayah'), findsOneWidget);
     });
 
     testWidgets('omits the meta line when surah metadata is unavailable',

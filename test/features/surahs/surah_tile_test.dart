@@ -7,7 +7,7 @@ Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('SurahTile', () {
-    testWidgets('renders names + capitalised place, without the ayah count',
+    testWidgets('renders names + Makki/Madani revelation and the ayah count',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -27,8 +27,7 @@ void main() {
       expect(find.text('Al-Fatihah'), findsOneWidget);
       expect(find.text('الفاتحة'), findsOneWidget);
       expect(find.text('1'), findsOneWidget); // leading badge
-      expect(find.text('Makkah'), findsOneWidget);
-      expect(find.textContaining('ayahs'), findsNothing); // count hidden
+      expect(find.text('Makki · 7 Ayah'), findsOneWidget);
     });
 
     testWidgets('Arabic chapter name is rendered prominently', (tester) async {
@@ -81,7 +80,7 @@ void main() {
       );
     });
 
-    testWidgets('shows no subtitle when revelationPlace is null',
+    testWidgets('falls back to the ayah count when revelationPlace is null',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -98,8 +97,30 @@ void main() {
       );
 
       expect(find.text('Al-Baqarah'), findsOneWidget);
-      expect(find.textContaining('ayahs'), findsNothing);
-      expect(find.text('Madinah'), findsNothing);
+      expect(find.text('286 Ayah'), findsOneWidget);
+      expect(find.textContaining('Madani'), findsNothing);
+    });
+
+    testWidgets('a verse hit replaces the count, keeping the line to two parts',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          SurahTile(
+            surah: const Surah(
+              id: 18,
+              nameArabic: 'الكهف',
+              nameEnglish: 'Al-Kahf',
+              totalAyahs: 110,
+              revelationPlace: 'makkah',
+            ),
+            verse: 5,
+            onTap: () {},
+          ),
+        ),
+      );
+
+      expect(find.text('Makki · Ayah 5'), findsOneWidget);
+      expect(find.textContaining('110'), findsNothing);
     });
 
     testWidgets('invokes onTap when tapped', (tester) async {
