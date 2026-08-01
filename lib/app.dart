@@ -45,7 +45,7 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final payload =
             await GetIt.I<NotificationScheduler>().consumeLaunchPayload();
-        routeFromPayload(payload);
+        await routeFromPayload(payload);
       });
     }
     if (FeatureFlags.proactiveTranslationSync) {

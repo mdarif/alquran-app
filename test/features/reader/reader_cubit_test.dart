@@ -8,6 +8,7 @@ import 'package:al_quran/features/reader/domain/entities/translation_resource.da
 import 'package:al_quran/features/reader/domain/repositories/ayah_repository.dart';
 import 'package:al_quran/features/reader/domain/repositories/last_read_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeLastReadRepository implements LastReadRepository {
@@ -149,17 +150,76 @@ void main() {
       await cubit.close();
     });
 
-    test('load() records the section opened at its first verse', () async {
-      final lastRead = _FakeLastReadRepository();
-      final cubit = ReaderCubit(
-        _FakeAyahRepository(ayahs: const [_ayah]),
-        lastRead,
-      );
-      await cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+    test(
+        'load() records the section opened at its first verse — after the dwell',
+        () {
+      fakeAsync((FakeAsync async) {
+        final lastRead = _FakeLastReadRepository();
+        final cubit = ReaderCubit(
+          _FakeAyahRepository(ayahs: const [_ayah]),
+          lastRead,
+        );
+        cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+        async.flushMicrotasks();
 
-      expect(lastRead.saved?.target, const ReaderTarget.surah(1, 'Al-Fatihah'));
-      expect(lastRead.saved?.ayahId, 1);
-      await cubit.close();
+        // Nothing yet: a section that just opened may only be a glance.
+        expect(lastRead.saved, isNull);
+
+        async.elapse(ReaderCubit.openDwell);
+        expect(
+          lastRead.saved?.target,
+          const ReaderTarget.surah(1, 'Al-Fatihah'),
+        );
+        expect(lastRead.saved?.ayahId, 1);
+        cubit.close();
+        async.flushMicrotasks();
+      });
+    });
+
+    test('a peek (left before the dwell) leaves Continue Reading alone', () {
+      fakeAsync((FakeAsync async) {
+        final lastRead = _FakeLastReadRepository();
+        final cubit = ReaderCubit(
+          _FakeAyahRepository(ayahs: const [_ayah]),
+          lastRead,
+        );
+        cubit.load(const ReaderTarget.surah(1, 'Al-Fatihah'));
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 1)); // a two-second glance…
+        cubit.close(); // …then back out
+        async.flushMicrotasks();
+        async.elapse(ReaderCubit.openDwell);
+
+        expect(lastRead.saved, isNull);
+      });
+    });
+
+    test('a scrolled position wins over the pending open stamp', () {
+      fakeAsync((FakeAsync async) {
+        final lastRead = _FakeLastReadRepository();
+        final cubit = ReaderCubit(
+          _FakeAyahRepository(ayahs: const [_ayah]),
+          lastRead,
+        );
+        cubit.load(const ReaderTarget.surah(2, 'Al-Baqarah'));
+        async.flushMicrotasks();
+        cubit.saveProgress(
+          const Ayah(
+            id: 262,
+            surahId: 2,
+            ayahNumber: 255,
+            textArabic: 'x',
+            isSajda: false,
+          ),
+        );
+        expect(lastRead.saved?.ayahNumber, 255); // written at once
+
+        // The open stamp must not land on top of it when its timer would fire.
+        async.elapse(ReaderCubit.openDwell * 2);
+        expect(lastRead.saved?.ayahNumber, 255);
+        cubit.close();
+        async.flushMicrotasks();
+      });
     });
 
     test('saveProgress records the exact verse within the section', () async {

@@ -276,6 +276,10 @@ void main() {
     // Swipe RIGHT → next surah (RTL/Mushaf paging).
     await tester.fling(find.byType(PageView), const Offset(400, 0), 1200);
     await tester.pumpAndSettle();
+    // Settling on the new section isn't enough — a fling through several surahs
+    // must not rewrite the resume point. It lands once the reader dwells here.
+    await tester.pump(ReaderCubit.openDwell);
+    await tester.pumpAndSettle();
 
     // Last Read now points at the new section, opened at its first verse.
     expect(lastRead.saved?.surahId, 3);

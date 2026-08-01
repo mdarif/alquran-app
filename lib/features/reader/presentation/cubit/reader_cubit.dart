@@ -29,6 +29,13 @@ class ReaderCubit extends Cubit<ReaderState> {
   bool _detailed = false;
   Ayah? _lastAyah;
 
+  /// How long a freshly opened section must stay on screen before its first
+  /// verse is written as the resume point. Long enough that browsing the TOC or
+  /// flinging between surahs leaves Continue Reading alone, short enough that
+  /// actually settling in to read is recorded even without a scroll.
+  static const Duration openDwell = Duration(seconds: 3);
+  Timer? _openStampTimer;
+
   // --- Section cache (keeps swipes instant) ---------------------------------
   // The translation editions and surah headers are mushaf-wide constants, so we
   // fetch them once and reuse. Ayahs are cached per section and the immediate
@@ -90,7 +97,7 @@ class ReaderCubit extends Cubit<ReaderState> {
           headings: _headings ?? state.headings,
         ),
       );
-      if (cached.isNotEmpty) saveProgress(cached.first);
+      if (cached.isNotEmpty) _stampOpen(cached.first);
       _prefetchNeighbours(target);
       return;
     }
@@ -112,8 +119,9 @@ class ReaderCubit extends Cubit<ReaderState> {
         ),
       );
       // Remember the resume point: the section opened, at its first verse until
-      // the user scrolls (then [saveProgress] refines it).
-      if (ayahs.isNotEmpty) saveProgress(ayahs.first);
+      // the user scrolls (then [saveProgress] refines it) — written only once
+      // the reader has dwelt here, so a peek doesn't overwrite it.
+      if (ayahs.isNotEmpty) _stampOpen(ayahs.first);
       _prefetchNeighbours(target);
     } catch (e) {
       emit(state.copyWith(status: ReaderStatus.error, error: e.toString()));
@@ -186,12 +194,34 @@ class ReaderCubit extends Cubit<ReaderState> {
     if (ayah != null) saveProgress(ayah);
   }
 
+  /// Provisionally marks a freshly opened section at [ayah] (its first verse),
+  /// but only persists it once the reader has *dwelt* here — see [openDwell].
+  /// Peeking at a surah from the TOC, or flinging through several sections, must
+  /// not destroy a deep resume point ("Continue Reading: Al-Baqarah 255" is worth
+  /// more than a two-second glance at Al-Fatihah). Any real signal — a scroll
+  /// report, a resume pin, a viewport toggle — goes through [saveProgress] and
+  /// writes at once, cancelling this.
+  void _stampOpen(Ayah ayah) {
+    _lastAyah = ayah;
+    _openStampTimer?.cancel();
+    final target = _target;
+    if (target == null) return;
+    _openStampTimer = Timer(openDwell, () => _persist(target, ayah));
+  }
+
   /// Records [ayah] as the last-read verse within the current section, so the
   /// home "Last Read" card resumes exactly here (in the current viewport).
   void saveProgress(Ayah ayah) {
+    // A definite position supersedes any pending open stamp — including a
+    // just-scheduled first-verse one, which must never land on top of it.
+    _openStampTimer?.cancel();
     _lastAyah = ayah;
     final target = _target;
     if (target == null) return;
+    _persist(target, ayah);
+  }
+
+  void _persist(ReaderTarget target, Ayah ayah) {
     unawaited(
       _lastRead.save(
         LastRead(
@@ -203,5 +233,13 @@ class ReaderCubit extends Cubit<ReaderState> {
         ),
       ),
     );
+  }
+
+  @override
+  Future<void> close() {
+    // Leaving before the dwell elapsed means this was a peek, not a read — drop
+    // the pending stamp (and never let a timer outlive the cubit).
+    _openStampTimer?.cancel();
+    return super.close();
   }
 }

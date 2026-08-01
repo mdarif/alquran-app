@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -175,7 +177,7 @@ class _Row extends StatelessWidget {
       onTap: () {
         Navigator.of(context).pop(); // close the sheet first
         // Same routing path as the notification tap.
-        routeFromPayload(openAlKahfPayload);
+        unawaited(routeFromPayload(openAlKahfPayload));
       },
       child: content,
     );
