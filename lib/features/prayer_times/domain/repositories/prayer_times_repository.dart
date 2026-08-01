@@ -15,6 +15,9 @@ abstract interface class PrayerTimesRepository {
   /// the caller reacts to [LocationStatus]. Never throws.
   Future<LocationResult> acquireLocation();
 
-  /// Prayer times for [location] on [date] (local DateTimes).
-  DailyPrayerTimes timesFor(GeoLocation location, DateTime date);
+  /// Prayer times for [location] on [date] (local DateTimes), or **null** when
+  /// no defensible schedule exists for that day — above the polar circles the
+  /// sun may not rise or set at all. Callers must degrade gracefully (hide the
+  /// prayer UI) rather than assume a value. Never throws.
+  DailyPrayerTimes? timesFor(GeoLocation location, DateTime date);
 }

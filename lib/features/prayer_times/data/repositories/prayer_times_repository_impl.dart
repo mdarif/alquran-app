@@ -7,10 +7,18 @@ import '../../domain/location/location_provider.dart';
 import '../../domain/repositories/prayer_times_repository.dart';
 
 class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
-  PrayerTimesRepositoryImpl(this._prefs, this._locationProvider);
+  PrayerTimesRepositoryImpl(
+    this._prefs,
+    this._locationProvider, {
+    DateTime Function(DateTime utc)? toLocal,
+  }) : _toLocal = toLocal ?? _deviceLocal;
 
   final SharedPreferences _prefs;
   final LocationProvider _locationProvider;
+
+  /// UTC instant → the wall clock to display. Injectable so tests are
+  /// independent of the machine's timezone; production uses the device's.
+  final DateTime Function(DateTime utc) _toLocal;
 
   static const String _kLat = 'prayer_lat';
   static const String _kLon = 'prayer_lon';
@@ -54,35 +62,55 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
   }
 
   @override
-  DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
-    final params = _method.getParameters()..madhab = _madhab;
-    // utcOffset from the date itself makes adhan's wall-clock fields the local
-    // time at the location (device is physically there). In tests a
-    // `DateTime.utc(...)` → offset 0 → deterministic UTC-clock fields.
-    final times = adhan.PrayerTimes(
-      adhan.Coordinates(location.latitude, location.longitude),
-      adhan.DateComponents.from(date),
-      params,
-      utcOffset: date.timeZoneOffset,
-    );
+  DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) {
+    final params = _method.getParameters()
+      ..madhab = _madhab
+      // Owner decision: at latitudes where the 18° twilight is never reached,
+      // divide the night by fajrAngle/60 and ishaAngle/60 (the "angle based"
+      // rule) — what Aladhan and most UK/EU timetables use. Previously this was
+      // left at adhan's own default (middle of the night), which ran London's
+      // Fajr ~18 min early. Never binds at subcontinental latitudes.
+      ..highLatitudeRule = adhan.HighLatitudeRule.twilight_angle;
+    final adhan.PrayerTimes times;
+    try {
+      // Zero offset → adhan hands back true UTC instants, and each is converted
+      // on its OWN instant below. Passing the *device's* offset (the old code)
+      // froze one offset for the whole day, taken from whenever the app
+      // happened to be opened — which put every time an hour out on a
+      // DST-transition day. Omitting it entirely would make adhan localise
+      // internally, which is correct but untestable across machines.
+      times = adhan.PrayerTimes(
+        adhan.Coordinates(location.latitude, location.longitude),
+        adhan.DateComponents.from(date),
+        params,
+        utcOffset: Duration.zero,
+      );
+    } catch (_) {
+      // Above the polar circles the sun may not rise or set at all, and the
+      // library throws on the resulting NaN. No defensible times exist for that
+      // day, so report none rather than crashing the app (proper high-latitude
+      // support is a future release).
+      return null;
+    }
     return DailyPrayerTimes(
-      fajr: _local(times.fajr),
-      sunrise: _local(times.sunrise),
-      dhuhr: _local(times.dhuhr),
-      asr: _local(times.asr),
-      maghrib: _local(times.maghrib),
-      isha: _local(times.isha),
+      fajr: _toLocal(times.fajr),
+      sunrise: _toLocal(times.sunrise),
+      dhuhr: _toLocal(times.dhuhr),
+      asr: _toLocal(times.asr),
+      maghrib: _toLocal(times.maghrib),
+      isha: _toLocal(times.isha),
       location: location,
       date: date,
     );
   }
 
-  /// adhan with `utcOffset` returns each time as `t.toUtc().add(offset)` — a
-  /// DateTime flagged `isUtc` whose wall-clock fields are the correct LOCAL time
-  /// but whose *instant* is shifted by the offset. Comparing those against a
-  /// real `DateTime.now()` via `isAfter` is therefore off by the offset (it once
-  /// kept a long-passed Asr as "next" late at night). Rebuild a plain local
-  /// DateTime from the wall-clock fields: same display, correct instant.
-  static DateTime _local(DateTime t) =>
-      DateTime(t.year, t.month, t.day, t.hour, t.minute);
+  /// The device's local wall clock for [utc], as a plain (non-UTC) DateTime so
+  /// its *instant* matches what it displays — `isAfter(DateTime.now())` then
+  /// ranks the day correctly (a UTC-flagged time shifted by an offset once kept
+  /// a long-passed Asr as "next" late at night). `toLocal()` applies the offset
+  /// in force at that instant, which is what makes DST days come out right.
+  static DateTime _deviceLocal(DateTime utc) {
+    final t = utc.toLocal();
+    return DateTime(t.year, t.month, t.day, t.hour, t.minute);
+  }
 }

@@ -42,20 +42,36 @@ class WidgetBridge {
     }
 
     final today = DateTime(now.year, now.month, now.day);
+    final days = [
+      for (var i = 0; i < _horizonDays; i++)
+        if (_dayFor(location, today.add(Duration(days: i))) case final day?)
+          day,
+    ];
+    // Nothing computable for the whole horizon (polar latitude) → report it as
+    // "no schedule" so the native widget shows its empty state instead of a
+    // half-filled timeline.
+    if (days.isEmpty) {
+      return WidgetPayload(
+        schemaVersion: WidgetPayload.currentSchemaVersion,
+        generatedAt: now,
+        hasLocation: false,
+        locationLabel: location.label,
+        days: const [],
+      );
+    }
     return WidgetPayload(
       schemaVersion: WidgetPayload.currentSchemaVersion,
       generatedAt: now,
       hasLocation: true,
       locationLabel: location.label,
-      days: [
-        for (var i = 0; i < _horizonDays; i++)
-          _dayFor(location, today.add(Duration(days: i))),
-      ],
+      days: days,
     );
   }
 
-  WidgetDay _dayFor(GeoLocation location, DateTime date) {
+  /// One day's markers, or null when that day has no computable schedule.
+  WidgetDay? _dayFor(GeoLocation location, DateTime date) {
     final t = _repo.timesFor(location, date);
+    if (t == null) return null;
     return WidgetDay(
       date: DateTime(date.year, date.month, date.day),
       markers: [

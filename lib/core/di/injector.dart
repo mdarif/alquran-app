@@ -128,6 +128,10 @@ Future<void> configureDependencies() async {
           final loc = repo.location;
           if (loc == null) return MushafPalette.phaseForHour(now.hour);
           final t = repo.timesFor(loc, now);
+          // No schedule for this day (polar latitude) → "Light of Day" tracks
+          // the clock instead of prayer boundaries, exactly as it does before
+          // a location is set.
+          if (t == null) return MushafPalette.phaseForHour(now.hour);
           return phaseForBoundaries(
             fajr: t.fajr,
             sunrise: t.sunrise,

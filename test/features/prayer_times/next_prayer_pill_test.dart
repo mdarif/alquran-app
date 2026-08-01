@@ -45,6 +45,9 @@ PrayerTimesCubit _cubit({GeoLocation? saved, int hour = 17, int minute = 0}) {
   final cubit = PrayerTimesCubit(
     _FakeRepo(saved: saved),
     clock: () => DateTime(2026, 6, 23, hour, minute),
+    // The clock is frozen here; the boundary tick is covered in the cubit's
+    // own tests, and a live timer would trip the pending-timer check.
+    autoRefresh: false,
   );
   addTearDown(cubit.close);
   return cubit;

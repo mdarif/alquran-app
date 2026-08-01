@@ -5,6 +5,7 @@ import 'package:al_quran/features/prayer_times/domain/entities/prayer.dart';
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
 import 'package:al_quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
 import 'package:al_quran/features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _loc = GeoLocation(latitude: 24.45, longitude: 54.38);
@@ -13,8 +14,11 @@ class _FakeRepo implements PrayerTimesRepository {
   _FakeRepo({
     this.saved,
     this.acquireResult = const LocationResult(LocationStatus.ok, _loc),
+    this.noSchedule = false,
   });
 
+  /// Simulates a polar day: the sun neither rises nor sets, so no times exist.
+  final bool noSchedule;
   GeoLocation? saved;
   LocationResult acquireResult;
   int acquireCalls = 0;
@@ -32,7 +36,8 @@ class _FakeRepo implements PrayerTimesRepository {
   }
 
   @override
-  DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
+  DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) {
+    if (noSchedule) return null;
     final d = DateTime(date.year, date.month, date.day);
     return DailyPrayerTimes(
       fajr: d.add(const Duration(hours: 4, minutes: 30)),
@@ -183,6 +188,77 @@ void main() {
           PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(19));
       addTearDown(cubit.close);
       expect(cubit.gregorianDate, DateTime(2026, 6, 23));
+    });
+  });
+
+  group('no computable schedule (polar latitude)', () {
+    test('reports times unavailable instead of throwing', () {
+      final cubit = PrayerTimesCubit(
+        _FakeRepo(saved: _loc, noSchedule: true),
+        clock: () => at(13),
+      );
+      addTearDown(cubit.close);
+      // The location is fine — the times simply do not exist. Re-fetching the
+      // location would not help, so this must NOT read as "no location".
+      expect(cubit.state.hasLocation, isTrue);
+      expect(cubit.state.timesUnavailable, isTrue);
+      expect(cubit.state.next, isNull);
+      expect(cubit.state.today, isNull);
+    });
+
+    test('hijriBaseDate falls back to the civil date (no sunset to roll on)',
+        () {
+      final cubit = PrayerTimesCubit(
+        _FakeRepo(saved: _loc, noSchedule: true),
+        clock: () => at(23),
+      );
+      addTearDown(cubit.close);
+      expect(cubit.hijriBaseDate, DateTime(2026, 6, 23));
+    });
+  });
+
+  group('self-refresh at the prayer boundary', () {
+    test('advances on its own when a prayer time passes', () {
+      fakeAsync((FakeAsync async) {
+        var now = at(13); // Asr (15:30) is next
+        final cubit =
+            PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => now);
+        addTearDown(cubit.close);
+        expect(cubit.state.next!.prayer, Prayer.asr);
+
+        // The app sits open (it holds a wakelock) across Asr. Nothing calls
+        // refresh() — the pill used to keep showing a prayer already gone.
+        now = at(15, 31);
+        async.elapse(const Duration(hours: 2, minutes: 31));
+        expect(cubit.state.next!.prayer, Prayer.maghrib);
+      });
+    });
+
+    test('keeps advancing across several boundaries', () {
+      fakeAsync((FakeAsync async) {
+        var now = at(13);
+        final cubit =
+            PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => now);
+        addTearDown(cubit.close);
+
+        now = at(15, 31);
+        async.elapse(const Duration(hours: 2, minutes: 31));
+        expect(cubit.state.next!.prayer, Prayer.maghrib);
+
+        now = at(18, 46);
+        async.elapse(const Duration(hours: 3, minutes: 15));
+        expect(cubit.state.next!.prayer, Prayer.isha);
+      });
+    });
+
+    test('closing cancels the pending tick (no timer outlives the cubit)', () {
+      fakeAsync((FakeAsync async) {
+        final cubit =
+            PrayerTimesCubit(_FakeRepo(saved: _loc), clock: () => at(13));
+        cubit.close();
+        async.elapse(const Duration(days: 1));
+        // fakeAsync asserts at the end of the zone that no timers are pending.
+      });
     });
   });
 }

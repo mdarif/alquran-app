@@ -17,6 +17,7 @@ class PrayerTimesState extends Equatable {
     this.next,
     this.forbidden,
     this.hasLocation = false,
+    this.timesUnavailable = false,
     this.status,
   });
 
@@ -25,12 +26,20 @@ class PrayerTimesState extends Equatable {
         next = null,
         forbidden = null,
         hasLocation = false,
+        timesUnavailable = false,
         status = null;
 
   final DailyPrayerTimes? today;
   final NextPrayer? next;
   final ForbiddenWindow? forbidden;
   final bool hasLocation;
+
+  /// True when the location is known but the day has no computable schedule —
+  /// above the polar circles the sun may not rise or set. Distinct from "no
+  /// location yet": re-fetching the location would not help, so the UI hides
+  /// the prayer surface rather than offering to enable it.
+  final bool timesUnavailable;
+
   final LocationStatus? status;
 
   PrayerTimesState copyWith({LocationStatus? status}) => PrayerTimesState(
@@ -38,10 +47,18 @@ class PrayerTimesState extends Equatable {
         next: next,
         forbidden: forbidden,
         hasLocation: hasLocation,
+        timesUnavailable: timesUnavailable,
         status: status ?? this.status,
       );
 
   @override
-  List<Object?> get props =>
-      [today?.date, next?.prayer, next?.at, forbidden, hasLocation, status];
+  List<Object?> get props => [
+        today?.date,
+        next?.prayer,
+        next?.at,
+        forbidden,
+        hasLocation,
+        timesUnavailable,
+        status,
+      ];
 }

@@ -37,6 +37,11 @@ class NextPrayerPill extends StatelessWidget {
       builder: (context, state) {
         final cs = Theme.of(context).colorScheme;
 
+        // Location known, but this day has no computable schedule (polar
+        // latitude). Re-fetching the location wouldn't help, so show nothing
+        // rather than an affordance that can't fix it.
+        if (state.timesUnavailable) return const SizedBox.shrink();
+
         if (!state.hasLocation || state.next == null) {
           return IconButton(
             key: WidgetKeys.nextPrayerPill,

@@ -25,13 +25,21 @@ final _date = DateTime.utc(2026, 6, 23);
 Future<PrayerTimesRepositoryImpl> _repo(
   _FakeLocationProvider provider, {
   Map<String, Object> prefs = const {},
+  DateTime Function(DateTime)? toLocal,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   return PrayerTimesRepositoryImpl(
     await SharedPreferences.getInstance(),
     provider,
+    // Default: keep the UTC wall clock, so every expectation below is
+    // machine-timezone independent (the real app injects DateTime.toLocal).
+    toLocal: toLocal ?? _asIs,
   );
 }
+
+/// Identity conversion: times stay on the UTC clock, deterministic everywhere.
+DateTime _asIs(DateTime utc) =>
+    DateTime(utc.year, utc.month, utc.day, utc.hour, utc.minute);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +51,7 @@ void main() {
     test('produces the six daily times in ascending order, on the date',
         () async {
       final repo = await _repo(provider);
-      final t = repo.timesFor(_abuDhabi, _date);
+      final t = repo.timesFor(_abuDhabi, _date)!;
       final ordered = [t.fajr, t.sunrise, t.dhuhr, t.asr, t.maghrib, t.isha];
       for (var i = 1; i < ordered.length; i++) {
         expect(
@@ -60,7 +68,7 @@ void main() {
     test('Asr uses the Standard/Shafi rule (NOT Hanafi) — creed guard',
         () async {
       final repo = await _repo(provider);
-      final ours = repo.timesFor(_abuDhabi, _date).asr;
+      final ours = repo.timesFor(_abuDhabi, _date)!.asr;
 
       // Compute the Hanafi Asr directly; it is strictly LATER than Shafi's.
       // (Asr is method-independent — only the madhab differs here.)
@@ -89,7 +97,7 @@ void main() {
       // (e.g. Asr) still read as "after now". timesFor must hand back local
       // DateTimes whose instant matches their wall clock.
       final repo = await _repo(provider);
-      final t = repo.timesFor(_abuDhabi, _date);
+      final t = repo.timesFor(_abuDhabi, _date)!;
 
       expect(t.asr.isUtc, isFalse);
       expect(t.isha.isUtc, isFalse);
@@ -99,6 +107,87 @@ void main() {
       final afterIsha = t.isha.add(const Duration(minutes: 1));
       expect(t.asr.isAfter(afterIsha), isFalse);
       expect(t.nextAfter(afterIsha), isNull);
+    });
+  });
+
+  group('PrayerTimesRepositoryImpl — daylight saving', () {
+    // London's clocks go back 02:00 BST → 01:00 GMT on 25 Oct 2026. Every
+    // prayer that day falls AFTER the switch, so all six must read GMT.
+    // Regression: the old code froze one offset for the whole day, taken from
+    // the moment the app happened to be opened — so opening at 00:30 (still
+    // BST) shifted the entire day an hour late (Fajr 05:49 instead of 04:49).
+    DateTime londonLocal(DateTime utc) {
+      final bst = utc.isBefore(DateTime.utc(2026, 10, 25, 1));
+      final shifted = utc.add(Duration(hours: bst ? 1 : 0));
+      return DateTime(
+        shifted.year,
+        shifted.month,
+        shifted.day,
+        shifted.hour,
+        shifted.minute,
+      );
+    }
+
+    const london = GeoLocation(latitude: 51.5074, longitude: -0.1278);
+
+    test('converts each time on its own instant, not one whole-day offset',
+        () async {
+      final repo = await _repo(provider, toLocal: londonLocal);
+      final t = repo.timesFor(london, DateTime(2026, 10, 25))!;
+
+      // GMT wall clock — what the clock on the wall reads at those moments.
+      expect('${t.fajr.hour}:${t.fajr.minute}', '4:49');
+      expect('${t.sunrise.hour}:${t.sunrise.minute}', '6:42');
+      expect('${t.dhuhr.hour}:${t.dhuhr.minute}', '11:46');
+      expect('${t.maghrib.hour}:${t.maghrib.minute}', '16:47');
+    });
+
+    test('the result does not depend on the time of day it was computed at',
+        () async {
+      final repo = await _repo(provider, toLocal: londonLocal);
+      // Pre-switch (00:30 BST) vs post-switch (12:00 GMT) on the same date.
+      final early = repo.timesFor(london, DateTime(2026, 10, 25, 0, 30))!;
+      final later = repo.timesFor(london, DateTime(2026, 10, 25, 12))!;
+      expect(early.fajr, later.fajr);
+      expect(early.maghrib, later.maghrib);
+    });
+  });
+
+  group('PrayerTimesRepositoryImpl — high latitudes', () {
+    test('Fajr/Isha use the angle-based rule (owner decision)', () async {
+      // London, 1 Aug 2026: the 18° twilight is never reached, so the rule
+      // decides. Angle-based gives 02:49 / 23:23 BST — Aladhan on the Karachi
+      // method says 02:50 / 23:23, i.e. the same rule to within the libraries'
+      // ±1 min rounding. The old library default (middle of the night) gave
+      // 02:32 / 23:38, ~18 min early. Times here are on the UTC clock = BST−1h.
+      final repo = await _repo(provider);
+      final t = repo.timesFor(
+        const GeoLocation(latitude: 51.5074, longitude: -0.1278),
+        DateTime.utc(2026, 8, 1),
+      )!;
+      int mins(DateTime x) => x.hour * 60 + x.minute;
+      // Reference (Aladhan, Karachi method, angle-based), on the UTC clock.
+      // A 2-minute tolerance absorbs the libraries' rounding conventions
+      // without letting a whole rule change slip through.
+      expect((mins(t.fajr) - (1 * 60 + 50)).abs(), lessThanOrEqualTo(2));
+      expect((mins(t.isha) - (22 * 60 + 23)).abs(), lessThanOrEqualTo(2));
+      // Explicitly NOT the old library default (middle of the night), which
+      // put Fajr at 01:32 and Isha at 22:38 UTC.
+      expect(mins(t.fajr), greaterThan(1 * 60 + 40));
+      expect(mins(t.isha), lessThan(22 * 60 + 30));
+    });
+
+    test('returns null (never throws) where the sun does not rise or set',
+        () async {
+      final repo = await _repo(provider);
+      // Svalbard: polar night in December, midnight sun in June. The adhan
+      // package throws "value should not be infinite or NaN" for both — which
+      // used to propagate out of the theme resolver and the cubit constructor.
+      const svalbard = GeoLocation(latitude: 78.22, longitude: 15.65);
+      expect(repo.timesFor(svalbard, DateTime.utc(2026, 12, 21)), isNull);
+      expect(repo.timesFor(svalbard, DateTime.utc(2026, 6, 21)), isNull);
+      // …and a normal latitude on the same day still computes.
+      expect(repo.timesFor(_abuDhabi, DateTime.utc(2026, 12, 21)), isNotNull);
     });
   });
 

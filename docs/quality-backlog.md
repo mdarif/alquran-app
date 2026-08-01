@@ -11,6 +11,35 @@ Started 2026-07-08 during the audio / viewport-switch pass.
 
 ## Open
 
+### 14. Prayer times: rounding, polar support, Hijri anchor cadence (2026-08-01) · **LOW–MEDIUM / accuracy**
+- **Area:** `features/prayer_times` · `core/hijri` · `../alquran-data`
+- **Context:** a full cross-check on 2026-08-01 validated the schedule against
+  Aladhan (Karachi method 18°/18°, Shafi Asr) for Delhi/Karachi/Makkah — all
+  within ±1 min. Four defects found there were fixed the same day (see
+  *Resolved*); these three were deliberately deferred.
+- **a. Start-time rounding (LOW).** `adhan` rounds to the *nearest* minute, so a
+  start time can display up to 30 s before it truly enters. Timetable convention
+  for iḥtiyāṭ is to **ceil** the five start times and **floor** Sunrise. The
+  package exposes no rounding option (unlike the Swift/JS ports), so this means
+  post-processing seconds ourselves — which needs adhan to hand back unrounded
+  values, i.e. recomputing rather than reading `PrayerTimes`.
+- **b. Polar latitudes (LOW, no demand yet).** Above ~66° the sun may not rise
+  or set; `adhan` throws, and the app now catches that and reports *no times*
+  (pill hidden, widget empty state). Owner decision 2026-08-01: **ship that**,
+  and implement real high-latitude support (nearest normal latitude / aqrab
+  al-bilād, or a council rule) only if real users ask.
+- **c. Hijri anchor cadence (MEDIUM, data).** `hijri_anchor_points` holds a
+  single row (`2026-06-17 · PK · +1`), so that correction now applies forever.
+  It needs a new anchor whenever PK's announced date diverges from the tabular
+  calendar, maintained in `../alquran-data` — otherwise the displayed Islamic
+  date silently drifts a day. Worth a recurring check each Hijri month-start.
+- **Open question (owner):** whether to switch the calculation method from
+  **Karachi** to **Umm al-Qura**. Raised by the owner 2026-08-01; NOT actioned,
+  because Umm al-Qura's fixed `Maghrib + 90 min` Isha moves the subcontinent
+  audience off their local mosque timetables (1 Aug 2026: Karachi Isha 20:40 →
+  20:47, Mumbai 20:33 → 20:44, Delhi 20:40 → 20:42). See
+  `prayer-times-creed-constraint` memory.
+
 ### 13. Post-release: replace bundled Suhel Hindi with Rais Salafi translation (2026-07-31) · **MEDIUM / data hygiene**
 - **Area:** translations · bundled seed DB · editions catalogue
 - **Decision:** after this release, remove `hi-suhel-farooq-nadwi` from the
