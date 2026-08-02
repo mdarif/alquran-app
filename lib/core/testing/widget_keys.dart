@@ -60,6 +60,10 @@ class WidgetKeys {
   static Key editionSelected(String slug) => Key('edition-selected-$slug');
   static Key editionDownload(String slug) => Key('edition-download-$slug');
   static Key editionRemove(String slug) => Key('edition-remove-$slug');
+  static const translationsSearchField = Key('translations-search-field');
+  static const translationsSearchClear = Key('translations-search-clear');
+  static Key translationsLanguageFilter(String code) =>
+      Key('translations-language-filter-$code');
   // Collapse/expand the peek card's translation (read/listen to Arabic alone).
   static const peekTranslationToggle = Key('reader-peek-translation-toggle');
   // Settings-sheet switch: open the translation peek on tap (default off).

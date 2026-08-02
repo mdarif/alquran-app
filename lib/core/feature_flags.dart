@@ -14,6 +14,23 @@ abstract final class FeatureFlags {
   /// resolves exactly as before (the DB column just sits unused).
   static const bool indopakScript = true;
 
+  /// The Roman Urdu edition (`ur-roman-junagarhi-experimental`) in the reader
+  /// and the Translations picker. OFF (owner, 2026-08-02): the bundled text is
+  /// the third-party Al-QuranJino rendering and it is too rough to ship —
+  /// 309 verses carry the edition's footnote markers fused into a word
+  /// (`parhezgaaro1`), خ romanises as `q` (`qarch`, `aaqirath`), final ت as
+  /// `th` (`hidaayath`, `najaath`), nasalisation is dropped throughout (`hai`
+  /// for ہیں, `dilo` for دلوں), and 2:6 reads `darsana` for `darana`. Our own
+  /// hand-transliterated pilot in ../alquran-roman-urdu is better on every one
+  /// of those and will replace it; that work resumes later.
+  ///
+  /// While false the edition is filtered out of `translationResources()`, so it
+  /// disappears from the picker AND from the reader. A reader who had it
+  /// selected is handled already — `_activeLangs` drops slugs that are no
+  /// longer available and falls back to the defaults. The row stays in
+  /// `quran.db`; flipping this back is all it takes to restore it.
+  static const bool romanUrdu = false;
+
   /// Prayer times across the app: the Home app-bar next-prayer pill, the all-five
   /// times sheet, the forbidden-window caution, and the prayer-AWARE tint of
   /// "Light of Day" (the surface snaps to your real Fajr/Sunrise/Asr/Maghrib/Isha

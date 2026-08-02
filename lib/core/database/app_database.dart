@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
+import '../feature_flags.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -113,15 +114,23 @@ class AppDatabase extends _$AppDatabase {
     ];
   }
 
-  /// All translation editions, in the pipeline's global display order.
+  /// All reader text editions, in the pipeline's global display order.
   ///
   /// Ordered by `sortOrder`, not by id: id comes from `cur.lastrowid` upstream
   /// and shifts whenever an edition is inserted into or reordered in
   /// `sources.yaml`, which would silently reshuffle the reader's page.
   /// `sortOrder` is the deliberate order (Urdu first), and the picker's
   /// language grouping falls out of it.
+  /// Editions gated off in this build. Filtered here rather than at each call
+  /// site so a disabled edition cannot leak into the reader through one path
+  /// while the picker hides it on another.
+  static const _disabledSlugs = <String>[
+    if (!FeatureFlags.romanUrdu) 'ur-roman-junagarhi-experimental',
+  ];
+
   Future<List<ResourceRow>> translationResources() => (select(resources)
-        ..where((r) => r.type.equals('translation'))
+        ..where((r) => r.type.isIn(['translation', 'transliteration']))
+        ..where((r) => r.slug.isNotIn(_disabledSlugs))
         ..orderBy([
           (r) => OrderingTerm.asc(r.sortOrder),
           (r) => OrderingTerm.asc(r.id),

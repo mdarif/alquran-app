@@ -46,43 +46,105 @@ Ordered as the owner raised them, not by priority. Each notes where the work
 actually lands, since most of these start in `../alquran-data`, not here.
 
 1. **Tafsir in the Detailed view** — a per-ayah tafsir surfaced alongside the
-   translations. Biggest of the seven: pick an edition first (QUL/QuranEnc carry
+   translations. Biggest of the list: pick an edition first (QUL/QuranEnc carry
    tafsir resources; an Urdu tafsir matching the audience, and the *creed* of the
    tafsir matters more than its availability), then extend the data pipeline with
    a `tafsir` resource type + table parallel to `translations`, then the reader
    UI. Tafsir entries are long-form and often span a range of ayat rather than
    one — that shapes both the schema (ayah range, not ayah id) and the UI
    (expandable panel / sheet, not an inline block under the verse).
-2. **Prayer start-time reminders** — notify at Fajr/Dhuhr/Asr/Maghrib/Isha. The
+2. **Downloadable script / Mushaf text packs** — **P1**. Add separately
+   downloadable Arabic text editions so the reader can switch between Classic
+   Madani Mushaf, Naskh/IndoPak, and the current Mushaf Unicode text. Model this
+   like Quran.com native apps / Al Quran (word by word): each script pack should
+   be independently installable, removable, and selectable in reader settings,
+   rather than all scripts being bundled forever. This likely belongs beside the
+   existing downloadable-editions pipeline, but as Arabic script/text resources,
+   not translation resources. Preserve stable identities by slug, never DB ids;
+   verify each artifact by sha256 before install; and keep line/page fidelity as
+   an explicit acceptance gate for the Classic Madani pack.
+
+   **Reference apps — take a different thing from each** (owner, 2026-08-02):
+
+   - **KFGQPC "Quran Hafs"** (`sa.QuranComplex.QuranHafs`, King Fahd Complex —
+     the publisher of the printed Madani Mushaf) — the *fidelity* benchmark.
+     What to club in: the page **is** the unit, not a verse list — one screen =
+     one printed page, 15 lines, horizontal page-turn, no vertical scroll, and
+     lines justified edge-to-edge exactly as printed — built as **per-page
+     fonts over one shared frame image** — plus **pinch-zoom**, which neither
+     Quran.com nor Al Quran (word by word) offers (a product omission on their
+     side, not a technical limit: vector glyphs scale for free).
+     Verses are tapped *on the page* to open actions, so the reading surface
+     stays undisturbed. Also the reason to prefer this pack's text: it is the
+     publisher's own, so provenance for "Classic Madani" is authoritative
+     rather than reconstructed. Cost: ~25–45 MB pack, 604 lazily-loaded font
+     families to keep off the heap, and a licensing check on the QPC fonts +
+     frame artwork (see the licensing gate).
+   - **Al Quran (Greentech), Madani Mushaf 1440** — proves page fidelity and
+     **selectable/tappable verses** coexist: tap a verse → translations (our
+     Detailed-view content) + actions. That is the interaction model to copy,
+     and it is only possible because the page is real text, not a picture.
+   - **Quran.com native apps** — the *pack management* model: browse/download/
+     remove, size shown up front, resumable, works offline after install.
+   - **Al Quran (word by word)** — the *switching* model: script choice sits in
+     reader settings next to translation choice and re-renders in place.
+
+   This makes the long-standing **"Exact-Mushaf page rendering"** backlog item
+   (above, §MVP-out) a *consequence* of the Classic Madani pack rather than a
+   separate project: shipping the pack as printed pages gives line-for-line
+   rendering by construction. Consequences to accept up front: pinch-zoom
+   becomes page-scale (a 15-line page cannot reflow, so the font-size slider
+   hides), and it is a third *viewport* rather than a third value on
+   `ArabicScript`. Reading view only — Detailed (Arabic + translations) stays
+   flowing text.
+
+   **→ Full implementation plan: [`mushaf-page-mode-plan.md`](mushaf-page-mode-plan.md)**
+   (owner ask 2026-08-02). App only — explicitly **not** the website.
+3. **Prayer start-time reminders** — **P3**. Notify at
+   Fajr/Dhuhr/Asr/Maghrib/Isha when the actual prayer time arrives. The
    notification plumbing already exists (`NotificationScheduler` + the Sunnah
    reminder rolling window), so this is mostly scheduling: prayer times are
    computed locally per day, so the window has to be re-armed on launch/resume
    like the Sunnah one, and re-armed on a location change. Decide per-prayer
    opt-in vs all-or-nothing, and whether to offer a pre-prayer lead time. Watch
    the OEM battery-killer problem already documented for reminders (OnePlus).
-3. **More Sunnah occasions** — new Hijri month start, and the rest of the
+4. **More Sunnah occasions** — new Hijri month start, and the rest of the
    recurring calendar (Ayyam al-Beed already ships; candidates: the sacred
    months, Rajab/Sha'ban markers, Laylat al-Qadr odd nights). Extends
    `sunnah_events` + the occurrence engine; each new occasion needs a Hijri-date
    rule and a decision on whether it's informational or routes into the app.
    Anchor-table accuracy (see `quality-backlog.md` §14c) matters more once
    month-START events exist — those fire exactly on the boundary the anchors fix.
-4. **More authentic translations, + Roman Urdu** — tracked centrally in
+5. **More authentic translations, + Roman Urdu** — tracked centrally in
    `../alquran-data/TRANSLATIONS-ROADMAP.md`; the edition model + downloadable
    catalogue already support this, so new editions are a data-side job. Roman
    Urdu has its own repo (`../alquran-roman-urdu`) with a style guide and
    validation pipeline — that is the source, not a transliteration done here.
-5. **More reciters** — Maher al-Muaiqly, Saad al-Ghamdi, Sudais and others. The
+
+   **Roman Urdu is currently switched OFF** (owner, 2026-08-02):
+   `FeatureFlags.romanUrdu = false`, applied in `translationResources()` —
+   the one chokepoint the picker and the reader both read, so the edition
+   cannot leak through one path while hidden on the other. Readers who had it
+   selected fall back to the defaults (`_activeLangs` drops unavailable slugs).
+
+   The reason is quality, and the ruling is **ours or none**: the bundled
+   `ur-roman-junagarhi-experimental` is a third-party rendering (Al-QuranJino)
+   that mangles خ (`qarch`), final ت (`hidaayath`), drops nasalisation (`hai`
+   for ہیں) and fuses footnote markers into words in 309 verses
+   (`parhezgaaro1`). Our own text is better and will replace it — do not
+   re-enable the flag against the third-party edition, and do not try to clean
+   that text app-side. The row stays in `quran.db`, unused.
+6. **More reciters** — Maher al-Muaiqly, Saad al-Ghamdi, Sudais and others. The
    audio layer is already namespaced per reciter (`recitation/{reciter}_{bitrate}/`
    in both the R2 path and the on-disk cache), so no collision risk; the work is
    ingesting each reciter to R2 verse-by-verse against the same global 1..6236
    index, plus a reciter picker in reader settings (`reciterId` already persists).
    Licensing per reciter needs clearing exactly as for translations.
-6. **An authentic Urdu reciter** — as #5, but specifically an Urdu-language
+7. **An authentic Urdu reciter** — as #6, but specifically an Urdu-language
    recitation/translation audio for the core audience. Confirm what is wanted:
    Arabic recitation by a Pakistani/Indian qari, or Urdu *translation* audio
    played after each verse — they are different products and different data.
-7. **Tajweed colours** — colour-coded pronunciation rules over the Arabic. Needs
+8. **Tajweed colours** — colour-coded pronunciation rules over the Arabic. Needs
    a tajweed-annotated source (QUL exports tajweed-rule Uthmani) and a rendering
    approach: the current KFGQPC text is a single styled run, so per-rule colour
    means parsing the annotation into spans — and it must not fight the IndoPak

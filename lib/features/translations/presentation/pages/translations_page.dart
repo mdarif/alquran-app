@@ -18,6 +18,7 @@ class TranslationsPage extends StatefulWidget {
 
 class _TranslationsPageState extends State<TranslationsPage> {
   final TextEditingController _search = TextEditingController();
+  String _languageFilter = 'all';
 
   @override
   void initState() {
@@ -50,7 +51,13 @@ class _TranslationsPageState extends State<TranslationsPage> {
                 ? const _Loading()
                 : Column(
                     children: [
-                      _Header(search: _search),
+                      _Header(
+                        search: _search,
+                        items: state.items,
+                        languageFilter: _languageFilter,
+                        onLanguageFilterChanged: (value) =>
+                            setState(() => _languageFilter = value),
+                      ),
                       Expanded(
                         child: ValueListenableBuilder<TextEditingValue>(
                           valueListenable: _search,
@@ -60,6 +67,7 @@ class _TranslationsPageState extends State<TranslationsPage> {
                             child: _List(
                               state: state,
                               query: value.text.trim().toLowerCase(),
+                              languageFilter: _languageFilter,
                             ),
                           ),
                         ),
@@ -85,10 +93,37 @@ class _Loading extends StatelessWidget {
   }
 }
 
+String _languageDisplayLabel(String code, {String? nativeLabel}) {
+  final native = nativeLabel?.trim() ?? '';
+  if (native == 'اردو') return 'Urdu';
+  if (native == 'हिन्दी' || native == 'हिंदी') return 'Hindi';
+  if (native == 'বাংলা') return 'Bangla';
+  if (native.isNotEmpty && native.toLowerCase() != code.toLowerCase()) {
+    return native;
+  }
+  return switch (code.toLowerCase()) {
+    'ar' => 'Arabic',
+    'bn' => 'Bangla',
+    'en' => 'English',
+    'hi' => 'Hindi',
+    'id' => 'Bahasa Indonesia',
+    'ur' => 'Urdu',
+    _ => code.toUpperCase(),
+  };
+}
+
 class _Header extends StatelessWidget {
-  const _Header({required this.search});
+  const _Header({
+    required this.search,
+    required this.items,
+    required this.languageFilter,
+    required this.onLanguageFilterChanged,
+  });
 
   final TextEditingController search;
+  final List<EditionItem> items;
+  final String languageFilter;
+  final ValueChanged<String> onLanguageFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -131,11 +166,24 @@ class _Header extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           TextField(
+            key: WidgetKeys.translationsSearchField,
             controller: search,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Search',
               prefixIcon: const AppIcon(AppIcons.search),
+              suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: search,
+                builder: (context, value, _) {
+                  if (value.text.isEmpty) return const SizedBox.shrink();
+                  return IconButton(
+                    key: WidgetKeys.translationsSearchClear,
+                    tooltip: 'Clear search',
+                    icon: const AppIcon(AppIcons.close),
+                    onPressed: search.clear,
+                  );
+                },
+              ),
               filled: true,
               fillColor: cs.surface,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -151,21 +199,127 @@ class _Header extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          _LanguageFilters(
+            items: items,
+            selected: languageFilter,
+            onSelected: onLanguageFilterChanged,
+          ),
         ],
       ),
     );
   }
 }
 
-class _List extends StatelessWidget {
-  const _List({required this.state, required this.query});
+class _LanguageFilters extends StatelessWidget {
+  const _LanguageFilters({
+    required this.items,
+    required this.selected,
+    required this.onSelected,
+  });
 
-  final TranslationsState state;
-  final String query;
+  final List<EditionItem> items;
+  final String selected;
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    final downloaded = _filter(state.downloaded);
+    final codes = <String>{
+      for (final item in items) item.languageCode.toLowerCase(),
+    }.toList()
+      ..sort(
+        (a, b) => _languageDisplayLabel(a).compareTo(_languageDisplayLabel(b)),
+      );
+    if (codes.length <= 1) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 30,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _FilterChipButton(
+            code: 'all',
+            label: 'All',
+            selected: selected == 'all',
+            onSelected: onSelected,
+          ),
+          for (final code in codes) ...[
+            const SizedBox(width: 8),
+            _FilterChipButton(
+              code: code,
+              label: _languageFilterLabel(code),
+              selected: selected == code,
+              onSelected: onSelected,
+            ),
+          ],
+          // Keeps the final chip from kissing the sheet edge on narrow phones.
+          const SizedBox(width: 2),
+        ],
+      ),
+    );
+  }
+}
+
+String _languageFilterLabel(String code) {
+  return switch (code.toLowerCase()) {
+    'id' => 'Indonesian',
+    _ => _languageDisplayLabel(code),
+  };
+}
+
+class _FilterChipButton extends StatelessWidget {
+  const _FilterChipButton({
+    required this.code,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String code;
+  final String label;
+  final bool selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      key: WidgetKeys.translationsLanguageFilter(code),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(code),
+      showCheckmark: false,
+      labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+
+class _List extends StatelessWidget {
+  const _List({
+    required this.state,
+    required this.query,
+    required this.languageFilter,
+  });
+
+  final TranslationsState state;
+  final String query;
+  final String languageFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = _filter([
+      for (final item in state.downloaded)
+        if (item.selected) item,
+    ]);
+    final downloaded = _filter([
+      for (final item in state.downloaded)
+        if (!item.selected) item,
+    ]);
     final available = _filter(state.available);
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 6, 24, 18),
@@ -175,12 +329,18 @@ class _List extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 16),
             child: _Notice('New downloads are unavailable offline.'),
           ),
+        _Section(title: 'Shown in reader', items: shown),
+        if (shown.isNotEmpty && downloaded.isNotEmpty)
+          const SizedBox(height: 14),
         _Section(title: 'Downloaded', items: downloaded),
-        const SizedBox(height: 14),
-        const Divider(height: 1),
-        const SizedBox(height: 14),
+        if ((shown.isNotEmpty || downloaded.isNotEmpty) &&
+            available.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+        ],
         _Section(title: 'Available for download', items: available),
-        if (downloaded.isEmpty && available.isEmpty)
+        if (shown.isEmpty && downloaded.isEmpty && available.isEmpty)
           const Padding(
             padding: EdgeInsets.only(top: 24),
             child: _EmptyLine('No translations found'),
@@ -190,14 +350,38 @@ class _List extends StatelessWidget {
   }
 
   List<EditionItem> _filter(List<EditionItem> items) {
-    if (query.isEmpty) return items;
     return [
       for (final i in items)
-        if ('${i.languageLabel} ${i.languageCode} ${i.name} ${i.author ?? ''}'
-            .toLowerCase()
-            .contains(query))
+        if (_matchesLanguage(i) &&
+            (query.isEmpty || _translationSearchText(i).contains(query)))
           i,
     ];
+  }
+
+  bool _matchesLanguage(EditionItem item) =>
+      languageFilter == 'all' ||
+      item.languageCode.toLowerCase() == languageFilter;
+
+  String _translationSearchText(EditionItem item) {
+    return [
+      item.languageLabel,
+      item.languageCode,
+      _languageSearchAlias(item.languageCode),
+      item.name,
+      item.author ?? '',
+    ].join(' ').toLowerCase();
+  }
+
+  String _languageSearchAlias(String code) {
+    return switch (code.toLowerCase()) {
+      'ar' => 'arabic',
+      'bn' => 'bangla bengali',
+      'en' => 'english',
+      'hi' => 'hindi',
+      'id' => 'bahasa indonesia indonesian',
+      'ur' => 'urdu',
+      _ => '',
+    };
   }
 }
 
@@ -267,48 +451,45 @@ class _TranslationRow extends StatelessWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: _languageLabel,
-                                style: titleStyle,
-                              ),
-                              if (_sizeLabel.isNotEmpty) ...[
-                                TextSpan(text: ' ', style: titleStyle),
-                                TextSpan(
-                                  text: _sizeLabel,
-                                  style: sizeStyle,
-                                ),
-                              ],
-                            ],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Flexible(
                         child: Text(
-                          _authorLabel,
+                          _titleLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontWeight: FontWeight.w400,
-                          ),
+                          style: titleStyle,
                         ),
                       ),
-                      if (_isExperimental) ...[
-                        const SizedBox(width: 6),
-                        const _ExperimentalPill(),
+                      if (_sizeLabel.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(_sizeLabel, style: sizeStyle),
                       ],
                     ],
                   ),
+                  const SizedBox(height: 2),
+                  if (_subtitleLabel.isNotEmpty)
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _subtitleLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        if (_isExperimental) ...[
+                          const SizedBox(width: 6),
+                          const _ExperimentalPill(),
+                        ],
+                      ],
+                    )
+                  else if (_isExperimental)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: _ExperimentalPill(),
+                    ),
                   if (item.error != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
@@ -334,10 +515,18 @@ class _TranslationRow extends StatelessWidget {
   }
 
   String get _languageLabel {
-    final native = item.languageLabel.trim();
-    if (native == 'اردو') return 'Urdu';
-    if (native == 'हिन्दी' || native == 'हिंदी') return 'Hindi';
-    return native.isNotEmpty ? native : item.languageCode.toUpperCase();
+    return _languageDisplayLabel(
+      item.languageCode,
+      nativeLabel: item.languageLabel,
+    );
+  }
+
+  String get _titleLabel {
+    final name = item.name.trim();
+    if (name.isEmpty || name.toLowerCase() == _languageLabel.toLowerCase()) {
+      return _languageLabel;
+    }
+    return '$_languageLabel · $name';
   }
 
   String get _sizeLabel {
@@ -346,10 +535,10 @@ class _TranslationRow extends StatelessWidget {
     return '($size)';
   }
 
-  String get _authorLabel {
+  String get _subtitleLabel {
     final author = item.author?.trim() ?? '';
     if (author.isNotEmpty) return author;
-    return item.name.trim();
+    return '';
   }
 
   bool get _isExperimental =>

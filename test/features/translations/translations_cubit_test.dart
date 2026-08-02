@@ -870,5 +870,173 @@ void main() {
         Icons.check_box_rounded,
       );
     });
+
+    testWidgets('searching hindi finds Hindi editions with native labels',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [
+          const CatalogueEntry(
+            slug: 'hi-suhel-farooq-nadwi',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Suhel Farooq Khan/Saifur Rahman Nadwi',
+            nativeName: 'हिन्दी',
+            file: 'hi-suhel-farooq-nadwi.db.gz',
+            bytes: 613000,
+            sha256: 'x',
+            uncompressedBytes: 3000000,
+            uncompressedSha256: 'y',
+            ayahCount: 6236,
+          ),
+          const CatalogueEntry(
+            slug: 'en-sahih',
+            type: 'translation',
+            languageCode: 'en',
+            name: 'Sahih International',
+            nativeName: 'English',
+            file: 'en-sahih.db.gz',
+            bytes: 477000,
+            sha256: 'z',
+            uncompressedBytes: 1100000,
+            uncompressedSha256: 'w',
+            ayahCount: 6236,
+          ),
+        ],
+      );
+      final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      await tester.enterText(
+        find.byKey(WidgetKeys.translationsSearchField),
+        'hindi',
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(WidgetKeys.editionRow('hi-suhel-farooq-nadwi')),
+        findsOneWidget,
+      );
+      expect(find.byKey(WidgetKeys.editionRow('en-sahih')), findsNothing);
+      expect(find.byKey(WidgetKeys.editionRow('ur-junagarhi')), findsNothing);
+    });
+
+    testWidgets('search field shows a clear button that clears the query',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [_entry('en-sahih', 'en', 'Sahih International')],
+      );
+      final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      expect(find.byKey(WidgetKeys.translationsSearchClear), findsNothing);
+
+      await tester.enterText(
+        find.byKey(WidgetKeys.translationsSearchField),
+        'english',
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.editionRow('ur-junagarhi')), findsNothing);
+      expect(find.byKey(WidgetKeys.translationsSearchClear), findsOneWidget);
+
+      await tester.tap(find.byKey(WidgetKeys.translationsSearchClear));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.editionRow('ur-junagarhi')), findsOneWidget);
+      expect(find.byKey(WidgetKeys.editionRow('en-sahih')), findsOneWidget);
+      expect(find.byKey(WidgetKeys.translationsSearchClear), findsNothing);
+    });
+
+    testWidgets('selected and downloaded-only editions are grouped separately',
+        (tester) async {
+      final repo = _FakeRepo(
+        local: [
+          InstalledEdition(
+            slug: 'hi-ahsanul-kalam',
+            type: 'translation',
+            languageCode: 'hi',
+            name: 'Ahsanul Kalam',
+            installedAt: DateTime(2026),
+          ),
+        ],
+      );
+      final settings = _FakeSettings(selectedTranslations: ['ur-junagarhi']);
+      final cubit = TranslationsCubit(
+        repo,
+        const [_bundledUrdu],
+        settings: settings,
+      );
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+
+      expect(find.text('Shown in reader'), findsOneWidget);
+      expect(find.text('Downloaded'), findsOneWidget);
+
+      final shownTop = tester.getTopLeft(find.text('Shown in reader')).dy;
+      final urduTop = tester
+          .getTopLeft(find.byKey(WidgetKeys.editionRow('ur-junagarhi')))
+          .dy;
+      final downloadedTop = tester.getTopLeft(find.text('Downloaded')).dy;
+      final hindiTop = tester
+          .getTopLeft(find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')))
+          .dy;
+
+      expect(shownTop, lessThan(urduTop));
+      expect(urduTop, lessThan(downloadedTop));
+      expect(downloadedTop, lessThan(hindiTop));
+    });
+
+    testWidgets('language filters quickly narrow visible editions',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [
+          _entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam'),
+          _entry('en-sahih', 'en', 'Sahih International'),
+        ],
+      );
+      final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+      await tester.tap(find.byKey(WidgetKeys.translationsLanguageFilter('hi')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')),
+        findsOneWidget,
+      );
+      expect(find.byKey(WidgetKeys.editionRow('ur-junagarhi')), findsNothing);
+      expect(find.byKey(WidgetKeys.editionRow('en-sahih')), findsNothing);
+
+      await tester
+          .tap(find.byKey(WidgetKeys.translationsLanguageFilter('all')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam')),
+        findsOneWidget,
+      );
+      expect(find.byKey(WidgetKeys.editionRow('ur-junagarhi')), findsOneWidget);
+      expect(find.byKey(WidgetKeys.editionRow('en-sahih')), findsOneWidget);
+    });
+
+    testWidgets('same-language rows include the edition name in the title',
+        (tester) async {
+      final repo = _FakeRepo(
+        available: [
+          _entry('hi-suhel-farooq-nadwi', 'hi', 'Suhel Farooq Khan'),
+          _entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam'),
+        ],
+      );
+      final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+      await cubit.load();
+
+      await pumpTranslationsPage(tester, cubit);
+
+      expect(find.text('Hindi · Suhel Farooq Khan'), findsOneWidget);
+      expect(find.text('Hindi · Ahsanul Kalam'), findsOneWidget);
+    });
   });
 }

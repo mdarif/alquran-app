@@ -141,6 +141,17 @@ Commands:
   wrapping and left ragged gaps in the reader) into regular spaces. English only;
   embedded Arabic + curly quotes preserved; the app just renders the DB. After a
   rebuild, propagate the DB to app **and** web. See `../alquran-data/HANDOFF.md`.
+- **Roman Urdu is OFF — "ours or none"** (owner, 2026-08-02).
+  `FeatureFlags.romanUrdu = false`, applied in `translationResources()`
+  (`core/database/app_database.dart`) — the single chokepoint the picker and the
+  reader both read. The bundled `ur-roman-junagarhi-experimental` row is a
+  third-party rendering (Al-QuranJino) that mangles خ (`qarch` for kharch),
+  final ت (`hidaayath`), drops nasalisation (`hai` for ہیں) and fuses its
+  footnote markers into words in 309 verses (`parhezgaaro1`). We ship **our own**
+  Roman Urdu or none — `../alquran-roman-urdu/data/roman-urdu/` (325 of 6236
+  verses, hand-written; see its `docs/TRANSLITERATION-GUIDE.md`). Don't
+  re-enable the flag against the third-party text and don't clean that text
+  app-side. Web is gated in parity via `EDITION_FLAGS` in `src/lib/editions.ts`.
 - **Default reader translation = Urdu-only** on a fresh install (no saved
   selection), **regardless of device locale** — `_activeLangs()` in
   `features/reader/presentation/pages/reader_page.dart` returns `{'ur'}` (else the
