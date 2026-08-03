@@ -377,8 +377,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
               onPressed: () => _setDetailed(isReading),
             ),
             // Bookmarks outrank the reading-theme picker for a quick app-bar
-            // slot — the theme picker moved into Settings (Reading Theme row)
-            // and stays reachable from there.
+            // slot; the theme picker stays on Home's overflow menu.
             IconButton(
               key: WidgetKeys.readerBookmarksButton,
               tooltip: 'Bookmarks',

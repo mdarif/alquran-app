@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../../core/feature_flags.dart';
@@ -8,6 +9,8 @@ import '../../../reader/domain/entities/translation_resource.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/domain/repositories/reader_settings_repository.dart';
 import '../../../reader/presentation/pages/reader_settings_page.dart';
+import '../../../prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
+import '../../../prayer_times/presentation/cubit/prayer_notifications_state.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 import 'app_settings_actions.dart';
 
@@ -37,6 +40,15 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications) {
+      return BlocBuilder<PrayerNotificationsCubit, PrayerNotificationsState>(
+        builder: (context, _) => _buildSettings(context),
+      );
+    }
+    return _buildSettings(context);
+  }
+
+  Widget _buildSettings(BuildContext context) {
     return FutureBuilder<List<TranslationResource>>(
       future: _resources,
       builder: (context, snapshot) {
@@ -51,6 +63,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           onScriptChanged: (v) => _settings.setScript(v),
           resources: resources,
           activeTranslationSummary: _translationSummary(resources),
+          showTranslations: false,
           onOpenTranslations: () => showTranslationsSheet(
             context,
             onTranslationsChanged: () {

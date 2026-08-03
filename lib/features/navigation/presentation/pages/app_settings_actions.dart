@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
@@ -7,22 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
-import '../../../../core/theme/theme_cubit.dart';
-import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import '../../../app_update/domain/repositories/app_update_repository.dart';
+import '../../../prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import '../../../reader/presentation/pages/reader_settings_page.dart';
 
 const String _downloadUrl = 'https://alquranreader.com/download';
-
-IconData _phaseIcon(DayPhase phase) => switch (phase) {
-      DayPhase.fajr => AppIcons.phaseFajr,
-      DayPhase.duha => AppIcons.phaseDuha,
-      DayPhase.asr => AppIcons.phaseAsr,
-      DayPhase.maghrib => AppIcons.phaseMaghrib,
-      DayPhase.isha => AppIcons.phaseIsha,
-    };
 
 List<SettingsAction> appSettingsActions(BuildContext context) => [
       const SettingsAction(
@@ -31,13 +22,6 @@ List<SettingsAction> appSettingsActions(BuildContext context) => [
         title: 'Share Al Quran',
         onTap: _shareApp,
       ),
-      if (FeatureFlags.lightOfDay && _themeCubit(context) != null)
-        SettingsAction(
-          key: WidgetKeys.readingThemeMenuButton,
-          icon: _phaseIcon(_themeCubit(context)!.activePhase),
-          title: 'Reading Theme',
-          onTap: () => _openReadingTheme(context),
-        ),
       if (FeatureFlags.softUpdateReminder)
         SettingsAction(
           key: WidgetKeys.appUpdateMenuButton,
@@ -45,33 +29,76 @@ List<SettingsAction> appSettingsActions(BuildContext context) => [
           title: 'Check for update',
           onTap: () => _checkForUpdate(context),
         ),
+      if (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications)
+        SettingsAction(
+          key: WidgetKeys.prayerNotificationsToggle,
+          icon: AppIcons.reminders,
+          title: 'Salat notifications',
+          section: SettingsActionSection.reminders,
+          switchValue: _prayerNotifications(context)?.state.enabled ?? false,
+          onSwitchChanged: (enabled) =>
+              _setPrayerNotifications(context, enabled),
+          onTap: () {
+            final cubit = _prayerNotifications(context);
+            if (cubit == null) return;
+            _setPrayerNotifications(context, !cubit.state.enabled);
+          },
+        ),
+      if (FeatureFlags.prayerTimes &&
+          FeatureFlags.prayerTimeNotifications &&
+          kDebugMode)
+        SettingsAction(
+          key: WidgetKeys.prayerNotificationsTestButton,
+          icon: AppIcons.scheduleTest,
+          title: 'Schedule salat test',
+          section: SettingsActionSection.debug,
+          onTap: () => _schedulePrayerNotificationTest(context),
+        ),
       SettingsAction(
         key: WidgetKeys.aboutMenuButton,
         icon: AppIcons.about,
         title: 'About',
+        showsChevron: true,
         onTap: () => _openAbout(context),
       ),
     ];
 
-ThemeCubit? _themeCubit(BuildContext context) {
+Future<void> _schedulePrayerNotificationTest(BuildContext context) async {
+  final cubit = _prayerNotifications(context);
+  if (cubit == null) return;
+  final messenger = ScaffoldMessenger.of(context);
+  final report = await cubit.scheduleDeliveryTest();
+  debugPrint('[prayer-notifications] delivery test: $report');
+  if (!context.mounted) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(report),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+}
+
+PrayerNotificationsCubit? _prayerNotifications(BuildContext context) {
   try {
-    return BlocProvider.of<ThemeCubit>(context);
+    return BlocProvider.of<PrayerNotificationsCubit>(context);
   } catch (_) {
     return null;
   }
 }
 
-void _openReadingTheme(BuildContext context) {
-  final cubit = _themeCubit(context);
+Future<void> _setPrayerNotifications(
+  BuildContext context,
+  bool enabled,
+) async {
+  final cubit = _prayerNotifications(context);
   if (cubit == null) return;
-  showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    builder: (_) => BlocProvider<ThemeCubit>.value(
-      value: cubit,
-      child: const ReadingLightSheet(),
-    ),
-  );
+  if (enabled) {
+    await cubit.enable();
+  } else {
+    await cubit.disable();
+  }
 }
 
 Future<void> _checkForUpdate(BuildContext context) async {

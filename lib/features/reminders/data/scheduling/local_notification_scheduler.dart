@@ -19,6 +19,10 @@ class LocalNotificationScheduler implements NotificationScheduler {
   static const String _channelName = 'Sunnah Reminders';
   static const String _channelDesc =
       'Gentle reminders for Sunnah acts (Surah Al-Kahf, fasting days, etc.)';
+  static const String _salatChannelId = 'salat_notifications_nature_v1';
+  static const String _salatChannelName = 'Salat Notifications';
+  static const String _salatChannelDesc =
+      'Gentle salat-time nudges with a soft natural sound';
 
   /// Native bridge for the battery-optimization exemption (see MainActivity.kt).
   static const MethodChannel _native =
@@ -45,6 +49,15 @@ class LocalNotificationScheduler implements NotificationScheduler {
           _channelName,
           description: _channelDesc,
           importance: Importance.high,
+        ),
+      );
+      await _android?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _salatChannelId,
+          _salatChannelName,
+          description: _salatChannelDesc,
+          importance: Importance.high,
+          sound: RawResourceAndroidNotificationSound('salat_nudge'),
         ),
       );
     } catch (_) {
@@ -100,6 +113,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
   }
 
   @override
+  Future<void> cancel(int id) async {
+    try {
+      await _plugin.cancel(id: id);
+    } catch (_) {}
+  }
+
+  @override
   Future<int> pendingCount() async {
     try {
       final pending = await _plugin.pendingNotificationRequests();
@@ -115,6 +135,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? soundName,
   }) async {
     try {
       await _plugin.zonedSchedule(
@@ -122,7 +143,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
         title: title,
         body: body,
         scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
-        notificationDetails: _details(),
+        notificationDetails: _details(soundName: soundName),
         androidScheduleMode: await _scheduleMode(),
       );
       return null;
@@ -179,6 +200,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required String title,
     required String body,
     String? payload,
+    String? soundName,
   }) async {
     try {
       await _plugin.zonedSchedule(
@@ -186,7 +208,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
         title: title,
         body: body,
         scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
-        notificationDetails: _details(),
+        notificationDetails: _details(soundName: soundName),
         androidScheduleMode: await _scheduleMode(),
         payload: payload,
       );
@@ -241,24 +263,32 @@ class LocalNotificationScheduler implements NotificationScheduler {
     }
   }
 
-  NotificationDetails _details() => const NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelId,
-          _channelName,
-          channelDescription: _channelDesc,
-          importance: Importance.high,
-          priority: Priority.high,
-          // Tag as a REMINDER so the OS (and aggressive OEM skins) treat it as a
-          // time-sensitive nudge rather than a disposable alert.
-          category: AndroidNotificationCategory.reminder,
-          // Linger in the shade until the user swipes it away — a Sunnah nudge
-          // shouldn't vanish on the next unlock (autoCancel defaults to true,
-          // which clears it the moment it's tapped/brushed). Tapping still opens
-          // the app via the payload route; it just no longer self-dismisses.
-          autoCancel: false,
-        ),
-        iOS: DarwinNotificationDetails(),
-      );
+  NotificationDetails _details({String? soundName}) {
+    final salatSound = soundName == 'salat_nudge';
+    return NotificationDetails(
+      android: AndroidNotificationDetails(
+        salatSound ? _salatChannelId : _channelId,
+        salatSound ? _salatChannelName : _channelName,
+        channelDescription: salatSound ? _salatChannelDesc : _channelDesc,
+        importance: Importance.high,
+        priority: Priority.high,
+        sound: salatSound
+            ? const RawResourceAndroidNotificationSound('salat_nudge')
+            : null,
+        // Tag as a REMINDER so the OS (and aggressive OEM skins) treat it as a
+        // time-sensitive nudge rather than a disposable alert.
+        category: AndroidNotificationCategory.reminder,
+        // Linger in the shade until the user swipes it away — a Sunnah nudge
+        // shouldn't vanish on the next unlock (autoCancel defaults to true,
+        // which clears it the moment it's tapped/brushed). Tapping still opens
+        // the app via the payload route; it just no longer self-dismisses.
+        autoCancel: false,
+      ),
+      iOS: DarwinNotificationDetails(
+        sound: salatSound ? 'salat_nudge.wav' : null,
+      ),
+    );
+  }
 
   tz.TZDateTime _nextInstanceOf(int weekday, int hour, int minute) {
     final now = tz.TZDateTime.now(tz.local);

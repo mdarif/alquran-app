@@ -186,15 +186,15 @@ void main() {
   });
 
   testWidgets(
-    'Settings gains a Reading Theme row now that the app bar toggle is gone',
+    'Settings does not duplicate the Home Reading Theme action',
     (tester) async {
       await pump(tester, await _fixedTheme(DayPhase.duha));
 
       await tester.tap(find.byKey(WidgetKeys.settingsButton));
       await tester.pumpAndSettle();
 
-      expect(find.byKey(WidgetKeys.readingThemeMenuButton), findsOneWidget);
-      expect(find.text('Reading Theme'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.readingThemeMenuButton), findsNothing);
+      expect(find.text('Reading Theme'), findsNothing);
     },
   );
 }

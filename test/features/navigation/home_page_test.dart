@@ -371,6 +371,48 @@ void main() {
       expect(updateTop, lessThan(aboutTop));
     });
 
+    testWidgets('Settings only shows chevrons for navigation rows',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      Finder chevronInside(Key key) => find.descendant(
+            of: find.byKey(key),
+            matching: find.byIcon(AppIcons.chevronRight),
+          );
+
+      expect(chevronInside(WidgetKeys.shareAppButton), findsNothing);
+      expect(chevronInside(WidgetKeys.appUpdateMenuButton), findsNothing);
+      expect(chevronInside(WidgetKeys.aboutMenuButton), findsOneWidget);
+    });
+
+    testWidgets('Settings keeps translations out of the app settings surface',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      final resetTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.readerSettingsReset),
+          )
+          .dy;
+      final shareTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.shareAppButton),
+          )
+          .dy;
+
+      expect(find.widgetWithText(ListTile, 'Translations'), findsNothing);
+      expect(find.byKey(WidgetKeys.readingThemeMenuButton), findsNothing);
+      expect(resetTop, lessThan(shareTop));
+    });
+
     testWidgets('Settings opens the About screen', (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));

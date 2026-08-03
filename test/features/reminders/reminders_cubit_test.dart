@@ -30,6 +30,8 @@ class _FakeScheduler implements NotificationScheduler {
   @override
   Future<void> cancelAll() async => cancelAllCalls++;
   @override
+  Future<void> cancel(int id) async {}
+  @override
   Future<int> pendingCount() async => oneShotIds.length;
   @override
   Future<String?> scheduleOneShotDebug({
@@ -37,6 +39,7 @@ class _FakeScheduler implements NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? soundName,
   }) async {
     oneShotIds.add(id);
     return null;
@@ -52,6 +55,7 @@ class _FakeScheduler implements NotificationScheduler {
     required String title,
     required String body,
     String? payload,
+    String? soundName,
   }) async =>
       oneShotIds.add(id);
 

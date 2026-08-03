@@ -97,6 +97,9 @@ class WidgetKeys {
   // Sunnah reminders
   static const remindersButton = Key('reminders-button');
   static const remindersSheet = Key('reminders-sheet');
+  static const prayerNotificationsToggle = Key('prayer-notifications-toggle');
+  static const prayerNotificationsTestButton =
+      Key('prayer-notifications-test-button');
 
   // About / credits
   static const aboutPage = Key('about-page');
