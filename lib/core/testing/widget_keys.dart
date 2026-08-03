@@ -34,6 +34,8 @@ class WidgetKeys {
   static const readerSettingsPage = Key('reader-settings-page');
   static const readerSettingsReset = Key('reader-settings-reset');
   static const themeToggle = Key('reader-theme-toggle');
+  static const readerBookmarksButton = Key('reader-bookmarks-button');
+  static const readingThemeMenuButton = Key('settings-reading-theme-button');
   // Uthmani/IndoPak script switch, inside the text-size panel (only rendered
   // while FeatureFlags.indopakScript is on) — this keys the two-card row.
   static const scriptToggle = Key('reader-script-toggle');

@@ -458,8 +458,7 @@ void main() {
 
   group('Default translation selection', () {
     // No saved selection (the default _FakeSettings) → the reader resolves a
-    // single default: Urdu (the flagship), regardless of device language, per
-    // owner decision. Only falls through to the first edition when Urdu is absent.
+    // device-locale-aware default from the editions already on this device.
     Future<void> openDetailed(WidgetTester tester, AyahRepository repo) async {
       GetIt.I
         ..unregister<ReaderCubit>()
@@ -471,18 +470,26 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('defaults to Urdu even when the device-language edition exists',
+    testWidgets('defaults to the device-language edition when it exists',
         (tester) async {
-      // Test host locale is en and English is available, but the fresh-install
-      // default is Urdu-only regardless of device language.
+      tester.binding.platformDispatcher.localesTestValue = const [
+        Locale('en', 'US'),
+      ];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
       await openDetailed(tester, _FakeAyahRepoWithTranslations());
-      expect(find.text('اردو متن'), findsOneWidget);
-      expect(find.text('english body'), findsNothing);
+      expect(find.text('english body'), findsOneWidget);
+      expect(find.text('اردو متن'), findsNothing);
     });
 
-    testWidgets('falls back to the first edition when Urdu has no edition',
+    testWidgets(
+        'falls back to the best available edition when locale is absent',
         (tester) async {
-      // No Urdu edition available → last-resort first available (English here).
+      tester.binding.platformDispatcher.localesTestValue = const [
+        Locale('ar', 'SA'),
+      ];
+      addTearDown(tester.binding.platformDispatcher.clearLocalesTestValue);
+
       await openDetailed(tester, _FakeAyahRepoEnOnly());
       expect(find.text('english body'), findsOneWidget);
     });

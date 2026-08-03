@@ -68,7 +68,15 @@ the evidence, so both dead ends are recorded here to stop anyone re-walking them
   rosette are their own glyph codes and can be pink and blue. Colour is a
   *rendering* choice, not evidence of an image.
 - The **frame** genuinely is artwork. No font produces that. But it is *one
-  image behind the text*, not 604 page pictures.
+  asset behind the text*, not 604 page pictures.
+- In the reference app **every colour on the page is configurable** (owner,
+  exploring it 2026-08-02). That **rules out raster images entirely** — you
+  cannot recolour a PNG per element. It does *not* choose between SVG and fonts:
+  per-word glyph codes rendered as spans recolour just as freely, which is
+  exactly how you expose "body text / waqf marks / ayah markers" as separate
+  colour settings. The only thing it settles beyond raster is the **frame**: if
+  its greens and pinks are configurable too, the frame is **vector, so ship it
+  as SVG, not WebP** (§6).
 
 **The build, therefore:**
 
@@ -133,7 +141,9 @@ axis the owner cares about, including the one it was supposed to win.
    - wrap the page in `InteractiveViewer` and zoom to 6x — confirm crispness
      and 60fps pan on the OnePlus 15R;
    - **load and evict 30 page fonts in sequence**, watching resident memory.
-     This is the one genuinely unproven assumption in the plan.
+     This is the one genuinely unproven assumption in the plan;
+   - check in the reference app **whether the decorative frame recolours** along
+     with the text — that is what tells us the frame must be vector (§2).
 
 Exit criteria: written licence position + a zoomed spike screenshot the owner
 signs off against the print.
@@ -189,7 +199,8 @@ MushafPageView
           └ InteractiveViewer(minScale: 1, maxScale: 6)
               └ AspectRatio(printed page ratio)
                   └ Stack
-                      ├ PageFrame        (one shared image asset)
+                      ├ PageFrame        (one shared SVG — vector so it stays
+                      │                   crisp at 6x zoom AND is recolourable)
                       ├ RunningHeads     (juz + surah, from layout.sqlite)
                       ├ Column of 15 MushafLine
                       │    └ RichText of per-word TextSpans in the page font,
@@ -238,6 +249,18 @@ the rest of the app already uses, so everything reconnects with no new concepts:
   reads as a physical page resting on our adaptive surface. Dark mode inverts the
   surround, never the page. (Fonts do give us the option of a true dark page
   later; deliberately out of scope for v1.)
+- **Page colour customisation** — the reference app makes every colour
+  configurable, and this build gets it nearly free: body text, waqf marks and
+  ayah markers are already separate spans keyed by `words.kind`, and an SVG
+  frame is recolourable. **Recommendation: ship a small curated set of page
+  themes, not a colour picker per element.** A picker lets a reader produce an
+  unreadable or undignified Mushaf, and the quality bar here is an *experience*,
+  not a settings screen. Curated themes also let Light of Day drive the page
+  properly rather than tinting over it — which is the cleaner answer to the
+  conflict above, and worth revisiting once this lands.
+- **Tajweed becomes reachable** (roadmap #7) once colour is per-span and the
+  pack is word-addressed. Out of scope here; note it so the schema does not
+  foreclose it.
 - **Page navigation vs `advancedNavigation = false`.** v1 ships Surah-only, but a
   page-based Mushaf without a page jumper is hostile. **Recommendation:** surface
   a page/juz jumper *inside this viewport only*, independent of the global flag.

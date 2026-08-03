@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/experimental_pill.dart';
 import '../../domain/ayah_share.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/translation_resource.dart';
@@ -408,19 +409,31 @@ class _Translation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isRtl = resource.languageCode == 'ur';
+    final isRtl = resource.isRtl;
+    final isExperimental = resource.experimental;
+    final credit = resource.displayCredit;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 14),
-        Text(
-          // Just the author — the script already makes the language obvious.
-          resource.attribution,
-          textAlign: TextAlign.left,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                // Just the author — the script already makes the language obvious.
+                credit,
+                textAlign: TextAlign.left,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (isExperimental) ...[
+              const SizedBox(width: 6),
+              const ExperimentalPill(),
+            ],
+          ],
         ),
         const SizedBox(height: 4),
         Text(
@@ -432,6 +445,7 @@ class _Translation extends StatelessWidget {
           style: resource.languageCode.scriptStyle(
             theme.textTheme.bodyLarge!
                 .copyWith(height: 1.5, fontSize: fontSize),
+            isRtl: isRtl,
           ),
         ),
       ],

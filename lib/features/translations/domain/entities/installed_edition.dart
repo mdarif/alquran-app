@@ -19,6 +19,8 @@ class InstalledEdition extends Equatable {
     this.ayahCount = 0,
     this.bytes = 0,
     this.sha256,
+    this.creditName,
+    this.experimental = false,
   });
 
   final String slug;
@@ -36,6 +38,13 @@ class InstalledEdition extends Equatable {
   final String? sha256;
   final DateTime installedAt;
 
+  /// Short one-line display name for the reader credit + picker subtitle.
+  /// Null means "use author, else name".
+  final String? creditName;
+
+  /// True = show the "Experimental" pill (unreviewed/pilot content).
+  final bool experimental;
+
   /// Present the same way a bundled edition is, so the reader and its pickers
   /// need not know where a given text came from.
   TranslationResource toResource() => TranslationResource(
@@ -52,8 +61,11 @@ class InstalledEdition extends Equatable {
         sortOrder: sortOrder,
         license: license,
         sourceUrl: sourceUrl,
+        creditName: creditName,
+        experimental: experimental,
       );
 
   @override
-  List<Object?> get props => [slug, sha256, installedAt];
+  List<Object?> get props =>
+      [slug, sha256, installedAt, creditName, experimental];
 }

@@ -27,6 +27,8 @@ class CatalogueEntry extends Equatable {
     this.sortOrder = 0,
     this.license,
     this.sourceUrl,
+    this.creditName,
+    this.experimental = false,
   });
 
   factory CatalogueEntry.fromJson(Map<String, dynamic> json) => CatalogueEntry(
@@ -40,6 +42,11 @@ class CatalogueEntry extends Equatable {
         sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
         license: json['license'] as String?,
         sourceUrl: json['sourceUrl'] as String?,
+        // Older catalogues may not carry these fields; absent means "use
+        // author, else name" and "not experimental" — the same defaults as
+        // every edition that never sets them upstream.
+        creditName: json['creditName'] as String?,
+        experimental: json['experimental'] as bool? ?? false,
         ayahCount: (json['ayahCount'] as num?)?.toInt() ?? 0,
         file: json['file'] as String,
         bytes: (json['bytes'] as num?)?.toInt() ?? 0,
@@ -58,6 +65,14 @@ class CatalogueEntry extends Equatable {
   final int sortOrder;
   final String? license;
   final String? sourceUrl;
+
+  /// Short one-line display name for the reader credit + picker subtitle.
+  /// Null means "use author, else name".
+  final String? creditName;
+
+  /// True = show the "Experimental" pill (unreviewed/pilot content).
+  final bool experimental;
+
   final int ayahCount;
 
   /// Filename relative to the catalogue's own URL, e.g. `hi-ahsanul-kalam.db.gz`.
@@ -73,6 +88,15 @@ class CatalogueEntry extends Equatable {
 
   String get languageLabel =>
       nativeName?.trim().isNotEmpty == true ? nativeName! : languageCode;
+
+  /// One-line credit shown in the Translations picker.
+  String get displayCredit {
+    final credit = creditName?.trim();
+    if (credit != null && credit.isNotEmpty) return credit;
+    final a = author?.trim();
+    if (a != null && a.isNotEmpty) return a;
+    return name;
+  }
 
   @override
   List<Object?> get props => [slug, sha256];

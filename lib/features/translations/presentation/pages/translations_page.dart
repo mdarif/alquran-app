@@ -5,8 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
-import '../../../../core/translations/translation_metadata_overrides.dart';
+import '../../../../core/translations/translation_recommendations.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../core/widgets/experimental_pill.dart';
 import '../cubit/translations_cubit.dart';
 
 class TranslationsPage extends StatefulWidget {
@@ -224,12 +225,10 @@ class _LanguageFilters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final codes = <String>{
-      for (final item in items) item.languageCode.toLowerCase(),
-    }.toList()
-      ..sort(
-        (a, b) => _languageDisplayLabel(a).compareTo(_languageDisplayLabel(b)),
-      );
+    final codes = TranslationRecommendations.visibleLanguageFilters(
+      {for (final item in items) item.languageCode.toLowerCase()},
+      View.of(context).platformDispatcher.locales,
+    );
     if (codes.length <= 1) return const SizedBox.shrink();
 
     return SizedBox(
@@ -316,11 +315,14 @@ class _List extends StatelessWidget {
       for (final item in state.downloaded)
         if (item.selected) item,
     ]);
-    final downloaded = _filter([
-      for (final item in state.downloaded)
-        if (!item.selected) item,
-    ]);
-    final available = _filter(state.available);
+    final downloaded = _sort(
+      context,
+      _filter([
+        for (final item in state.downloaded)
+          if (!item.selected) item,
+      ]),
+    );
+    final available = _sort(context, _filter(state.available));
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 6, 24, 18),
       children: [
@@ -356,6 +358,16 @@ class _List extends StatelessWidget {
             (query.isEmpty || _translationSearchText(i).contains(query)))
           i,
     ];
+  }
+
+  List<EditionItem> _sort(BuildContext context, List<EditionItem> items) {
+    return TranslationRecommendations.sortByLanguagePriority(
+      items,
+      languageCode: (item) => item.languageCode,
+      slug: (item) => item.slug,
+      name: (item) => '${item.name} ${item.languageLabel}',
+      locales: View.of(context).platformDispatcher.locales,
+    );
   }
 
   bool _matchesLanguage(EditionItem item) =>
@@ -430,9 +442,9 @@ class _TranslationRow extends StatelessWidget {
       fontWeight: FontWeight.w700,
       color: cs.onSurface,
     );
-    final sizeStyle = theme.textTheme.labelMedium?.copyWith(
+    final sizeStyle = theme.textTheme.labelSmall?.copyWith(
       color: cs.onSurfaceVariant,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w500,
     );
     return InkWell(
       key: WidgetKeys.editionRow(item.slug),
@@ -481,14 +493,14 @@ class _TranslationRow extends StatelessWidget {
                         ),
                         if (_isExperimental) ...[
                           const SizedBox(width: 6),
-                          const _ExperimentalPill(),
+                          const ExperimentalPill(),
                         ],
                       ],
                     )
                   else if (_isExperimental)
                     const Padding(
                       padding: EdgeInsets.only(top: 2),
-                      child: _ExperimentalPill(),
+                      child: ExperimentalPill(),
                     ),
                   if (item.error != null)
                     Padding(
@@ -521,13 +533,7 @@ class _TranslationRow extends StatelessWidget {
     );
   }
 
-  String get _titleLabel {
-    final name = item.name.trim();
-    if (name.isEmpty || name.toLowerCase() == _languageLabel.toLowerCase()) {
-      return _languageLabel;
-    }
-    return '$_languageLabel · $name';
-  }
+  String get _titleLabel => _languageLabel;
 
   String get _sizeLabel {
     if (item.bytes <= 0) return '';
@@ -535,14 +541,9 @@ class _TranslationRow extends StatelessWidget {
     return '($size)';
   }
 
-  String get _subtitleLabel {
-    final author = item.author?.trim() ?? '';
-    if (author.isNotEmpty) return author;
-    return '';
-  }
+  String get _subtitleLabel => item.displayCredit;
 
-  bool get _isExperimental =>
-      TranslationMetadataOverrides.isExperimental(item.slug);
+  bool get _isExperimental => item.experimental;
 
   VoidCallback? _onTap(BuildContext context) {
     final cubit = context.read<TranslationsCubit>();
@@ -555,33 +556,6 @@ class _TranslationRow extends StatelessWidget {
         () => cubit.toggleSelected(item.slug),
       EditionState.downloading => null,
     };
-  }
-}
-
-class _ExperimentalPill extends StatelessWidget {
-  const _ExperimentalPill();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: cs.tertiaryContainer.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        child: Text(
-          'Experimental',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: cs.onTertiaryContainer,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
   }
 }
 

@@ -15,6 +15,7 @@ const _urdu = TranslationResource(
   languageCode: 'ur',
   name: 'Urdu',
   author: 'Junagarhi',
+  direction: 'rtl',
 );
 const _hindi = TranslationResource(
   id: 2,
@@ -29,6 +30,21 @@ const _english = TranslationResource(
   languageCode: 'en',
   name: 'English',
   author: 'Hilali & Khan',
+);
+
+/// A Latin-script pilot edition sharing languageCode 'ur' with [_urdu] but
+/// direction 'ltr' — like ur-roman-abu-rayyan, whose author is a two-person
+/// licensing credit too long for the reader, so creditName carries the short
+/// display name instead.
+const _romanUrdu = TranslationResource(
+  id: 4,
+  slug: 'ur-roman-test',
+  languageCode: 'ur',
+  name: 'Abu Rayyan',
+  author: 'Muhammad Junagarhi; transliterated by Abu Rayyan',
+  direction: 'ltr',
+  creditName: 'Abu Rayyan',
+  experimental: true,
 );
 
 Widget _wrap(Widget child) =>
@@ -404,6 +420,61 @@ void main() {
       final urduText = tester.widget<Text>(find.text('اردو ترجمہ'));
       expect(urduText.textDirection, TextDirection.rtl);
       expect(urduText.textAlign, TextAlign.right);
+    });
+
+    testWidgets(
+        'a Latin-script pilot edition sharing languageCode "ur" renders '
+        'left-to-right with its short credit + Experimental pill',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 1,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+        translations: {'ur-roman-test': 'Alif Laam Meem'},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(
+            ayah: ayah,
+            resources: [_romanUrdu],
+            arabicFontSize: 24,
+          ),
+        ),
+      );
+
+      final text = tester.widget<Text>(find.text('Alif Laam Meem'));
+      expect(text.textDirection, TextDirection.ltr);
+      expect(text.textAlign, TextAlign.left);
+      // Short creditName ("Abu Rayyan"), not the full licensing author string.
+      expect(find.text('Abu Rayyan'), findsOneWidget);
+      expect(
+        find.text('Muhammad Junagarhi; transliterated by Abu Rayyan'),
+        findsNothing,
+      );
+      expect(find.text('Experimental'), findsOneWidget);
+    });
+
+    testWidgets('a non-experimental edition shows no Experimental pill',
+        (tester) async {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 1,
+        ayahNumber: 1,
+        textArabic: 'الٓمٓ',
+        isSajda: false,
+        translations: {'ur-test': 'اردو ترجمہ'},
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          const AyahTile(ayah: ayah, resources: [_urdu], arabicFontSize: 24),
+        ),
+      );
+
+      expect(find.text('Experimental'), findsNothing);
     });
   });
 }

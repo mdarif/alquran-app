@@ -83,6 +83,7 @@ const _kResources = <TranslationResource>[
     languageCode: 'ur',
     name: 'Urdu',
     author: 'Junagarhi',
+    direction: 'rtl',
   ),
   TranslationResource(
     id: 2,
@@ -482,6 +483,51 @@ void main() {
       expect(cardVisible(tester), isTrue);
       expect(find.text('No translation available'), findsOneWidget);
       expect(find.textContaining('Junagarhi'), findsNothing);
+    });
+
+    testWidgets(
+        'a Latin-script pilot edition sharing languageCode "ur" renders '
+        'left-to-right with its short credit + Experimental pill',
+        (tester) async {
+      const romanUrdu = TranslationResource(
+        id: 3,
+        slug: 'ur-roman-test',
+        languageCode: 'ur',
+        name: 'Abu Rayyan',
+        author: 'Muhammad Junagarhi; transliterated by Abu Rayyan',
+        direction: 'ltr',
+        creditName: 'Abu Rayyan',
+        experimental: true,
+      );
+      final ayahs = [
+        const Ayah(
+          id: 1001,
+          surahId: 1,
+          ayahNumber: 1,
+          textArabic: 'الٓمٓ',
+          isSajda: false,
+          translations: {'ur-roman-test': 'Alif Laam Meem'},
+        ),
+      ];
+      await tester.pumpWidget(
+        reader(
+          ayahs,
+          resources: const [romanUrdu],
+          selected: const {'ur-roman-test'},
+        ),
+      );
+      await tester.pump();
+      await _tapText(tester);
+
+      final text = tester.widget<Text>(find.text('Alif Laam Meem'));
+      expect(text.textDirection, TextDirection.ltr);
+      expect(text.textAlign, TextAlign.left);
+      expect(find.text('Abu Rayyan'), findsOneWidget);
+      expect(
+        find.text('Muhammad Junagarhi; transliterated by Abu Rayyan'),
+        findsNothing,
+      );
+      expect(find.text('Experimental'), findsOneWidget);
     });
   });
 

@@ -22,9 +22,18 @@ Quran" — the correct name everywhere is **"Al Quran"**.
   translations; navigation by Surah / Page / Juz / Hizb / Ruku (Rub + Sajda
   stored too); pinch-to-zoom (hard accessibility requirement); dual viewport
   (Reading = Arabic only, Detailed = Arabic + Urdu + Hindi); fully offline.
-- **Out (backlog):** IndoPak script, English/Roman-Urdu, audio, bookmarks,
-  last-read, dark mode, tajweed, full-text search, tafsir, word-by-word,
-  exact-Mushaf rendering.
+- **Shipped beyond the original MVP** (owner sign-off given per-feature, see
+  `FeatureFlags` in `lib/core/feature_flags.dart` for the on/off story of
+  each): IndoPak script (Noorehuda font), English translation, Roman Urdu
+  (our own `ur-roman-abu-rayyan`, opt-in + Experimental-tagged; the old
+  third-party edition stays off), single-ayah + continuous audio recitation
+  (Alafasy), ayah bookmarks (`features/reader/presentation/pages/
+  bookmarks_page.dart`), last-read resume banner, "Light of Day" time/prayer
+  -adaptive theming (not a literal light/dark toggle), Sunnah reminders,
+  Hijri date + special-occasion gilding, home-screen widgets (dark for v1).
+- **Still out (backlog):** tajweed coloring, full-text search, tafsir,
+  word-by-word, exact-Mushaf page-image rendering (see
+  `docs/mushaf-page-mode-plan.md` for the page-mode approach instead).
 
 ## Architecture (PRD §7.1 — follow strictly)
 

@@ -23,6 +23,8 @@ class TranslationResource extends Equatable {
     this.defaultOn = false,
     this.license,
     this.sourceUrl,
+    this.creditName,
+    this.experimental = false,
   });
 
   final int id;
@@ -37,8 +39,22 @@ class TranslationResource extends Equatable {
   final String? license;
   final String? sourceUrl;
 
-  /// Attribution shown in the reader: the translator when known, else the name.
-  String get attribution => author?.trim().isNotEmpty == true ? author! : name;
+  /// Short one-line display name for the reader credit + picker subtitle.
+  /// Null means "use author, else name" — only set upstream when [author] is
+  /// a multi-person licensing credit too long to show inline.
+  final String? creditName;
+
+  /// True = show the "Experimental" pill (unreviewed/pilot content).
+  final bool experimental;
+
+  /// One-line credit shown in the reader and the Translations picker.
+  String get displayCredit {
+    final credit = creditName?.trim();
+    if (credit != null && credit.isNotEmpty) return credit;
+    final a = author?.trim();
+    if (a != null && a.isNotEmpty) return a;
+    return name;
+  }
 
   /// Label for the picker: the language in its own script where we have it.
   String get languageLabel =>
@@ -59,5 +75,7 @@ class TranslationResource extends Equatable {
         defaultOn,
         license,
         sourceUrl,
+        creditName,
+        experimental,
       ];
 }

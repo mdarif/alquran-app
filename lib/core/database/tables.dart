@@ -63,6 +63,14 @@ class Resources extends Table {
   TextColumn get license => text().nullable()();
   TextColumn get sourceUrl => text().nullable()();
 
+  /// Short one-line display name for the reader credit + picker subtitle.
+  /// NULL means "use author, else name" — only set when [author] is a
+  /// multi-person licensing credit too long to show inline.
+  TextColumn get creditName => text().nullable()();
+
+  /// 1 = show the "Experimental" pill (unreviewed/pilot content).
+  IntColumn get experimental => integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

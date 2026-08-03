@@ -1,7 +1,6 @@
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/editions_database.dart';
 import '../../../../core/feature_flags.dart';
-import '../../../../core/translations/translation_metadata_overrides.dart';
 import '../../domain/entities/arabic_script.dart';
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
@@ -179,12 +178,14 @@ class AyahRepositoryImpl implements AyahRepository {
             languageCode: r.languageCode,
             name: r.name,
             nativeName: r.nativeName,
-            author: TranslationMetadataOverrides.author(r.slug, r.author),
+            author: r.author,
             direction: r.direction,
             sortOrder: r.sortOrder,
             defaultOn: true,
             license: r.license,
             sourceUrl: r.sourceUrl,
+            creditName: r.creditName,
+            experimental: r.experimental == 1,
           ),
     ];
 
@@ -211,11 +212,13 @@ class AyahRepositoryImpl implements AyahRepository {
         languageCode: e.languageCode,
         name: e.name,
         nativeName: e.nativeName,
-        author: TranslationMetadataOverrides.author(e.slug, e.author),
+        author: e.author,
         direction: e.direction,
         sortOrder: e.sortOrder,
         license: e.license,
         sourceUrl: e.sourceUrl,
+        creditName: e.creditName,
+        experimental: e.experimental == 1,
       );
     }
     final merged = bySlug.values.toList()

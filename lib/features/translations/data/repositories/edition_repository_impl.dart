@@ -8,7 +8,6 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' as sq;
 
 import '../../../../core/database/editions_database.dart';
-import '../../../../core/translations/translation_metadata_overrides.dart';
 import '../../domain/entities/catalogue_entry.dart';
 import '../../domain/entities/installed_edition.dart';
 import '../../domain/repositories/edition_repository.dart';
@@ -93,7 +92,7 @@ class EditionRepositoryImpl implements EditionRepository {
           languageCode: r.languageCode,
           name: r.name,
           nativeName: r.nativeName,
-          author: TranslationMetadataOverrides.author(r.slug, r.author),
+          author: r.author,
           direction: r.direction,
           sortOrder: r.sortOrder,
           license: r.license,
@@ -102,6 +101,8 @@ class EditionRepositoryImpl implements EditionRepository {
           bytes: r.bytes,
           sha256: r.sha256,
           installedAt: r.installedAt,
+          creditName: r.creditName,
+          experimental: r.experimental == 1,
         ),
     ];
   }
@@ -153,9 +154,7 @@ class EditionRepositoryImpl implements EditionRepository {
           languageCode: entry.languageCode,
           name: entry.name,
           nativeName: Value(entry.nativeName),
-          author: Value(
-            TranslationMetadataOverrides.author(entry.slug, entry.author),
-          ),
+          author: Value(entry.author),
           direction: Value(entry.direction),
           sortOrder: Value(entry.sortOrder),
           license: Value(entry.license),
@@ -163,6 +162,8 @@ class EditionRepositoryImpl implements EditionRepository {
           ayahCount: Value(texts.length),
           bytes: Value(raw.length),
           sha256: Value(entry.sha256),
+          creditName: Value(entry.creditName),
+          experimental: Value(entry.experimental ? 1 : 0),
           installedAt: DateTime.now(),
         ),
         texts,

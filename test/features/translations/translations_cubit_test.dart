@@ -124,7 +124,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  test('bundled editions are listed but offer no action', () async {
+  test('bundled editions are listed as on-device rows', () async {
     final cubit = TranslationsCubit(_FakeRepo(), const [_bundledUrdu]);
     await cubit.load();
 
@@ -148,7 +148,7 @@ void main() {
     expect(cubit.state.items.single.bytes, 1024);
   });
 
-  test('a non-default bundled edition remains available for CDN install',
+  test('a non-default bundled edition is not offered again for download',
       () async {
     const bundledHindi = TranslationResource(
       id: 2,
@@ -166,8 +166,104 @@ void main() {
     );
     await cubit.load();
 
+    expect(
+      cubit.state.downloaded.map((i) => i.slug),
+      ['ur-junagarhi', 'hi-suhel-farooq-nadwi'],
+    );
+    expect(cubit.state.available, isEmpty);
+  });
+
+  test('a non-default bundled English edition is not duplicated as a download',
+      () async {
+    const bundledEnglish = TranslationResource(
+      id: 3,
+      slug: 'en-hilali-khan',
+      languageCode: 'en',
+      name: 'The Noble Quran (Hilali & Khan)',
+      defaultOn: false,
+    );
+    final repo = _FakeRepo(
+      available: [
+        _entry('en-hilali-khan', 'en', 'The Noble Quran (Hilali & Khan)'),
+        _entry('en-sahih-international', 'en', 'Sahih International'),
+      ],
+    );
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu, bundledEnglish],
+    );
+    await cubit.load();
+
+    expect(
+      cubit.state.downloaded.map((i) => i.slug),
+      ['ur-junagarhi', 'en-hilali-khan'],
+    );
+    expect(cubit.state.available.map((i) => i.slug), [
+      'en-sahih-international',
+    ]);
+  });
+
+  test('installed copy of a bundled edition is not listed twice', () async {
+    const bundledHindi = TranslationResource(
+      id: 2,
+      slug: 'hi-ahsanul-kalam',
+      languageCode: 'hi',
+      name: 'Ahsanul Kalam',
+      author: 'Muhammad Rais Qureshi Salafi',
+      defaultOn: false,
+    );
+    final repo = _FakeRepo(
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          author: 'Muhammad Rais Qureshi Salafi',
+          bytes: 3011584,
+          installedAt: DateTime(2026),
+        ),
+      ],
+      available: [_entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam')],
+    );
+    final settings = _FakeSettings(
+      selectedTranslations: ['ur-junagarhi', 'hi-ahsanul-kalam'],
+    );
+    final cubit = TranslationsCubit(
+      repo,
+      const [_bundledUrdu, bundledHindi],
+      settings: settings,
+    );
+    await cubit.load();
+
+    final hindiRows = [
+      for (final item in cubit.state.items)
+        if (item.slug == 'hi-ahsanul-kalam') item,
+    ];
+    expect(hindiRows, hasLength(1));
+    expect(hindiRows.single.state, EditionState.bundled);
+    expect(hindiRows.single.selected, isTrue);
+    expect(cubit.state.available, isEmpty);
+  });
+
+  test('same-language catalogue-only edition stays downloadable', () async {
+    final repo = _FakeRepo(
+      available: [
+        _entry('ur-junagarhi', 'ur', 'Junagarhi'),
+        _entry(
+          'ur-roman-junagarhi-experimental',
+          'ur',
+          'Roman Urdu (Experimental)',
+        ),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
     expect(cubit.state.downloaded.map((i) => i.slug), ['ur-junagarhi']);
-    expect(cubit.state.available.single.slug, 'hi-suhel-farooq-nadwi');
+    expect(cubit.state.available.map((i) => i.slug), [
+      'ur-roman-junagarhi-experimental',
+    ]);
   });
 
   test('two editions of one language are both listed under it', () async {
@@ -278,7 +374,7 @@ void main() {
     expect(invalidations, 1);
   });
 
-  test('Ahsanul Kalam author metadata is corrected for older installs',
+  test('Ahsanul Kalam author metadata passes through from local storage',
       () async {
     final repo = _FakeRepo(
       local: [
@@ -297,7 +393,7 @@ void main() {
 
     expect(
       cubit.state.items.singleWhere((i) => i.slug == 'hi-ahsanul-kalam').author,
-      'Muhammad Rais Qureshi Salafi',
+      'Shaikh Muhammad Rais Qureshi',
     );
   });
 
@@ -328,6 +424,54 @@ void main() {
       cubit.state.available.map((i) => i.slug),
       isNot(contains(item.slug)),
     );
+  });
+
+  test(
+      'an installed edition with fresher catalogue metadata but unchanged '
+      'content refreshes creditName/experimental without an update prompt',
+      () async {
+    final repo = _FakeRepo(
+      available: [
+        const CatalogueEntry(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          author: 'Shaikh Muhammad Rais Qureshi',
+          file: 'hi-ahsanul-kalam.db.gz',
+          bytes: 1024,
+          sha256: 'same-sha',
+          uncompressedBytes: 4096,
+          uncompressedSha256: 'y',
+          ayahCount: 6236,
+          experimental: true,
+        ),
+      ],
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          // Stale local snapshot from before credit_name/experimental
+          // existed, or from before an author correction — the content
+          // itself (sha256) hasn't changed, only the catalogue's metadata.
+          author: 'Muhammad Rais Qureshi Salafi',
+          sha256: 'same-sha',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
+    final item = cubit.state.items.singleWhere(
+      (i) => i.slug == 'hi-ahsanul-kalam',
+    );
+    // No re-download prompt — the packaged content is unchanged.
+    expect(item.state, EditionState.installed);
+    expect(item.author, 'Shaikh Muhammad Rais Qureshi');
+    expect(item.experimental, isTrue);
   });
 
   test('an edition removed from the catalogue stays installed and usable',
@@ -539,6 +683,7 @@ void main() {
             author: 'Muhammad Rais Qureshi Salafi',
             bytes: 2900000,
             installedAt: DateTime(2026),
+            experimental: true,
           ),
         ],
       );
@@ -1022,7 +1167,8 @@ void main() {
       expect(find.byKey(WidgetKeys.editionRow('en-sahih')), findsOneWidget);
     });
 
-    testWidgets('same-language rows include the edition name in the title',
+    testWidgets(
+        'same-language rows share a plain language title, distinguished by subtitle',
         (tester) async {
       final repo = _FakeRepo(
         available: [
@@ -1035,8 +1181,30 @@ void main() {
 
       await pumpTranslationsPage(tester, cubit);
 
-      expect(find.text('Hindi · Suhel Farooq Khan'), findsOneWidget);
-      expect(find.text('Hindi · Ahsanul Kalam'), findsOneWidget);
+      // Title is just the language, not "Hindi · <edition name>" — the two
+      // rows are distinguished by their subtitle (translator credit) instead.
+      final nadwiRow =
+          find.byKey(WidgetKeys.editionRow('hi-suhel-farooq-nadwi'));
+      final kalamRow = find.byKey(WidgetKeys.editionRow('hi-ahsanul-kalam'));
+      expect(
+        find.descendant(of: nadwiRow, matching: find.text('Hindi')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: nadwiRow,
+          matching: find.text('Suhel Farooq Khan'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: kalamRow, matching: find.text('Hindi')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: kalamRow, matching: find.text('Ahsanul Kalam')),
+        findsOneWidget,
+      );
     });
   });
 }

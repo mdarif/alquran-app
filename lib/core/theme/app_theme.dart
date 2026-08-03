@@ -76,9 +76,14 @@ extension TranslationTextStyle on String {
   /// A text style suited to this language code's script. Urdu needs a dedicated
   /// nastaliq face and extra line height; Hindi a Devanagari face; other
   /// languages use [base] unchanged.
-  TextStyle scriptStyle(TextStyle base) {
+  ///
+  /// [isRtl] disambiguates 'ur': the language code alone doesn't identify the
+  /// script — a Latin-script Roman Urdu edition also carries languageCode
+  /// 'ur' (grouping only, see TranslationResource's doc comment) but must NOT
+  /// get the Nastaliq face. Only the actually-RTL 'ur' edition does.
+  TextStyle scriptStyle(TextStyle base, {bool isRtl = false}) {
     switch (this) {
-      case 'ur':
+      case 'ur' when isRtl:
         return base.copyWith(
           fontFamily: AppTheme.urduFontFamily,
           height: 2.0,

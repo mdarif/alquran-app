@@ -12,7 +12,7 @@ it drift from `FeatureFlags` / the actual code.
 - **Surah navigation** — full list of 114, search (mirrors web quickMatch).
 - **Audio recitation** — tap-a-verse + continuous full-surah autoplay (cross-surah), Alafasy, self-hosted CDN stream+cache. Foreground-only (see below).
 - **IndoPak script** — Noorehuda font, authentic Quran.com `text_indopak`, flag ON.
-- **Multiple translations, multi-language** — Urdu (Junagarhi, default), Hindi (Suhel Farooq Khan/Nadwi), English (Hilali & Khan) bundled; the edition model (data repo, 2026-07-28) supports several editions per language and on-demand downloads via a Translations screen reading a CDN catalogue.
+- **Multiple translations, multi-language** — Urdu (Junagarhi, default), Hindi (Suhel Farooq Khan/Nadwi), English (Hilali & Khan) bundled in the current seed; the edition model (data repo, 2026-07-28) supports several editions per language and on-demand downloads via a Translations screen reading a CDN catalogue. A translation slug must appear in exactly one visible bucket: bundled/on-device, installed/on-device, or available for download — never both bundled and downloadable.
 - **Continue reading** — resumes the exact verse, in the viewport you left off in; the open stamp waits for a dwell so a glance can't overwrite a deep position.
 - **Light of Day** — time-adaptive theming (pillar 1 of 3; shipped as the "dark mode" answer instead of a literal toggle).
 - **Prayer times sheet** — Karachi method + Shafi Asr (hard-wired, no other madhab options), Hijri date shown.
@@ -120,6 +120,30 @@ actually lands, since most of these start in `../alquran-data`, not here.
    catalogue already support this, so new editions are a data-side job. Roman
    Urdu has its own repo (`../alquran-roman-urdu`) with a style guide and
    validation pipeline — that is the source, not a transliteration done here.
+
+   **Bundle-size direction** (owner, 2026-08-03): over time, shrink
+   `quran.db` so it carries the Quran text + indices + only the smallest
+   first-run translation set. The likely long-term shape is:
+
+   - **Always keep downloaded editions in `editions.db`, never `quran.db`.**
+     The seed DB is overwritten on version bumps, so merging downloads into it
+     would silently destroy reader downloads on app update.
+   - **Prefer bundling Urdu as the flagship offline baseline.** Consider keeping
+     one Hindi edition bundled if India/offline-first remains a v1/v2 priority.
+     English should move to downloadable-only once the catalogue flow is proven.
+   - **Do not show duplicate downloads for bundled slugs.** If `ur-junagarhi`
+     is in `quran.db` and also appears in `catalogue.json`, the picker shows it
+     once as on-device, never again under "Available for download". A
+     same-language different slug, e.g. Roman Urdu, may still appear as a
+     separate downloadable edition.
+   - **Keep selection logic separate from packaging.** Smart defaults may choose
+     Hindi/Urdu/English/Roman Urdu based on locale, but that must not decide
+     whether a catalogue row is hidden. Duplicate suppression is based on
+     physical presence by slug: bundled slugs + installed slugs.
+   - **When removing built-in translations later, old saved selections must
+     degrade safely.** If a previously bundled slug becomes downloadable-only,
+     it should either remain available in the catalogue or fall back to the
+     locale/default bundled edition without leaving the reader blank.
 
    **Roman Urdu is currently switched OFF** (owner, 2026-08-02):
    `FeatureFlags.romanUrdu = false`, applied in `translationResources()` —

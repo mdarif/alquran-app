@@ -14,15 +14,23 @@ abstract final class FeatureFlags {
   /// resolves exactly as before (the DB column just sits unused).
   static const bool indopakScript = true;
 
-  /// The Roman Urdu edition (`ur-roman-junagarhi-experimental`) in the reader
-  /// and the Translations picker. OFF (owner, 2026-08-02): the bundled text is
-  /// the third-party Al-QuranJino rendering and it is too rough to ship —
-  /// 309 verses carry the edition's footnote markers fused into a word
-  /// (`parhezgaaro1`), خ romanises as `q` (`qarch`, `aaqirath`), final ت as
-  /// `th` (`hidaayath`, `najaath`), nasalisation is dropped throughout (`hai`
-  /// for ہیں, `dilo` for دلوں), and 2:6 reads `darsana` for `darana`. Our own
-  /// hand-transliterated pilot in ../alquran-roman-urdu is better on every one
-  /// of those and will replace it; that work resumes later.
+  /// The retired third-party Roman Urdu edition
+  /// (`ur-roman-junagarhi-experimental`, Al-QuranJino) in the reader and the
+  /// Translations picker. OFF (owner, 2026-08-02): 309 verses carry the
+  /// edition's footnote markers fused into a word (`parhezgaaro1`), خ
+  /// romanises as `q` (`qarch`, `aaqirath`), final ت as `th` (`hidaayath`,
+  /// `najaath`), nasalisation is dropped throughout (`hai` for ہیں, `dilo`
+  /// for دلوں), and 2:6 reads `darsana` for `darana`.
+  ///
+  /// SUPERSEDED 2026-08-03 by our own full-coverage edition
+  /// `ur-roman-abu-rayyan` ("Abu Rayyan"), which is unrelated to this flag: it
+  /// ships opt-in (`default_on: false` in the DB), visible in the picker, and
+  /// tagged with the "Experimental" pill via the DB's own
+  /// `resources.experimental` column — reflecting its `beta-unverified`
+  /// review status in ../alquran-roman-urdu, not hidden behind a flag. This
+  /// flag now only gates the dead Al-QuranJino slug,
+  /// which is also `enabled: false` at the DB/catalogue level in
+  /// ../alquran-data — kept here as a belt-and-suspenders app-side filter.
   ///
   /// While false the edition is filtered out of `translationResources()`, so it
   /// disappears from the picker AND from the reader. A reader who had it

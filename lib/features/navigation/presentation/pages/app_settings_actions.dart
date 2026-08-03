@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,11 +7,22 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
+import '../../../../core/theme/theme_cubit.dart';
+import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import '../../../app_update/domain/repositories/app_update_repository.dart';
 import '../../../reader/presentation/pages/reader_settings_page.dart';
 
 const String _downloadUrl = 'https://alquranreader.com/download';
+
+IconData _phaseIcon(DayPhase phase) => switch (phase) {
+      DayPhase.fajr => AppIcons.phaseFajr,
+      DayPhase.duha => AppIcons.phaseDuha,
+      DayPhase.asr => AppIcons.phaseAsr,
+      DayPhase.maghrib => AppIcons.phaseMaghrib,
+      DayPhase.isha => AppIcons.phaseIsha,
+    };
 
 List<SettingsAction> appSettingsActions(BuildContext context) => [
       const SettingsAction(
@@ -19,6 +31,13 @@ List<SettingsAction> appSettingsActions(BuildContext context) => [
         title: 'Share Al Quran',
         onTap: _shareApp,
       ),
+      if (FeatureFlags.lightOfDay && _themeCubit(context) != null)
+        SettingsAction(
+          key: WidgetKeys.readingThemeMenuButton,
+          icon: _phaseIcon(_themeCubit(context)!.activePhase),
+          title: 'Reading Theme',
+          onTap: () => _openReadingTheme(context),
+        ),
       if (FeatureFlags.softUpdateReminder)
         SettingsAction(
           key: WidgetKeys.appUpdateMenuButton,
@@ -33,6 +52,27 @@ List<SettingsAction> appSettingsActions(BuildContext context) => [
         onTap: () => _openAbout(context),
       ),
     ];
+
+ThemeCubit? _themeCubit(BuildContext context) {
+  try {
+    return BlocProvider.of<ThemeCubit>(context);
+  } catch (_) {
+    return null;
+  }
+}
+
+void _openReadingTheme(BuildContext context) {
+  final cubit = _themeCubit(context);
+  if (cubit == null) return;
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (_) => BlocProvider<ThemeCubit>.value(
+      value: cubit,
+      child: const ReadingLightSheet(),
+    ),
+  );
+}
 
 Future<void> _checkForUpdate(BuildContext context) async {
   final messenger = ScaffoldMessenger.of(context);

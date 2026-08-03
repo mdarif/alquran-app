@@ -21,12 +21,16 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         // The asset DB ships with every table and all data already created by
-        // the data pipeline — there is nothing to create here.
+        // the data pipeline — there is nothing to create here. Bumped to 2 for
+        // the resources.credit_name/experimental columns (added upstream in
+        // alquran-data): the seed DB is always wholesale-replaced by
+        // db_seeder.dart, never incrementally migrated, so this is purely
+        // documentation of the shape change, not a real upgrade path.
         onCreate: (m) async {},
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');

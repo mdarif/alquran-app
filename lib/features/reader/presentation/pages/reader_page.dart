@@ -18,6 +18,7 @@ import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/translations/translation_recommendations.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../navigation/presentation/pages/app_settings_actions.dart';
 import '../../../translations/presentation/translations_sheet.dart';
@@ -27,12 +28,13 @@ import '../../domain/entities/ayah.dart';
 import '../../domain/entities/reader_target.dart';
 import '../../domain/entities/surah_heading.dart';
 import '../../domain/entities/translation_resource.dart';
-import '../../../../core/theme/theme_toggle_button.dart';
 import '../../domain/reader_navigation.dart';
 import '../../domain/repositories/ayah_bookmark_repository.dart';
+import '../../domain/repositories/ayah_repository.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 import '../cubit/ayah_audio_cubit.dart';
 import '../cubit/reader_cubit.dart';
+import 'bookmarks_page.dart';
 import 'reader_settings_page.dart';
 import '../scroll_immersion.dart';
 import '../widgets/ayah_tile.dart';
@@ -374,7 +376,15 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
               ),
               onPressed: () => _setDetailed(isReading),
             ),
-            if (FeatureFlags.lightOfDay) const ThemeToggleButton(),
+            // Bookmarks outrank the reading-theme picker for a quick app-bar
+            // slot — the theme picker moved into Settings (Reading Theme row)
+            // and stays reachable from there.
+            IconButton(
+              key: WidgetKeys.readerBookmarksButton,
+              tooltip: 'Bookmarks',
+              icon: const AppIcon(AppIcons.bookmark),
+              onPressed: _openBookmarks,
+            ),
             // Settings sits last (rightmost): reading size, Arabic font +
             // translation, in a bottom sheet. (Prayer times live on the Home bar,
             // so there's no indicator here — keeps the reader calm.)
@@ -769,6 +779,18 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   /// was getting cramped, and this leaves room to grow denser without
   /// crowding. Changes apply live to the verses behind it and persist, via
   /// _applyFont / _applyScript.
+  void _openBookmarks() {
+    if (!GetIt.I.isRegistered<AyahRepository>()) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookmarksPage(
+          bookmarks: _bookmarks,
+          ayahs: GetIt.I<AyahRepository>(),
+        ),
+      ),
+    );
+  }
+
   void _openSettingsSheet() {
     final resources = _cubit.state.resources;
     Navigator.of(context).push(
@@ -931,9 +953,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
 
   /// The reader's active editions, as SLUGS — shared by the Reading peek and
   /// Detailed view. The saved selection (validated against what is installed),
-  /// or, when nothing is saved, the edition(s) the data marks `default_on`
-  /// (Urdu — the flagship — regardless of device language, per owner decision).
-  /// Only as a last resort, the first available edition.
+  /// or, when nothing is saved, a device-locale-aware recommendation from the
+  /// editions already on this device. Only as a last resort, the first available
+  /// edition.
   ///
   /// Slugs rather than language codes: a language may carry several editions,
   /// so a per-language selection could not say *which* Hindi to show.
@@ -948,8 +970,21 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       final valid = saved.where(available.contains).toSet();
       if (valid.isNotEmpty) return valid;
     }
-    final defaults = {for (final r in all.where((r) => r.defaultOn)) r.slug};
-    if (defaults.isNotEmpty) return defaults;
+    final recommended = TranslationRecommendations.freshInstallDefaults(
+      [
+        for (final r in all)
+          TranslationCandidate(
+            slug: r.slug,
+            languageCode: r.languageCode,
+            name: r.name,
+            nativeName: r.nativeName ?? '',
+            defaultOn: r.defaultOn,
+            sortOrder: r.sortOrder,
+          ),
+      ],
+      locales: View.of(context).platformDispatcher.locales,
+    );
+    if (recommended.isNotEmpty) return recommended;
     return {all.first.slug};
   }
 

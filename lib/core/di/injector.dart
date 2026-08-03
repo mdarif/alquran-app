@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:get_it/get_it.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -198,11 +199,11 @@ Future<void> configureDependencies() async {
   // "new edition available" signal even when the screen isn't open. The
   // bundled list is resolved once, here, so the registration below stays a
   // plain sync closure like every other lazy-singleton cubit.
-  final bundledTranslations = await _bundledTranslations(getIt<AppDatabase>());
+  final bundled = await bundledTranslations(getIt<AppDatabase>());
   getIt.registerLazySingleton<TranslationsCubit>(
     () => TranslationsCubit(
       getIt<EditionRepository>(),
-      bundledTranslations,
+      bundled,
       settings: getIt<ReaderSettingsRepository>(),
       prefs: getIt<SharedPreferences>(),
       onTranslationsChanged: () =>
@@ -235,22 +236,40 @@ Future<void> configureDependencies() async {
 
 /// Editions compiled into the app (as opposed to downloaded ones), for
 /// [TranslationsCubit]'s bundled/default-on filtering.
-Future<List<TranslationResource>> _bundledTranslations(AppDatabase db) async {
+///
+/// `resources` in quran.db carries a metadata row for EVERY edition
+/// (including downloadable-only ones like hi-ahsanul-kalam/ur-roman-abu-rayyan
+/// — needed so the picker/search can describe them before they're ever
+/// downloaded), but only `default_on` rows are actually meant to be treated
+/// as bundled here. Filtered to match AyahRepositoryImpl's own
+/// `r.defaultOn == 1` bundled filter — without this, a downloadable edition
+/// would be permanently claimed as "bundled" in the picker (no
+/// install/remove lifecycle, and its `editions.installed()` row — with the
+/// fresher creditName/experimental/author — would never be consulted).
+///
+/// Public (not `_`-prefixed) and [visibleForTesting] specifically so this
+/// filter has a regression test — see
+/// test/core/di/injector_bundled_translations_test.dart.
+@visibleForTesting
+Future<List<TranslationResource>> bundledTranslations(AppDatabase db) async {
   final rows = await db.translationResources();
   return [
     for (final r in rows)
-      TranslationResource(
-        id: r.id,
-        slug: r.slug,
-        languageCode: r.languageCode,
-        name: r.name,
-        nativeName: r.nativeName,
-        author: r.author,
-        direction: r.direction,
-        sortOrder: r.sortOrder,
-        defaultOn: r.defaultOn == 1,
-        license: r.license,
-        sourceUrl: r.sourceUrl,
-      ),
+      if (r.defaultOn == 1)
+        TranslationResource(
+          id: r.id,
+          slug: r.slug,
+          languageCode: r.languageCode,
+          name: r.name,
+          nativeName: r.nativeName,
+          author: r.author,
+          direction: r.direction,
+          sortOrder: r.sortOrder,
+          defaultOn: true,
+          license: r.license,
+          sourceUrl: r.sourceUrl,
+          creditName: r.creditName,
+          experimental: r.experimental == 1,
+        ),
   ];
 }

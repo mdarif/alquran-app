@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:equatable/equatable.dart';
-import 'package:flutter/widgets.dart' show VoidCallback;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/translations/translation_metadata_overrides.dart';
+import '../../../../core/translations/translation_recommendations.dart';
 import '../../../reader/domain/entities/translation_resource.dart';
 import '../../../reader/domain/repositories/reader_settings_repository.dart';
 import '../../domain/entities/catalogue_entry.dart';
@@ -27,6 +27,8 @@ class EditionItem extends Equatable {
     this.selected = false,
     this.progress,
     this.error,
+    this.creditName,
+    this.experimental = false,
   });
 
   final String slug;
@@ -45,6 +47,22 @@ class EditionItem extends Equatable {
   /// 0..1 while downloading.
   final double? progress;
   final String? error;
+
+  /// Short one-line display name for the row subtitle. Null means "use
+  /// author, else name".
+  final String? creditName;
+
+  /// True = show the "Experimental" pill (unreviewed/pilot content).
+  final bool experimental;
+
+  /// One-line credit shown as the row subtitle.
+  String get displayCredit {
+    final credit = creditName?.trim();
+    if (credit != null && credit.isNotEmpty) return credit;
+    final a = author?.trim();
+    if (a != null && a.isNotEmpty) return a;
+    return name;
+  }
 
   EditionItem copyWith({
     EditionState? state,
@@ -66,6 +84,8 @@ class EditionItem extends Equatable {
         state: state ?? this.state,
         progress: progress,
         error: clearError ? null : (error ?? this.error),
+        creditName: creditName,
+        experimental: experimental,
       );
 
   @override
@@ -215,50 +235,50 @@ class TranslationsCubit extends Cubit<TranslationsState> {
       unavailable = true;
     }
 
-    final defaultBundledSlugs = {
-      for (final r in _bundled)
-        if (r.defaultOn) r.slug,
-    };
+    final recommendedBundledSlugs = _recommendedBundledSlugs();
+    final bundledSlugs = _bundledSlugs();
     final selectedSlugs =
-        (_settings?.selectedTranslations ?? defaultBundledSlugs.toList())
+        (_settings?.selectedTranslations ?? recommendedBundledSlugs.toList())
             .toSet();
     final installedSlugs = {for (final e in installed) e.slug};
     final catalogueBySlug = {for (final c in available) c.slug: c};
 
     final items = <EditionItem>[
       for (final r in _bundled)
-        if (r.defaultOn)
-          EditionItem(
-            slug: r.slug,
-            languageCode: r.languageCode,
-            languageLabel: r.languageLabel,
-            name: r.name,
-            author: TranslationMetadataOverrides.author(r.slug, r.author),
-            license: r.license,
-            sourceUrl: r.sourceUrl,
-            bytes: catalogueBySlug[r.slug]?.bytes ?? 0,
-            selected: selectedSlugs.contains(r.slug),
-            state: EditionState.bundled,
-          ),
+        EditionItem(
+          slug: r.slug,
+          languageCode: r.languageCode,
+          languageLabel: r.languageLabel,
+          name: r.name,
+          author: r.author,
+          license: r.license,
+          sourceUrl: r.sourceUrl,
+          bytes: catalogueBySlug[r.slug]?.bytes ?? 0,
+          selected: selectedSlugs.contains(r.slug),
+          state: EditionState.bundled,
+          creditName: r.creditName,
+          experimental: r.experimental,
+        ),
       for (final e in installed)
-        _installedItem(e, catalogueBySlug[e.slug], selectedSlugs),
+        if (!bundledSlugs.contains(e.slug))
+          _installedItem(e, catalogueBySlug[e.slug], selectedSlugs),
       for (final c in available)
-        // Skip only what is already active on the device. Non-default bundled
-        // editions are deliberately still presented as CDN downloads: future
-        // seed DBs keep only Urdu bundled, and this keeps the UX model stable
-        // while older/dev DBs still carry Hindi or English rows.
-        if (!installedSlugs.contains(c.slug) &&
-            !defaultBundledSlugs.contains(c.slug))
+        // Skip anything already on this device. Bundled editions come from
+        // quran.db; downloaded editions come from editions.db. A slug can never
+        // be both on-device and offered for download in the same list.
+        if (!installedSlugs.contains(c.slug) && !bundledSlugs.contains(c.slug))
           EditionItem(
             slug: c.slug,
             languageCode: c.languageCode,
             languageLabel: c.languageLabel,
             name: c.name,
-            author: TranslationMetadataOverrides.author(c.slug, c.author),
+            author: c.author,
             license: c.license,
             sourceUrl: c.sourceUrl,
             bytes: c.bytes,
             state: EditionState.available,
+            creditName: c.creditName,
+            experimental: c.experimental,
           ),
     ];
 
@@ -367,10 +387,7 @@ class TranslationsCubit extends Cubit<TranslationsState> {
     }
     final settings = _settings;
     if (settings == null) return;
-    final defaults = [
-      for (final r in _bundled)
-        if (r.defaultOn) r.slug,
-    ];
+    final defaults = _recommendedBundledSlugs().toList();
     final current = (settings.selectedTranslations ?? defaults).toSet();
     if (current.contains(slug)) {
       if (current.length == 1) return;
@@ -388,33 +405,46 @@ class TranslationsCubit extends Cubit<TranslationsState> {
     CatalogueEntry? catalogue,
     Set<String> selectedSlugs,
   ) {
+    // Whether the on-disk edition content itself is stale — this is what
+    // gates the "Update" button/re-download, since it's the only thing that
+    // costs bytes.
     final updateAvailable = catalogue != null &&
         edition.sha256 != null &&
         edition.sha256 != catalogue.sha256;
+    // Display metadata (author/creditName/experimental/etc.) is cheap: the
+    // catalogue is already fetched on every load(), so prefer it whenever
+    // it's available rather than only on a content update. Otherwise a
+    // metadata-only catalogue fix (e.g. a corrected credit name) would never
+    // reach an already-installed edition until its content also changed.
+    final name = catalogue?.name ?? edition.name;
+    final author = catalogue?.author ?? edition.author;
+    final license = catalogue?.license ?? edition.license;
+    final sourceUrl = catalogue?.sourceUrl ?? edition.sourceUrl;
+    final creditName = catalogue?.creditName ?? edition.creditName;
+    final experimental = catalogue?.experimental ?? edition.experimental;
     return EditionItem(
       slug: edition.slug,
       languageCode: edition.languageCode,
       languageLabel: edition.nativeName ?? edition.languageCode,
-      name: edition.name,
-      author: TranslationMetadataOverrides.author(edition.slug, edition.author),
-      license: edition.license,
-      sourceUrl: edition.sourceUrl,
+      name: name,
+      author: author,
+      license: license,
+      sourceUrl: sourceUrl,
       bytes: updateAvailable ? catalogue.bytes : edition.bytes,
       selected: selectedSlugs.contains(edition.slug),
       state: updateAvailable
           ? EditionState.updateAvailable
           : EditionState.installed,
+      creditName: creditName,
+      experimental: experimental,
     );
   }
 
   Future<bool> _selectInstalledSlugs(Set<String> slugs) async {
     final settings = _settings;
     if (settings == null) return false;
-    final current = settings.selectedTranslations ??
-        [
-          for (final r in _bundled)
-            if (r.defaultOn) r.slug,
-        ];
+    final current =
+        settings.selectedTranslations ?? _recommendedBundledSlugs().toList();
     final missing = [
       for (final slug in slugs)
         if (!current.contains(slug)) slug,
@@ -446,4 +476,23 @@ class TranslationsCubit extends Cubit<TranslationsState> {
       ),
     );
   }
+
+  Set<String> _recommendedBundledSlugs() {
+    return TranslationRecommendations.freshInstallDefaults(
+      [
+        for (final r in _bundled)
+          TranslationCandidate(
+            slug: r.slug,
+            languageCode: r.languageCode,
+            name: r.name,
+            nativeName: r.nativeName ?? '',
+            defaultOn: r.defaultOn,
+            sortOrder: r.sortOrder,
+          ),
+      ],
+      locales: PlatformDispatcher.instance.locales,
+    );
+  }
+
+  Set<String> _bundledSlugs() => {for (final r in _bundled) r.slug};
 }

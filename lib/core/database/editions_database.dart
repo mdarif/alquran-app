@@ -24,11 +24,27 @@ class EditionsDatabase extends _$EditionsDatabase {
   EditionsDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
+        // Unlike the bundled quran.db, this file is a real per-device user
+        // database (downloaded editions), never wholesale-replaced — an
+        // existing install's rows must survive this in place. A row missing
+        // the new columns resolves to creditName: null, experimental: false,
+        // which is exactly today's display (falls back to author/name, no
+        // pill) until that edition is reinstalled/updated and gets a fresh
+        // row via replaceEdition().
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(installedEditions, installedEditions.creditName);
+            await m.addColumn(
+              installedEditions,
+              installedEditions.experimental,
+            );
+          }
+        },
         beforeOpen: (_) async {
           await customStatement('PRAGMA foreign_keys = ON');
         },
@@ -118,6 +134,13 @@ class InstalledEditions extends Table {
   /// can tell "already installed" from "a newer build of the same edition".
   TextColumn get sha256 => text().nullable()();
   DateTimeColumn get installedAt => dateTime()();
+
+  /// Short one-line display name for the reader credit + picker subtitle.
+  /// NULL means "use author, else name".
+  TextColumn get creditName => text().nullable()();
+
+  /// 1 = show the "Experimental" pill (unreviewed/pilot content).
+  IntColumn get experimental => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {slug};

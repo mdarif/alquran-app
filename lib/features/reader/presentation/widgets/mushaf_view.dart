@@ -10,6 +10,7 @@ import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/mushaf_palette.dart';
+import '../../../../core/widgets/experimental_pill.dart';
 import '../../domain/ayah_share.dart' show editionChipLabel;
 import '../../domain/entities/ayah.dart';
 import '../../domain/entities/surah_heading.dart';
@@ -1571,32 +1572,10 @@ class _MushafPeekCard extends StatelessWidget {
                     else
                       for (var i = 0; i < shown.length; i++) ...[
                         if (i > 0) const SizedBox(height: 18),
-                        Text(
-                          current.translations[shown[i].slug]!,
-                          textAlign: shown[i].languageCode == 'ur'
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          textDirection: shown[i].languageCode == 'ur'
-                              ? TextDirection.rtl
-                              : TextDirection.ltr,
-                          locale: Locale(shown[i].languageCode),
-                          style: shown[i].languageCode.scriptStyle(
-                                theme.textTheme.bodyLarge!.copyWith(
-                                  height: 1.5,
-                                  fontSize: translationSize,
-                                ),
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          shown[i].attribution,
-                          textAlign: shown[i].languageCode == 'ur'
-                              ? TextAlign.right
-                              : TextAlign.left,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        _PeekTranslation(
+                          resource: shown[i],
+                          text: current.translations[shown[i].slug]!,
+                          fontSize: translationSize,
                         ),
                       ],
                   ],
@@ -1606,6 +1585,67 @@ class _MushafPeekCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One translation in the peek card: body text over its credit line, aligned
+/// by script (Urdu → right, Roman Urdu/English/Hindi → left). Mirrors
+/// [_Translation] in ayah_tile.dart, but with the credit line BELOW the body
+/// text (this card's existing layout) rather than above it.
+class _PeekTranslation extends StatelessWidget {
+  const _PeekTranslation({
+    required this.resource,
+    required this.text,
+    required this.fontSize,
+  });
+
+  final TranslationResource resource;
+  final String text;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isRtl = resource.isRtl;
+    final isExperimental = resource.experimental;
+    final credit = resource.displayCredit;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          text,
+          textAlign: isRtl ? TextAlign.right : TextAlign.left,
+          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          locale: Locale(resource.languageCode),
+          style: resource.languageCode.scriptStyle(
+            theme.textTheme.bodyLarge!
+                .copyWith(height: 1.5, fontSize: fontSize),
+            isRtl: isRtl,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+          children: [
+            Flexible(
+              child: Text(
+                credit,
+                textAlign: isRtl ? TextAlign.right : TextAlign.left,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            if (isExperimental) ...[
+              const SizedBox(width: 6),
+              const ExperimentalPill(),
+            ],
+          ],
+        ),
+      ],
     );
   }
 }
