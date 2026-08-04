@@ -135,6 +135,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? payload,
     String? soundName,
   }) async {
     try {
@@ -145,6 +146,7 @@ class LocalNotificationScheduler implements NotificationScheduler {
         scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
         notificationDetails: _details(soundName: soundName),
         androidScheduleMode: await _scheduleMode(),
+        payload: payload,
       );
       return null;
     } catch (e) {

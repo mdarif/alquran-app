@@ -58,6 +58,7 @@ class _FakeScheduler implements NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? payload,
     String? soundName,
   }) async =>
       null;

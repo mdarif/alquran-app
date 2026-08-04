@@ -3,6 +3,7 @@ import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
 import 'package:al_quran/features/prayer_times/domain/repositories/prayer_notification_settings_repository.dart';
 import 'package:al_quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
+import 'package:al_quran/features/prayer_times/domain/scheduling/prayer_notification_payload.dart';
 import 'package:al_quran/features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import 'package:al_quran/features/reminders/domain/scheduling/notification_scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,7 @@ class _Scheduled {
     required this.fireAt,
     required this.title,
     required this.body,
+    this.payload,
     this.soundName,
   });
 
@@ -60,6 +62,7 @@ class _Scheduled {
   final DateTime fireAt;
   final String title;
   final String body;
+  final String? payload;
   final String? soundName;
 }
 
@@ -108,6 +111,7 @@ class _FakeScheduler implements NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? payload,
     String? soundName,
   }) async {
     oneShots.add(
@@ -116,6 +120,7 @@ class _FakeScheduler implements NotificationScheduler {
         fireAt: fireAt,
         title: title,
         body: body,
+        payload: payload,
         soundName: soundName,
       ),
     );
@@ -137,6 +142,7 @@ class _FakeScheduler implements NotificationScheduler {
         fireAt: fireAt,
         title: title,
         body: body,
+        payload: payload,
         soundName: soundName,
       ),
     );
@@ -199,6 +205,10 @@ void main() {
     expect(
       scheduler.oneShots.map((n) => n.soundName),
       everyElement('salat_nudge'),
+    );
+    expect(
+      scheduler.oneShots.map((n) => n.payload),
+      everyElement(openPrayerTimesPayload),
     );
   });
 
@@ -275,11 +285,30 @@ void main() {
 
     final report = await build(scheduler: scheduler).scheduleDeliveryTest();
 
+    // `now` is noon: 2 min later (12:02 PM) sits closest to Dhuhr (13:47),
+    // NOT a fixed "Isha" — regression guard for the bug where the debug test
+    // always said Isha regardless of the actual time of day.
     expect(report, contains('Scheduled'));
     expect(scheduler.oneShots.single.id, PrayerNotificationsCubit.debugTestId);
-    expect(scheduler.oneShots.single.title, 'Salat Time - Isha');
+    expect(scheduler.oneShots.single.title, 'Salat Time - Dhuhr');
     expect(scheduler.oneShots.single.body, '12:02 PM');
     expect(scheduler.oneShots.single.soundName, 'salat_nudge');
+    expect(scheduler.oneShots.single.payload, openPrayerTimesPayload);
+  });
+
+  test('scheduleDeliveryTest labels itself by whichever prayer is nearest',
+      () async {
+    // now = 17:33, 2 min later = 17:35 = exactly Asr — must say Asr, not
+    // whatever the previous or next salah happens to be.
+    final scheduler = _FakeScheduler();
+
+    final report = await build(
+      scheduler: scheduler,
+      clock: () => DateTime(2026, 8, 3, 17, 33),
+    ).scheduleDeliveryTest();
+
+    expect(report, contains('Scheduled'));
+    expect(scheduler.oneShots.single.title, 'Salat Time - Asr');
   });
 
   test('scheduleDeliveryTest requests permission when notifications are off',

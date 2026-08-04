@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../reminders/domain/scheduling/notification_scheduler.dart';
+import '../../domain/entities/prayer.dart';
 import '../../domain/repositories/prayer_notification_settings_repository.dart';
 import '../../domain/repositories/prayer_times_repository.dart';
 import '../../domain/scheduling/prayer_notification_payload.dart';
@@ -135,13 +136,35 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
     final error = await _scheduler.scheduleOneShotDebug(
       id: debugTestId,
       fireAt: fireAt,
-      title: 'Salat Time - Isha',
+      title: 'Salat Time - ${_nearestPrayerLabel(fireAt)}',
       body: _formatTime(fireAt),
+      payload: openPrayerTimesPayload,
       soundName: 'salat_nudge',
     );
     if (error != null) return 'Schedule FAILED - $error';
     final pending = await _scheduler.pendingCount();
     return 'Scheduled - $pending queued. Lock the phone, wait ~2 min.';
+  }
+
+  /// The salah whose time is closest to [at] — so a debug test fired "now"
+  /// reads as whatever prayer is actually current (e.g. Asr at 4pm), not a
+  /// fixed placeholder. Falls back to a generic label if location/times
+  /// aren't available (shouldn't happen — the caller only reaches here once
+  /// notifications are already permitted and the row is visible).
+  String _nearestPrayerLabel(DateTime at) {
+    final location = _prayerTimes.location;
+    final day = location == null ? null : _prayerTimes.timesFor(location, at);
+    if (day == null) return 'Prayer';
+    (Prayer, DateTime)? nearest;
+    Duration? nearestDiff;
+    for (final entry in day.schedule) {
+      final diff = entry.$2.difference(at).abs();
+      if (nearestDiff == null || diff < nearestDiff) {
+        nearest = entry;
+        nearestDiff = diff;
+      }
+    }
+    return nearest?.$1.label ?? 'Prayer';
   }
 
   String _formatTime(DateTime time) {

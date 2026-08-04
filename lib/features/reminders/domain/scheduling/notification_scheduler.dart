@@ -51,6 +51,7 @@ abstract interface class NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? payload,
     String? soundName,
   });
 
