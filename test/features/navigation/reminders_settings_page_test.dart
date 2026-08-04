@@ -350,7 +350,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repo.saved, isNull);
-      expect(find.textContaining('Enable location for Al Quran'), findsOneWidget);
+      expect(
+        find.textContaining('Enable location for Al Quran'),
+        findsOneWidget,
+      );
       // The hint itself is unchanged (still there — no silent no-op).
       expect(find.textContaining('Enable location so'), findsOneWidget);
     });

@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('has exactly 114 entries, one per surah id 1..114', () {
     expect(surahMeanings, hasLength(114));
-    expect(surahMeanings.keys.toSet(), Set.of(List.generate(114, (i) => i + 1)));
+    expect(
+      surahMeanings.keys.toSet(),
+      Set.of(List.generate(114, (i) => i + 1)),
+    );
   });
 
   test('no entry is blank', () {

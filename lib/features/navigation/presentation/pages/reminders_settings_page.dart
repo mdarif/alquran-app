@@ -77,8 +77,7 @@ Future<void> _showInfoPopover(
   required List<String> lines,
 }) {
   final box = context.findRenderObject()! as RenderBox;
-  final overlay =
-      Overlay.of(context).context.findRenderObject()! as RenderBox;
+  final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
   final topLeft = box.localToGlobal(
     Offset(0, box.size.height),
     ancestor: overlay,
@@ -178,7 +177,9 @@ class _SunnahRemindersSection extends StatelessWidget {
                           const SizedBox(height: 14),
                           Text(
                             'Up next',
-                            style: Theme.of(context).textTheme.labelMedium
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
                                 ?.copyWith(
                                   color: Theme.of(
                                     context,

@@ -166,8 +166,7 @@ void main() {
       expect(find.text('Al-Baqarah'), findsOneWidget);
     });
 
-    testWidgets('shows Arabic surah name and English meaning',
-        (tester) async {
+    testWidgets('shows Arabic surah name and English meaning', (tester) async {
       await tester.pumpWidget(
         _wrap(
           _view(

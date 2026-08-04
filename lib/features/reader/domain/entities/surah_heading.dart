@@ -29,11 +29,11 @@ class SurahHeading extends Equatable {
 
   @override
   List<Object?> get props => [
-    number,
-    nameEnglish,
-    totalAyahs,
-    nameArabic,
-    revelationPlace,
-    nameMeaning,
-  ];
+        number,
+        nameEnglish,
+        totalAyahs,
+        nameArabic,
+        revelationPlace,
+        nameMeaning,
+      ];
 }
