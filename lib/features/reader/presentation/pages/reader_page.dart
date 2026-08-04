@@ -265,6 +265,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   final Map<int, Offset> _pointers = {};
   double? _pinchBaseDistance;
   double _fontAtPinchStart = 28;
+  double _pinchPreviewScale = 1;
+  double? _pinchTargetFont;
   bool _pageLocked = false;
 
   // Section paging is DRIVEN BY US, not the PageView's own gesture. The PageView is
@@ -430,51 +432,36 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
             if (state.ayahs.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
-            // One page per section in the active dimension. In Reading mode
-            // the audio highlight rides on its own BlocBuilder so an audio
-            // tick repaints the active page without extra plumbing.
-            Widget pages(AyahAudioState? audio) => PageView.builder(
-                  controller: _pageController,
-                  // RTL paging (the Arabic/Mushaf convention): swipe RIGHT advances
-                  // to the NEXT surah (ascending). `reverse` mirrors the layout so
-                  // the next section enters from the LEFT; the manual drag/fling
-                  // below flip sign to match (see _onSwipeUpdate / _onSwipeEnd).
-                  reverse: true,
-                  // The PageView never handles the drag itself — the directional
-                  // recognizer below does (so a vertical scroll is never stolen).
-                  // We drive the controller programmatically (jumpTo/animateToPage),
-                  // which NeverScrollable does not block.
-                  physics: const NeverScrollableScrollPhysics(),
-                  // Only the on-screen section builds on open. Neighbour VERSES
-                  // are still prefetched into the cubit cache (_prefetchNeighbours
-                  // after every load), so the first swipe renders from memory in a
-                  // single cheap frame (one virtualized Mushaf page) — we don't
-                  // also pay two off-screen MushafView builds under the open slide.
-                  allowImplicitScrolling: false,
-                  itemCount: _target.dimension.count,
-                  onPageChanged: _onPageChanged,
-                  itemBuilder: (context, i) => _sectionPage(
-                    i,
-                    state,
-                    audio,
-                    contentInsets,
-                    media.size.height,
-                  ),
-                );
-            // The tree shape must be IDENTICAL in both viewports: the
-            // BlocBuilder wraps the PageView whenever audio is on, and
-            // Detailed simply ignores the audio state. Branching on the
-            // viewport here (Reading wrapped, Detailed bare) used to remount
-            // the PageView on every toggle — the controller re-attached at its
-            // initial page, silently jumping back to the surah the reader was
-            // opened on (and to an endless spinner once that section had been
-            // evicted from the cache after a long fling).
-            final pageArea = FeatureFlags.audioRecitation
-                ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
-                    builder: (context, audio) =>
-                        pages(isReading ? audio : null),
-                  )
-                : pages(null);
+            // One page per section in the active dimension. Audio state is kept
+            // below this boundary: playback changes must never rebuild or remount
+            // the PageView while a swipe is in flight.
+            final pageArea = PageView.builder(
+              controller: _pageController,
+              // RTL paging (the Arabic/Mushaf convention): swipe RIGHT advances
+              // to the NEXT surah (ascending). `reverse` mirrors the layout so
+              // the next section enters from the LEFT; the manual drag/fling
+              // below flip sign to match (see _onSwipeUpdate / _onSwipeEnd).
+              reverse: true,
+              // The PageView never handles the drag itself — the directional
+              // recognizer below does (so a vertical scroll is never stolen).
+              // We drive the controller programmatically (jumpTo/animateToPage),
+              // which NeverScrollable does not block.
+              physics: const NeverScrollableScrollPhysics(),
+              // Only the on-screen section builds on open. Neighbour VERSES
+              // are still prefetched into the cubit cache (_prefetchNeighbours
+              // after every load), so the first swipe renders from memory in a
+              // single cheap frame (one virtualized Mushaf page) — we don't
+              // also pay two off-screen MushafView builds under the open slide.
+              allowImplicitScrolling: false,
+              itemCount: _target.dimension.count,
+              onPageChanged: _onPageChanged,
+              itemBuilder: (context, i) => _sectionPage(
+                i,
+                state,
+                contentInsets,
+                media.size.height,
+              ),
+            );
             // The section swipe: a directional recognizer that only claims the
             // gesture when the drag is more horizontal than vertical, so a scroll
             // (however curved/diagonal) always falls through to the vertical list.
@@ -493,7 +480,14 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
                     ..onEnd = _onSwipeEnd,
                 ),
               },
-              child: pageArea,
+              child: Transform.scale(
+                scale: _pinchPreviewScale,
+                alignment: Alignment.center,
+                transformHitTests: false,
+                // Cache the laid-out viewport so pinch movement composites the
+                // existing pixels instead of repainting every Arabic glyph.
+                child: RepaintBoundary(child: pageArea),
+              ),
             );
           },
         ),
@@ -513,7 +507,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     required bool interactive,
     required EdgeInsets contentInsets,
     required double viewportHeight,
-    AyahAudioState? audio,
   }) {
     // Key by the section's first ayah so a new section starts at the top, while
     // a same-section rebuild preserves scroll position.
@@ -529,38 +522,46 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     if (_viewport == _Viewport.reading) {
       // No SelectionArea in Reading mode — it competes in the gesture arena and
       // swallows the taps needed for tap-to-peek translation.
-      view = MushafView(
-        key: key,
-        ayahs: ayahs,
-        headings: headings,
-        arabicFontSize: _arabicFont,
-        arabicStyle: _arabicStyle,
-        resources: resources,
-        focusAyahId: focus,
-        contentInsets: contentInsets,
-        chromeHidden: _chromeHidden,
-        onVisibleAyah: interactive ? _onVisibleAyah : null,
-        selectedLanguages: _activeLangs(resources),
-        onRegisterFlush:
-            interactive ? (cb) => _flushCurrentPosition = cb : null,
-        audioState: audio,
-        onToggleLanguage:
-            interactive ? (code) => _toggleLang(code, resources) : null,
-        // The peek only opens when the feature is enabled and the reader opts in
-        // (Settings); off by default.
-        showPeek: FeatureFlags.readingTranslationPeek && _showTranslationPeek,
-        // A tap always selects/queues the verse for the player, peek or not.
-        onSelectVerse: interactive ? _onSelectVerse : null,
-        // Only the live page drives immersion (forward-scroll hides the chrome).
-        onImmersionChanged: interactive ? _setChromeHidden : null,
-        // Never let the selected/playing verse scroll to a point that renders
-        // BEHIND the app bar — Reading runs edge-to-edge, so a bare small
-        // fraction (the "near the top of the paragraph" default) isn't enough.
-        focusAlignment: safeFocusAlignment(
-          contentInsetTop: contentInsets.top,
-          viewportHeight: viewportHeight,
-        ),
-      );
+      Widget mushaf(AyahAudioState? audio) => MushafView(
+            key: key,
+            ayahs: ayahs,
+            headings: headings,
+            arabicFontSize: _arabicFont,
+            arabicStyle: _arabicStyle,
+            resources: resources,
+            focusAyahId: focus,
+            contentInsets: contentInsets,
+            chromeHidden: _chromeHidden,
+            onVisibleAyah: interactive ? _onVisibleAyah : null,
+            selectedLanguages: _activeLangs(resources),
+            onRegisterFlush:
+                interactive ? (cb) => _flushCurrentPosition = cb : null,
+            audioState: audio,
+            onToggleLanguage:
+                interactive ? (code) => _toggleLang(code, resources) : null,
+            // The peek only opens when the feature is enabled and the reader opts in
+            // (Settings); off by default.
+            showPeek:
+                FeatureFlags.readingTranslationPeek && _showTranslationPeek,
+            // A tap always selects/queues the verse for the player, peek or not.
+            onSelectVerse: interactive ? _onSelectVerse : null,
+            // Only the live page drives immersion (forward-scroll hides the chrome).
+            onImmersionChanged: interactive ? _setChromeHidden : null,
+            // Never let the selected/playing verse scroll to a point that renders
+            // BEHIND the app bar — Reading runs edge-to-edge, so a bare small
+            // fraction (the "near the top of the paragraph" default) isn't enough.
+            focusAlignment: safeFocusAlignment(
+              contentInsetTop: contentInsets.top,
+              viewportHeight: viewportHeight,
+            ),
+          );
+      view = FeatureFlags.audioRecitation && interactive
+          ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
+              buildWhen: (previous, current) =>
+                  previous.playingAyahId != current.playingAyahId,
+              builder: (_, audio) => mushaf(audio),
+            )
+          : mushaf(null);
     } else {
       // Copy/share in Detailed is per-verse (the tile's ⋯ menu) — no
       // SelectionArea in either viewport, it steals gestures (taps in Reading,
@@ -598,7 +599,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   Widget _sectionPage(
     int i,
     ReaderState state,
-    AyahAudioState? audio,
     EdgeInsets contentInsets,
     double viewportHeight,
   ) {
@@ -614,7 +614,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       headings: state.headings,
       resources: state.resources,
       interactive: active,
-      audio: active ? audio : null,
       contentInsets: contentInsets,
       viewportHeight: viewportHeight,
     );
@@ -739,6 +738,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     if (_pointers.length == 2) {
       _pinchBaseDistance = _pointerDistance();
       _fontAtPinchStart = _arabicFont;
+      _pinchTargetFont = _arabicFont;
+      _pinchPreviewScale = 1;
       if (!_pageLocked) setState(() => _pageLocked = true);
     }
   }
@@ -748,7 +749,16 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     _pointers[event.pointer] = event.position;
     final base = _pinchBaseDistance;
     if (_pointers.length == 2 && base != null && base > 0) {
-      _setFont(_fontAtPinchStart * (_pointerDistance() / base));
+      final target = (_fontAtPinchStart * (_pointerDistance() / base))
+          .clamp(_minFont, _maxFont)
+          .toDouble();
+      final previewScale = target / _fontAtPinchStart;
+      if (previewScale != _pinchPreviewScale) {
+        setState(() {
+          _pinchTargetFont = target;
+          _pinchPreviewScale = previewScale;
+        });
+      }
     }
   }
 
@@ -757,8 +767,18 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     _pointers.remove(event.pointer);
     if (_pointers.length < 2) _pinchBaseDistance = null;
     if (wasPinching) {
-      // A finger lifted out of a pinch — persist the final zoom level.
-      unawaited(_settings.setFontSize(_arabicFont));
+      // Preview by scaling the existing layout while fingers move, then reshape
+      // the Arabic text once when the pinch settles. Reflowing on every pointer
+      // event is particularly expensive for long Mushaf paragraphs.
+      final finalFont = (_pinchTargetFont ?? _arabicFont)
+          .clamp(_minFont, _maxFont)
+          .roundToDouble();
+      setState(() {
+        _arabicFont = finalFont;
+        _pinchPreviewScale = 1;
+        _pinchTargetFont = null;
+      });
+      unawaited(_settings.setFontSize(finalFont));
     }
     if (_pointers.isEmpty && _pageLocked) {
       setState(() => _pageLocked = false);
@@ -793,10 +813,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void _openSettingsSheet() {
     final resources = _cubit.state.resources;
     Navigator.of(context).push(
-      PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 260),
-        reverseTransitionDuration: const Duration(milliseconds: 220),
-        pageBuilder: (_, __, ___) => ReaderSettingsPage(
+      MaterialPageRoute<void>(
+        builder: (_) => ReaderSettingsPage(
           fontSize: _arabicFont,
           minFont: _minFont,
           maxFont: _maxFont,
@@ -819,15 +837,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           onToggleShowArabic: _toggleShowArabicMatn,
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(context),
-        ),
-        transitionsBuilder: (_, animation, __, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(1, 0),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-          ),
-          child: child,
         ),
       ),
     );
@@ -1072,12 +1081,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   }
 
   void _setFont(double value) {
-    // Snap to whole points. Pinch-zoom feeds a *continuous* value on every
-    // pointer-move; without snapping, each fractional change reshaped the entire
-    // (up to 286-verse) Mushaf paragraph, so one pinch fired dozens of full
-    // re-layouts — measured at build frames up to ~390ms on a long surah. Rounding
-    // collapses those to a single reshape per 1pt crossing: imperceptible (the
-    // size slider already steps in 2pt) but it removes the pinch stutter.
+    // Settings controls use whole-point sizes, matching the persisted value.
+    // Pinch preview is handled separately and commits here only after settling.
     final clamped = value.clamp(_minFont, _maxFont).roundToDouble();
     if (clamped != _arabicFont) setState(() => _arabicFont = clamped);
   }
@@ -1174,6 +1179,7 @@ class _DetailedListState extends State<_DetailedList> {
   final List<Object> _rows =
       []; // rebuilt on a same-section reload (script switch)
   final Map<int, int> _ayahRowIndex = {}; // ayah id -> row index
+  int _initialRowIndex = 0;
 
   Timer? _reportTimer;
   Timer? _highlightTimer;
@@ -1201,8 +1207,24 @@ class _DetailedListState extends State<_DetailedList> {
     _positions.itemPositions.addListener(_onPositions);
     final id = widget.focusAyahId;
     if (id != null && _ayahRowIndex.containsKey(id)) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _scrollToFocus(id, resume: true));
+      // Mount at the resume verse directly. Building row zero and then animating
+      // to the target after the first frame made every Reading -> Detailed switch
+      // perform two layouts plus a 450 ms programmatic scroll.
+      _initialRowIndex = _ayahRowIndex[id]!;
+      _heldFocusId = id;
+      _highlightAyahId = id;
+      _highlightTimer = Timer(const Duration(milliseconds: 1800), () {
+        if (mounted) setState(() => _highlightAyahId = null);
+      });
+      final onVisible = widget.onVisibleAyah;
+      if (onVisible != null) {
+        onVisible(
+          widget.ayahs.firstWhere(
+            (a) => a.id == id,
+            orElse: () => widget.ayahs.first,
+          ),
+        );
+      }
     }
     widget.onRegisterFlush?.call(_reportTopmost);
   }
@@ -1396,9 +1418,15 @@ class _DetailedListState extends State<_DetailedList> {
               child: ScrollablePositionedList.builder(
                 itemScrollController: _scrollController,
                 itemPositionsListener: _positions,
+                initialScrollIndex: _initialRowIndex,
+                initialAlignment: 0.06,
                 // Hard-clamp at the surah's first/last ayah — no rubber-band
                 // past the true content edges (mid-content still bounces).
                 physics: const QuranClampEdgesPhysics(),
+                // The visible page already has one capture/paint boundary.
+                // Nesting a composited boundary around every translation-heavy
+                // ayah creates a stack of large text layers during each fling.
+                addRepaintBoundaries: false,
                 itemCount: _rows.length,
                 padding: widget.contentInsets,
                 itemBuilder: _buildRow,
@@ -1514,6 +1542,11 @@ class _DetailedListState extends State<_DetailedList> {
     // per-tile); off-flag it builds exactly as before.
     final Widget tile = FeatureFlags.audioRecitation
         ? BlocBuilder<AyahAudioCubit, AyahAudioState>(
+            buildWhen: (previous, current) =>
+                previous.isActive(ayah.id) != current.isActive(ayah.id) ||
+                previous.isLoading(ayah.id) != current.isLoading(ayah.id) ||
+                previous.isPlaying(ayah.id) != current.isPlaying(ayah.id) ||
+                previous.hasError(ayah.id) != current.hasError(ayah.id),
             builder: (context, audio) => _ayahTile(context, ayah, audio),
           )
         : _ayahTile(context, ayah, null);

@@ -6,6 +6,11 @@ Feature-level status across the Al Quran ecosystem (this app, `../alquran-data`,
 exist. Update this file as features ship or scope decisions change; don't let
 it drift from `FeatureFlags` / the actual code.
 
+Performance is an active pre-release quality track, backed by physical-device
+profile measurements rather than simulator impressions. See
+[`performance-roadmap.md`](performance-roadmap.md) for the baseline, budgets,
+priorities, and release gate.
+
 ## Shipped
 
 - **Reading + Detailed viewport modes** — Arabic-only vs Arabic + Urdu/Hindi/English, pinch-to-zoom (20–48pt), +/- font buttons.

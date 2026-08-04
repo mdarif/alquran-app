@@ -61,7 +61,9 @@ class ReaderCubit extends Cubit<ReaderState> {
   /// rather than left to spin forever.
   void warm(ReaderTarget target) {
     final cached = _ayahCache[_key(target)];
-    if (cached == null || cached.isEmpty) unawaited(_warm(target));
+    if (cached == null || cached.isEmpty) {
+      unawaited(_warm(target, notifyListeners: true));
+    }
   }
 
   /// Drop every cached section. Call when the underlying text changes (e.g. the
@@ -137,19 +139,22 @@ class ReaderCubit extends Cubit<ReaderState> {
     for (final delta in const [-1, 1]) {
       final next = adjacentTarget(target, delta, headings);
       if (next == null || _ayahCache.containsKey(_key(next))) continue;
-      unawaited(_warm(next));
+      // Speculative neighbours are not represented by a visible spinner, so
+      // completing them must not rebuild the active reader mid-gesture.
+      unawaited(_warm(next, notifyListeners: false));
     }
   }
 
-  Future<void> _warm(ReaderTarget target) async {
+  Future<void> _warm(
+    ReaderTarget target, {
+    required bool notifyListeners,
+  }) async {
     try {
       _store(_key(target), await _repository.getAyahs(target));
-      // Wake any page currently showing a cache-miss spinner: bump the epoch
-      // so cache-reading widgets rebuild and pick the entry up. Unlike load(),
-      // a warm emits nothing else — without this a page that missed the cache
-      // (e.g. the Reading⇄Detailed toggle after a fast fling) never recovers.
-      // Guarded: background warms can outlive the reader (cubit closed on pop).
-      if (!isClosed) {
+      // An explicit warm comes from a page showing a cache-miss spinner, so bump
+      // the epoch to let it recover. Speculative neighbour prefetches have no
+      // waiting UI and stay silent. Guarded because either can outlive the reader.
+      if (notifyListeners && !isClosed) {
         emit(state.copyWith(cacheEpoch: state.cacheEpoch + 1));
       }
     } catch (_) {
