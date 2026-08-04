@@ -133,8 +133,9 @@ void main() {
     expect(find.byKey(WidgetKeys.showArabicToggle), findsOneWidget);
     await tester.tap(find.byKey(WidgetKeys.showArabicToggle));
     await tester.pumpAndSettle();
-    // Dismiss the sheet (tap the scrim above it) to see the verses.
-    await tester.tapAt(const Offset(200, 40));
+    // Dismiss the settings sheet to see the verses again. Use back instead of
+    // a fixed scrim coordinate; the sheet height differs across real devices.
+    await tester.pageBack();
     await tester.pumpAndSettle();
 
     // Arabic gone; the verses (and their translations) remain.
