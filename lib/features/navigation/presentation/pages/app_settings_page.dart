@@ -5,6 +5,8 @@ import 'package:get_it/get_it.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../app_update/domain/entities/app_update_prompt.dart';
+import '../../../app_update/domain/repositories/app_update_repository.dart';
 import '../../../reader/domain/entities/translation_resource.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/domain/repositories/reader_settings_repository.dart';
@@ -30,12 +32,29 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   final ReaderSettingsRepository _settings =
       GetIt.I<ReaderSettingsRepository>();
   late Future<List<TranslationResource>> _resources = _loadResources();
+  AppUpdatePrompt? _updatePrompt;
 
   Future<List<TranslationResource>> _loadResources() {
     if (!GetIt.I.isRegistered<AyahRepository>()) {
       return Future.value(const <TranslationResource>[]);
     }
     return GetIt.I<AyahRepository>().getTranslationResources();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUpdatePrompt();
+  }
+
+  Future<void> _loadUpdatePrompt() async {
+    if (!FeatureFlags.softUpdateReminder ||
+        !GetIt.I.isRegistered<AppUpdateRepository>()) {
+      return;
+    }
+    final prompt = await GetIt.I<AppUpdateRepository>().check();
+    if (!mounted) return;
+    setState(() => _updatePrompt = prompt);
   }
 
   @override
@@ -77,7 +96,10 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           showArabicMatn: _settings.showArabicMatn,
           onToggleShowArabic: (v) => _settings.setShowArabicMatn(v),
           onReset: _resetReadingPreferences,
-          appActions: appSettingsActions(context),
+          appActions: appSettingsActions(
+            context,
+            updatePrompt: _updatePrompt,
+          ),
         );
       },
     );

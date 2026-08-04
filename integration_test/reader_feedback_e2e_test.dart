@@ -49,8 +49,10 @@ Finder _centralMoreButton(WidgetTester tester) {
   final mid = size.height / 2;
   Element? best;
   var bestDist = double.infinity;
-  for (final e in find.byWidgetPredicate((w) => w is PopupMenuButton).evaluate()) {
-    final rect = tester.getRect(find.byElementPredicate((x) => identical(x, e)));
+  for (final e
+      in find.byWidgetPredicate((w) => w is PopupMenuButton).evaluate()) {
+    final rect =
+        tester.getRect(find.byElementPredicate((x) => identical(x, e)));
     final dist = (rect.center.dy - mid).abs();
     if (dist < bestDist) {
       bestDist = dist;

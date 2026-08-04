@@ -95,8 +95,8 @@ class ReaderSettingsPage extends StatefulWidget {
 
 class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
   static const double _step = 2;
-  static const double _sectionGap = 18;
-  static const double _labelGap = 7;
+  static const double _sectionGap = 14;
+  static const double _labelGap = 4;
 
   late double _fontSize = widget.fontSize;
   late ArabicScript _script = widget.script;
@@ -224,28 +224,6 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
                   ],
                 ),
               ],
-              _ActionSection(
-                label: SettingsActionSection.reading.label,
-                actions: _actions(SettingsActionSection.reading),
-                rowTitleStyle: rowTitleStyle,
-                colorScheme: cs,
-                trailing: ListTile(
-                  key: WidgetKeys.readerSettingsReset,
-                  dense: true,
-                  minVerticalPadding: 4,
-                  contentPadding: EdgeInsets.zero,
-                  leading: AppIcon(AppIcons.reset, color: cs.error),
-                  title: Text(
-                    'Reset Reading Preferences',
-                    style: rowTitleStyle?.copyWith(color: cs.error),
-                  ),
-                  subtitle: Text(
-                    'Font size, script, translations shown and reading aids.',
-                    style: rowSubtitleStyle,
-                  ),
-                  onTap: widget.onReset,
-                ),
-              ),
               if (widget.showTranslations && widget.resources.isNotEmpty) ...[
                 const SizedBox(height: _sectionGap),
                 const _SectionLabel('Translation'),
@@ -322,6 +300,28 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
                 rowTitleStyle: rowTitleStyle,
                 colorScheme: cs,
               ),
+              _ActionSection(
+                label: 'Reading Settings',
+                actions: _actions(SettingsActionSection.reading),
+                rowTitleStyle: rowTitleStyle,
+                colorScheme: cs,
+                trailing: ListTile(
+                  key: WidgetKeys.readerSettingsReset,
+                  dense: true,
+                  minVerticalPadding: 2,
+                  contentPadding: EdgeInsets.zero,
+                  leading: AppIcon(AppIcons.reset, color: cs.error),
+                  title: Text(
+                    'Reset Reading Settings',
+                    style: rowTitleStyle?.copyWith(color: cs.error),
+                  ),
+                  subtitle: Text(
+                    'Font size, script, translations shown and reading aids.',
+                    style: rowSubtitleStyle,
+                  ),
+                  onTap: widget.onReset,
+                ),
+              ),
             ],
           ),
         ),
@@ -353,7 +353,7 @@ class _ActionSection extends StatelessWidget {
       children: [
         const SizedBox(height: _ReaderSettingsPageState._sectionGap),
         _SectionLabel(label),
-        const SizedBox(height: 2),
+        const SizedBox(height: 0),
         for (final action in actions)
           ListTile(
             key: action.key,
@@ -463,6 +463,7 @@ class _ScriptPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Semantics(
       selected: selected,
       child: AnimatedContainer(
@@ -477,7 +478,7 @@ class _ScriptPreview extends StatelessWidget {
             color: selected
                 ? cs.primary.withValues(alpha: 0.55)
                 : Colors.transparent,
-            width: 1.2,
+            width: isDark ? 0.9 : 1.2,
           ),
         ),
         child: InkWell(

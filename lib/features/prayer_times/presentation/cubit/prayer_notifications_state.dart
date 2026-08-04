@@ -11,4 +11,3 @@ class PrayerNotificationsState {
   final bool hasLocation;
   final int scheduledCount;
 }
-

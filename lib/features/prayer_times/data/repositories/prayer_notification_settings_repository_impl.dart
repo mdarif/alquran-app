@@ -18,4 +18,3 @@ class PrayerNotificationSettingsRepositoryImpl
     await _prefs.setBool(_kEnabled, value);
   }
 }
-

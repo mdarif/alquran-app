@@ -26,4 +26,3 @@ void main() {
     expect(r.enabled, isFalse);
   });
 }
-

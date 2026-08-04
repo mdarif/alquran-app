@@ -148,7 +148,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// The default bar: the title, the prayer pill, a search icon, and the
-  /// reminders/light/share/About overflow.
+  /// reading-light/library/settings overflow.
   AppBar _defaultAppBar(BuildContext context) {
     return AppBar(
       centerTitle: false,
@@ -180,7 +180,6 @@ class _HomePageState extends State<HomePage> {
         // Secondary sections and settings fold into one overflow so the bar
         // stays uncrowded next to the title, prayer pill and search.
         HomeOverflowMenu(
-          showReminders: widget.sunnahReminders,
           showReadingLight: widget.lightOfDay,
         ),
       ],
