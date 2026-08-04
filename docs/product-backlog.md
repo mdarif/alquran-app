@@ -45,6 +45,7 @@ priorities, and release gate.
 - **Lock-screen / background audio** — see `quality-backlog.md` #11; foreground-only today.
 - **Tablet-specific layout** — no tablet UI; phone layout stretched. Deferred to release-after-next.
 - **Hifz (memorization) page mode** — optional page-wise mode without zoom/pan, roadmap item, not started.
+- **iOS Location Services fallback** — later UX pass for prayer times when global Location Services are off on iOS. Android now opens system Location settings from the Home location icon; iOS needs a platform-specific check/flow (likely app/system Settings affordance plus a future "Choose city" fallback). Do not try to silently enable Location Services; both platforms require user action.
 
 ## Roadmap — owner's next-version list (2026-08-01)
 
@@ -106,6 +107,13 @@ actually lands, since most of these start in `../alquran-data`, not here.
 
    **→ Full implementation plan: [`mushaf-page-mode-plan.md`](mushaf-page-mode-plan.md)**
    (owner ask 2026-08-02). App only — explicitly **not** the website.
+2b. **Full-text / verse-text search** — a dedicated search experience beyond
+   the Home surah-name quick search. Scope should cover Arabic ayah text plus
+   bundled/installed translation text, result snippets with highlighted matches,
+   Surah:Ayah addressing, language/source filters, and direct reader deep-links
+   to the matched ayah. Implementation likely needs an FTS5-backed index over
+   `ayahs` + selected `translations`, with downloaded editions folded in without
+   writing into the bundled `quran.db`.
 3. ~~**Prayer start-time reminders**~~ — **SHIPPED 2026-08-04** (see Shipped
    above, "Salat notifications"). All-or-nothing (no per-prayer opt-in, no
    pre-prayer lead time yet — could still be added later); watch the OEM

@@ -66,6 +66,10 @@ void main() {
     await _pumpSheet(tester, base: DateTime(2000, 1, 1));
     expect(find.text('24 Ramadan 1420 AH'), findsOneWidget);
     expect(find.text('1 January 2000'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('1 January 2000')).textAlign,
+      TextAlign.end,
+    );
   });
 
   testWidgets('lists the five prayers plus Sunrise with their times',
@@ -163,6 +167,7 @@ void main() {
 
     expect(find.text('Current'), findsNothing);
     expect(find.text('Next Prayer'), findsOneWidget);
+    expect(find.text('Next'), findsNothing);
     expect(find.text('Dhuhr'), findsWidgets);
     expect(find.text('05:10:00'), findsOneWidget);
   });

@@ -51,8 +51,7 @@ void main() {
       );
     });
 
-    test('credits the translator (author) over the edition name when set',
-        () {
+    test('credits the translator (author) over the edition name when set', () {
       const withAuthor = TranslationResource(
         id: 1,
         slug: 'ur-test',

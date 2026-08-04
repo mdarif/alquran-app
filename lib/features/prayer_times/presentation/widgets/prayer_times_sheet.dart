@@ -112,6 +112,9 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
     final cs = theme.colorScheme;
     final times = widget.times;
     final rowNext = times.nextAfter(_now)?.$1;
+    final hasActiveSalah = times.currentSalahAt(_now) != null;
+    final suppressNextBadge =
+        !hasActiveSalah && times.forbiddenAt(_now) == null;
     final notificationPrayer = widget.notificationPrayer;
     final notificationCurrent =
         notificationPrayer != null && _activePrayer == notificationPrayer;
@@ -174,6 +177,7 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
                 Prayer.fajr,
                 notificationPrayer,
                 notificationCurrent,
+                suppressNextBadge,
               ),
             ),
             _PrayerRow(
@@ -185,6 +189,7 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
                 Prayer.sunrise,
                 notificationPrayer,
                 notificationCurrent,
+                suppressNextBadge,
               ),
               forbidden: forbidden[ForbiddenReason.afterSunrise],
             ),
@@ -193,8 +198,12 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
                 label: prayer.label,
                 time: time,
                 isNext: prayer == rowNext,
-                badge:
-                    _badgeFor(prayer, notificationPrayer, notificationCurrent),
+                badge: _badgeFor(
+                  prayer,
+                  notificationPrayer,
+                  notificationCurrent,
+                  suppressNextBadge,
+                ),
                 forbidden: switch (prayer) {
                   Prayer.dhuhr => forbidden[ForbiddenReason.zenith],
                   Prayer.maghrib => forbidden[ForbiddenReason.beforeSunset],
@@ -213,11 +222,13 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
     Prayer prayer,
     Prayer? notificationPrayer,
     bool notificationCurrent,
+    bool suppressNextBadge,
   ) {
     if (notificationPrayer == prayer) {
       return notificationCurrent ? 'Now' : 'Notified';
     }
     if (prayer == _activePrayer) return 'Now';
+    if (suppressNextBadge) return null;
     if (prayer == widget.times.nextAfter(_now)?.$1) return 'Next';
     return null;
   }
@@ -282,7 +293,7 @@ class _PrayerFocusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -310,7 +321,7 @@ class _PrayerFocusCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             ClipRRect(
               borderRadius: BorderRadius.circular(999),
               child: LinearProgressIndicator(
@@ -742,9 +753,9 @@ class _ForbiddenNote extends StatelessWidget {
   }
 }
 
-/// The Islamic date for the audience: the Hijri date (e.g. `07 Muharram
-/// 1448 AH`) and, after a dot, the civil Gregorian date — kept on one line to
-/// stay compact. (Two discrete Texts so each remains findable in tests.)
+/// The Islamic date for the audience, paired with the civil Gregorian date.
+/// Both stay on one line: Hijri anchors the left edge, Gregorian balances the
+/// right edge so neither reads like incidental metadata.
 class _HijriDateLabel extends StatelessWidget {
   const _HijriDateLabel({required this.baseDate, required this.gregorianDate});
 
@@ -756,8 +767,7 @@ class _HijriDateLabel extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final hijri = HijriDate.fromGregorianCorrected(baseDate);
-    final muted =
-        theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
+    final dateStyle = theme.textTheme.titleSmall;
     // On a Sunnah occasion the Hijri date itself is gilded (gold + bolder).
     final isSunnah = sunnahOccasionName(baseDate) != null;
     final gold =
@@ -766,19 +776,29 @@ class _HijriDateLabel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(
-          hijri.formatted,
-          style: theme.textTheme.titleSmall?.copyWith(
-            color: isSunnah ? gold : cs.onSurface,
-            fontWeight: isSunnah ? FontWeight.w700 : null,
+        Expanded(
+          child: Text(
+            hijri.formatted,
+            overflow: TextOverflow.ellipsis,
+            style: dateStyle?.copyWith(
+              color: isSunnah ? gold : cs.onSurface,
+              fontWeight: isSunnah ? FontWeight.w700 : FontWeight.w600,
+            ),
           ),
         ),
-        Text('  ·  ', style: muted),
-        Flexible(
-          child: Text(
-            formatGregorianDate(gregorianDate),
-            overflow: TextOverflow.ellipsis,
-            style: muted,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              formatGregorianDate(gregorianDate),
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: dateStyle?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.88),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ],

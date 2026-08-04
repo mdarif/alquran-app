@@ -6,12 +6,22 @@ import '../../domain/location/location_provider.dart';
 /// Device location via `geolocator`. Low accuracy is deliberate — prayer times
 /// are insensitive to a few km, and a coarse fix is faster and less invasive.
 class GeolocatorLocationProvider implements LocationProvider {
-  const GeolocatorLocationProvider();
+  const GeolocatorLocationProvider({
+    Future<bool> Function()? isLocationServiceEnabled,
+    Future<bool> Function()? openLocationSettings,
+  })  : _isLocationServiceEnabled =
+            isLocationServiceEnabled ?? Geolocator.isLocationServiceEnabled,
+        _openLocationSettings =
+            openLocationSettings ?? Geolocator.openLocationSettings;
+
+  final Future<bool> Function() _isLocationServiceEnabled;
+  final Future<bool> Function() _openLocationSettings;
 
   @override
   Future<LocationResult> current() async {
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
+      if (!await _isLocationServiceEnabled()) {
+        await _openLocationSettings();
         return const LocationResult(LocationStatus.serviceOff);
       }
       var permission = await Geolocator.checkPermission();
