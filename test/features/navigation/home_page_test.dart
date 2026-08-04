@@ -23,6 +23,10 @@ import 'package:al_quran/features/reader/domain/repositories/last_read_repositor
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:al_quran/features/reader/presentation/pages/bookmarks_page.dart';
 import 'package:al_quran/features/reader/presentation/widgets/last_read_banner.dart';
+import 'package:al_quran/features/reminders/domain/repositories/reminder_settings_repository.dart';
+import 'package:al_quran/features/reminders/domain/scheduling/notification_scheduler.dart';
+import 'package:al_quran/features/reminders/presentation/cubit/reminders_cubit.dart';
+import 'package:al_quran/features/reminders/presentation/widgets/reminders_sheet.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
 import 'package:al_quran/features/surahs/presentation/cubit/surah_list_cubit.dart';
@@ -143,6 +147,80 @@ class _FakeAppUpdateRepository implements AppUpdateRepository {
   }
 }
 
+class _FakeReminderSettingsRepository implements ReminderSettingsRepository {
+  @override
+  bool enabled = false;
+
+  @override
+  Future<void> setEnabled(bool value) async => enabled = value;
+}
+
+class _FakeNotificationScheduler implements NotificationScheduler {
+  @override
+  Future<void> init({void Function(String? payload)? onSelect}) async {}
+
+  @override
+  Future<bool> requestPermission() async => true;
+
+  @override
+  Future<bool> hasPermission() async => true;
+
+  @override
+  Future<void> requestExactAlarmPermission() async {}
+
+  @override
+  Future<bool> canScheduleExact() async => true;
+
+  @override
+  Future<bool> isBatteryOptimizationExempt() async => true;
+
+  @override
+  Future<void> requestBatteryOptimizationExemption() async {}
+
+  @override
+  Future<void> cancelAll() async {}
+
+  @override
+  Future<void> cancel(int id) async {}
+
+  @override
+  Future<int> pendingCount() async => 0;
+
+  @override
+  Future<String?> scheduleOneShotDebug({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+    String? soundName,
+  }) async =>
+      null;
+
+  @override
+  Future<void> scheduleOneShot({
+    required int id,
+    required DateTime fireAt,
+    required String title,
+    required String body,
+    String? payload,
+    String? soundName,
+  }) async {}
+
+  @override
+  Future<void> scheduleWeekly({
+    required int id,
+    required int weekday,
+    required int hour,
+    required int minute,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {}
+
+  @override
+  Future<String?> consumeLaunchPayload() async => null;
+}
+
 Future<void> _pumpHome(
   WidgetTester tester, {
   bool advancedNavigation = true,
@@ -155,10 +233,18 @@ Future<void> _pumpHome(
   // A fixed light (not auto) so there's no Light-of-Day ticker to leak in tests.
   SharedPreferences.setMockInitialValues(const {'theme_choice': 'duha'});
   final theme = ThemeCubit(await SharedPreferences.getInstance());
+  final reminders = RemindersCubit(
+    _FakeReminderSettingsRepository(),
+    _FakeNotificationScheduler(),
+  );
   addTearDown(theme.close);
+  addTearDown(reminders.close);
   await tester.pumpWidget(
-    BlocProvider<ThemeCubit>.value(
-      value: theme,
+    MultiBlocProvider(
+      providers: [
+        BlocProvider<ThemeCubit>.value(value: theme),
+        BlocProvider<RemindersCubit>.value(value: reminders),
+      ],
       child: MaterialApp(
         home: HomePage(
           advancedNavigation: advancedNavigation,
@@ -251,7 +337,7 @@ void main() {
       await _pumpHome(tester); // all default to on
       expect(find.byType(HijriDateLine), findsOneWidget);
       expect(find.byType(LastReadBanner), findsOneWidget);
-      // Reminders + Reading Theme now live behind the app-bar overflow.
+      // Secondary controls live behind the app-bar overflow.
       expect(find.byKey(WidgetKeys.homeOverflowMenu), findsOneWidget);
     });
 
@@ -260,6 +346,7 @@ void main() {
       await _pumpHome(tester); // ThemeCubit is provided → Reading Theme shows
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
       await tester.pumpAndSettle();
+      expect(find.text('Sunnah reminders'), findsNothing);
       expect(find.text('Reading Theme'), findsOneWidget);
       await tester.tap(find.text('Reading Theme'));
       await tester.pumpAndSettle();
@@ -337,13 +424,39 @@ void main() {
 
       expect(find.byKey(WidgetKeys.shareAppButton), findsOneWidget);
       expect(find.text('Share Al Quran'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.remindersButton), findsOneWidget);
+      expect(find.text('Sunnah reminders'), findsOneWidget);
       expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
-      expect(find.text('Check for update'), findsOneWidget);
+      expect(find.text('Check for Updates'), findsOneWidget);
       expect(find.byKey(WidgetKeys.aboutMenuButton), findsOneWidget);
       expect(find.text('About'), findsOneWidget);
     });
 
-    testWidgets('Settings places update check after Share Al Quran',
+    testWidgets('Settings highlights when an update is available',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository(
+          AppUpdatePrompt(
+            currentVersion: '1.2.1',
+            latestVersion: '1.2.2',
+            storeUrl: Uri.parse(androidPlayStoreUrl),
+            message: 'A newer version is available.',
+          ),
+        ),
+      );
+
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
+      expect(find.text('Update available'), findsWidgets);
+    });
+
+    testWidgets('Settings places Sunnah reminders above app actions',
         (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
@@ -351,6 +464,11 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
       await tester.pumpAndSettle();
 
+      final sunnahTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.remindersButton),
+          )
+          .dy;
       final shareTop = tester
           .getTopLeft(
             find.byKey(WidgetKeys.shareAppButton),
@@ -367,8 +485,71 @@ void main() {
           )
           .dy;
 
+      expect(sunnahTop, lessThan(shareTop));
       expect(updateTop, greaterThan(shareTop));
       expect(updateTop, lessThan(aboutTop));
+    });
+
+    testWidgets('Settings opens Sunnah reminders from the Reminders section',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(WidgetKeys.remindersButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RemindersSheet), findsOneWidget);
+      expect(find.byKey(WidgetKeys.remindersSheet), findsOneWidget);
+    });
+
+    testWidgets('Settings only shows chevrons for navigation rows',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      Finder chevronInside(Key key) => find.descendant(
+            of: find.byKey(key),
+            matching: find.byIcon(AppIcons.chevronRight),
+          );
+
+      expect(chevronInside(WidgetKeys.shareAppButton), findsNothing);
+      expect(chevronInside(WidgetKeys.appUpdateMenuButton), findsNothing);
+      expect(chevronInside(WidgetKeys.remindersButton), findsOneWidget);
+      expect(chevronInside(WidgetKeys.aboutMenuButton), findsOneWidget);
+    });
+
+    testWidgets('Settings keeps translations out of the app settings surface',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      final shareTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.shareAppButton),
+          )
+          .dy;
+      await tester.ensureVisible(find.byKey(WidgetKeys.readerSettingsReset));
+      await tester.pumpAndSettle();
+      final resetTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.readerSettingsReset),
+          )
+          .dy;
+
+      expect(find.widgetWithText(ListTile, 'Translations'), findsNothing);
+      expect(find.byKey(WidgetKeys.readingThemeMenuButton), findsNothing);
+      expect(find.text('Reading Settings'), findsOneWidget);
+      expect(find.text('Reset Reading Settings'), findsOneWidget);
+      expect(resetTop, greaterThan(shareTop));
     });
 
     testWidgets('Settings opens the About screen', (tester) async {

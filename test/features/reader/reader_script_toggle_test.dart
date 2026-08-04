@@ -461,6 +461,8 @@ void main() {
       await tester.pumpAndSettle();
       expect(readerFontSize(tester), 30);
 
+      await tester.ensureVisible(find.byKey(WidgetKeys.readerSettingsReset));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(WidgetKeys.readerSettingsReset));
       await tester.pumpAndSettle();
       expect(find.text('Reset reading preferences?'), findsOneWidget);
@@ -484,6 +486,8 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.fontIncrease));
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.byKey(WidgetKeys.readerSettingsReset));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(WidgetKeys.readerSettingsReset));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancel'));

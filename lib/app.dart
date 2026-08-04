@@ -13,6 +13,7 @@ import 'core/scroll/quran_scroll_behavior.dart';
 import 'core/theme/mushaf_palette.dart';
 import 'core/theme/theme_cubit.dart';
 import 'core/warmup/reader_warmup.dart';
+import 'features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import 'features/navigation/presentation/pages/home_page.dart';
 import 'features/reminders/domain/scheduling/notification_scheduler.dart';
@@ -47,6 +48,9 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
             await GetIt.I<NotificationScheduler>().consumeLaunchPayload();
         await routeFromPayload(payload);
       });
+    }
+    if (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications) {
+      unawaited(GetIt.I<PrayerNotificationsCubit>().refresh());
     }
     if (FeatureFlags.proactiveTranslationSync) {
       // Best-effort: fetches the CDN catalogue so a newly published edition
@@ -91,6 +95,9 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
       if (FeatureFlags.sunnahReminders) {
         unawaited(GetIt.I<RemindersCubit>().refresh());
       }
+      if (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications) {
+        unawaited(GetIt.I<PrayerNotificationsCubit>().refresh());
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
       unawaited(WakelockPlus.disable());
@@ -108,6 +115,10 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
         BlocProvider<RemindersCubit>.value(
           value: GetIt.I<RemindersCubit>(),
         ),
+        if (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications)
+          BlocProvider<PrayerNotificationsCubit>.value(
+            value: GetIt.I<PrayerNotificationsCubit>(),
+          ),
         BlocProvider<TranslationsCubit>.value(
           value: GetIt.I<TranslationsCubit>(),
         ),

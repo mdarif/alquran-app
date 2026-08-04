@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../app_update/domain/entities/app_update_prompt.dart';
+import '../../../app_update/domain/repositories/app_update_repository.dart';
 import '../../../reader/domain/entities/translation_resource.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/domain/repositories/reader_settings_repository.dart';
 import '../../../reader/presentation/pages/reader_settings_page.dart';
+import '../../../prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
+import '../../../prayer_times/presentation/cubit/prayer_notifications_state.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 import 'app_settings_actions.dart';
 
@@ -27,6 +32,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   final ReaderSettingsRepository _settings =
       GetIt.I<ReaderSettingsRepository>();
   late Future<List<TranslationResource>> _resources = _loadResources();
+  AppUpdatePrompt? _updatePrompt;
 
   Future<List<TranslationResource>> _loadResources() {
     if (!GetIt.I.isRegistered<AyahRepository>()) {
@@ -36,7 +42,32 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadUpdatePrompt();
+  }
+
+  Future<void> _loadUpdatePrompt() async {
+    if (!FeatureFlags.softUpdateReminder ||
+        !GetIt.I.isRegistered<AppUpdateRepository>()) {
+      return;
+    }
+    final prompt = await GetIt.I<AppUpdateRepository>().check();
+    if (!mounted) return;
+    setState(() => _updatePrompt = prompt);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications) {
+      return BlocBuilder<PrayerNotificationsCubit, PrayerNotificationsState>(
+        builder: (context, _) => _buildSettings(context),
+      );
+    }
+    return _buildSettings(context);
+  }
+
+  Widget _buildSettings(BuildContext context) {
     return FutureBuilder<List<TranslationResource>>(
       future: _resources,
       builder: (context, snapshot) {
@@ -51,6 +82,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           onScriptChanged: (v) => _settings.setScript(v),
           resources: resources,
           activeTranslationSummary: _translationSummary(resources),
+          showTranslations: false,
           onOpenTranslations: () => showTranslationsSheet(
             context,
             onTranslationsChanged: () {
@@ -64,7 +96,10 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           showArabicMatn: _settings.showArabicMatn,
           onToggleShowArabic: (v) => _settings.setShowArabicMatn(v),
           onReset: _resetReadingPreferences,
-          appActions: appSettingsActions(context),
+          appActions: appSettingsActions(
+            context,
+            updatePrompt: _updatePrompt,
+          ),
         );
       },
     );

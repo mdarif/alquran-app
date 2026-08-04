@@ -19,12 +19,31 @@ class SettingsAction {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.section = SettingsActionSection.app,
+    this.showsChevron = false,
+    this.switchValue,
+    this.onSwitchChanged,
   });
 
   final Key key;
   final IconData icon;
   final String title;
   final VoidCallback onTap;
+  final SettingsActionSection section;
+  final bool showsChevron;
+  final bool? switchValue;
+  final ValueChanged<bool>? onSwitchChanged;
+}
+
+enum SettingsActionSection {
+  reading('Reading'),
+  reminders('Reminders'),
+  app('App'),
+  debug('Debug');
+
+  const SettingsActionSection(this.label);
+
+  final String label;
 }
 
 /// The unified Settings screen: reading preferences first, optional app-level
@@ -41,6 +60,7 @@ class ReaderSettingsPage extends StatefulWidget {
     required this.resources,
     required this.activeTranslationSummary,
     required this.onOpenTranslations,
+    this.showTranslations = true,
     required this.isReading,
     required this.showTranslationPeek,
     required this.onToggleTranslationPeek,
@@ -60,6 +80,7 @@ class ReaderSettingsPage extends StatefulWidget {
   final List<TranslationResource> resources;
   final String activeTranslationSummary;
   final VoidCallback onOpenTranslations;
+  final bool showTranslations;
   final bool isReading;
   final bool showTranslationPeek;
   final ValueChanged<bool> onToggleTranslationPeek;
@@ -74,13 +95,18 @@ class ReaderSettingsPage extends StatefulWidget {
 
 class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
   static const double _step = 2;
-  static const double _sectionGap = 18;
-  static const double _labelGap = 7;
+  static const double _sectionGap = 14;
+  static const double _labelGap = 4;
 
   late double _fontSize = widget.fontSize;
   late ArabicScript _script = widget.script;
   late bool _showPeek = widget.showTranslationPeek;
   late bool _showArabic = widget.showArabicMatn;
+
+  List<SettingsAction> _actions(SettingsActionSection section) => [
+        for (final action in widget.appActions)
+          if (action.section == section) action,
+      ];
 
   void _setFont(double value) {
     final v = value.clamp(widget.minFont, widget.maxFont).roundToDouble();
@@ -198,7 +224,7 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
                   ],
                 ),
               ],
-              if (widget.resources.isNotEmpty) ...[
+              if (widget.showTranslations && widget.resources.isNotEmpty) ...[
                 const SizedBox(height: _sectionGap),
                 const _SectionLabel('Translation'),
                 ListTile(
@@ -256,47 +282,102 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
                   ),
                 ),
               ],
-              const SizedBox(height: 26),
-              ListTile(
-                key: WidgetKeys.readerSettingsReset,
-                dense: true,
-                minVerticalPadding: 4,
-                contentPadding: EdgeInsets.zero,
-                leading: AppIcon(AppIcons.reset, color: cs.error),
-                title: Text(
-                  'Reset Reading Preferences',
-                  style: rowTitleStyle?.copyWith(color: cs.error),
-                ),
-                subtitle: Text(
-                  'Font size, script, translations shown and reading aids.',
-                  style: rowSubtitleStyle,
-                ),
-                onTap: widget.onReset,
+              _ActionSection(
+                label: SettingsActionSection.reminders.label,
+                actions: _actions(SettingsActionSection.reminders),
+                rowTitleStyle: rowTitleStyle,
+                colorScheme: cs,
               ),
-              if (widget.appActions.isNotEmpty) ...[
-                const SizedBox(height: _sectionGap),
-                const _SectionLabel('App'),
-                const SizedBox(height: 2),
-                for (final action in widget.appActions)
-                  ListTile(
-                    key: action.key,
-                    dense: true,
-                    minVerticalPadding: 4,
-                    contentPadding: EdgeInsets.zero,
-                    leading: AppIcon(
-                      action.icon,
-                      size: AppIconSize.action,
-                      color: cs.onSurface.withValues(alpha: 0.70),
-                    ),
-                    title: Text(action.title, style: rowTitleStyle),
-                    trailing: const AppIcon(AppIcons.chevronRight),
-                    onTap: action.onTap,
+              _ActionSection(
+                label: SettingsActionSection.app.label,
+                actions: _actions(SettingsActionSection.app),
+                rowTitleStyle: rowTitleStyle,
+                colorScheme: cs,
+              ),
+              _ActionSection(
+                label: SettingsActionSection.debug.label,
+                actions: _actions(SettingsActionSection.debug),
+                rowTitleStyle: rowTitleStyle,
+                colorScheme: cs,
+              ),
+              _ActionSection(
+                label: 'Reading Settings',
+                actions: _actions(SettingsActionSection.reading),
+                rowTitleStyle: rowTitleStyle,
+                colorScheme: cs,
+                trailing: ListTile(
+                  key: WidgetKeys.readerSettingsReset,
+                  dense: true,
+                  minVerticalPadding: 2,
+                  contentPadding: EdgeInsets.zero,
+                  leading: AppIcon(AppIcons.reset, color: cs.error),
+                  title: Text(
+                    'Reset Reading Settings',
+                    style: rowTitleStyle?.copyWith(color: cs.error),
                   ),
-              ],
+                  subtitle: Text(
+                    'Font size, script, translations shown and reading aids.',
+                    style: rowSubtitleStyle,
+                  ),
+                  onTap: widget.onReset,
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ActionSection extends StatelessWidget {
+  const _ActionSection({
+    required this.label,
+    required this.actions,
+    required this.rowTitleStyle,
+    required this.colorScheme,
+    this.trailing,
+  });
+
+  final String label;
+  final List<SettingsAction> actions;
+  final TextStyle? rowTitleStyle;
+  final ColorScheme colorScheme;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    if (actions.isEmpty && trailing == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: _ReaderSettingsPageState._sectionGap),
+        _SectionLabel(label),
+        const SizedBox(height: 0),
+        for (final action in actions)
+          ListTile(
+            key: action.key,
+            dense: true,
+            minVerticalPadding: 4,
+            contentPadding: EdgeInsets.zero,
+            leading: AppIcon(
+              action.icon,
+              size: AppIconSize.action,
+              color: colorScheme.onSurface.withValues(alpha: 0.70),
+            ),
+            title: Text(action.title, style: rowTitleStyle),
+            trailing: action.switchValue != null
+                ? Switch.adaptive(
+                    value: action.switchValue!,
+                    onChanged: action.onSwitchChanged,
+                  )
+                : (action.showsChevron
+                    ? const AppIcon(AppIcons.chevronRight)
+                    : null),
+            onTap: action.onTap,
+          ),
+        if (trailing != null) trailing!,
+      ],
     );
   }
 }
@@ -382,6 +463,7 @@ class _ScriptPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Semantics(
       selected: selected,
       child: AnimatedContainer(
@@ -396,7 +478,7 @@ class _ScriptPreview extends StatelessWidget {
             color: selected
                 ? cs.primary.withValues(alpha: 0.55)
                 : Colors.transparent,
-            width: 1.2,
+            width: isDark ? 0.9 : 1.2,
           ),
         ),
         child: InkWell(

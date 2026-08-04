@@ -10,8 +10,6 @@ import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../reader/domain/repositories/ayah_bookmark_repository.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/presentation/pages/bookmarks_page.dart';
-import '../../../reminders/presentation/cubit/reminders_cubit.dart';
-import '../../../reminders/presentation/widgets/reminders_sheet.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 import '../pages/app_settings_page.dart';
 
@@ -28,18 +26,17 @@ IconData _phaseIcon(DayPhase phase) => switch (phase) {
 bool _phaseFilled(DayPhase phase) => phase == DayPhase.maghrib;
 
 /// The Home app-bar overflow (`⋯`) that gathers the secondary controls the bar
-/// used to show as separate icons — Sunnah reminders and the Reading-Light
-/// picker — so the bar stays uncrowded next to the title + prayer pill. Each
-/// item is gated by its feature flag (passed in by [HomePage]) and reuses the
-/// existing sheets. Cubits are read DEFENSIVELY so an isolated pump won't crash.
+/// used to show as separate icons — currently the Reading-Light picker plus
+/// library/app destinations — so the bar stays uncrowded next to the title +
+/// prayer pill. Each item is gated by its feature flag (passed in by [HomePage])
+/// and reuses the existing sheets. Cubits are read DEFENSIVELY so an isolated
+/// pump won't crash.
 class HomeOverflowMenu extends StatelessWidget {
   const HomeOverflowMenu({
-    required this.showReminders,
     required this.showReadingLight,
     super.key,
   });
 
-  final bool showReminders;
   final bool showReadingLight;
 
   static T? _cubit<T extends StateStreamableSource<Object?>>(
@@ -54,7 +51,6 @@ class HomeOverflowMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reminders = showReminders ? _cubit<RemindersCubit>(context) : null;
     final theme = showReadingLight ? _cubit<ThemeCubit>(context) : null;
 
     // MenuAnchor (not PopupMenuButton) so the menu hugs its content — the popup
@@ -83,13 +79,6 @@ class HomeOverflowMenu extends StatelessWidget {
             controller.isOpen ? controller.close() : controller.open(),
       ),
       menuChildren: [
-        if (reminders != null)
-          _MenuItem(
-            icon: AppIcons.reminders,
-            filled: reminders.state.enabled,
-            label: 'Sunnah Reminders',
-            onPressed: () => _openReminders(context, reminders),
-          ),
         if (theme != null)
           _MenuItem(
             icon: _phaseIcon(theme.activePhase),
@@ -149,18 +138,6 @@ class HomeOverflowMenu extends StatelessWidget {
   void _openSettings(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const AppSettingsPage()),
-    );
-  }
-
-  void _openReminders(BuildContext context, RemindersCubit cubit) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => BlocProvider<RemindersCubit>.value(
-        value: cubit,
-        child: const RemindersSheet(),
-      ),
     );
   }
 

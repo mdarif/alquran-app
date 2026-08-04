@@ -9,8 +9,11 @@ import '../../features/navigation/presentation/cubit/index_list_cubit.dart';
 import '../../features/app_update/data/repositories/app_update_repository_impl.dart';
 import '../../features/app_update/domain/repositories/app_update_repository.dart';
 import '../../features/prayer_times/data/location/geolocator_location_provider.dart';
+import '../../features/prayer_times/data/repositories/prayer_notification_settings_repository_impl.dart';
 import '../../features/prayer_times/data/repositories/prayer_times_repository_impl.dart';
+import '../../features/prayer_times/domain/repositories/prayer_notification_settings_repository.dart';
 import '../../features/prayer_times/domain/repositories/prayer_times_repository.dart';
+import '../../features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import '../../features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
 import '../../features/reader/data/repositories/ayah_repository_impl.dart';
 import '../../features/reader/data/repositories/ayah_bookmark_repository_impl.dart';
@@ -181,6 +184,18 @@ Future<void> configureDependencies() async {
       () => RemindersCubit(
         getIt<ReminderSettingsRepository>(),
         getIt<NotificationScheduler>(),
+      ),
+    )
+    ..registerLazySingleton<PrayerNotificationSettingsRepository>(
+      () => PrayerNotificationSettingsRepositoryImpl(
+        getIt<SharedPreferences>(),
+      ),
+    )
+    ..registerLazySingleton<PrayerNotificationsCubit>(
+      () => PrayerNotificationsCubit(
+        getIt<PrayerNotificationSettingsRepository>(),
+        getIt<NotificationScheduler>(),
+        getIt<PrayerTimesRepository>(),
       ),
     )
     // Cubits (new instance per screen)

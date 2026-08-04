@@ -35,6 +35,10 @@ abstract interface class NotificationScheduler {
   /// Cancel every pending reminder (before rescheduling the rolling window).
   Future<void> cancelAll();
 
+  /// Cancel one pending notification by id. Used by features with their own id
+  /// namespace so they don't disturb other scheduled reminders.
+  Future<void> cancel(int id);
+
   /// DEBUG: how many notifications the OS currently has queued (-1 on error).
   /// Lets the debug panel confirm a scheduled test actually landed in the queue
   /// — distinguishing "scheduling failed" from "OS dropped a queued alarm".
@@ -47,6 +51,7 @@ abstract interface class NotificationScheduler {
     required DateTime fireAt,
     required String title,
     required String body,
+    String? soundName,
   });
 
   /// Schedule a one-shot notification at [fireAt] (local wall-clock).
@@ -56,6 +61,7 @@ abstract interface class NotificationScheduler {
     required String title,
     required String body,
     String? payload,
+    String? soundName,
   });
 
   /// Schedule a weekly-repeating notification (used for Al-Kahf).
