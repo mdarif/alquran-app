@@ -99,7 +99,7 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
           fireAt: time,
           title: 'Salat Time - ${prayer.label}',
           body: _formatTime(time),
-          payload: openPrayerTimesPayload,
+          payload: prayerTimesPayload(prayer: prayer, fireAt: time),
           soundName: 'salat_nudge',
         );
         scheduled++;
@@ -138,7 +138,7 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
       fireAt: fireAt,
       title: 'Salat Time - ${_nearestPrayerLabel(fireAt)}',
       body: _formatTime(fireAt),
-      payload: openPrayerTimesPayload,
+      payload: _nearestPrayerPayload(fireAt),
       soundName: 'salat_nudge',
     );
     if (error != null) return 'Schedule FAILED - $error';
@@ -152,9 +152,19 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
   /// aren't available (shouldn't happen — the caller only reaches here once
   /// notifications are already permitted and the row is visible).
   String _nearestPrayerLabel(DateTime at) {
+    return _nearestPrayer(at)?.$1.label ?? 'Prayer';
+  }
+
+  String _nearestPrayerPayload(DateTime at) {
+    final nearest = _nearestPrayer(at);
+    if (nearest == null) return openPrayerTimesPayload;
+    return prayerTimesPayload(prayer: nearest.$1, fireAt: at);
+  }
+
+  (Prayer, DateTime)? _nearestPrayer(DateTime at) {
     final location = _prayerTimes.location;
     final day = location == null ? null : _prayerTimes.timesFor(location, at);
-    if (day == null) return 'Prayer';
+    if (day == null) return null;
     (Prayer, DateTime)? nearest;
     Duration? nearestDiff;
     for (final entry in day.schedule) {
@@ -164,7 +174,7 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
         nearestDiff = diff;
       }
     }
-    return nearest?.$1.label ?? 'Prayer';
+    return nearest;
   }
 
   String _formatTime(DateTime time) {

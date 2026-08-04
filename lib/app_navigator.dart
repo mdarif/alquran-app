@@ -24,8 +24,9 @@ final navigatorKey = GlobalKey<NavigatorState>();
 /// opens Surah 18, a salat-time notification opens the Prayer Times sheet;
 /// everything else is informational (no route).
 Future<void> routeFromPayload(String? payload) async {
-  if (payload == openPrayerTimesPayload) {
-    _openPrayerTimesSheet();
+  final prayerTap = parsePrayerTimesPayload(payload);
+  if (prayerTap != null) {
+    _openPrayerTimesSheet(notificationTap: prayerTap);
     return;
   }
   if (payload != openAlKahfPayload) return;
@@ -51,7 +52,7 @@ Future<void> routeFromPayload(String? payload) async {
 /// Opens the same sheet [NextPrayerPill] does — best-effort: if the cubit
 /// isn't reachable from the navigator's context, or today's times aren't
 /// computed yet (no location), it's a silent no-op rather than a crash.
-void _openPrayerTimesSheet() {
+void _openPrayerTimesSheet({PrayerNotificationTap? notificationTap}) {
   final context = navigatorKey.currentContext;
   if (context == null) return;
   PrayerTimesCubit? cubit;
@@ -69,6 +70,8 @@ void _openPrayerTimesSheet() {
     builder: (_) => PrayerTimesSheet(
       times: today,
       next: cubit!.state.next?.prayer,
+      notificationPrayer: notificationTap?.prayer,
+      notificationFireAt: notificationTap?.fireAt,
       hijriBaseDate: FeatureFlags.hijriDate ? cubit.hijriBaseDate : null,
       gregorianDate: cubit.gregorianDate,
     ),

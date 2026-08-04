@@ -58,6 +58,29 @@ class DailyPrayerTimes {
     return null;
   }
 
+  /// The next obligatory prayer strictly after [now]. Unlike [nextAfter], this
+  /// skips Sunrise because it is a marker, not a salah.
+  (Prayer, DateTime)? nextSalahAfter(DateTime now) {
+    for (final entry in schedule) {
+      if (entry.$2.isAfter(now)) return entry;
+    }
+    return null;
+  }
+
+  /// The salah window active at [now], bounded by the next marker. Between Fajr
+  /// and sunrise this returns Fajr; Sunrise itself is never a current salah.
+  (Prayer, DateTime, DateTime)? currentSalahAt(DateTime now) {
+    for (var i = 0; i < _markers.length - 1; i++) {
+      final (prayer, start) = _markers[i];
+      final end = _markers[i + 1].$2;
+      if (!prayer.isSalah) continue;
+      if (!now.isBefore(start) && now.isBefore(end)) {
+        return (prayer, start, end);
+      }
+    }
+    return null;
+  }
+
   // Forbidden-time spans. The calc lib exposes only the final times, not the
   // sun's elevation, so "a spear's length" after sunrise and the yellowing
   // before sunset are documented fixed approximations (they drift a little with

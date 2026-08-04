@@ -1,5 +1,6 @@
 import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/prayer.dart';
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
 import 'package:al_quran/features/prayer_times/domain/repositories/prayer_notification_settings_repository.dart';
 import 'package:al_quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
@@ -208,8 +209,16 @@ void main() {
     );
     expect(
       scheduler.oneShots.map((n) => n.payload),
-      everyElement(openPrayerTimesPayload),
+      everyElement(startsWith('open:prayer_times?')),
     );
+    final asrPayload = scheduler.oneShots
+        .firstWhere(
+          (n) => n.title == 'Salat Time - Asr',
+        )
+        .payload;
+    final tap = parsePrayerTimesPayload(asrPayload);
+    expect(tap?.prayer, Prayer.asr);
+    expect(tap?.fireAt, DateTime(2026, 8, 3, 17, 35));
   });
 
   test('notification copy uses prayer name and formatted time', () async {
@@ -293,7 +302,9 @@ void main() {
     expect(scheduler.oneShots.single.title, 'Salat Time - Dhuhr');
     expect(scheduler.oneShots.single.body, '12:02 PM');
     expect(scheduler.oneShots.single.soundName, 'salat_nudge');
-    expect(scheduler.oneShots.single.payload, openPrayerTimesPayload);
+    final tap = parsePrayerTimesPayload(scheduler.oneShots.single.payload);
+    expect(tap?.prayer, Prayer.dhuhr);
+    expect(tap?.fireAt, DateTime(2026, 8, 3, 12, 2));
   });
 
   test('scheduleDeliveryTest labels itself by whichever prayer is nearest',
