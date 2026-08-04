@@ -94,10 +94,14 @@ class WidgetKeys {
   static const prayerTimesSheet = Key('prayer-times-sheet');
   static const hijriDateLine = Key('hijri-date-line');
 
-  // Sunnah reminders
+  // Reminders (Sunnah reminders + Salat notifications, one settings screen)
   static const remindersButton = Key('reminders-button');
-  static const remindersSheet = Key('reminders-sheet');
+  static const remindersPage = Key('reminders-page');
+  static const sunnahRemindersToggle = Key('sunnah-reminders-toggle');
+  static const sunnahRemindersInfoButton = Key('sunnah-reminders-info-button');
   static const prayerNotificationsToggle = Key('prayer-notifications-toggle');
+  static const prayerNotificationsInfoButton =
+      Key('prayer-notifications-info-button');
   static const prayerNotificationsTestButton =
       Key('prayer-notifications-test-button');
 

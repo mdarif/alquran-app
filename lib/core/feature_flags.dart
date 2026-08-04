@@ -50,13 +50,10 @@ abstract final class FeatureFlags {
   static const bool prayerTimes = true;
 
   /// Local salat-time notifications using the existing prayer-times calculation
-  /// and local notification scheduler. OFF while we settle the UX/reliability:
-  /// while false no toggle is shown, no permission is requested, and no salat
+  /// and local notification scheduler. ON (owner decision, 2026-08-04). While
+  /// false no toggle is shown, no permission is requested, and no salat
   /// notifications are scheduled. `FeatureFlags.prayerTimes` must also be true.
-  static const bool prayerTimeNotifications = bool.fromEnvironment(
-    'PRAYER_TIME_NOTIFICATIONS',
-    defaultValue: false,
-  );
+  static const bool prayerTimeNotifications = true;
 
   /// Home-screen widgets (Android `PrayerWidgetProvider` + `PrayerScheduleWidget`,
   /// iOS WidgetKit `PrayerWidget`/`PrayerScheduleWidget`). Shipped DARK for v1:

@@ -24,6 +24,7 @@ priorities, and release gate.
 - **Reader virtualization** — page-chunked lazy list, ~17-31ms open time.
 - **Bookmarks** — ayah-level, multiple, with a bookmarks screen (`AyahBookmarkRepository`, verse address only — no notes/tags yet).
 - **Sunnah reminders** — local notifications for Al-Kahf (Friday), White Days, Ashura, Arafah, Dhul Hijjah; the Al-Kahf one routes into the reader and resumes where you left off.
+- **Salat notifications** — local notifications at each of the 5 daily prayer times (2026-08-04, `FeatureFlags.prayerTimeNotifications`); tapping one opens the Prayer Times sheet. Both reminder types now live on one unified "Reminders" screen (uniform toggle + info popover per row), reachable from the Home overflow.
 
 ## Built but flagged OFF for v1
 
@@ -105,14 +106,16 @@ actually lands, since most of these start in `../alquran-data`, not here.
 
    **→ Full implementation plan: [`mushaf-page-mode-plan.md`](mushaf-page-mode-plan.md)**
    (owner ask 2026-08-02). App only — explicitly **not** the website.
-3. **Prayer start-time reminders** — **P3**. Notify at
-   Fajr/Dhuhr/Asr/Maghrib/Isha when the actual prayer time arrives. The
-   notification plumbing already exists (`NotificationScheduler` + the Sunnah
-   reminder rolling window), so this is mostly scheduling: prayer times are
-   computed locally per day, so the window has to be re-armed on launch/resume
-   like the Sunnah one, and re-armed on a location change. Decide per-prayer
-   opt-in vs all-or-nothing, and whether to offer a pre-prayer lead time. Watch
-   the OEM battery-killer problem already documented for reminders (OnePlus).
+3. ~~**Prayer start-time reminders**~~ — **SHIPPED 2026-08-04** (see Shipped
+   above, "Salat notifications"). All-or-nothing (no per-prayer opt-in, no
+   pre-prayer lead time yet — could still be added later); watch the OEM
+   battery-killer problem already documented for reminders (OnePlus).
+3b. **Dedicated Salah screen** (owner, 2026-08-04) — a proper prayer-times
+   home surface, not just the Home pill + bottom sheet. Not scoped yet; likely
+   candidates once picked up: a monthly calendar of times (not just today),
+   qibla direction, per-prayer notification opt-in/lead-time (see #3 above),
+   maybe a stronger visual tie to "Light of Day" phases. Design + scope owner
+   sign-off needed before starting.
 4. **More Sunnah occasions** — new Hijri month start, and the rest of the
    recurring calendar (Ayyam al-Beed already ships; candidates: the sacred
    months, Rajab/Sha'ban markers, Laylat al-Qadr odd nights). Extends

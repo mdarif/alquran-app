@@ -10,6 +10,12 @@ import 'package:al_quran/features/navigation/domain/entities/index_kind.dart';
 import 'package:al_quran/features/navigation/domain/repositories/index_repository.dart';
 import 'package:al_quran/features/navigation/presentation/cubit/index_list_cubit.dart';
 import 'package:al_quran/features/navigation/presentation/pages/home_page.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
+import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
+import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
+import 'package:al_quran/features/prayer_times/domain/repositories/prayer_notification_settings_repository.dart';
+import 'package:al_quran/features/prayer_times/domain/repositories/prayer_times_repository.dart';
+import 'package:al_quran/features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import 'package:al_quran/features/prayer_times/presentation/widgets/hijri_date_line.dart';
 import 'package:al_quran/features/reader/domain/entities/last_read.dart';
 import 'package:al_quran/features/reader/domain/entities/ayah.dart';
@@ -26,7 +32,6 @@ import 'package:al_quran/features/reader/presentation/widgets/last_read_banner.d
 import 'package:al_quran/features/reminders/domain/repositories/reminder_settings_repository.dart';
 import 'package:al_quran/features/reminders/domain/scheduling/notification_scheduler.dart';
 import 'package:al_quran/features/reminders/presentation/cubit/reminders_cubit.dart';
-import 'package:al_quran/features/reminders/presentation/widgets/reminders_sheet.dart';
 import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
 import 'package:al_quran/features/surahs/presentation/cubit/surah_list_cubit.dart';
@@ -155,6 +160,27 @@ class _FakeReminderSettingsRepository implements ReminderSettingsRepository {
   Future<void> setEnabled(bool value) async => enabled = value;
 }
 
+class _FakePrayerNotificationSettingsRepository
+    implements PrayerNotificationSettingsRepository {
+  @override
+  bool enabled = false;
+
+  @override
+  Future<void> setEnabled(bool value) async => enabled = value;
+}
+
+class _FakePrayerTimesRepository implements PrayerTimesRepository {
+  @override
+  GeoLocation? get location => null;
+
+  @override
+  Future<LocationResult> acquireLocation() async =>
+      const LocationResult(LocationStatus.unavailable, null);
+
+  @override
+  DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) => null;
+}
+
 class _FakeNotificationScheduler implements NotificationScheduler {
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {}
@@ -237,13 +263,24 @@ Future<void> _pumpHome(
     _FakeReminderSettingsRepository(),
     _FakeNotificationScheduler(),
   );
+  // AppSettingsPage (opened from the ⋯ overflow) requires this cubit whenever
+  // FeatureFlags.prayerTimeNotifications is on, same as the real app.dart tree.
+  final prayerNotifications = PrayerNotificationsCubit(
+    _FakePrayerNotificationSettingsRepository(),
+    _FakeNotificationScheduler(),
+    _FakePrayerTimesRepository(),
+  );
   addTearDown(theme.close);
   addTearDown(reminders.close);
+  addTearDown(prayerNotifications.close);
   await tester.pumpWidget(
     MultiBlocProvider(
       providers: [
         BlocProvider<ThemeCubit>.value(value: theme),
         BlocProvider<RemindersCubit>.value(value: reminders),
+        BlocProvider<PrayerNotificationsCubit>.value(
+          value: prayerNotifications,
+        ),
       ],
       child: MaterialApp(
         home: HomePage(
@@ -346,7 +383,6 @@ void main() {
       await _pumpHome(tester); // ThemeCubit is provided → Reading Theme shows
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
       await tester.pumpAndSettle();
-      expect(find.text('Sunnah reminders'), findsNothing);
       expect(find.text('Reading Theme'), findsOneWidget);
       await tester.tap(find.text('Reading Theme'));
       await tester.pumpAndSettle();
@@ -370,6 +406,21 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.bookmarksMenuButton));
       await tester.pumpAndSettle();
       expect(find.byType(BookmarksPage), findsOneWidget);
+    });
+
+    testWidgets('the overflow opens Reminders directly (a Settings peer)',
+        (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      expect(find.text('Reminders'), findsOneWidget);
+
+      await tester.tap(find.byKey(WidgetKeys.remindersButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.remindersPage), findsOneWidget);
+      expect(find.text('Sunnah Reminders'), findsOneWidget);
+      expect(find.text('Salat Notifications'), findsOneWidget);
     });
 
     testWidgets('shows and dismisses the optional app update reminder',
@@ -424,8 +475,8 @@ void main() {
 
       expect(find.byKey(WidgetKeys.shareAppButton), findsOneWidget);
       expect(find.text('Share Al Quran'), findsOneWidget);
-      expect(find.byKey(WidgetKeys.remindersButton), findsOneWidget);
-      expect(find.text('Sunnah reminders'), findsOneWidget);
+      // Reminders moved to the overflow as a Settings peer — not in this list.
+      expect(find.byKey(WidgetKeys.remindersButton), findsNothing);
       expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
       expect(find.text('Check for Updates'), findsOneWidget);
       expect(find.byKey(WidgetKeys.aboutMenuButton), findsOneWidget);
@@ -456,55 +507,6 @@ void main() {
       expect(find.text('Update available'), findsWidgets);
     });
 
-    testWidgets('Settings places Sunnah reminders above app actions',
-        (tester) async {
-      await _pumpHome(tester);
-      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
-      await tester.pumpAndSettle();
-
-      final sunnahTop = tester
-          .getTopLeft(
-            find.byKey(WidgetKeys.remindersButton),
-          )
-          .dy;
-      final shareTop = tester
-          .getTopLeft(
-            find.byKey(WidgetKeys.shareAppButton),
-          )
-          .dy;
-      final updateTop = tester
-          .getTopLeft(
-            find.byKey(WidgetKeys.appUpdateMenuButton),
-          )
-          .dy;
-      final aboutTop = tester
-          .getTopLeft(
-            find.byKey(WidgetKeys.aboutMenuButton),
-          )
-          .dy;
-
-      expect(sunnahTop, lessThan(shareTop));
-      expect(updateTop, greaterThan(shareTop));
-      expect(updateTop, lessThan(aboutTop));
-    });
-
-    testWidgets('Settings opens Sunnah reminders from the Reminders section',
-        (tester) async {
-      await _pumpHome(tester);
-      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(WidgetKeys.remindersButton));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(RemindersSheet), findsOneWidget);
-      expect(find.byKey(WidgetKeys.remindersSheet), findsOneWidget);
-    });
-
     testWidgets('Settings only shows chevrons for navigation rows',
         (tester) async {
       await _pumpHome(tester);
@@ -520,7 +522,6 @@ void main() {
 
       expect(chevronInside(WidgetKeys.shareAppButton), findsNothing);
       expect(chevronInside(WidgetKeys.appUpdateMenuButton), findsNothing);
-      expect(chevronInside(WidgetKeys.remindersButton), findsOneWidget);
       expect(chevronInside(WidgetKeys.aboutMenuButton), findsOneWidget);
     });
 

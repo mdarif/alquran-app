@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../reminders/domain/scheduling/notification_scheduler.dart';
 import '../../domain/repositories/prayer_notification_settings_repository.dart';
 import '../../domain/repositories/prayer_times_repository.dart';
+import '../../domain/scheduling/prayer_notification_payload.dart';
 import 'prayer_notifications_state.dart';
 
 class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
@@ -97,6 +98,7 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
           fireAt: time,
           title: 'Salat Time - ${prayer.label}',
           body: _formatTime(time),
+          payload: openPrayerTimesPayload,
           soundName: 'salat_nudge',
         );
         scheduled++;

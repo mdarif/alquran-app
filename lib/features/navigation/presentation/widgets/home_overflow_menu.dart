@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 
+import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/mushaf_palette.dart' show DayPhase;
@@ -12,6 +13,7 @@ import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/presentation/pages/bookmarks_page.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 import '../pages/app_settings_page.dart';
+import '../pages/reminders_settings_page.dart';
 
 /// Phase → app-bar glyph (mirrors [ThemeToggleButton]'s private mapping); Dusk
 /// is the only filled one (the golden going-down light).
@@ -98,6 +100,14 @@ class HomeOverflowMenu extends StatelessWidget {
           label: 'Bookmarks',
           onPressed: () => _openBookmarks(context),
         ),
+        if (FeatureFlags.sunnahReminders ||
+            (FeatureFlags.prayerTimes && FeatureFlags.prayerTimeNotifications))
+          _MenuItem(
+            key: WidgetKeys.remindersButton,
+            icon: AppIcons.reminders,
+            label: 'Reminders',
+            onPressed: () => _openReminders(context),
+          ),
         _MenuItem(
           key: WidgetKeys.homeSettingsMenuButton,
           icon: AppIcons.settings,
@@ -138,6 +148,12 @@ class HomeOverflowMenu extends StatelessWidget {
   void _openSettings(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const AppSettingsPage()),
+    );
+  }
+
+  void _openReminders(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const RemindersSettingsPage()),
     );
   }
 
