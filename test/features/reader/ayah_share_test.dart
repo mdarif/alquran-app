@@ -44,13 +44,14 @@ void main() {
       );
       expect(
         text,
-        'الٓمٓ\n\nالف لام میم\n\nAlif Lam Mim\n\n— Al-Baqarah 2:1',
+        'الٓمٓ\n\nالف لام میم\n\nAlif Lam Mim\n\n— Al-Baqarah 2:1'
+        '\n\nAl Quran · alquranreader.com',
       );
     });
 
     test('falls back to surahId:ayah when the name is unknown', () {
       final text = buildAyahShareText(ayah: _ayah, resources: const []);
-      expect(text, 'الٓمٓ\n\n— 2:1');
+      expect(text, 'الٓمٓ\n\n— 2:1\n\nAl Quran · alquranreader.com');
     });
 
     test('omits translations the ayah does not have', () {
@@ -67,7 +68,15 @@ void main() {
         resources: const [_urdu, _english],
         surahName: 'Al-Baqarah',
       );
-      expect(text, 'نص\n\nاردو\n\n— Al-Baqarah 2:2');
+      expect(
+        text,
+        'نص\n\nاردو\n\n— Al-Baqarah 2:2\n\nAl Quran · alquranreader.com',
+      );
+    });
+
+    test('always ends with the branding line', () {
+      final text = buildAyahShareText(ayah: _ayah, resources: const []);
+      expect(text, endsWith('Al Quran · alquranreader.com'));
     });
   });
 }

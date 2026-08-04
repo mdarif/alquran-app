@@ -52,5 +52,6 @@ String buildAyahShareText({
     if (text != null) parts.add(text);
   }
   parts.add('— $reference');
+  parts.add('Al Quran · alquranreader.com');
   return parts.join('\n\n');
 }

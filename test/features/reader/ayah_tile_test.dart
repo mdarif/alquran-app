@@ -360,7 +360,10 @@ void main() {
       await tester.tap(find.text('Copy'));
       await tester.pumpAndSettle();
 
-      expect(copied, 'الٓمٓ\n\nاردو\n\n— Al-Baqarah 2:1');
+      expect(
+        copied,
+        'الٓمٓ\n\nاردو\n\n— Al-Baqarah 2:1\n\nAl Quran · alquranreader.com',
+      );
       expect(find.text('Ayah copied'), findsOneWidget);
     });
 
