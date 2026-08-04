@@ -50,6 +50,18 @@ First time only: add the signing secrets once — see
       OnePlus (OEM battery-killer is the known reminders risk) and an iPhone.
 - [ ] If you replaced `assets/db/quran.db` since the last release, you ran
       `make seed-version` (else devices won't pick up the new data).
+- [ ] If you replaced `assets/db/quran.db`, confirm it is the **lean app seed**,
+      not the full publishing DB:
+      ```bash
+      du -h assets/db/quran.db
+      sqlite3 assets/db/quran.db \
+        "select r.slug, count(t.id) from resources r left join translations t on t.resource_id=r.id group by r.slug order by r.sort_order;"
+      ```
+      Expected today: only bundled/default offline editions have 6,236 rows;
+      downloadable editions are metadata-only (`0` rows) and install into
+      `editions.db` at runtime. If the DB suddenly jumps by multiple MB or every
+      downloadable edition has rows, stop the release and rebuild from
+      `../alquran-data` without `--include-downloadable-text`.
 - [ ] You did **not** regenerate `android/`/`ios/` (a `flutter create`) without
       re-running `make location-perms notif-perms audio-perms` — a regen wipes
       the permission/Info.plist edits and the home-widget native code.

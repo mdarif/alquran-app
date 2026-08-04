@@ -6,6 +6,33 @@ platitudes — exact codepoints, commands, and root causes.
 
 ---
 
+## 0. Release/data packaging — lean seed DB is sacred
+
+### Downloadable translations must not be bundled into `quran.db`
+- The app has two translation stores by design: bundled offline seed data in
+  `assets/db/quran.db`, and user-installed editions in `editions.db`.
+- `db_seeder.dart` replaces the bundled `quran.db` wholesale when
+  `assets/db/quran.db.version` changes. Putting downloaded editions into that
+  file would both bloat every new install and risk confusing future data
+  refreshes.
+- The 2026-08-04 release candidate caught this the hard way: Play Console showed
+  a ~4.27 MB new-install size jump because the seed DB had grown from ~11.5 MB to
+  ~28.6 MB after every configured translation was inserted into `quran.db`.
+- The fix lives in `../alquran-data`: normal `build_db.py` creates a lean app
+  seed where only `bundle: true` editions carry text; publishing downloadable
+  artifacts requires a temporary full DB via `--include-downloadable-text`.
+
+Release gate:
+```bash
+du -h assets/db/quran.db
+sqlite3 assets/db/quran.db \
+  "select r.slug, count(t.id) from resources r left join translations t on t.resource_id=r.id group by r.slug order by r.sort_order;"
+```
+
+Expected: bundled/default offline editions have 6,236 rows; downloadable
+catalogue editions have `0` rows in the app seed. If the release artifact grows
+unexpectedly, check this before uploading to Play/App Store.
+
 ## 1. Arabic rendering in Flutter — the big one
 
 ### Flutter does not apply the `liga` OpenType feature for Arabic runs
