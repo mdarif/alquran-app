@@ -36,7 +36,8 @@ String editionChipLabel(
 }
 
 /// Builds clean, shareable/copyable text for a single ayah: the Arabic, each
-/// available translation, and a reference like "Al-Baqarah 2:1".
+/// available translation (credited to its translator/edition), and a
+/// reference like "Al-Baqarah 2:1".
 String buildAyahShareText({
   required Ayah ayah,
   required List<TranslationResource> resources,
@@ -49,7 +50,7 @@ String buildAyahShareText({
   final parts = <String>[ayah.textArabic];
   for (final r in resources) {
     final text = ayah.translations[r.slug];
-    if (text != null) parts.add(text);
+    if (text != null) parts.add('${r.displayCredit}\n$text');
   }
   parts.add('— $reference');
   parts.add('Al Quran · alquranreader.com');

@@ -36,7 +36,9 @@ void main() {
   });
 
   group('buildAyahShareText', () {
-    test('includes Arabic, each translation, and a named reference', () {
+    test(
+        'includes Arabic, each translation credited to its edition, '
+        'and a named reference', () {
       final text = buildAyahShareText(
         ayah: _ayah,
         resources: const [_urdu, _english],
@@ -44,9 +46,25 @@ void main() {
       );
       expect(
         text,
-        'الٓمٓ\n\nالف لام میم\n\nAlif Lam Mim\n\n— Al-Baqarah 2:1'
-        '\n\nAl Quran · alquranreader.com',
+        'الٓمٓ\n\nJunagarhi\nالف لام میم\n\nHilali & Khan\nAlif Lam Mim'
+        '\n\n— Al-Baqarah 2:1\n\nAl Quran · alquranreader.com',
       );
+    });
+
+    test('credits the translator (author) over the edition name when set',
+        () {
+      const withAuthor = TranslationResource(
+        id: 1,
+        slug: 'ur-test',
+        languageCode: 'ur',
+        name: 'Junagarhi Edition',
+        author: 'Muhammad Junagarhi',
+      );
+      final text = buildAyahShareText(
+        ayah: _ayah,
+        resources: const [withAuthor],
+      );
+      expect(text, contains('Muhammad Junagarhi\nالف لام میم'));
     });
 
     test('falls back to surahId:ayah when the name is unknown', () {
@@ -70,7 +88,7 @@ void main() {
       );
       expect(
         text,
-        'نص\n\nاردو\n\n— Al-Baqarah 2:2\n\nAl Quran · alquranreader.com',
+        'نص\n\nJunagarhi\nاردو\n\n— Al-Baqarah 2:2\n\nAl Quran · alquranreader.com',
       );
     });
 

@@ -362,7 +362,8 @@ void main() {
 
       expect(
         copied,
-        'الٓمٓ\n\nاردو\n\n— Al-Baqarah 2:1\n\nAl Quran · alquranreader.com',
+        'الٓمٓ\n\nJunagarhi\nاردو\n\n— Al-Baqarah 2:1'
+        '\n\nAl Quran · alquranreader.com',
       );
       expect(find.text('Ayah copied'), findsOneWidget);
     });
