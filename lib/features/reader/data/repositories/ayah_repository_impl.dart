@@ -1,3 +1,4 @@
+import '../../../../core/data/surah_meanings.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/database/editions_database.dart';
 import '../../../../core/feature_flags.dart';
@@ -153,6 +154,7 @@ class AyahRepositoryImpl implements AyahRepository {
           totalAyahs: s.totalAyahs,
           nameArabic: s.nameArabic,
           revelationPlace: s.revelationPlace,
+          nameMeaning: surahMeanings[s.id],
         ),
     };
   }

@@ -125,6 +125,13 @@ void main() {
         );
     final first = await repo.getSurahHeadings();
     expect(first, hasLength(1));
+    expect(
+      first[1]!.nameMeaning,
+      'The Opener',
+      reason:
+          'nameMeaning is looked up from the static surahMeanings map by id, '
+          'not read from the DB row',
+    );
 
     // Insert another surah: a fresh read would see 2, a memoised one still sees 1.
     await db.into(db.surahs).insert(

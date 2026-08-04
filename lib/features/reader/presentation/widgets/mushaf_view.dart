@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
-import '../../../../core/format/surah_meta_labels.dart';
 import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -74,6 +73,7 @@ class MushafView extends StatefulWidget {
     this.showPeek = false,
     this.onSelectVerse,
     this.onImmersionChanged,
+    this.onScrollSettled,
     this.focusAlignment = 0.04,
     super.key,
   });
@@ -134,6 +134,9 @@ class MushafView extends StatefulWidget {
   /// Reports a sustained scroll direction for immersive reading: true = hide the
   /// chrome (reading forward), false = show it (reverse scroll / at the top).
   final ValueChanged<bool>? onImmersionChanged;
+
+  /// Called after the scrollable settles.
+  final VoidCallback? onScrollSettled;
 
   /// The SPL alignment fraction (of the FULL screen height — this list runs
   /// edge-to-edge behind the chrome) used to scroll-to-focus a selected/playing
@@ -802,8 +805,10 @@ class _MushafViewState extends State<MushafView>
               // update during layout, so reading them here (mid-notification)
               // would still see the pre-scroll top.
               if (n is ScrollEndNotification) {
-                WidgetsBinding.instance
-                    .addPostFrameCallback((_) => _reportTopmost());
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  widget.onScrollSettled?.call();
+                  _reportTopmost();
+                });
               }
               return false;
             },
@@ -1315,13 +1320,13 @@ class SurahHeaderCard extends StatelessWidget {
     final number = heading?.number ?? fallbackNumber;
     final nameEnglish = heading?.nameEnglish ?? 'Surah $number';
     final nameArabic = heading?.nameArabic;
-    final meta = _metaLine(heading);
+    final nameMeaning = heading?.nameMeaning;
     final scale = fontSize / _baseFontSize;
 
     return Padding(
       padding: const EdgeInsets.only(
-        top: 4,
-        bottom: 8,
+        top: 2,
+        bottom: 4,
         left: 20,
         right: 20,
       ),
@@ -1348,7 +1353,7 @@ class SurahHeaderCard extends StatelessWidget {
             ),
           ),
           if (nameArabic != null) ...[
-            SizedBox(height: 14 * scale),
+            SizedBox(height: 8 * scale),
             Text(
               nameArabic,
               textAlign: TextAlign.center,
@@ -1372,32 +1377,20 @@ class SurahHeaderCard extends StatelessWidget {
               color: cs.onSurface,
             ),
           ),
-          if (meta != null) ...[
-            SizedBox(height: 6 * scale),
+          if (nameMeaning != null) ...[
+            SizedBox(height: 2 * scale),
             Text(
-              meta,
+              nameMeaning,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: (theme.textTheme.bodySmall?.fontSize ?? 12) * scale,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) * scale,
                 color: cs.onSurfaceVariant,
-                letterSpacing: 0.5,
               ),
             ),
           ],
         ],
       ),
     );
-  }
-
-  /// "Makki · 7 Ayah" — each part included only when known. Same wording as the
-  /// TOC row (shared labels in `core/format`).
-  static String? _metaLine(SurahHeading? heading) {
-    if (heading == null) return null;
-    final parts = [
-      revelationLabel(heading.revelationPlace),
-      ayahCountLabel(heading.totalAyahs),
-    ].nonNulls;
-    return parts.isEmpty ? null : parts.join(' · ');
   }
 }
 

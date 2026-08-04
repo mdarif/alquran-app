@@ -65,6 +65,7 @@ Map<int, SurahHeading> _headings(
   int count, {
   String? arabic,
   String? place,
+  String? meaning,
 }) =>
     {
       surahId: SurahHeading(
@@ -73,6 +74,7 @@ Map<int, SurahHeading> _headings(
         totalAyahs: count,
         nameArabic: arabic,
         revelationPlace: place,
+        nameMeaning: meaning,
       ),
     };
 
@@ -164,7 +166,7 @@ void main() {
       expect(find.text('Al-Baqarah'), findsOneWidget);
     });
 
-    testWidgets('shows Arabic surah name and revelation/verse meta line',
+    testWidgets('shows Arabic surah name and English meaning',
         (tester) async {
       await tester.pumpWidget(
         _wrap(
@@ -176,17 +178,20 @@ void main() {
               7,
               arabic: 'الفاتحة',
               place: 'makkah',
+              meaning: 'The Opener',
             ),
           ),
         ),
       );
       expect(find.text('الفاتحة'), findsOneWidget);
-      // Same wording as the TOC row, so a surah describes itself identically
-      // wherever it appears.
-      expect(find.text('Makki · 7 Ayah'), findsOneWidget);
+      expect(find.text('The Opener'), findsOneWidget);
+      // The Makki/verse-count meta line was dropped to make room for the
+      // meaning line — must not silently reappear.
+      expect(find.textContaining('Makki'), findsNothing);
+      expect(find.textContaining('Ayah'), findsNothing);
     });
 
-    testWidgets('omits the meta line when surah metadata is unavailable',
+    testWidgets('omits the meaning line when surah metadata is unavailable',
         (tester) async {
       await tester.pumpWidget(
         _wrap(_view(headings: const {}, surahId: 2, ayahCount: 3)),
