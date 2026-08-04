@@ -241,6 +241,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // bar, player bar, and OS system bars; a reverse swipe (down) brings them back;
   // the top always shows them. Driven by the active viewport's scroll direction.
   bool _chromeHidden = false;
+  bool? _pendingSystemUiHidden;
 
   // The verse the reader tapped in Reading — "queued" for the always-on player's
   // Play button (which has no per-verse buttons of its own). Drives the queued
@@ -547,6 +548,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
             onSelectVerse: interactive ? _onSelectVerse : null,
             // Only the live page drives immersion (forward-scroll hides the chrome).
             onImmersionChanged: interactive ? _setChromeHidden : null,
+            onScrollSettled: interactive ? _applyPendingSystemUiMode : null,
             // Never let the selected/playing verse scroll to a point that renders
             // BEHIND the app bar — Reading runs edge-to-edge, so a bare small
             // fraction (the "near the top of the paragraph" default) isn't enough.
@@ -587,6 +589,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         onToggleBookmark: interactive ? _toggleBookmark : null,
         // Only the live page drives immersion (forward-scroll hides the chrome).
         onImmersionChanged: interactive ? _setChromeHidden : null,
+        onScrollSettled: interactive ? _applyPendingSystemUiMode : null,
       );
     }
     return view;
@@ -644,7 +647,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // Swiping to a new section reveals the chrome (the new surah's title), and
     // re-syncs with the incoming list's fresh immersion detector — which starts
     // from "shown", so leaving it hidden would strand the bars off-screen.
-    _setChromeHidden(false);
+    _setChromeHidden(false, applySystemUiNow: true);
     // A user swipe stops the recitation; an autoplay-driven advance keeps it
     // rolling (the incoming section's first verse plays via the setSequence
     // listener above).
@@ -1048,9 +1051,17 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   /// The active viewport reported a sustained scroll direction: hide the chrome
   /// (app bar + player bar + OS system bars) while reading forward, show it on a
   /// reverse scroll or at the top. Only the interactive page drives this.
-  void _setChromeHidden(bool hidden) {
+  void _setChromeHidden(bool hidden, {bool applySystemUiNow = false}) {
     if (hidden == _chromeHidden) return;
     setState(() => _chromeHidden = hidden);
+    _pendingSystemUiHidden = hidden;
+    if (applySystemUiNow) _applyPendingSystemUiMode();
+  }
+
+  void _applyPendingSystemUiMode() {
+    final hidden = _pendingSystemUiHidden;
+    if (!mounted || hidden == null || hidden != _chromeHidden) return;
+    _pendingSystemUiHidden = null;
     SystemChrome.setEnabledSystemUIMode(
       hidden ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
     );
@@ -1110,6 +1121,7 @@ class _DetailedList extends StatefulWidget {
     this.onToggleBookmark,
     this.bookmarkedAyahIds = const {},
     this.onImmersionChanged,
+    this.onScrollSettled,
     super.key,
   });
 
@@ -1153,6 +1165,9 @@ class _DetailedList extends StatefulWidget {
 
   /// See [MushafView.onImmersionChanged] — forward-scroll hides the chrome.
   final ValueChanged<bool>? onImmersionChanged;
+
+  /// See [MushafView.onScrollSettled] — applies deferred platform chrome.
+  final VoidCallback? onScrollSettled;
 
   /// The editions actually rendered in each tile: the enabled ones, falling back
   /// to all if a stale saved selection matches nothing available.
@@ -1399,6 +1414,7 @@ class _DetailedListState extends State<_DetailedList> {
             }
             final hide = _immersion.update(n);
             if (hide != null) widget.onImmersionChanged?.call(hide);
+            if (n is ScrollEndNotification) widget.onScrollSettled?.call();
             return false;
           },
           // No SelectionArea here (mirrors Reading): on Android its touch

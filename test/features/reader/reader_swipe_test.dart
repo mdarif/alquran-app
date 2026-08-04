@@ -16,6 +16,7 @@ import 'package:al_quran/features/reader/presentation/cubit/reader_cubit.dart';
 import 'package:al_quran/features/reader/presentation/pages/reader_page.dart';
 import 'package:al_quran/features/reader/presentation/widgets/mushaf_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 
@@ -433,6 +434,50 @@ void main() {
       await tester.fling(find.byType(MushafView), const Offset(500, 0), 1400);
       await tester.pumpAndSettle();
       expect(find.text('Chapter 3'), findsWidgets);
+    });
+
+    testWidgets('defers OS fullscreen changes until vertical scroll settles',
+        (tester) async {
+      final platformCalls = <MethodCall>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'SystemChrome.setEnabledSystemUIMode') {
+            platformCalls.add(call);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+
+      await pumpScrollableReader(tester);
+      platformCalls.clear();
+
+      final g = await tester.startGesture(
+        tester.getCenter(find.byType(MushafView)),
+      );
+      for (var i = 0; i < 4; i++) {
+        await g.moveBy(const Offset(0, -80));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(const Duration(milliseconds: 350));
+
+      expect(
+        platformCalls,
+        isEmpty,
+        reason: 'system UI changes are platform work and must not run mid-drag',
+      );
+
+      await g.up();
+      await tester.pump();
+
+      expect(
+        platformCalls.map((c) => c.method),
+        contains('SystemChrome.setEnabledSystemUIMode'),
+      );
     });
   });
 
