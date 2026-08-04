@@ -89,7 +89,7 @@ void main() {
       expect(find.text(name), findsOneWidget);
     }
     expect(find.text('6:30'), findsOneWidget); // sunrise time shown
-    expect(find.textContaining('No prayer'), findsWidgets);
+    expect(find.textContaining('No Nafl Prayer'), findsWidgets);
     expect(find.textContaining('2026'), findsOneWidget); // Gregorian date line
   });
 

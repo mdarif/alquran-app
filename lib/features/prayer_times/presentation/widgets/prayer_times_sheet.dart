@@ -481,7 +481,7 @@ class _ForbiddenFocusCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Prayer is paused now',
+                    'No voluntary prayer',
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: fg,
                       fontWeight: FontWeight.w700,
@@ -729,7 +729,7 @@ class _ForbiddenNote extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           Text(
-            'No prayer · ${formatPrayerTime(window.start)}'
+            'No Nafl Prayer · ${formatPrayerTime(window.start)}'
             '–${formatPrayerTime(window.end)}',
             style: theme.textTheme.labelSmall?.copyWith(
               color: gold.withValues(alpha: 0.78),

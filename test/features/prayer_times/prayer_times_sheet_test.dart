@@ -100,9 +100,9 @@ void main() {
       (tester) async {
     await _pumpSheet(tester, base: DateTime(2000, 1, 1));
     // afterSunrise 6:30–6:45, zenith 11:55–12:00, beforeSunset 5:15–5:30.
-    expect(find.textContaining('No prayer · 6:30–6:45'), findsOneWidget);
-    expect(find.textContaining('No prayer · 11:55–12:00'), findsOneWidget);
-    expect(find.textContaining('No prayer · 5:15–5:30'), findsOneWidget);
+    expect(find.textContaining('No Nafl Prayer · 6:30–6:45'), findsOneWidget);
+    expect(find.textContaining('No Nafl Prayer · 11:55–12:00'), findsOneWidget);
+    expect(find.textContaining('No Nafl Prayer · 5:15–5:30'), findsOneWidget);
   });
 
   testWidgets('shows current-to-next countdown context', (tester) async {
@@ -224,7 +224,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Prayer is paused now'), findsOneWidget);
+    expect(find.text('No voluntary prayer'), findsOneWidget);
     expect(find.text('Zenith (Istiwāʾ)'), findsOneWidget);
     expect(find.text('Until 12:00'), findsOneWidget);
     expect(find.text('00:02:00'), findsOneWidget);

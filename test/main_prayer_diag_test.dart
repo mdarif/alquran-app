@@ -12,7 +12,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Prayer-times diag'), findsOneWidget);
     expect(find.textContaining('Forbidden'), findsWidgets); // pill states
-    expect(find.textContaining('No prayer'), findsWidgets); // sheet marks
+    expect(find.textContaining('No Nafl Prayer'), findsWidgets); // sheet marks
     expect(find.text('Sunrise'), findsWidgets);
   });
 }
