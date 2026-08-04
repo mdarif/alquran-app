@@ -236,6 +236,24 @@ void main() {
       expect(find.textContaining('phone Settings'), findsOneWidget);
     });
 
+    testWidgets(
+        'Salat: shows the permission-denied hint instead of a silent revert',
+        (tester) async {
+      final prayerNotifications = PrayerNotificationsCubit(
+        _FakePrayerNotificationSettingsRepository(),
+        _FakeScheduler(granted: false),
+        _FakePrayerTimesRepository(saved: _loc),
+      );
+      addTearDown(prayerNotifications.close);
+      await _pump(tester, prayerNotifications: prayerNotifications);
+
+      await tester.tap(find.byKey(WidgetKeys.prayerNotificationsToggle));
+      await tester.pumpAndSettle();
+
+      expect(prayerNotifications.state.enabled, isFalse);
+      expect(find.textContaining('phone Settings'), findsOneWidget);
+    });
+
     testWidgets('shows Up next + reliability hint only while enabled',
         (tester) async {
       final reminders = RemindersCubit(
@@ -250,6 +268,29 @@ void main() {
 
       expect(find.text('Up next'), findsOneWidget);
       expect(find.textContaining('may delay reminders'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Salat: the debug "Schedule salat test" button schedules and reports',
+        (tester) async {
+      final prayerNotifications = PrayerNotificationsCubit(
+        _FakePrayerNotificationSettingsRepository(enabled: true),
+        _FakeScheduler(),
+        _FakePrayerTimesRepository(saved: _loc),
+      );
+      addTearDown(prayerNotifications.close);
+      await prayerNotifications.refresh();
+      await _pump(tester, prayerNotifications: prayerNotifications);
+      await tester.pump();
+
+      expect(
+        find.byKey(WidgetKeys.prayerNotificationsTestButton),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(WidgetKeys.prayerNotificationsTestButton));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Scheduled'), findsOneWidget);
     });
 
     testWidgets(
