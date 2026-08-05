@@ -362,7 +362,7 @@ void main() {
 
       expect(
         copied,
-        'الٓمٓ\n\nJunagarhi\nاردو\n\n— Al-Baqarah 2:1'
+        'Al-Baqarah 2:1\n\nالٓمٓ\n\nJunagarhi\nاردو'
         '\n\nAl Quran · alquranreader.com',
       );
       expect(find.text('Ayah copied'), findsOneWidget);

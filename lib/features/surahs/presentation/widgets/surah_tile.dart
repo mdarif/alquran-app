@@ -40,11 +40,11 @@ class SurahTile extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 70),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(20, 6, 20, 6),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 20, 6),
           child: Row(
             children: [
               _SurahNumberBadge(number: surah.id),
-              const SizedBox(width: 20),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

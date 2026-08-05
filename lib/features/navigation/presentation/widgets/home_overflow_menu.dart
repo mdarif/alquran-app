@@ -55,22 +55,25 @@ class HomeOverflowMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = showReadingLight ? _cubit<ThemeCubit>(context) : null;
+    final cs = Theme.of(context).colorScheme;
 
     // MenuAnchor (not PopupMenuButton) so the menu hugs its content — the popup
     // menu rounds its width up in fixed steps, leaving a blank strip on the right.
     return MenuAnchor(
-      alignmentOffset: const Offset(-18, 4),
+      alignmentOffset: const Offset(0, 4),
       style: MenuStyle(
+        alignment: AlignmentDirectional.bottomEnd,
         padding: const WidgetStatePropertyAll(
-          EdgeInsets.symmetric(vertical: 6),
+          EdgeInsets.symmetric(vertical: 2),
         ),
-        elevation: const WidgetStatePropertyAll(4),
+        backgroundColor: WidgetStatePropertyAll(cs.surface),
+        elevation: const WidgetStatePropertyAll(12),
         shadowColor: WidgetStatePropertyAll(
-          Colors.black.withValues(alpha: 0.16),
+          Colors.black.withValues(alpha: 0.32),
         ),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        shape: const WidgetStatePropertyAll(
+          RoundedRectangleBorder(),
         ),
       ),
       builder: (context, controller, _) => IconButton(
@@ -203,9 +206,9 @@ class _MenuItem extends StatelessWidget {
       width: 252,
       child: MenuItemButton(
         style: ButtonStyle(
-          minimumSize: const WidgetStatePropertyAll(Size.fromHeight(48)),
+          minimumSize: const WidgetStatePropertyAll(Size.fromHeight(36)),
           padding: const WidgetStatePropertyAll(
-            EdgeInsetsDirectional.fromSTEB(18, 8, 18, 8),
+            EdgeInsetsDirectional.fromSTEB(18, 4, 18, 4),
           ),
           overlayColor: WidgetStatePropertyAll(
             cs.primary.withValues(alpha: 0.08),

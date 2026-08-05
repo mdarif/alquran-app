@@ -65,11 +65,11 @@ class SurahListBody extends StatelessWidget {
               separatorBuilder: (context, _) {
                 final cs = Theme.of(context).colorScheme;
                 return Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 78, end: 20),
+                  padding: const EdgeInsetsDirectional.only(start: 68, end: 20),
                   child: Divider(
                     height: 1,
-                    thickness: 0.6,
-                    color: cs.outlineVariant.withValues(alpha: 0.42),
+                    thickness: 1,
+                    color: cs.outlineVariant.withValues(alpha: 0.24),
                   ),
                 );
               },

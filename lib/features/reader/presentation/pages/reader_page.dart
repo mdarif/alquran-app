@@ -734,9 +734,16 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   }
 
   void _openTafsirForAyah(Ayah ayah) {
+    final resources = _cubit.state.resources;
+    final active = _activeLangs(resources);
+    final shownResources = [
+      for (final r in resources)
+        if (active.contains(r.slug)) r,
+    ];
     showTafsirForAyahSheet(
       context,
       ayah: ayah,
+      resources: shownResources.isEmpty ? resources : shownResources,
       surahName: _cubit.state.headings[ayah.surahId]?.nameEnglish,
     );
   }

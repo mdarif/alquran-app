@@ -47,12 +47,16 @@ String buildAyahShareText({
       ? '${ayah.surahId}:${ayah.ayahNumber}'
       : '$surahName ${ayah.surahId}:${ayah.ayahNumber}';
 
-  final parts = <String>[ayah.textArabic];
+  final parts = <String>[reference, ayah.textArabic];
   for (final r in resources) {
     final text = ayah.translations[r.slug];
-    if (text != null) parts.add('${r.displayCredit}\n$text');
+    if (text != null) {
+      final credit = r.experimental
+          ? '${r.displayCredit} - Experimental'
+          : r.displayCredit;
+      parts.add('$credit\n$text');
+    }
   }
-  parts.add('— $reference');
   parts.add('Al Quran · alquranreader.com');
   return parts.join('\n\n');
 }

@@ -46,8 +46,8 @@ void main() {
       );
       expect(
         text,
-        'الٓمٓ\n\nJunagarhi\nالف لام میم\n\nHilali & Khan\nAlif Lam Mim'
-        '\n\n— Al-Baqarah 2:1\n\nAl Quran · alquranreader.com',
+        'Al-Baqarah 2:1\n\nالٓمٓ\n\nJunagarhi\nالف لام میم\n\nHilali & Khan'
+        '\nAlif Lam Mim\n\nAl Quran · alquranreader.com',
       );
     });
 
@@ -68,7 +68,24 @@ void main() {
 
     test('falls back to surahId:ayah when the name is unknown', () {
       final text = buildAyahShareText(ayah: _ayah, resources: const []);
-      expect(text, 'الٓمٓ\n\n— 2:1\n\nAl Quran · alquranreader.com');
+      expect(text, '2:1\n\nالٓمٓ\n\nAl Quran · alquranreader.com');
+    });
+
+    test('appends "- Experimental" to the credit for experimental editions',
+        () {
+      const experimental = TranslationResource(
+        id: 2,
+        slug: 'ur-test',
+        languageCode: 'ur',
+        name: 'Abu Rayyan',
+        author: 'Abu Rayyan',
+        experimental: true,
+      );
+      final text = buildAyahShareText(
+        ayah: _ayah,
+        resources: const [experimental],
+      );
+      expect(text, contains('Abu Rayyan - Experimental\nالف لام میم'));
     });
 
     test('omits translations the ayah does not have', () {
@@ -87,7 +104,7 @@ void main() {
       );
       expect(
         text,
-        'نص\n\nJunagarhi\nاردو\n\n— Al-Baqarah 2:2\n\nAl Quran · alquranreader.com',
+        'Al-Baqarah 2:2\n\nنص\n\nJunagarhi\nاردو\n\nAl Quran · alquranreader.com',
       );
     });
 

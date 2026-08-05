@@ -127,90 +127,92 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Text(
-                  "Today's Prayer Times",
-                  style: theme.textTheme.titleMedium,
-                ),
-                if (times.location.label != null) ...[
-                  const Spacer(),
-                  Flexible(
-                    child: Text(
-                      times.location.label!,
-                      textAlign: TextAlign.end,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
-                    ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    "Today's Prayer Times",
+                    style: theme.textTheme.titleMedium,
                   ),
+                  if (times.location.label != null) ...[
+                    const Spacer(),
+                    Flexible(
+                      child: Text(
+                        times.location.label!,
+                        textAlign: TextAlign.end,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
                 ],
+              ),
+              if (widget.hijriBaseDate != null) ...[
+                const SizedBox(height: 10),
+                _HijriDateLabel(
+                  baseDate: widget.hijriBaseDate!,
+                  gregorianDate: widget.gregorianDate ?? widget.hijriBaseDate!,
+                ),
               ],
-            ),
-            if (widget.hijriBaseDate != null) ...[
-              const SizedBox(height: 10),
-              _HijriDateLabel(
-                baseDate: widget.hijriBaseDate!,
-                gregorianDate: widget.gregorianDate ?? widget.hijriBaseDate!,
+              const SizedBox(height: 12),
+              _PrayerFocusCard(
+                times: times,
+                now: _now,
+                next: rowNext,
+                notificationPrayer: notificationPrayer,
+                notificationFireAt: widget.notificationFireAt,
               ),
-            ],
-            const SizedBox(height: 12),
-            _PrayerFocusCard(
-              times: times,
-              now: _now,
-              next: rowNext,
-              notificationPrayer: notificationPrayer,
-              notificationFireAt: widget.notificationFireAt,
-            ),
-            const SizedBox(height: 8),
-            // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq — not a
-            // salah, so never highlighted), then the remaining four prayers.
-            _PrayerRow(
-              label: Prayer.fajr.label,
-              time: times.fajr,
-              isNext: rowNext == Prayer.fajr,
-              badge: _badgeFor(
-                Prayer.fajr,
-                notificationPrayer,
-                notificationCurrent,
-                suppressNextBadge,
-              ),
-            ),
-            _PrayerRow(
-              label: 'Sunrise',
-              time: times.sunrise,
-              isNext: rowNext == Prayer.sunrise,
-              muted: true,
-              badge: _badgeFor(
-                Prayer.sunrise,
-                notificationPrayer,
-                notificationCurrent,
-                suppressNextBadge,
-              ),
-              forbidden: forbidden[ForbiddenReason.afterSunrise],
-            ),
-            for (final (prayer, time) in times.schedule.skip(1))
+              const SizedBox(height: 8),
+              // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq — not a
+              // salah, so never highlighted), then the remaining four prayers.
               _PrayerRow(
-                label: prayer.label,
-                time: time,
-                isNext: prayer == rowNext,
+                label: Prayer.fajr.label,
+                time: times.fajr,
+                isNext: rowNext == Prayer.fajr,
                 badge: _badgeFor(
-                  prayer,
+                  Prayer.fajr,
                   notificationPrayer,
                   notificationCurrent,
                   suppressNextBadge,
                 ),
-                forbidden: switch (prayer) {
-                  Prayer.dhuhr => forbidden[ForbiddenReason.zenith],
-                  Prayer.maghrib => forbidden[ForbiddenReason.beforeSunset],
-                  _ => null,
-                },
               ),
-          ],
+              _PrayerRow(
+                label: 'Sunrise',
+                time: times.sunrise,
+                isNext: rowNext == Prayer.sunrise,
+                muted: true,
+                badge: _badgeFor(
+                  Prayer.sunrise,
+                  notificationPrayer,
+                  notificationCurrent,
+                  suppressNextBadge,
+                ),
+                forbidden: forbidden[ForbiddenReason.afterSunrise],
+              ),
+              for (final (prayer, time) in times.schedule.skip(1))
+                _PrayerRow(
+                  label: prayer.label,
+                  time: time,
+                  isNext: prayer == rowNext,
+                  badge: _badgeFor(
+                    prayer,
+                    notificationPrayer,
+                    notificationCurrent,
+                    suppressNextBadge,
+                  ),
+                  forbidden: switch (prayer) {
+                    Prayer.dhuhr => forbidden[ForbiddenReason.zenith],
+                    Prayer.maghrib => forbidden[ForbiddenReason.beforeSunset],
+                    _ => null,
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
