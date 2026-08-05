@@ -29,6 +29,7 @@ class CatalogueEntry extends Equatable {
     this.sourceUrl,
     this.creditName,
     this.experimental = false,
+    this.visible = true,
   });
 
   factory CatalogueEntry.fromJson(Map<String, dynamic> json) => CatalogueEntry(
@@ -47,6 +48,7 @@ class CatalogueEntry extends Equatable {
         // every edition that never sets them upstream.
         creditName: json['creditName'] as String?,
         experimental: json['experimental'] as bool? ?? false,
+        visible: json['visible'] as bool? ?? true,
         ayahCount: (json['ayahCount'] as num?)?.toInt() ?? 0,
         file: json['file'] as String,
         bytes: (json['bytes'] as num?)?.toInt() ?? 0,
@@ -72,6 +74,10 @@ class CatalogueEntry extends Equatable {
 
   /// True = show the "Experimental" pill (unreviewed/pilot content).
   final bool experimental;
+
+  /// Runtime catalogue switch. False hides this slug from the manager without
+  /// changing the artifact or requiring an app release.
+  final bool visible;
 
   final int ayahCount;
 
@@ -99,7 +105,7 @@ class CatalogueEntry extends Equatable {
   }
 
   @override
-  List<Object?> get props => [slug, sha256];
+  List<Object?> get props => [slug, sha256, visible];
 }
 
 /// The remote catalogue: every edition available for download.

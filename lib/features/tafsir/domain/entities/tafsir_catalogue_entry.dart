@@ -22,6 +22,7 @@ class TafsirCatalogueEntry extends Equatable {
     this.sourceUrl,
     this.creditName,
     this.abridged = false,
+    this.visible = true,
   });
 
   factory TafsirCatalogueEntry.fromJson(Map<String, dynamic> json) =>
@@ -37,6 +38,7 @@ class TafsirCatalogueEntry extends Equatable {
         sourceUrl: json['sourceUrl'] as String?,
         creditName: json['creditName'] as String?,
         abridged: json['abridged'] as bool? ?? false,
+        visible: json['visible'] as bool? ?? true,
         ayahCount: (json['ayahCount'] as num?)?.toInt() ?? 0,
         textGroupCount: (json['textGroupCount'] as num?)?.toInt() ?? 0,
         file: json['file'] as String,
@@ -57,6 +59,7 @@ class TafsirCatalogueEntry extends Equatable {
   final String? sourceUrl;
   final String? creditName;
   final bool abridged;
+  final bool visible;
   final int ayahCount;
   final int textGroupCount;
   final String file;
@@ -84,7 +87,7 @@ class TafsirCatalogueEntry extends Equatable {
       );
 
   @override
-  List<Object?> get props => [slug, sha256];
+  List<Object?> get props => [slug, sha256, visible];
 }
 
 class TafsirCatalogue extends Equatable {

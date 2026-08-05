@@ -104,16 +104,26 @@ class TafsirCubit extends Cubit<TafsirState> {
     required List<TafsirResource> installed,
   }) {
     final installedBySlug = {for (final r in installed) r.slug: r};
-    final catalogueBySlug = {for (final e in available) e.slug: e};
+    final hiddenSlugs = {
+      for (final entry in available)
+        if (!entry.visible) entry.slug,
+    };
+    final visibleCatalogueBySlug = {
+      for (final entry in available)
+        if (entry.visible) entry.slug: entry,
+    };
     final slugs = <String>{
-      ...catalogueBySlug.keys,
-      ...installedBySlug.keys,
+      ...visibleCatalogueBySlug.keys,
+      for (final slug in installedBySlug.keys)
+        if (!hiddenSlugs.contains(slug)) slug,
     }.toList()
       ..sort((a, b) {
-        final left =
-            catalogueBySlug[a]?.sortOrder ?? installedBySlug[a]?.sortOrder ?? 0;
-        final right =
-            catalogueBySlug[b]?.sortOrder ?? installedBySlug[b]?.sortOrder ?? 0;
+        final left = visibleCatalogueBySlug[a]?.sortOrder ??
+            installedBySlug[a]?.sortOrder ??
+            0;
+        final right = visibleCatalogueBySlug[b]?.sortOrder ??
+            installedBySlug[b]?.sortOrder ??
+            0;
         final cmp = left.compareTo(right);
         return cmp == 0 ? a.compareTo(b) : cmp;
       });
@@ -122,7 +132,7 @@ class TafsirCubit extends Cubit<TafsirState> {
       for (final slug in slugs)
         TafsirItem(
           slug: slug,
-          catalogueEntry: catalogueBySlug[slug],
+          catalogueEntry: visibleCatalogueBySlug[slug],
           resource: installedBySlug[slug],
           status: installedBySlug.containsKey(slug)
               ? TafsirItemStatus.installed

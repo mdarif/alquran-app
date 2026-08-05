@@ -241,32 +241,42 @@ class TranslationsCubit extends Cubit<TranslationsState> {
         (_settings?.selectedTranslations ?? recommendedBundledSlugs.toList())
             .toSet();
     final installedSlugs = {for (final e in installed) e.slug};
-    final catalogueBySlug = {for (final c in available) c.slug: c};
+    final hiddenSlugs = {
+      for (final entry in available)
+        if (!entry.visible) entry.slug,
+    };
+    final catalogueBySlug = {
+      for (final entry in available)
+        if (entry.visible) entry.slug: entry,
+    };
 
     final items = <EditionItem>[
       for (final r in _bundled)
-        EditionItem(
-          slug: r.slug,
-          languageCode: r.languageCode,
-          languageLabel: r.languageLabel,
-          name: r.name,
-          author: r.author,
-          license: r.license,
-          sourceUrl: r.sourceUrl,
-          bytes: catalogueBySlug[r.slug]?.bytes ?? 0,
-          selected: selectedSlugs.contains(r.slug),
-          state: EditionState.bundled,
-          creditName: r.creditName,
-          experimental: r.experimental,
-        ),
+        if (!hiddenSlugs.contains(r.slug))
+          EditionItem(
+            slug: r.slug,
+            languageCode: r.languageCode,
+            languageLabel: r.languageLabel,
+            name: r.name,
+            author: r.author,
+            license: r.license,
+            sourceUrl: r.sourceUrl,
+            bytes: catalogueBySlug[r.slug]?.bytes ?? 0,
+            selected: selectedSlugs.contains(r.slug),
+            state: EditionState.bundled,
+            creditName: r.creditName,
+            experimental: r.experimental,
+          ),
       for (final e in installed)
-        if (!bundledSlugs.contains(e.slug))
+        if (!bundledSlugs.contains(e.slug) && !hiddenSlugs.contains(e.slug))
           _installedItem(e, catalogueBySlug[e.slug], selectedSlugs),
       for (final c in available)
         // Skip anything already on this device. Bundled editions come from
         // quran.db; downloaded editions come from editions.db. A slug can never
         // be both on-device and offered for download in the same list.
-        if (!installedSlugs.contains(c.slug) && !bundledSlugs.contains(c.slug))
+        if (c.visible &&
+            !installedSlugs.contains(c.slug) &&
+            !bundledSlugs.contains(c.slug))
           EditionItem(
             slug: c.slug,
             languageCode: c.languageCode,

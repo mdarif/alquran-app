@@ -86,7 +86,13 @@ class _FakeSettings implements ReaderSettingsRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-CatalogueEntry _entry(String slug, String lang, String name) => CatalogueEntry(
+CatalogueEntry _entry(
+  String slug,
+  String lang,
+  String name, {
+  bool visible = true,
+}) =>
+    CatalogueEntry(
       slug: slug,
       type: 'translation',
       languageCode: lang,
@@ -97,6 +103,7 @@ CatalogueEntry _entry(String slug, String lang, String name) => CatalogueEntry(
       uncompressedBytes: 4096,
       uncompressedSha256: 'y',
       ayahCount: 6236,
+      visible: visible,
     );
 
 const _bundledUrdu = TranslationResource(
@@ -498,6 +505,53 @@ void main() {
     expect(item.state, EditionState.installed);
     expect(cubit.state.catalogueUnavailable, isFalse);
     expect(cubit.state.downloaded.map((i) => i.slug), contains(item.slug));
+  });
+
+  test('a catalogue edition marked visible=false is hidden from the manager',
+      () async {
+    final repo = _FakeRepo(
+      available: [
+        _entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam', visible: false),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
+    expect(
+      cubit.state.items.map((item) => item.slug),
+      isNot(contains('hi-ahsanul-kalam')),
+    );
+    expect(cubit.state.available, isEmpty);
+  });
+
+  test('an installed edition marked visible=false is hidden from the manager',
+      () async {
+    final repo = _FakeRepo(
+      available: [
+        _entry('hi-ahsanul-kalam', 'hi', 'Ahsanul Kalam', visible: false),
+      ],
+      local: [
+        InstalledEdition(
+          slug: 'hi-ahsanul-kalam',
+          type: 'translation',
+          languageCode: 'hi',
+          name: 'Ahsanul Kalam',
+          sha256: 'some-sha',
+          installedAt: DateTime(2026),
+        ),
+      ],
+    );
+    final cubit = TranslationsCubit(repo, const [_bundledUrdu]);
+    await cubit.load();
+
+    expect(
+      cubit.state.items.map((item) => item.slug),
+      isNot(contains('hi-ahsanul-kalam')),
+    );
+    expect(
+      cubit.state.downloaded.map((item) => item.slug),
+      isNot(contains('hi-ahsanul-kalam')),
+    );
   });
 
   test('a newly available edition is flagged unseen until marked seen',
