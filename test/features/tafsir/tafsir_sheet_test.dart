@@ -6,6 +6,7 @@ import 'package:al_quran/features/tafsir/domain/entities/tafsir_resource.dart';
 import 'package:al_quran/features/tafsir/domain/repositories/tafsir_repository.dart';
 import 'package:al_quran/features/tafsir/presentation/cubit/tafsir_cubit.dart';
 import 'package:al_quran/features/tafsir/presentation/tafsir_sheet.dart';
+import 'package:al_quran/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
@@ -88,6 +89,51 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.text('Urdu - Tafsir Ibn Kathir', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'تحقیقات کتاب',
+        findRichText: true,
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    final urduHeading = tester.widget<SelectableText>(
+      _selectableText('تحقیقات کتاب'),
+    );
+    expect(
+      urduHeading.textSpan?.style?.fontFamily,
+      AppTheme.urduFontFamily,
+    );
+    expect(
+      find.text(
+        'اردو تفسیر «ذَلِكَ»۔',
+        findRichText: true,
+        skipOffstage: false,
+      ),
+      findsOneWidget,
+    );
+    final urduCommentary = tester.widget<SelectableText>(
+      _selectableText('اردو تفسیر «ذَلِكَ»۔'),
+    );
+    final urduSpan = urduCommentary.textSpan!;
+    expect(urduSpan.style?.fontFamily, AppTheme.urduFontFamily);
+    final arabicQuote = urduSpan.children!
+        .whereType<TextSpan>()
+        .singleWhere((span) => span.text == '«ذَلِكَ»');
+    expect(arabicQuote.style?.fontFamily, AppTheme.arabicFontFamily);
+
+    await tester.tap(
+      find.text(
+        'English - Tafsir Ibn Kathir (Abridged)',
+        skipOffstage: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
       find.text(
         'Guidance is granted to Those Who have Taqwa',
         findRichText: true,
@@ -96,18 +142,24 @@ void main() {
     );
     expect(find.text('Commentary body.', findRichText: true), findsOneWidget);
 
-    final heading = tester.widget<RichText>(
-      find.text(
-        'Guidance is granted to Those Who have Taqwa',
-        findRichText: true,
-      ),
+    final heading = tester.widget<SelectableText>(
+      _selectableText('Guidance is granted to Those Who have Taqwa'),
     );
-    expect(heading.text.style?.fontWeight, FontWeight.w700);
+    expect(heading.textSpan?.style?.fontWeight, FontWeight.w700);
 
-    final arabicQuote = tester.widget<Text>(find.text('الم'));
-    expect(arabicQuote.textDirection, TextDirection.rtl);
-    expect(arabicQuote.textAlign, TextAlign.right);
+    final arabicBlock = tester.widget<SelectableText>(_selectableText('الم'));
+    expect(arabicBlock.textDirection, TextDirection.rtl);
+    expect(arabicBlock.textAlign, TextAlign.right);
   });
+}
+
+Finder _selectableText(String text) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is SelectableText &&
+        (widget.data == text || widget.textSpan?.toPlainText() == text),
+    description: 'SelectableText("$text")',
+  );
 }
 
 class _FakeTafsirRepository implements TafsirRepository {
@@ -120,18 +172,32 @@ class _FakeTafsirRepository implements TafsirRepository {
     required String slug,
     required int surah,
     required int ayah,
-  }) async =>
-      const TafsirEntry(
-        resource: 'en-ibn-kathir-abridged',
+  }) async {
+    if (slug == 'ur-ibn-kathir') {
+      return const TafsirEntry(
+        resource: 'ur-ibn-kathir',
         ayahKey: '1:1',
         groupAyahKey: '1:1',
         fromAyah: '1:1',
         toAyah: '1:1',
         ayahKeys: ['1:1'],
-        text: '<div lang="en" class="en">'
-            '<h2>Guidance is granted to Those Who have Taqwa</h2></div>'
-            '<p>Commentary body.</p><p>الم</p>',
+        text: 'تحقیقات کتاب ٭٭'
+            '<div lang="ur" class="ur"><p class="ur">اردو تفسیر '
+            '<span class="arabic qpc-hafs">«ذَلِكَ»</span>۔</p></div>',
       );
+    }
+    return const TafsirEntry(
+      resource: 'en-ibn-kathir-abridged',
+      ayahKey: '1:1',
+      groupAyahKey: '1:1',
+      fromAyah: '1:1',
+      toAyah: '1:1',
+      ayahKeys: ['1:1'],
+      text: '<div lang="en" class="en">'
+          '<h2>Guidance is granted to Those Who have Taqwa</h2></div>'
+          '<p>Commentary body.</p><p>الم</p>',
+    );
+  }
 
   @override
   Future<void> install(
@@ -147,6 +213,15 @@ class _FakeTafsirRepository implements TafsirRepository {
           name: 'Tafsir Ibn Kathir',
           nativeName: 'English',
           abridged: true,
+          ayahCount: 6236,
+          bytes: 512,
+        ),
+        TafsirResource(
+          slug: 'ur-ibn-kathir',
+          languageCode: 'ur',
+          name: 'Tafsir Ibn Kathir',
+          nativeName: 'اردو',
+          direction: 'rtl',
           ayahCount: 6236,
           bytes: 512,
         ),

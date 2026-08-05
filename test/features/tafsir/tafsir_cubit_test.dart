@@ -54,6 +54,49 @@ void main() {
       isNot(contains('ur-ibn-kathir')),
     );
   });
+
+  test('entriesForAyah returns every installed Tafsir with commentary',
+      () async {
+    final cubit = TafsirCubit(
+      const _FakeTafsirRepository(
+        catalogue: TafsirCatalogue(resources: []),
+        installedResources: [
+          TafsirResource(
+            slug: 'en-ibn-kathir-abridged',
+            languageCode: 'en',
+            name: 'Tafsir Ibn Kathir',
+            ayahCount: 6236,
+            bytes: 200,
+          ),
+          TafsirResource(
+            slug: 'ur-ibn-kathir',
+            languageCode: 'ur',
+            name: 'Tafsir Ibn Kathir',
+            nativeName: 'اردو',
+            direction: 'rtl',
+            ayahCount: 6236,
+            bytes: 200,
+          ),
+        ],
+        entriesBySlug: {
+          'en-ibn-kathir-abridged': _englishEntry,
+          'ur-ibn-kathir': _urduEntry,
+        },
+      ),
+    );
+    addTearDown(cubit.close);
+
+    final results = await cubit.entriesForAyah(surah: 2, ayah: 2);
+
+    expect(
+      results.map((result) => result.resource.slug),
+      const ['en-ibn-kathir-abridged', 'ur-ibn-kathir'],
+    );
+    expect(results.map((result) => result.entry.text), [
+      'English commentary.',
+      'اردو تفسیر۔',
+    ]);
+  });
 }
 
 const _visibleEnglish = TafsirCatalogueEntry(
@@ -86,15 +129,38 @@ const _hiddenUrdu = TafsirCatalogueEntry(
   visible: false,
 );
 
+const _englishEntry = TafsirEntry(
+  resource: 'en-ibn-kathir-abridged',
+  ayahKey: '2:2',
+  groupAyahKey: '2:2',
+  fromAyah: '2:2',
+  toAyah: '2:2',
+  ayahKeys: ['2:2'],
+  text: 'English commentary.',
+);
+
+const _urduEntry = TafsirEntry(
+  resource: 'ur-ibn-kathir',
+  ayahKey: '2:2',
+  groupAyahKey: '2:2',
+  fromAyah: '2:2',
+  toAyah: '2:2',
+  ayahKeys: ['2:2'],
+  text: 'اردو تفسیر۔',
+);
+
 class _FakeTafsirRepository implements TafsirRepository {
   const _FakeTafsirRepository({
     required TafsirCatalogue catalogue,
     List<TafsirResource> installedResources = const [],
+    Map<String, TafsirEntry> entriesBySlug = const {},
   })  : _catalogue = catalogue,
-        _installedResources = installedResources;
+        _installedResources = installedResources,
+        _entriesBySlug = entriesBySlug;
 
   final TafsirCatalogue _catalogue;
   final List<TafsirResource> _installedResources;
+  final Map<String, TafsirEntry> _entriesBySlug;
 
   @override
   Future<TafsirCatalogue> catalogue() async => _catalogue;
@@ -105,7 +171,7 @@ class _FakeTafsirRepository implements TafsirRepository {
     required int surah,
     required int ayah,
   }) async =>
-      null;
+      _entriesBySlug[slug];
 
   @override
   Future<void> install(

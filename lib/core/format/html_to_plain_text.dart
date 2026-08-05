@@ -23,7 +23,7 @@ String htmlToPlainText(String html) {
 
   return text
       .split('\n')
-      .map((line) => line.trim())
+      .map((line) => _cleanTafsirMarkers(line.trim()))
       .join('\n')
       .replaceAll(RegExp(r'\n{3,}'), '\n\n')
       .trim();
@@ -51,10 +51,12 @@ class TafsirTextSpan {
   const TafsirTextSpan({
     required this.text,
     this.isMuted = false,
+    this.isArabic = false,
   });
 
   final String text;
   final bool isMuted;
+  final bool isArabic;
 }
 
 List<TafsirTextBlock> htmlToTafsirBlocks(String html) {
@@ -78,7 +80,11 @@ List<TafsirTextBlock> htmlToTafsirBlocks(String html) {
     caseSensitive: false,
     dotAll: true,
   );
+  var offset = 0;
   for (final match in blockPattern.allMatches(source)) {
+    if (match.start > offset) {
+      blocks.addAll(_looseTafsirBlocks(source.substring(offset, match.start)));
+    }
     final tag = match.group(1)!.toLowerCase();
     final attrs = match.group(2) ?? '';
     final inner = match.group(3)!;
@@ -95,6 +101,10 @@ List<TafsirTextBlock> htmlToTafsirBlocks(String html) {
         isLead: _hasClass(attrs, 'translation'),
       ),
     );
+    offset = match.end;
+  }
+  if (offset < source.length) {
+    blocks.addAll(_looseTafsirBlocks(source.substring(offset)));
   }
 
   if (blocks.isNotEmpty) return blocks;
@@ -125,7 +135,13 @@ List<TafsirTextSpan> _inlineSpans(String html) {
     final attrs = match.group(1) ?? '';
     final text = htmlToPlainText(match.group(2)!);
     if (text.isNotEmpty) {
-      spans.add(TafsirTextSpan(text: text, isMuted: _hasClass(attrs, 'gray')));
+      spans.add(
+        TafsirTextSpan(
+          text: text,
+          isMuted: _hasClass(attrs, 'gray'),
+          isArabic: _isArabicInline(attrs),
+        ),
+      );
     }
     offset = match.end;
   }
@@ -155,19 +171,62 @@ List<TafsirTextSpan> _withSpacesBetweenInlinePieces(
 }
 
 bool _endsWithSpaceOrOpeningPunctuation(String text) =>
-    RegExp(r'[\s([]$').hasMatch(text);
+    RegExp(r'[\s([«]$').hasMatch(text);
 
 bool _startsWithSpaceOrClosingPunctuation(String text) =>
-    RegExp(r'^[\s,.;:!?)\]]').hasMatch(text);
+    RegExp(r'^[\s,.;:!?)\]»،؟۔]').hasMatch(text);
+
+List<TafsirTextBlock> _looseTafsirBlocks(String html) {
+  final hasHeadingMarker = _hasDecorativeHeadingMarker(html);
+  final text = htmlToPlainText(html);
+  if (text.isEmpty) return const [];
+  return [
+    for (final paragraph in text.split('\n\n'))
+      if (paragraph.trim().isNotEmpty)
+        _looseTafsirBlock(paragraph.trim(), hasHeadingMarker),
+  ];
+}
+
+TafsirTextBlock _looseTafsirBlock(String text, bool hasHeadingMarker) {
+  final heading = _cleanTafsirMarkers(text).trim();
+  final isHeading = hasHeadingMarker && heading.isNotEmpty;
+  return TafsirTextBlock(
+    text: isHeading ? heading : text,
+    spans: [TafsirTextSpan(text: isHeading ? heading : text)],
+    headingLevel: isHeading ? 2 : null,
+    isArabic: !isHeading && _looksArabic(text),
+  );
+}
+
+String _cleanTafsirMarkers(String text) {
+  return text.replaceAll(RegExp(r'[٭۝۞۩◌\u06DD\u06DE\u06E9]+'), '').trim();
+}
+
+bool _hasDecorativeHeadingMarker(String text) {
+  return RegExp(r'[٭۝۞۩◌\u06DD\u06DE\u06E9]{2,}').hasMatch(text);
+}
 
 bool _isArabicBlock(String attrs, String text) {
   final normalized = attrs.toLowerCase();
+  if (normalized.contains('lang="ur"') ||
+      normalized.contains("lang='ur'") ||
+      _hasClass(attrs, 'ur')) {
+    return false;
+  }
   return normalized.contains('lang="ar"') ||
       normalized.contains("lang='ar'") ||
       normalized.contains('lang="fa"') ||
       normalized.contains("lang='fa'") ||
       _hasClass(attrs, 'qpc-hafs') ||
       _looksArabic(text);
+}
+
+bool _isArabicInline(String attrs) {
+  final normalized = attrs.toLowerCase();
+  return normalized.contains('lang="ar"') ||
+      normalized.contains("lang='ar'") ||
+      _hasClass(attrs, 'arabic') ||
+      _hasClass(attrs, 'qpc-hafs');
 }
 
 int? _headingLevel(String tag, String inner) {

@@ -74,7 +74,16 @@ class TafsirCubit extends Cubit<TafsirState> {
     required int surah,
     required int ayah,
   }) async {
+    final results = await entriesForAyah(surah: surah, ayah: ayah);
+    return results.isEmpty ? null : results.first;
+  }
+
+  Future<List<TafsirAyahResult>> entriesForAyah({
+    required int surah,
+    required int ayah,
+  }) async {
     final installed = await _repository.installed();
+    final results = <TafsirAyahResult>[];
     for (final resource in installed) {
       final entry = await _repository.entryForAyah(
         slug: resource.slug,
@@ -82,10 +91,10 @@ class TafsirCubit extends Cubit<TafsirState> {
         ayah: ayah,
       );
       if (entry != null) {
-        return TafsirAyahResult(resource: resource, entry: entry);
+        results.add(TafsirAyahResult(resource: resource, entry: entry));
       }
     }
-    return null;
+    return results;
   }
 
   void _updateItem(String slug, TafsirItem item) {

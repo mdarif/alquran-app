@@ -61,5 +61,28 @@ void main() {
       expect(blocks[1].spans.first.isMuted, isTrue);
       expect(blocks[1].text, '(there is no doubt) and they then continue');
     });
+
+    test('keeps Urdu Tafsir blocks out of the Quran Arabic font path', () {
+      final blocks = htmlToTafsirBlocks(
+        'تحقیقات کتاب ٭٭'
+        '<div lang="ur" class="ur"><p class="ur">سیدنا ابن عباس رضی اللہ '
+        'عنہما فرماتے ہیں یہاں <span class="arabic qpc-hafs">«ذَلِكَ»</span> '
+        'معنی میں ہیں۔</p></div>',
+      );
+
+      expect(blocks, hasLength(2));
+      expect(blocks[0].text, 'تحقیقات کتاب');
+      expect(blocks[0].text, isNot(contains('٭')));
+      expect(blocks[0].text, isNot(contains('۞')));
+      expect(blocks[0].isHeading, isTrue);
+      expect(blocks[0].isArabic, isFalse);
+      expect(blocks[1].text, contains('سیدنا ابن عباس'));
+      expect(blocks[1].text, contains('«ذَلِكَ»'));
+      expect(blocks[1].isArabic, isFalse);
+      expect(
+        blocks[1].spans.singleWhere((s) => s.text == '«ذَلِكَ»').isArabic,
+        isTrue,
+      );
+    });
   });
 }

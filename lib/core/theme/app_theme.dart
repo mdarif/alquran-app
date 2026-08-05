@@ -86,7 +86,7 @@ extension TranslationTextStyle on String {
       case 'ur' when isRtl:
         return base.copyWith(
           fontFamily: AppTheme.urduFontFamily,
-          height: 2.0,
+          height: _atLeast(base.height, 2.25),
         );
       case 'hi':
         return base.copyWith(
@@ -96,5 +96,10 @@ extension TranslationTextStyle on String {
       default:
         return base;
     }
+  }
+
+  double _atLeast(double? value, double minimum) {
+    if (value == null || value < minimum) return minimum;
+    return value;
   }
 }

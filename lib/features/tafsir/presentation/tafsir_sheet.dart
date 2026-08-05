@@ -121,8 +121,8 @@ class _AyahTafsirSheet extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: FutureBuilder<TafsirAyahResult?>(
-                future: cubit.entryForAyah(
+              child: FutureBuilder<List<TafsirAyahResult>>(
+                future: cubit.entriesForAyah(
                   surah: ayah.surahId,
                   ayah: ayah.ayahNumber,
                 ),
@@ -130,8 +130,8 @@ class _AyahTafsirSheet extends StatelessWidget {
                   if (snapshot.connectionState != ConnectionState.done) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final result = snapshot.data;
-                  if (result == null) {
+                  final results = snapshot.data ?? const [];
+                  if (results.isEmpty) {
                     return BlocProvider.value(
                       value: cubit,
                       child: const TafsirPage(showHeader: false),
@@ -140,7 +140,7 @@ class _AyahTafsirSheet extends StatelessWidget {
                   return _TafsirEntryView(
                     ayah: ayah,
                     resources: resources,
-                    result: result,
+                    results: results,
                     label: '${surahName ?? 'Surah ${ayah.surahId}'} '
                         '${ayah.surahId}:${ayah.ayahNumber}',
                   );
@@ -158,23 +158,19 @@ class _TafsirEntryView extends StatelessWidget {
   const _TafsirEntryView({
     required this.ayah,
     required this.resources,
-    required this.result,
+    required this.results,
     required this.label,
   });
 
   final Ayah ayah;
   final List<TranslationResource> resources;
-  final TafsirAyahResult result;
+  final List<TafsirAyahResult> results;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final entry = result.entry;
-    final coveredRange = entry.fromAyah == entry.toAyah
-        ? null
-        : '${entry.fromAyah} - ${entry.toAyah}';
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
       children: [
@@ -185,40 +181,80 @@ class _TafsirEntryView extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        if (coveredRange != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            'Tafsir covers $coveredRange',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-        ],
-        const SizedBox(height: 6),
-        Text(
-          _tafsirDisplayLabel(result.resource),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: cs.onSurface,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
         const SizedBox(height: 16),
         _AyahStudyBlock(
           ayah: ayah,
           resources: resources,
         ),
         const SizedBox(height: 18),
-        Divider(color: cs.outlineVariant),
-        const SizedBox(height: 16),
-        _TafsirBody(text: entry.text),
+        Divider(color: cs.outlineVariant, height: 1),
+        for (var i = 0; i < results.length; i++) ...[
+          _TafsirEntrySection(
+            result: results[i],
+            initiallyExpanded: results.length == 1 || i == results.length - 1,
+          ),
+          Divider(color: cs.outlineVariant, height: 1),
+        ],
       ],
+    );
+  }
+}
+
+class _TafsirEntrySection extends StatelessWidget {
+  const _TafsirEntrySection({
+    required this.result,
+    required this.initiallyExpanded,
+  });
+
+  final TafsirAyahResult result;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final entry = result.entry;
+    final coveredRange = entry.fromAyah == entry.toAyah
+        ? null
+        : '${entry.fromAyah} - ${entry.toAyah}';
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 18),
+        initiallyExpanded: initiallyExpanded,
+        maintainState: true,
+        title: Text(
+          _tafsirDisplayLabel(result.resource),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: cs.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: coveredRange == null
+            ? null
+            : Text(
+                'Covers $coveredRange',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+        children: [
+          _TafsirBody(text: entry.text),
+        ],
+      ),
     );
   }
 
   String _tafsirDisplayLabel(TafsirResource resource) {
-    final language = resource.nativeName?.trim().isNotEmpty == true
-        ? resource.nativeName!.trim()
-        : resource.languageCode.toUpperCase();
+    final language = switch (resource.languageCode) {
+      'en' => 'English',
+      'ur' => 'Urdu',
+      'ar' => 'Arabic',
+      _ => resource.nativeName?.trim().isNotEmpty == true
+          ? resource.nativeName!.trim()
+          : resource.languageCode.toUpperCase(),
+    };
     final suffix = resource.abridged ? ' (Abridged)' : '';
     return '$language - ${resource.name}$suffix';
   }
@@ -242,7 +278,7 @@ class _TafsirBody extends StatelessWidget {
           if (blocks[i].isHeading) const SizedBox(height: 4),
         ],
         if (blocks.isEmpty)
-          Text(
+          SelectableText(
             htmlToPlainText(text),
             style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
           ),
@@ -261,6 +297,7 @@ class _TafsirTextBlockView extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isArabic = block.isArabic;
+    final isRtl = !isArabic && _looksRtlScript(block.text);
     final headingSize = _headingSize(block.headingLevel);
     final baseStyle = block.isHeading
         ? theme.textTheme.headlineSmall
@@ -271,42 +308,55 @@ class _TafsirTextBlockView extends StatelessWidget {
             fontWeight: block.isHeading ? FontWeight.w700 : FontWeight.w400,
             height: 1.7,
           )
-        : baseStyle?.copyWith(
-            fontWeight: block.isHeading ? FontWeight.w700 : FontWeight.w400,
-            fontSize: block.isHeading ? headingSize : baseStyle.fontSize,
-            height: block.isHeading ? 1.22 : 1.55,
-          );
+        : block.isHeading
+            ? (isRtl ? 'ur' : 'en').scriptStyle(
+                baseStyle?.copyWith(
+                      fontWeight: isRtl ? FontWeight.w400 : FontWeight.w700,
+                      fontSize: isRtl ? 20 : headingSize,
+                      height: isRtl ? 2.35 : 1.22,
+                    ) ??
+                    const TextStyle(),
+                isRtl: isRtl,
+              )
+            : (isRtl ? 'ur' : 'en').scriptStyle(
+                baseStyle?.copyWith(
+                      fontWeight: FontWeight.w400,
+                      fontSize: isRtl ? 18 : baseStyle.fontSize,
+                      height: isRtl ? 2.65 : 1.55,
+                    ) ??
+                    const TextStyle(),
+                isRtl: isRtl,
+              );
     if (isArabic) {
-      return Text(
+      return SelectableText(
         block.text,
         textAlign: TextAlign.right,
         textDirection: TextDirection.rtl,
-        locale: const Locale('ar'),
         style: style,
       );
     }
-    final textStyle = style?.copyWith(
+    final textStyle = style.copyWith(
       color: block.isLead ? cs.error : style.color,
       fontWeight: block.isLead ? FontWeight.w600 : style.fontWeight,
     );
-    return RichText(
-      textAlign: TextAlign.left,
-      textDirection: TextDirection.ltr,
-      locale: const Locale('en'),
-      text: TextSpan(
+    return SelectableText.rich(
+      TextSpan(
         style: textStyle,
         children: [
           for (final span in block.spans)
             TextSpan(
               text: span.text,
-              style: span.isMuted
-                  ? TextStyle(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.62),
-                    )
-                  : null,
+              style: _spanStyle(
+                span,
+                textStyle,
+                cs.onSurfaceVariant.withValues(alpha: 0.62),
+                cs.primary,
+              ),
             ),
         ],
       ),
+      textAlign: isRtl ? TextAlign.right : TextAlign.left,
+      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
     );
   }
 
@@ -321,6 +371,34 @@ class _TafsirTextBlockView extends StatelessWidget {
       _ => 24,
     };
   }
+
+  TextStyle? _spanStyle(
+    TafsirTextSpan span,
+    TextStyle? baseStyle,
+    Color mutedColor,
+    Color arabicColor,
+  ) {
+    if (span.isArabic) {
+      return QuranTextStyle.madani.copyWith(
+        color: span.isMuted ? mutedColor : arabicColor,
+        fontSize: (baseStyle?.fontSize ?? 17) + 3,
+        fontWeight: FontWeight.w400,
+        height: 1.65,
+      );
+    }
+    final color = span.isMuted ? mutedColor : baseStyle?.color;
+    return span.isMuted ? TextStyle(color: color) : null;
+  }
+}
+
+bool _looksRtlScript(String text) {
+  final letters =
+      RegExp(r'[\p{Letter}]', unicode: true).allMatches(text).length;
+  if (letters == 0) return false;
+  final rtl = RegExp(
+    r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]',
+  ).allMatches(text).length;
+  return rtl / letters >= 0.45;
 }
 
 class _AyahStudyBlock extends StatelessWidget {
@@ -346,11 +424,10 @@ class _AyahStudyBlock extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
+            SelectableText(
               ayah.textArabic,
               textAlign: TextAlign.right,
               textDirection: TextDirection.rtl,
-              locale: const Locale('ar'),
               style: QuranTextStyle.madani.copyWith(fontSize: 26),
             ),
             for (final resource in resources)
@@ -403,11 +480,10 @@ class _TafsirTranslationText extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 4),
-          Text(
+          SelectableText(
             text,
             textAlign: isRtl ? TextAlign.right : TextAlign.left,
             textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-            locale: Locale(resource.languageCode),
             style: resource.languageCode.scriptStyle(
               theme.textTheme.bodyMedium!.copyWith(height: 1.5),
               isRtl: isRtl,

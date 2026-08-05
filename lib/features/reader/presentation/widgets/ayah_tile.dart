@@ -159,75 +159,67 @@ class AyahTile extends StatelessWidget {
                     ),
                   ),
                 ),
-              PopupMenuButton<_AyahAction>(
-                tooltip: 'Ayah options',
-                icon: AppIcon(
-                  AppIcons.more,
-                  size: AppIconSize.action,
-                  color: theme.colorScheme.onSurfaceVariant,
+              MenuAnchor(
+                alignmentOffset: const Offset(0, 4),
+                style: MenuStyle(
+                  alignment: AlignmentDirectional.bottomEnd,
+                  padding: const WidgetStatePropertyAll(
+                    EdgeInsets.symmetric(vertical: 2),
+                  ),
+                  backgroundColor: WidgetStatePropertyAll(
+                    theme.colorScheme.surface,
+                  ),
+                  elevation: const WidgetStatePropertyAll(12),
+                  shadowColor: WidgetStatePropertyAll(
+                    Colors.black.withValues(alpha: 0.32),
+                  ),
+                  surfaceTintColor:
+                      const WidgetStatePropertyAll(Colors.transparent),
+                  shape: const WidgetStatePropertyAll(RoundedRectangleBorder()),
                 ),
-                onSelected: (action) => _onAction(context, action),
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: _AyahAction.copy,
-                    height: _CompactMenuItem.height,
-                    padding: EdgeInsets.zero,
-                    child: _CompactMenuItem(
-                      icon: AppIcons.copy,
-                      label: 'Copy',
-                    ),
+                builder: (context, controller, _) => IconButton(
+                  tooltip: 'Ayah options',
+                  icon: AppIcon(
+                    AppIcons.more,
+                    size: AppIconSize.action,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  const PopupMenuItem(
-                    value: _AyahAction.share,
-                    height: _CompactMenuItem.height,
-                    padding: EdgeInsets.zero,
-                    child: _CompactMenuItem(
-                      icon: AppIcons.share,
-                      label: 'Share',
-                    ),
+                  onPressed: () => controller.isOpen
+                      ? controller.close()
+                      : controller.open(),
+                ),
+                menuChildren: [
+                  _AyahMenuItem(
+                    icon: AppIcons.copy,
+                    label: 'Copy',
+                    onPressed: () => _onAction(context, _AyahAction.copy),
                   ),
-                  if (onToggleBookmark != null)
-                    PopupMenuItem(
-                      value: _AyahAction.bookmark,
-                      height: _CompactMenuItem.height,
-                      padding: EdgeInsets.zero,
-                      child: _CompactMenuItem(
-                        icon: AppIcons.bookmark,
-                        filled: isBookmarked,
-                        label: isBookmarked ? 'Remove bookmark' : 'Bookmark',
-                      ),
-                    ),
+                  _AyahMenuItem(
+                    icon: AppIcons.share,
+                    label: 'Share',
+                    onPressed: () => _onAction(context, _AyahAction.share),
+                  ),
                   if (onOpenTranslations != null)
-                    const PopupMenuItem(
-                      value: _AyahAction.translations,
-                      height: _CompactMenuItem.height,
-                      padding: EdgeInsets.zero,
-                      child: _CompactMenuItem(
-                        icon: AppIcons.viewReading,
-                        label: 'Translations',
-                      ),
+                    _AyahMenuItem(
+                      icon: AppIcons.viewReading,
+                      label: 'Translations',
+                      onPressed: () =>
+                          _onAction(context, _AyahAction.translations),
                     ),
                   if (onOpenTafsir != null)
-                    const PopupMenuItem(
-                      value: _AyahAction.tafsir,
-                      height: _CompactMenuItem.height,
-                      padding: EdgeInsets.zero,
-                      child: _CompactMenuItem(
-                        icon: AppIcons.alKahf,
-                        label: 'Tafsir',
-                      ),
+                    _AyahMenuItem(
+                      icon: AppIcons.alKahf,
+                      label: 'Tafsir',
+                      onPressed: () => _onAction(context, _AyahAction.tafsir),
                     ),
                   // Whole-page image, not just this verse — captures every verse
                   // currently on screen (see [onScreenshotPage]).
                   if (onScreenshotPage != null)
-                    const PopupMenuItem(
-                      value: _AyahAction.screenshot,
-                      height: _CompactMenuItem.height,
-                      padding: EdgeInsets.zero,
-                      child: _CompactMenuItem(
-                        icon: AppIcons.screenshot,
-                        label: 'Screenshot page',
-                      ),
+                    _AyahMenuItem(
+                      icon: AppIcons.screenshot,
+                      label: 'Screenshot page',
+                      onPressed: () =>
+                          _onAction(context, _AyahAction.screenshot),
                     ),
                 ],
               ),
@@ -319,10 +311,6 @@ class AyahTile extends StatelessWidget {
       onOpenTafsir?.call();
       return;
     }
-    if (action == _AyahAction.bookmark) {
-      onToggleBookmark?.call();
-      return;
-    }
     final messenger = ScaffoldMessenger.of(context);
     final text = buildAyahShareText(
       ayah: ayah,
@@ -341,7 +329,6 @@ class AyahTile extends StatelessWidget {
           );
         case _AyahAction.share:
           await SharePlus.instance.share(ShareParams(text: text));
-        case _AyahAction.bookmark:
         case _AyahAction.translations:
         case _AyahAction.tafsir:
           break; // handled above
@@ -362,49 +349,54 @@ class AyahTile extends StatelessWidget {
   }
 }
 
-enum _AyahAction { copy, share, bookmark, translations, tafsir, screenshot }
+enum _AyahAction { copy, share, translations, tafsir, screenshot }
 
-class _CompactMenuItem extends StatelessWidget {
-  const _CompactMenuItem({
+class _AyahMenuItem extends StatelessWidget {
+  const _AyahMenuItem({
     required this.icon,
     required this.label,
-    this.filled = false,
+    required this.onPressed,
   });
-
-  static const double height = 44;
 
   final IconData icon;
   final String label;
-  final bool filled;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 28,
+    final cs = Theme.of(context).colorScheme;
+    final iconColor = cs.onSurface.withValues(alpha: 0.70);
+    return SizedBox(
+      width: 252,
+      child: MenuItemButton(
+        style: ButtonStyle(
+          minimumSize: const WidgetStatePropertyAll(Size.fromHeight(36)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsetsDirectional.fromSTEB(18, 4, 18, 4),
+          ),
+          overlayColor: WidgetStatePropertyAll(
+            cs.primary.withValues(alpha: 0.08),
+          ),
+          foregroundColor: WidgetStatePropertyAll(cs.onSurface),
+          textStyle: WidgetStatePropertyAll(
+            Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  height: 1.1,
+                ),
+          ),
+        ),
+        leadingIcon: SizedBox.square(
+          dimension: 24,
+          child: Center(
             child: AppIcon(
               icon,
-              filled: filled,
-              size: AppIconSize.label,
-              color: theme.colorScheme.onSurfaceVariant,
+              size: AppIconSize.action,
+              color: iconColor,
             ),
           ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+        ),
+        onPressed: onPressed,
+        child: Text(label),
       ),
     );
   }
