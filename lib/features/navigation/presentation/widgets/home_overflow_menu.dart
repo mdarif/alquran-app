@@ -11,6 +11,7 @@ import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../reader/domain/repositories/ayah_bookmark_repository.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/presentation/pages/bookmarks_page.dart';
+import '../../../tafsir/presentation/tafsir_sheet.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 import '../pages/app_settings_page.dart';
 import '../pages/reminders_settings_page.dart';
@@ -95,6 +96,12 @@ class HomeOverflowMenu extends StatelessWidget {
           onPressed: () => _openTranslations(context),
         ),
         _MenuItem(
+          key: WidgetKeys.tafsirMenuButton,
+          icon: AppIcons.alKahf,
+          label: 'Tafsir',
+          onPressed: () => _openTafsir(context),
+        ),
+        _MenuItem(
           key: WidgetKeys.bookmarksMenuButton,
           icon: AppIcons.bookmark,
           label: 'Bookmarks',
@@ -143,6 +150,10 @@ class HomeOverflowMenu extends StatelessWidget {
 
   void _openTranslations(BuildContext context) {
     showTranslationsSheet(context);
+  }
+
+  void _openTafsir(BuildContext context) {
+    showTafsirSheet(context);
   }
 
   void _openSettings(BuildContext context) {

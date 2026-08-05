@@ -567,7 +567,8 @@ void main() {
       expect(find.byKey(WidgetKeys.aboutPage), findsOneWidget);
     });
 
-    testWidgets('the home overflow exposes Translations before Bookmarks',
+    testWidgets(
+        'the home overflow exposes Translations and Tafsir before Bookmarks',
         (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
@@ -575,6 +576,8 @@ void main() {
 
       expect(find.byKey(WidgetKeys.translationsMenuButton), findsOneWidget);
       expect(find.text('Translations'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.tafsirMenuButton), findsOneWidget);
+      expect(find.text('Tafsir'), findsOneWidget);
       expect(find.byKey(WidgetKeys.bookmarksMenuButton), findsOneWidget);
 
       final translationsTop = tester
@@ -582,12 +585,34 @@ void main() {
             find.byKey(WidgetKeys.translationsMenuButton),
           )
           .dy;
+      final tafsirTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.tafsirMenuButton),
+          )
+          .dy;
       final bookmarksTop = tester
           .getTopLeft(
             find.byKey(WidgetKeys.bookmarksMenuButton),
           )
           .dy;
-      expect(translationsTop, lessThan(bookmarksTop));
+      expect(translationsTop, lessThan(tafsirTop));
+      expect(tafsirTop, lessThan(bookmarksTop));
+    });
+
+    testWidgets('the home overflow opens the Tafsir sheet', (tester) async {
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.tafsirMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.tafsirPage), findsOneWidget);
+      expect(find.text('Tafsir Ibn Kathir'), findsOneWidget);
+      expect(find.text('English abridged edition'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Preparing Download'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('hides each flagged feature when its flag is off',
