@@ -54,3 +54,6 @@ tmp/
 # committed (R2 is the store; see tool/audio/README.md).
 tool/audio/staging/
 tool/audio/__pycache__/
+
+# Wrangler local cache/state (infra/app-update-worker) — never committed.
+.wrangler/

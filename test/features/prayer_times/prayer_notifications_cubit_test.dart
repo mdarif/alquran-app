@@ -69,7 +69,10 @@ class _Scheduled {
 
 class _FakeScheduler implements NotificationScheduler {
   bool granted = true;
+  bool batteryExempt = true;
   int requestPermissionCalls = 0;
+  int exactAlarmCalls = 0;
+  int batteryExemptionCalls = 0;
   final List<int> cancelledIds = [];
   final List<_Scheduled> oneShots = [];
 
@@ -86,16 +89,17 @@ class _FakeScheduler implements NotificationScheduler {
   Future<bool> hasPermission() async => granted;
 
   @override
-  Future<void> requestExactAlarmPermission() async {}
+  Future<void> requestExactAlarmPermission() async => exactAlarmCalls++;
 
   @override
   Future<bool> canScheduleExact() async => true;
 
   @override
-  Future<bool> isBatteryOptimizationExempt() async => true;
+  Future<bool> isBatteryOptimizationExempt() async => batteryExempt;
 
   @override
-  Future<void> requestBatteryOptimizationExemption() async {}
+  Future<void> requestBatteryOptimizationExemption() async =>
+      batteryExemptionCalls++;
 
   @override
   Future<void> cancelAll() async {}
@@ -331,5 +335,58 @@ void main() {
     expect(scheduler.requestPermissionCalls, 1);
     expect(scheduler.oneShots, isEmpty);
     expect(report, contains('Notifications not allowed'));
+  });
+
+  test('enable nudges toward reliable delivery (exact alarms + exemption)',
+      () async {
+    final scheduler = _FakeScheduler()..batteryExempt = false;
+
+    await build(scheduler: scheduler).enable();
+
+    expect(scheduler.exactAlarmCalls, 1);
+    expect(scheduler.batteryExemptionCalls, 1);
+  });
+
+  test('enable skips the exemption prompt when already exempt', () async {
+    final scheduler = _FakeScheduler()..batteryExempt = true;
+
+    await build(scheduler: scheduler).enable();
+
+    expect(scheduler.exactAlarmCalls, 1);
+    expect(scheduler.batteryExemptionCalls, 0);
+  });
+
+  test('refresh surfaces the battery-optimization reliability flag', () async {
+    final scheduler = _FakeScheduler()..batteryExempt = false;
+    final cubit = build(
+      settings: _FakeSettings(enabled: true),
+      scheduler: scheduler,
+    );
+
+    await cubit.refresh();
+
+    expect(cubit.state.batteryOptimized, isTrue);
+  });
+
+  test('fixReliability re-runs the exemption prompt', () async {
+    final scheduler = _FakeScheduler();
+
+    await build(
+      settings: _FakeSettings(enabled: true),
+      scheduler: scheduler,
+    ).fixReliability();
+
+    expect(scheduler.batteryExemptionCalls, 1);
+  });
+
+  test('fixExactAlarms re-runs the exact-alarm prompt', () async {
+    final scheduler = _FakeScheduler();
+
+    await build(
+      settings: _FakeSettings(enabled: true),
+      scheduler: scheduler,
+    ).fixExactAlarms();
+
+    expect(scheduler.exactAlarmCalls, 1);
   });
 }

@@ -85,7 +85,7 @@ Dismiss behavior:
 3. Tap `Later`.
 4. Relaunch with the same config: the banner should stay hidden.
 5. The same version appears again only after `remindAfterDays` expires
-   (production uses 30 days).
+   (production uses 7 days).
 6. Increase `latestVersion` in `dev/app-update/update-available.json`.
 7. Restart the fixture server and app: the banner should appear again.
 

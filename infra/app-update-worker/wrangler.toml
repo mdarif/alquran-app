@@ -1,0 +1,18 @@
+# Serves the soft-update config the app reads at
+# https://alquranreader.com/app-update.json — a single, path-scoped Worker
+# Route so it doesn't touch the rest of the alquranreader.com zone, which is
+# otherwise served by the al-quran-web Pages project. Backed by the existing
+# `al-quran-editions` R2 bucket (object key: app-update.json), the same
+# bucket the release workflow (flutter-release.yml) already writes to via
+# `wrangler r2 object put`.
+name = "app-update-router"
+main = "src/index.ts"
+compatibility_date = "2026-06-01"
+
+routes = [
+  { pattern = "alquranreader.com/app-update.json", zone_name = "alquranreader.com" },
+]
+
+[[r2_buckets]]
+binding = "APP_UPDATE_BUCKET"
+bucket_name = "al-quran-editions"

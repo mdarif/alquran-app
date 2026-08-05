@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/reminder_occurrence.dart';
 import '../../domain/entities/sunnah_events.dart';
 import '../../domain/repositories/reminder_settings_repository.dart';
+import '../../domain/scheduling/notification_delivery_status.dart';
 import '../../domain/scheduling/notification_scheduler.dart';
 import '../../domain/scheduling/occurrence_engine.dart';
 import '../../domain/scheduling/reminder_payload.dart';
@@ -53,10 +54,7 @@ class RemindersCubit extends Cubit<RemindersState> {
       emit(state.copyWith(permissionGranted: false));
       return;
     }
-    await _scheduler.requestExactAlarmPermission();
-    if (!await _scheduler.isBatteryOptimizationExempt()) {
-      await _scheduler.requestBatteryOptimizationExemption();
-    }
+    await requestReliableNotificationDelivery(_scheduler);
     await _settings.setEnabled(true);
     await _rescheduleAll();
   }
@@ -127,14 +125,12 @@ class RemindersCubit extends Cubit<RemindersState> {
       );
     }
 
-    final exempt = await _scheduler.isBatteryOptimizationExempt();
-    final exact = await _scheduler.canScheduleExact();
+    final delivery = await NotificationDeliveryStatus.read(_scheduler);
     emit(
       RemindersState(
         enabled: true,
         permissionGranted: true,
-        batteryOptimized: !exempt,
-        exactAlarmsAllowed: exact,
+        delivery: delivery,
         upcoming: _engine.upNext(now),
       ),
     );

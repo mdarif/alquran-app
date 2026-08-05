@@ -69,6 +69,7 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     // Whether prayer is prohibited right now — from TODAY's windows, before any
     // rollover below swaps `day` for tomorrow.
     final forbidden = day.forbiddenAt(now);
+    final current = day.currentSalahAt(now);
     var upcoming = day.nextAfter(now);
     if (upcoming == null) {
       // Every prayer today has passed → the next is tomorrow's Fajr.
@@ -86,6 +87,7 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     final remaining = upcoming.$2.difference(now);
     return PrayerTimesState(
       today: day,
+      current: current == null ? null : (current.$1, current.$2),
       next: NextPrayer(
         prayer: upcoming.$1,
         at: upcoming.$2,

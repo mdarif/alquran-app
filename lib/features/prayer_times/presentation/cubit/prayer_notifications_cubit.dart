@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../reminders/domain/scheduling/notification_delivery_status.dart';
 import '../../../reminders/domain/scheduling/notification_scheduler.dart';
 import '../../domain/entities/prayer.dart';
 import '../../domain/repositories/prayer_notification_settings_repository.dart';
@@ -42,6 +43,7 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
       );
       return;
     }
+    await requestReliableNotificationDelivery(_scheduler);
     await _settings.setEnabled(true);
     await _reschedule();
   }
@@ -50,6 +52,18 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
     await _settings.setEnabled(false);
     await _cancelPrayerNotifications();
     emit(const PrayerNotificationsState(enabled: false));
+  }
+
+  /// Re-run the battery-optimization prompt (from the reliability hint).
+  Future<void> fixReliability() async {
+    await _scheduler.requestBatteryOptimizationExemption();
+    await refresh();
+  }
+
+  /// DEBUG ONLY: re-open the exact-alarm system screen, then refresh status.
+  Future<void> fixExactAlarms() async {
+    await _scheduler.requestExactAlarmPermission();
+    await refresh();
   }
 
   Future<void> refresh() async {
@@ -106,10 +120,12 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
       }
     }
 
+    final delivery = await NotificationDeliveryStatus.read(_scheduler);
     emit(
       PrayerNotificationsState(
         enabled: true,
         permissionGranted: true,
+        delivery: delivery,
         scheduledCount: scheduled,
       ),
     );

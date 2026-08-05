@@ -3,7 +3,7 @@ import 'dart:convert';
 const String defaultStoreUrl =
     'https://play.google.com/store/apps/details?id=com.almarfa.alquran';
 const String defaultMessage = 'A newer version is available.';
-const int defaultRemindAfterDays = 30;
+const int defaultRemindAfterDays = 7;
 
 String buildAppUpdateConfigJson({
   required String latestVersion,

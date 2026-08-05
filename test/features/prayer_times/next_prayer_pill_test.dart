@@ -65,18 +65,29 @@ Future<void> _pump(WidgetTester tester, PrayerTimesCubit? cubit) {
 }
 
 void main() {
-  testWidgets('shows the next prayer + time when located', (tester) async {
+  testWidgets('shows the current prayer start time when located',
+      (tester) async {
     await _pump(tester, _cubit(saved: _loc, hour: 17)); // → Maghrib 18:42
     expect(find.byKey(WidgetKeys.nextPrayerPill), findsOneWidget);
-    expect(find.textContaining('Maghrib'), findsOneWidget);
-    expect(find.textContaining('6:42'), findsOneWidget);
+    expect(find.textContaining('Asr'), findsOneWidget);
+    expect(find.textContaining('3:30'), findsOneWidget);
+    expect(find.textContaining('Maghrib'), findsNothing);
   });
 
-  testWidgets('during the dawn window the pill shows Sunrise', (tester) async {
+  testWidgets('falls back to the next prayer outside a prayer window',
+      (tester) async {
+    await _pump(tester, _cubit(saved: _loc, hour: 7)); // after sunrise
+    expect(find.textContaining('Dhuhr'), findsOneWidget);
+    expect(find.textContaining('12:00'), findsOneWidget);
+  });
+
+  testWidgets('during the dawn prayer window the pill shows Fajr start',
+      (tester) async {
     // Fake repo: fajr 5:00, sunrise 6:30 → at 06:00 the next marker is Sunrise.
     await _pump(tester, _cubit(saved: _loc, hour: 6));
-    expect(find.textContaining('Sunrise'), findsOneWidget);
-    expect(find.textContaining('6:30'), findsOneWidget);
+    expect(find.textContaining('Fajr'), findsOneWidget);
+    expect(find.textContaining('5:00'), findsOneWidget);
+    expect(find.textContaining('Sunrise'), findsNothing);
   });
 
   testWidgets('tapping opens the all-five sheet', (tester) async {

@@ -353,7 +353,7 @@ jobs:
           dart run tool/generate_app_update_config.dart \
             --latest-version="${{ steps.version.outputs.new_semver }}" \
             --minimum-supported-version="1.0.0" \
-            --remind-after-days="30" \
+            --remind-after-days="7" \
             --output="app-update.json"
           cat app-update.json
 
@@ -408,16 +408,45 @@ jobs:
           whatsNewDirectory: distribution/whatsnew
 
       - name: Publish app update config
-        if: steps.play.outputs.enabled == 'true' && steps.app_update_publish.outputs.enabled == 'true' && inputs.dry_run != true
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          APP_UPDATE_R2_BUCKET: ${{ secrets.APP_UPDATE_R2_BUCKET }}
+        if: steps.app_update_publish.outputs.enabled == 'true' && inputs.dry_run != true
         run: |
           npx --yes wrangler r2 object put "${APP_UPDATE_R2_BUCKET}/app-update.json" \
             --file app-update.json \
             --content-type application/json \
-            --cache-control "public, max-age=300"
+            --cache-control "public, max-age=300" \
+            --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APP_UPDATE_R2_BUCKET: ${{ secrets.APP_UPDATE_R2_BUCKET }}
+
+      # ------------------------------------------------------------------ #
+      # 13b. Verify the live remote source of truth actually reflects this
+      #      release. Publishing to R2 can silently no-op (wrong bucket,
+      #      stale cache, wrangler auth drift) — this step re-fetches the
+      #      public URL the app itself reads and fails the release if the
+      #      advertised latestVersion doesn't match what we just shipped.
+      #      This is the check that would have caught the 1.2.4 miss.
+      # ------------------------------------------------------------------ #
+      - name: Verify published app-update.json matches release
+        if: steps.app_update_publish.outputs.enabled == 'true' && inputs.dry_run != true
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.new_semver }}
+        run: |
+          sleep 5  # let R2/edge cache settle
+          curl -fsSL "https://alquranreader.com/app-update.json?cachebust=$(date +%s)" -o live-app-update.json
+          LIVE_VERSION=$(node -e "const fs = require('fs'); const json = JSON.parse(fs.readFileSync('live-app-update.json', 'utf8')); process.stdout.write(json.latestVersion || '');")
+          echo "Expected: $EXPECTED_VERSION | Live: $LIVE_VERSION"
+          if [ "$LIVE_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Live app-update.json reports latestVersion=$LIVE_VERSION but this release is $EXPECTED_VERSION. The in-app 'Check for Updates' banner will NOT detect this release. Check R2 bucket/route config."
+            exit 1
+          fi
+          echo "Remote update config verified — in-app update check will detect $EXPECTED_VERSION."
+
+      - name: Warn if app update config publish was skipped
+        if: steps.app_update_publish.outputs.enabled != 'true' && inputs.dry_run != true
+        run: |
+          echo "::warning::Skipping app-update.json publish (Cloudflare secrets not set) — the in-app 'Check for Updates' feature will NOT see this release (${{ steps.version.outputs.new_semver }}) until the config is published another way."
 
       # ------------------------------------------------------------------ #
       # 14. Commit the version bump, tag, and push. Skipped for dry runs.

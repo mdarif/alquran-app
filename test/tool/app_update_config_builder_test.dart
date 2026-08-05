@@ -15,7 +15,7 @@ void main() {
       expect(decoded['minimumSupportedVersion'], '1.0.0');
       expect(decoded['storeUrl'], defaultStoreUrl);
       expect(decoded['message'], 'A newer version is available.');
-      expect(decoded['remindAfterDays'], 30);
+      expect(decoded['remindAfterDays'], 7);
     });
 
     test('rejects invalid versions and reminder windows', () {

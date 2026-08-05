@@ -11,9 +11,11 @@ import '../cubit/prayer_times_cubit.dart';
 import '../cubit/prayer_times_state.dart';
 import 'prayer_times_sheet.dart';
 
-/// The subtle app-bar indicator: a static `Maghrib 6:42` pill (matching the
-/// reader's `_PagePill` tone) that opens the all-five sheet on tap. When no
-/// location is set yet, a discreet location icon offers one tap to enable.
+/// The subtle app-bar indicator: a static `Asr 4:01` pill (matching the
+/// reader's `_PagePill` tone) that opens the all-five sheet on tap. It shows
+/// the current prayer when one is active, falling back to the next prayer
+/// outside a prayer window. When no location is set yet, a discreet location
+/// icon offers one tap to enable.
 ///
 /// Lives on the Home bar only (the reader keeps its reading controls instead).
 /// Reads the cubit DEFENSIVELY (like [ThemeToggleButton]) so a screen pumped in
@@ -62,25 +64,34 @@ class NextPrayerPill extends StatelessWidget {
         }
 
         final next = state.next!;
+        final current = state.current;
+        final prayer = current?.$1 ?? next.prayer;
+        final at = current?.$2 ?? next.at;
+        final tooltipPrefix =
+            current == null ? 'Next prayer' : 'Current prayer';
         return Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Material(
-              key: WidgetKeys.nextPrayerPill,
-              color: cs.secondaryContainer,
-              borderRadius: BorderRadius.circular(20),
-              child: InkWell(
+            child: Tooltip(
+              message:
+                  '$tooltipPrefix: ${prayer.label} at ${formatPrayerTime(at)}',
+              child: Material(
+                key: WidgetKeys.nextPrayerPill,
+                color: cs.secondaryContainer,
                 borderRadius: BorderRadius.circular(20),
-                onTap: () => _openSheet(context, bloc),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: Text(
-                    '${next.prayer.label}  ${formatPrayerTime(next.at)}',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: cs.onSecondaryContainer,
-                          fontWeight: FontWeight.w600,
-                        ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _openSheet(context, bloc),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    child: Text(
+                      '${prayer.label}  ${formatPrayerTime(at)}',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: cs.onSecondaryContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                   ),
                 ),
               ),

@@ -102,22 +102,39 @@ Every release generates `app-update.json` from the bumped semver:
   "minimumSupportedVersion": "1.0.0",
   "storeUrl": "https://play.google.com/store/apps/details?id=com.almarfa.alquran",
   "message": "A newer version is available.",
-  "remindAfterDays": 30
+  "remindAfterDays": 7
 }
 ```
 
-The Android app reads `https://alquranreader.com/app-update.json`. Host that
-path from the R2 bucket named in `APP_UPDATE_R2_BUCKET`, then set:
+The Android app reads `https://alquranreader.com/app-update.json`. That exact
+path is served by a small Cloudflare Worker in `infra/app-update-worker/`
+(route `alquranreader.com/app-update.json`, scoped to that one path so it
+doesn't touch the rest of the alquranreader.com zone, which is otherwise the
+al-quran-web Pages site) — it reads the `app-update.json` object out of the
+`al-quran-editions` R2 bucket. **Root-domain R2 custom domains don't work
+here**: alquranreader.com already has a Pages custom domain attached for the
+website, and a bucket-level custom domain on the same root would conflict —
+that's why this needs the path-scoped Worker Route instead. Deploy/redeploy
+the Worker only when `infra/app-update-worker/src/index.ts` changes:
+
+```bash
+cd infra/app-update-worker && npx wrangler deploy
+```
+
+Then set the three release-workflow secrets so `flutter-release.yml` can
+write the object on every release:
 
 ```bash
 gh secret set CLOUDFLARE_API_TOKEN --repo mdarif/alquran-app
 gh secret set CLOUDFLARE_ACCOUNT_ID --repo mdarif/alquran-app --body "..."
-gh secret set APP_UPDATE_R2_BUCKET --repo mdarif/alquran-app --body "..."
+gh secret set APP_UPDATE_R2_BUCKET --repo mdarif/alquran-app --body "al-quran-editions"
 ```
 
-After that, release runs publish the config automatically after the Play upload
-step succeeds. Older app versions show the banner on Home, `Later` hides the
-same version for 30 days, and the banner stops once the installed version is
+After that, release runs publish the config automatically (independent of
+whether the Play upload runs) and a verification step re-fetches the live
+`app-update.json` and fails the release if it doesn't match the shipped
+version. Older app versions show the banner on Home, `Later` hides the
+same version for 7 days, and the banner stops once the installed version is
 current or newer.
 
 ### 5. Branch protection (none, by design)

@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import '../../domain/entities/daily_prayer_times.dart';
 import '../../domain/entities/forbidden_window.dart';
 import '../../domain/entities/next_prayer.dart';
+import '../../domain/entities/prayer.dart';
 import '../../domain/location/location_provider.dart';
 
 /// What the indicator renders. [today] is the active day's schedule (today, or
@@ -14,6 +15,7 @@ import '../../domain/location/location_provider.dart';
 class PrayerTimesState extends Equatable {
   const PrayerTimesState({
     this.today,
+    this.current,
     this.next,
     this.forbidden,
     this.hasLocation = false,
@@ -23,6 +25,7 @@ class PrayerTimesState extends Equatable {
 
   const PrayerTimesState.unset()
       : today = null,
+        current = null,
         next = null,
         forbidden = null,
         hasLocation = false,
@@ -30,6 +33,7 @@ class PrayerTimesState extends Equatable {
         status = null;
 
   final DailyPrayerTimes? today;
+  final (Prayer, DateTime)? current;
   final NextPrayer? next;
   final ForbiddenWindow? forbidden;
   final bool hasLocation;
@@ -44,6 +48,7 @@ class PrayerTimesState extends Equatable {
 
   PrayerTimesState copyWith({LocationStatus? status}) => PrayerTimesState(
         today: today,
+        current: current,
         next: next,
         forbidden: forbidden,
         hasLocation: hasLocation,
@@ -54,6 +59,8 @@ class PrayerTimesState extends Equatable {
   @override
   List<Object?> get props => [
         today?.date,
+        current?.$1,
+        current?.$2,
         next?.prayer,
         next?.at,
         forbidden,

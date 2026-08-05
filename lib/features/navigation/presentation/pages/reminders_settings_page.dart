@@ -253,9 +253,16 @@ class _SalatNotificationsSection extends StatelessWidget {
                       ? _NoLocationHint(
                           onEnable: () => _enableLocation(context, bloc),
                         )
-                      : kDebugMode
-                          ? _SalatDebugButton(cubit: bloc)
-                          : null,
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (state.batteryOptimized) ...[
+                              const SizedBox(height: 8),
+                              _ReliabilityHint(onFix: bloc.fixReliability),
+                            ],
+                            if (kDebugMode) _SalatDebugButton(cubit: bloc),
+                          ],
+                        ),
         );
       },
     );

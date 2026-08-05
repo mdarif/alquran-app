@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -15,14 +17,17 @@ class LocalNotificationScheduler implements NotificationScheduler {
 
   void Function(String? payload)? _onSelect;
 
-  static const String _channelId = 'sunnah_reminders';
+  static const String _channelId = 'sunnah_reminders_v2';
   static const String _channelName = 'Sunnah Reminders';
   static const String _channelDesc =
       'Gentle reminders for Sunnah acts (Surah Al-Kahf, fasting days, etc.)';
-  static const String _salatChannelId = 'salat_notifications_nature_v1';
+  static const String _salatChannelId = 'salat_notifications_nature_v4';
   static const String _salatChannelName = 'Salat Notifications';
   static const String _salatChannelDesc =
       'Gentle salat-time nudges with a soft natural sound';
+  static final Int64List _salatVibrationPattern = Int64List.fromList(
+    const [0, 250, 160, 250],
+  );
 
   /// Native bridge for the battery-optimization exemption (see MainActivity.kt).
   static const MethodChannel _native =
@@ -48,16 +53,22 @@ class LocalNotificationScheduler implements NotificationScheduler {
           _channelId,
           _channelName,
           description: _channelDesc,
-          importance: Importance.high,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
         ),
       );
       await _android?.createNotificationChannel(
-        const AndroidNotificationChannel(
+        AndroidNotificationChannel(
           _salatChannelId,
           _salatChannelName,
           description: _salatChannelDesc,
-          importance: Importance.high,
-          sound: RawResourceAndroidNotificationSound('salat_nudge'),
+          importance: Importance.max,
+          playSound: true,
+          sound: const RawResourceAndroidNotificationSound('salat_nudge'),
+          enableVibration: true,
+          vibrationPattern: _salatVibrationPattern,
+          audioAttributesUsage: AudioAttributesUsage.notification,
         ),
       );
     } catch (_) {
@@ -272,11 +283,15 @@ class LocalNotificationScheduler implements NotificationScheduler {
         salatSound ? _salatChannelId : _channelId,
         salatSound ? _salatChannelName : _channelName,
         channelDescription: salatSound ? _salatChannelDesc : _channelDesc,
-        importance: Importance.high,
-        priority: Priority.high,
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: true,
         sound: salatSound
             ? const RawResourceAndroidNotificationSound('salat_nudge')
             : null,
+        enableVibration: true,
+        vibrationPattern: salatSound ? _salatVibrationPattern : null,
+        audioAttributesUsage: AudioAttributesUsage.notification,
         // Tag as a REMINDER so the OS (and aggressive OEM skins) treat it as a
         // time-sensitive nudge rather than a disposable alert.
         category: AndroidNotificationCategory.reminder,
