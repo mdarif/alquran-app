@@ -12,9 +12,11 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Hosts a small MethodChannel so the Sunnah-reminders feature can ask the user to
+ * Hosts a small MethodChannel so the reminders features can (1) ask the user to
  * exempt the app from battery optimization — the single biggest cause of dropped
- * scheduled notifications on aggressive OEMs (OnePlus/Oppo/Xiaomi). Exact alarms
+ * scheduled notifications on aggressive OEMs (OnePlus/Oppo/Xiaomi) — and (2) deep-link
+ * to the OS notification settings screen, since some OEM skins hide an app-level
+ * Ring/Vibrate toggle the app cannot set programmatically. Exact alarms
  * (SCHEDULE_EXACT_ALARM) are handled by flutter_local_notifications directly.
  */
 class MainActivity : FlutterActivity() {
@@ -29,6 +31,10 @@ class MainActivity : FlutterActivity() {
                         result.success(isIgnoringBatteryOptimizations())
                     "requestIgnoreBatteryOptimizations" -> {
                         requestIgnoreBatteryOptimizations()
+                        result.success(null)
+                    }
+                    "openNotificationSettings" -> {
+                        openNotificationSettings(call.argument<String>("channelId"))
                         result.success(null)
                     }
                     else -> result.notImplemented()
@@ -60,6 +66,37 @@ class MainActivity : FlutterActivity() {
             } catch (_: Exception) {
                 // Best-effort — nothing more we can do from here.
             }
+        }
+    }
+
+    // Some OEM skins (ColorOS/OxygenOS confirmed) expose an app-level Ring /
+    // Vibrate toggle ABOVE the notification channel that this app cannot set
+    // programmatically, and it can stay off even when the channel itself is
+    // configured correctly (max importance, sound, vibration). Deep-linking
+    // straight to the Salat channel's settings screen is the most direct way
+    // to get a user to that toggle — see docs/notification-reliability-notes.md.
+    private fun openNotificationSettings(channelId: String?) {
+        if (channelId != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        putExtra(Settings.EXTRA_CHANNEL_ID, channelId)
+                    },
+                )
+                return
+            } catch (_: Exception) {
+                // Fall through to the app-level settings screen below.
+            }
+        }
+        try {
+            startActivity(
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                },
+            )
+        } catch (_: Exception) {
+            // Best-effort — nothing more we can do from here.
         }
     }
 }

@@ -46,12 +46,27 @@ Open concern:
 
 Recommended future work:
 
-- Add a native method to open app notification settings, and ideally Salat
-  channel settings (`Settings.ACTION_APP_NOTIFICATION_SETTINGS` /
-  `Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS`).
-- Add an in-app hint near Salat notifications: if the scheduled test appears but
-  is silent, enable `Ring` / `Vibrate` in Al Quran notification settings.
 - Repeat killed-app tests on at least one stock Android/Pixel device and one
   Samsung device before trusting the behavior broadly.
 - Keep the debug scheduled test button available for internal QA until the
   notification flow has been validated across devices.
+
+## 2026-08-05: guided sound-check implemented
+
+Built the two follow-ups queued above:
+
+- `MainActivity.kt` exposes `openNotificationSettings` on the existing
+  `com.almarfa.al_quran/reminders` MethodChannel — deep-links to
+  `Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS` for the Salat channel on
+  Android 8+ (falls back to `ACTION_APP_NOTIFICATION_SETTINGS`).
+- `NotificationScheduler.openNotificationSettings` / `.salatChannelId` wrap
+  that channel from Dart (`LocalNotificationScheduler`).
+- Enabling Salat Notifications now fires an immediate test notification
+  (`PrayerNotificationsCubit.sendSoundCheck`) and asks "Did you hear or feel
+  it?" — answering "No" opens the Salat channel's settings directly
+  (`openSoundSettings`). A persistent "Didn't hear the test?" row lets a user
+  re-run the check later (`reminders_settings_page.dart`,
+  `_SoundCheckHint`/`_runSoundCheck`).
+
+Still open: the on-device Samsung/stock-Android pass above hasn't been
+repeated with this flow yet.

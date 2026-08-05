@@ -71,6 +71,12 @@ class _FakeScheduler implements NotificationScheduler {
     String? payload,
   }) async =>
       weeklyCalls++;
+
+  @override
+  String get salatChannelId => 'salat_notifications_nature_v4';
+
+  @override
+  Future<void> openNotificationSettings({String? channelId}) async {}
 }
 
 class _FakeSettings implements ReminderSettingsRepository {

@@ -75,6 +75,7 @@ class _FakeScheduler implements NotificationScheduler {
   int batteryExemptionCalls = 0;
   final List<int> cancelledIds = [];
   final List<_Scheduled> oneShots = [];
+  final List<String?> openedSettingsChannelIds = [];
 
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {}
@@ -166,6 +167,13 @@ class _FakeScheduler implements NotificationScheduler {
 
   @override
   Future<String?> consumeLaunchPayload() async => null;
+
+  @override
+  String get salatChannelId => 'salat_notifications_nature_v4';
+
+  @override
+  Future<void> openNotificationSettings({String? channelId}) async =>
+      openedSettingsChannelIds.add(channelId);
 }
 
 void main() {
@@ -388,5 +396,31 @@ void main() {
     ).fixExactAlarms();
 
     expect(scheduler.exactAlarmCalls, 1);
+  });
+
+  test('sendSoundCheck schedules an immediate test with the salat sound',
+      () async {
+    final scheduler = _FakeScheduler();
+    final cubit = build(scheduler: scheduler);
+
+    await cubit.sendSoundCheck();
+
+    expect(scheduler.oneShots, hasLength(1));
+    final scheduled = scheduler.oneShots.single;
+    expect(scheduled.id, PrayerNotificationsCubit.soundCheckId);
+    expect(scheduled.soundName, 'salat_nudge');
+    expect(scheduled.fireAt, now.add(const Duration(seconds: 3)));
+  });
+
+  test('openSoundSettings opens the salat channel settings', () async {
+    final scheduler = _FakeScheduler();
+    final cubit = build(scheduler: scheduler);
+
+    await cubit.openSoundSettings();
+
+    expect(
+      scheduler.openedSettingsChannelIds,
+      ['salat_notifications_nature_v4'],
+    );
   });
 }

@@ -30,6 +30,7 @@ class _FakeScheduler implements NotificationScheduler {
   bool granted;
   bool batteryExempt;
   int batteryExemptionCalls = 0;
+  final List<String?> openedSettingsChannelIds = [];
 
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {}
@@ -83,6 +84,11 @@ class _FakeScheduler implements NotificationScheduler {
   }) async {}
   @override
   Future<String?> consumeLaunchPayload() async => null;
+  @override
+  String get salatChannelId => 'salat_notifications_nature_v4';
+  @override
+  Future<void> openNotificationSettings({String? channelId}) async =>
+      openedSettingsChannelIds.add(channelId);
 }
 
 class _FakePrayerNotificationSettingsRepository
@@ -291,6 +297,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Scheduled'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Salat: enabling runs a sound check, and "No" opens the channel '
+        'settings', (tester) async {
+      final scheduler = _FakeScheduler();
+      final prayerNotifications = PrayerNotificationsCubit(
+        _FakePrayerNotificationSettingsRepository(),
+        scheduler,
+        _FakePrayerTimesRepository(saved: _loc),
+      );
+      addTearDown(prayerNotifications.close);
+      await _pump(tester, prayerNotifications: prayerNotifications);
+
+      await tester.tap(find.byKey(WidgetKeys.prayerNotificationsToggle));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Did you hear or feel it?'), findsOneWidget);
+
+      await tester.tap(find.text("No, didn't notice"));
+      await tester.pumpAndSettle();
+
+      expect(
+        scheduler.openedSettingsChannelIds,
+        ['salat_notifications_nature_v4'],
+      );
     });
 
     testWidgets(

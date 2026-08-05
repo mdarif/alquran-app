@@ -303,6 +303,12 @@ class _FakeNotificationScheduler implements NotificationScheduler {
 
   @override
   Future<String?> consumeLaunchPayload() async => null;
+
+  @override
+  String get salatChannelId => 'salat_notifications_nature_v4';
+
+  @override
+  Future<void> openNotificationSettings({String? channelId}) async {}
 }
 
 Future<void> _pumpHome(

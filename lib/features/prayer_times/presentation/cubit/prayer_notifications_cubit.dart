@@ -24,6 +24,7 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
 
   static const int _idBase = 20000;
   static const int debugTestId = _idBase + 99;
+  static const int soundCheckId = _idBase + 98;
   static const int _windowDays = 2;
   static const int _maxPerDay = 5;
 
@@ -64,6 +65,32 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
   Future<void> fixExactAlarms() async {
     await _scheduler.requestExactAlarmPermission();
     await refresh();
+  }
+
+  /// Fires an immediate test Salat notification (a few seconds out, through
+  /// the real alarm path) so a fresh "enable" can confirm — right away,
+  /// instead of at the next actual prayer time — whether the user will
+  /// actually hear/feel it. Some OEM skins (ColorOS/OxygenOS confirmed) hide
+  /// an app-level Ring/Vibrate toggle above the notification channel that this
+  /// app cannot set programmatically; [openSoundSettings] is the follow-up
+  /// when the answer is "no". See docs/notification-reliability-notes.md.
+  Future<void> sendSoundCheck() async {
+    final fireAt = _clock().add(const Duration(seconds: 3));
+    await _scheduler.scheduleOneShot(
+      id: soundCheckId,
+      fireAt: fireAt,
+      title: 'Salat Notifications',
+      body: 'This is what a Salat notification sounds/feels like.',
+      soundName: 'salat_nudge',
+    );
+  }
+
+  /// Deep-links to the Salat channel's OS notification settings (Ring/Vibrate
+  /// toggles), for a user who didn't hear/feel the sound check.
+  Future<void> openSoundSettings() async {
+    await _scheduler.openNotificationSettings(
+      channelId: _scheduler.salatChannelId,
+    );
   }
 
   Future<void> refresh() async {

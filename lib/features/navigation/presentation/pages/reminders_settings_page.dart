@@ -260,6 +260,10 @@ class _SalatNotificationsSection extends StatelessWidget {
                               const SizedBox(height: 8),
                               _ReliabilityHint(onFix: bloc.fixReliability),
                             ],
+                            const SizedBox(height: 8),
+                            _SoundCheckHint(
+                              onTap: () => _runSoundCheck(context, bloc),
+                            ),
                             if (kDebugMode) _SalatDebugButton(cubit: bloc),
                           ],
                         ),
@@ -281,6 +285,57 @@ class _SalatNotificationsSection extends StatelessWidget {
     if (!context.mounted) return;
     if (!cubit.state.enabled) {
       _showPermissionDeniedSnack(context);
+      return;
+    }
+    if (cubit.state.permissionGranted && cubit.state.hasLocation) {
+      await _runSoundCheck(context, cubit);
+    }
+  }
+
+  /// Fires an immediate test notification and asks the user whether they
+  /// heard/felt it — catching a silenced Ring/Vibrate toggle (an OEM-level
+  /// setting the app cannot set programmatically; see
+  /// docs/notification-reliability-notes.md) right when notifications are
+  /// enabled, instead of at the next missed prayer.
+  Future<void> _runSoundCheck(
+    BuildContext context,
+    PrayerNotificationsCubit cubit,
+  ) async {
+    await cubit.sendSoundCheck();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Sending a test Salat notification…'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    await Future<void>.delayed(const Duration(seconds: 4));
+    if (!context.mounted) return;
+    final heard = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Did you hear or feel it?'),
+        content: const Text(
+          'We just sent a test Salat notification. If your phone stayed '
+          'silent, Ring or Vibrate may be off for Al Quran in your phone '
+          'Settings — prayer notifications would be silent too.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("No, didn't notice"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yes, got it'),
+          ),
+        ],
+      ),
+    );
+    if (heard == false) {
+      await cubit.openSoundSettings();
     }
   }
 
@@ -568,6 +623,54 @@ class _ReliabilityHint extends StatelessWidget {
                 child: Text(
                   'Your phone may delay reminders. Tap to allow background '
                   'activity for reliable delivery.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+              AppIcon(
+                AppIcons.chevronRight,
+                size: AppIconSize.inline,
+                color: cs.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Always visible while Salat Notifications is on — lets a user re-run the
+/// sound check on demand (they may have dismissed the initial prompt, or the
+/// phone was on silent at the time). See docs/notification-reliability-notes.md.
+class _SoundCheckHint extends StatelessWidget {
+  const _SoundCheckHint({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              AppIcon(
+                AppIcons.reminders,
+                size: AppIconSize.label,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Didn't hear the test notification? Tap to check again.",
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: cs.onSurfaceVariant),
                 ),

@@ -79,4 +79,18 @@ abstract interface class NotificationScheduler {
   /// The payload of a notification that cold-launched the app, or null. Consumed
   /// once (call after the first frame to route a tap that opened the app).
   Future<String?> consumeLaunchPayload();
+
+  /// The Android channel id used for Salat notifications — exposed so callers
+  /// can deep-link to that specific channel's settings rather than the app's
+  /// general notification settings.
+  String get salatChannelId;
+
+  /// Opens the OS notification settings screen (Android). When [channelId] is
+  /// given, lands directly on that channel's settings (Ring/Vibrate toggles
+  /// live there on Android 8+); otherwise opens the app's general notification
+  /// settings. Some OEM skins (ColorOS/OxygenOS confirmed) hide an app-level
+  /// Ring/Vibrate toggle above the channel that this app cannot set
+  /// programmatically — this is how a user reaches it. Self-guarding +
+  /// best-effort; no-op on iOS.
+  Future<void> openNotificationSettings({String? channelId});
 }

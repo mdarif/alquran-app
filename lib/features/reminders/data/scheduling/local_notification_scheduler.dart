@@ -253,6 +253,19 @@ class LocalNotificationScheduler implements NotificationScheduler {
   }
 
   @override
+  String get salatChannelId => _salatChannelId;
+
+  @override
+  Future<void> openNotificationSettings({String? channelId}) async {
+    try {
+      await _native.invokeMethod<void>(
+        'openNotificationSettings',
+        {'channelId': channelId},
+      );
+    } catch (_) {}
+  }
+
+  @override
   Future<String?> consumeLaunchPayload() async {
     try {
       final details = await _plugin.getNotificationAppLaunchDetails();
