@@ -298,7 +298,7 @@ class _AppUpdateBanner extends StatelessWidget {
     final cs = theme.colorScheme;
     return Padding(
       key: WidgetKeys.appUpdateBanner,
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: cs.surface,
@@ -308,7 +308,7 @@ class _AppUpdateBanner extends StatelessWidget {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 6, 8),
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 6, 6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
