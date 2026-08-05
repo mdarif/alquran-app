@@ -31,7 +31,7 @@ Future<void> showTafsirForAyahSheet(
   required Ayah ayah,
   required String? surahName,
 }) {
-  final cubit = GetIt.I<TafsirCubit>();
+  final cubit = GetIt.I<TafsirCubit>()..load();
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -123,13 +123,9 @@ class _AyahTafsirSheet extends StatelessWidget {
                   }
                   final result = snapshot.data;
                   if (result == null) {
-                    return _NoInstalledTafsir(
-                      onOpenDownloads: () {
-                        final rootContext =
-                            Navigator.of(context, rootNavigator: true).context;
-                        Navigator.of(context).maybePop();
-                        showTafsirSheet(rootContext);
-                      },
+                    return BlocProvider.value(
+                      value: cubit,
+                      child: const TafsirPage(showHeader: false),
                     );
                   }
                   return _TafsirEntryView(
@@ -185,63 +181,6 @@ class _TafsirEntryView extends StatelessWidget {
               result.resource.isRtl ? TextDirection.rtl : TextDirection.ltr,
           textAlign: result.resource.isRtl ? TextAlign.right : TextAlign.left,
           style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
-        ),
-      ],
-    );
-  }
-}
-
-class _NoInstalledTafsir extends StatelessWidget {
-  const _NoInstalledTafsir({required this.onOpenDownloads});
-
-  final VoidCallback onOpenDownloads;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: cs.surface,
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: 0.70),
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'No Tafsir downloaded',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Download a Tafsir edition once and it will be available offline from each ayah.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: onOpenDownloads,
-                    icon: const AppIcon(AppIcons.alKahf),
-                    label: const Text('Open Tafsir Downloads'),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ],
     );

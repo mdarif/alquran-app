@@ -6,7 +6,9 @@ import '../../../../core/theme/app_icons.dart';
 import '../cubit/tafsir_cubit.dart';
 
 class TafsirPage extends StatelessWidget {
-  const TafsirPage({super.key});
+  const TafsirPage({this.showHeader = true, super.key});
+
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context) {
@@ -21,44 +23,45 @@ class TafsirPage extends StatelessWidget {
         top: false,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-              child: Column(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.28),
-                      borderRadius: BorderRadius.circular(2),
+            if (showHeader)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.28),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 40,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            tooltip: 'Close',
-                            icon: const AppIcon(AppIcons.close),
-                            onPressed: () => Navigator.of(context).maybePop(),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 40,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: IconButton(
+                              tooltip: 'Close',
+                              icon: const AppIcon(AppIcons.close),
+                              onPressed: () => Navigator.of(context).maybePop(),
+                            ),
                           ),
-                        ),
-                        Text(
-                          'Tafsir',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                          Text(
+                            'Tafsir',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             Expanded(
               child: BlocBuilder<TafsirCubit, TafsirState>(
                 builder: (context, state) {
@@ -69,12 +72,16 @@ class TafsirPage extends StatelessWidget {
                   return RefreshIndicator(
                     onRefresh: () => context.read<TafsirCubit>().load(),
                     child: ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        showHeader ? 8 : 0,
+                        20,
+                        24,
+                      ),
                       children: [
                         if (state.catalogueUnavailable)
                           const _InlineNotice(
-                            text:
-                                'Could not refresh the Tafsir catalogue. Showing what is available on this device.',
+                            text: 'Tafsir catalogue unavailable.',
                           ),
                         for (final item in state.items)
                           _TafsirResourceCard(item: item),
@@ -104,15 +111,15 @@ class _TafsirResourceCard extends StatelessWidget {
     final installing = item.status == TafsirItemStatus.installing;
     return Padding(
       key: WidgetKeys.tafsirResourceRow(item.slug),
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 10),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.18),
           border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.70)),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -127,7 +134,7 @@ class _TafsirResourceCard extends StatelessWidget {
                           item.name,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
-                            height: 1.15,
+                            height: 1.18,
                           ),
                         ),
                         if (item.subtitle.isNotEmpty) ...[
@@ -136,7 +143,7 @@ class _TafsirResourceCard extends StatelessWidget {
                             item.subtitle,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: cs.onSurfaceVariant,
-                              height: 1.25,
+                              height: 1.22,
                             ),
                           ),
                         ],
@@ -148,12 +155,12 @@ class _TafsirResourceCard extends StatelessWidget {
                 ],
               ),
               if (item.status == TafsirItemStatus.unavailable) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
-                  'Download support is ready in the app. This edition appears here once the Tafsir catalogue is published.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  'This edition appears here when a Tafsir catalogue is available.',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
-                    height: 1.35,
+                    height: 1.32,
                   ),
                 ),
               ],
@@ -163,22 +170,24 @@ class _TafsirResourceCard extends StatelessWidget {
                   value: item.progress == 0 ? null : item.progress,
                 ),
               ],
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  key: WidgetKeys.tafsirDownload(item.slug),
-                  onPressed: item.status == TafsirItemStatus.available ||
-                          item.status == TafsirItemStatus.failed
-                      ? () => context.read<TafsirCubit>().install(item.slug)
-                      : null,
-                  icon: AppIcon(
-                    installed ? AppIcons.statusPass : AppIcons.alKahf,
-                    filled: installed,
+              if (item.status != TafsirItemStatus.unavailable) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: FilledButton.tonalIcon(
+                    key: WidgetKeys.tafsirDownload(item.slug),
+                    onPressed: item.status == TafsirItemStatus.available ||
+                            item.status == TafsirItemStatus.failed
+                        ? () => context.read<TafsirCubit>().install(item.slug)
+                        : null,
+                    icon: AppIcon(
+                      installed ? AppIcons.statusPass : AppIcons.alKahf,
+                      filled: installed,
+                    ),
+                    label: Text(_buttonLabel(item)),
                   ),
-                  label: Text(_buttonLabel(item)),
                 ),
-              ),
+              ],
             ],
           ),
         ),
