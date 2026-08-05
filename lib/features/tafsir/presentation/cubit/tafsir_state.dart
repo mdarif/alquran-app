@@ -67,11 +67,27 @@ class TafsirItem extends Equatable {
   String get name =>
       resource?.name ?? catalogueEntry?.name ?? plannedName ?? slug;
 
+  String get languageCode =>
+      resource?.languageCode ?? catalogueEntry?.languageCode ?? '';
+
+  String? get nativeName => resource?.nativeName ?? catalogueEntry?.nativeName;
+
+  String? get author =>
+      resource?.displayCredit ??
+      catalogueEntry?.creditName ??
+      catalogueEntry?.author;
+
+  bool get abridged => resource?.abridged ?? catalogueEntry?.abridged ?? false;
+
+  int get sortOrder => resource?.sortOrder ?? catalogueEntry?.sortOrder ?? 0;
+
+  String? get error => null;
+
   String get subtitle {
-    final author = resource?.displayCredit ?? catalogueEntry?.creditName;
-    final language = resource?.languageCode ?? catalogueEntry?.languageCode;
+    final author = this.author;
+    final language = languageCode;
     final parts = [
-      if (language != null && language.isNotEmpty) language.toUpperCase(),
+      if (language.isNotEmpty) language.toUpperCase(),
       if (catalogueEntry?.abridged == true || resource?.abridged == true)
         'abridged',
       if (author != null && author.isNotEmpty) author,

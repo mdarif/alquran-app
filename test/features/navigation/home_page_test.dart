@@ -203,6 +203,20 @@ class _FakeTafsirRepository implements TafsirRepository {
             textGroupCount: 0,
             abridged: true,
           ),
+          TafsirCatalogueEntry(
+            slug: 'ur-ibn-kathir',
+            languageCode: 'ur',
+            name: 'Tafsir Ibn Kathir',
+            nativeName: 'اردو',
+            direction: 'rtl',
+            file: 'ur-ibn-kathir.db.gz',
+            bytes: 1024 * 1024,
+            sha256: 'sha256-ur',
+            uncompressedBytes: 4 * 1024 * 1024,
+            uncompressedSha256: 'raw-sha256-ur',
+            ayahCount: 6236,
+            textGroupCount: 0,
+          ),
         ],
       );
 
@@ -654,10 +668,24 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(WidgetKeys.tafsirPage), findsOneWidget);
-      expect(find.text('Tafsir Ibn Kathir'), findsOneWidget);
-      expect(find.text('EN · abridged'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.tafsirSearchField), findsOneWidget);
       expect(
-        find.widgetWithText(FilledButton, 'Download'),
+        find.byKey(WidgetKeys.tafsirLanguageFilter('all')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(WidgetKeys.tafsirLanguageFilter('ur')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(WidgetKeys.tafsirLanguageFilter('en')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Tafsir Ibn Kathir'), findsWidgets);
+      expect(find.text('English'), findsWidgets);
+      expect(find.text('Urdu'), findsWidgets);
+      expect(
+        find.byKey(WidgetKeys.tafsirDownload('en-ibn-kathir-abridged')),
         findsOneWidget,
       );
     });

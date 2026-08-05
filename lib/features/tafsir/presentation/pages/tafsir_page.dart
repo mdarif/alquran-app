@@ -5,15 +5,28 @@ import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../cubit/tafsir_cubit.dart';
 
-class TafsirPage extends StatelessWidget {
+class TafsirPage extends StatefulWidget {
   const TafsirPage({this.showHeader = true, super.key});
 
   final bool showHeader;
 
   @override
+  State<TafsirPage> createState() => _TafsirPageState();
+}
+
+class _TafsirPageState extends State<TafsirPage> {
+  final TextEditingController _search = TextEditingController();
+  String _languageFilter = 'all';
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
     return Material(
       key: WidgetKeys.tafsirPage,
       color: cs.surface,
@@ -21,85 +34,378 @@ class TafsirPage extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: SafeArea(
         top: false,
-        child: Column(
-          children: [
-            if (showHeader)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.28),
-                        borderRadius: BorderRadius.circular(2),
+        child: BlocBuilder<TafsirCubit, TafsirState>(
+          builder: (context, state) {
+            if (state.status == TafsirStatus.loading && state.items.isEmpty) {
+              return const _Loading();
+            }
+            return Column(
+              children: [
+                if (widget.showHeader)
+                  _Header(
+                    search: _search,
+                    items: state.items,
+                    languageFilter: _languageFilter,
+                    onLanguageFilterChanged: (value) =>
+                        setState(() => _languageFilter = value),
+                  ),
+                Expanded(
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _search,
+                    builder: (context, value, _) => RefreshIndicator(
+                      onRefresh: () => context.read<TafsirCubit>().load(),
+                      child: _List(
+                        state: state,
+                        query: value.text.trim().toLowerCase(),
+                        languageFilter: _languageFilter,
+                        compact: !widget.showHeader,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 40,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              tooltip: 'Close',
-                              icon: const AppIcon(AppIcons.close),
-                              onPressed: () => Navigator.of(context).maybePop(),
-                            ),
-                          ),
-                          Text(
-                            'Tafsir',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            Expanded(
-              child: BlocBuilder<TafsirCubit, TafsirState>(
-                builder: (context, state) {
-                  if (state.status == TafsirStatus.loading &&
-                      state.items.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  return RefreshIndicator(
-                    onRefresh: () => context.read<TafsirCubit>().load(),
-                    child: ListView(
-                      padding: EdgeInsets.fromLTRB(
-                        20,
-                        showHeader ? 8 : 0,
-                        20,
-                        24,
-                      ),
-                      children: [
-                        if (state.catalogueUnavailable)
-                          const _InlineNotice(
-                            text: 'Tafsir catalogue unavailable.',
-                          ),
-                        for (final item in state.items)
-                          _TafsirResourceCard(item: item),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _TafsirResourceCard extends StatelessWidget {
-  const _TafsirResourceCard({required this.item});
+class _Loading extends StatelessWidget {
+  const _Loading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 360,
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  const _Header({
+    required this.search,
+    required this.items,
+    required this.languageFilter,
+    required this.onLanguageFilterChanged,
+  });
+
+  final TextEditingController search;
+  final List<TafsirItem> items;
+  final String languageFilter;
+  final ValueChanged<String> onLanguageFilterChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.28),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 40,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    tooltip: 'Close',
+                    icon: const AppIcon(AppIcons.close),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                ),
+                Text(
+                  'Tafsir',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: WidgetKeys.tafsirSearchField,
+            controller: search,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'Search',
+              prefixIcon: const AppIcon(AppIcons.search),
+              suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: search,
+                builder: (context, value, _) {
+                  if (value.text.isEmpty) return const SizedBox.shrink();
+                  return IconButton(
+                    key: WidgetKeys.tafsirSearchClear,
+                    tooltip: 'Clear search',
+                    icon: const AppIcon(AppIcons.close),
+                    onPressed: search.clear,
+                  );
+                },
+              ),
+              filled: true,
+              fillColor: cs.surface,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.65),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(28),
+                borderSide: BorderSide(color: cs.primary),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _LanguageFilters(
+            items: items,
+            selected: languageFilter,
+            onSelected: onLanguageFilterChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguageFilters extends StatelessWidget {
+  const _LanguageFilters({
+    required this.items,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<TafsirItem> items;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final codes = {
+      for (final item in items) item.languageCode.toLowerCase(),
+    }.where((code) => code.isNotEmpty).toList()
+      ..sort(_compareLanguages);
+    if (codes.length <= 1) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 30,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          _FilterChipButton(
+            code: 'all',
+            label: 'All',
+            selected: selected == 'all',
+            onSelected: onSelected,
+          ),
+          for (final code in codes) ...[
+            const SizedBox(width: 8),
+            _FilterChipButton(
+              code: code,
+              label: _languageLabel(code),
+              selected: selected == code,
+              onSelected: onSelected,
+            ),
+          ],
+          const SizedBox(width: 2),
+        ],
+      ),
+    );
+  }
+
+  int _compareLanguages(String a, String b) {
+    int rank(String code) {
+      return switch (code) {
+        'ur' => 0,
+        'en' => 1,
+        'ar' => 2,
+        _ => 10,
+      };
+    }
+
+    final cmp = rank(a).compareTo(rank(b));
+    return cmp == 0 ? a.compareTo(b) : cmp;
+  }
+}
+
+class _FilterChipButton extends StatelessWidget {
+  const _FilterChipButton({
+    required this.code,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String code;
+  final String label;
+  final bool selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      key: WidgetKeys.tafsirLanguageFilter(code),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(code),
+      showCheckmark: false,
+      labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+  }
+}
+
+class _List extends StatelessWidget {
+  const _List({
+    required this.state,
+    required this.query,
+    required this.languageFilter,
+    required this.compact,
+  });
+
+  final TafsirState state;
+  final String query;
+  final String languageFilter;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final installed = _filter([
+      for (final item in state.items)
+        if (item.status == TafsirItemStatus.installed) item,
+    ]);
+    final available = _filter([
+      for (final item in state.items)
+        if (item.status == TafsirItemStatus.available ||
+            item.status == TafsirItemStatus.installing ||
+            item.status == TafsirItemStatus.failed)
+          item,
+    ]);
+    final planned = _filter([
+      for (final item in state.items)
+        if (item.status == TafsirItemStatus.unavailable) item,
+    ]);
+
+    return ListView(
+      padding: EdgeInsets.fromLTRB(24, compact ? 0 : 6, 24, 18),
+      children: [
+        if (state.catalogueUnavailable)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: _Notice('New Tafsir downloads are unavailable offline.'),
+          ),
+        _Section(title: 'On device', items: installed),
+        if (installed.isNotEmpty && available.isNotEmpty)
+          const SizedBox(height: 14),
+        _Section(title: 'Available for download', items: available),
+        if ((installed.isNotEmpty || available.isNotEmpty) &&
+            planned.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+        ],
+        _Section(title: 'Planned', items: planned),
+        if (installed.isEmpty && available.isEmpty && planned.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: _EmptyLine('No Tafsir found'),
+          ),
+      ],
+    );
+  }
+
+  List<TafsirItem> _filter(List<TafsirItem> items) {
+    final filtered = [
+      for (final item in items)
+        if (_matchesLanguage(item) &&
+            (query.isEmpty || _searchText(item).contains(query)))
+          item,
+    ];
+    return filtered..sort(_compareItems);
+  }
+
+  bool _matchesLanguage(TafsirItem item) =>
+      languageFilter == 'all' ||
+      item.languageCode.toLowerCase() == languageFilter;
+
+  String _searchText(TafsirItem item) {
+    return [
+      item.name,
+      item.languageCode,
+      _languageLabel(item.languageCode),
+      item.author ?? '',
+      item.nativeName ?? '',
+    ].join(' ').toLowerCase();
+  }
+
+  int _compareItems(TafsirItem a, TafsirItem b) {
+    final order = a.sortOrder.compareTo(b.sortOrder);
+    if (order != 0) return order;
+    final lang = _languageRank(a.languageCode).compareTo(
+      _languageRank(b.languageCode),
+    );
+    if (lang != 0) return lang;
+    return a.name.compareTo(b.name);
+  }
+
+  int _languageRank(String code) {
+    return switch (code.toLowerCase()) {
+      'ur' => 0,
+      'en' => 1,
+      'ar' => 2,
+      _ => 10,
+    };
+  }
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.items});
+
+  final String title;
+  final List<TafsirItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 6),
+        for (final item in items) _TafsirRow(item: item),
+      ],
+    );
+  }
+}
+
+class _TafsirRow extends StatelessWidget {
+  const _TafsirRow({required this.item});
 
   final TafsirItem item;
 
@@ -107,117 +413,190 @@ class _TafsirResourceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final installed = item.status == TafsirItemStatus.installed;
-    final installing = item.status == TafsirItemStatus.installing;
-    return Padding(
+    return InkWell(
       key: WidgetKeys.tafsirResourceRow(item.slug),
-      padding: const EdgeInsets.only(bottom: 10),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.18),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.70)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+      onTap: _onTap(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: [
+            SizedBox(width: 26, child: _Leading(item: item)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _titleLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurface,
                             fontWeight: FontWeight.w700,
-                            height: 1.18,
                           ),
                         ),
-                        if (item.subtitle.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            item.subtitle,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              height: 1.22,
-                            ),
+                      ),
+                      if (_sizeLabel.isNotEmpty) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          _sizeLabel,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
                           ),
-                        ],
+                        ),
                       ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _subtitleLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  _StatusPill(status: item.status),
+                  if (item.status == TafsirItemStatus.failed &&
+                      item.error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        item.error!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: cs.error,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (item.status == TafsirItemStatus.installing)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: LinearProgressIndicator(
+                        value: item.progress == 0 ? null : item.progress,
+                      ),
+                    ),
                 ],
               ),
-              if (item.status == TafsirItemStatus.unavailable) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'This edition appears here when a Tafsir catalogue is available.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    height: 1.32,
-                  ),
-                ),
-              ],
-              if (installing) ...[
-                const SizedBox(height: 14),
-                LinearProgressIndicator(
-                  value: item.progress == 0 ? null : item.progress,
-                ),
-              ],
-              if (item.status != TafsirItemStatus.unavailable) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: FilledButton.tonalIcon(
-                    key: WidgetKeys.tafsirDownload(item.slug),
-                    onPressed: item.status == TafsirItemStatus.available ||
-                            item.status == TafsirItemStatus.failed
-                        ? () => context.read<TafsirCubit>().install(item.slug)
-                        : null,
-                    icon: AppIcon(
-                      installed ? AppIcons.statusPass : AppIcons.alKahf,
-                      filled: installed,
-                    ),
-                    label: Text(_buttonLabel(item)),
-                  ),
-                ),
-              ],
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            _Action(item: item),
+          ],
         ),
       ),
     );
   }
 
-  String _buttonLabel(TafsirItem item) {
-    return switch (item.status) {
-      TafsirItemStatus.installed => 'Ready',
-      TafsirItemStatus.installing => 'Downloading',
-      TafsirItemStatus.failed => 'Retry Download',
-      TafsirItemStatus.unavailable => 'Preparing Download',
-      TafsirItemStatus.available => item.downloadBytes > 0
-          ? 'Download ${_formatBytes(item.downloadBytes)}'
-          : 'Download',
-    };
+  String get _titleLabel => _languageLabel(item.languageCode);
+
+  String get _subtitleLabel {
+    final suffix = item.abridged ? ' (Abridged)' : '';
+    final author = item.author?.trim();
+    final base = '${item.name}$suffix';
+    if (author == null || author.isEmpty || author == item.name) return base;
+    return '$base · $author';
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '';
-    final mb = bytes / (1024 * 1024);
-    if (mb >= 1) return '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} MB';
-    final kb = bytes / 1024;
-    return '${kb.toStringAsFixed(kb >= 10 ? 0 : 1)} KB';
+  String get _sizeLabel {
+    if (item.downloadBytes <= 0 ||
+        item.status == TafsirItemStatus.installed ||
+        item.status == TafsirItemStatus.unavailable) {
+      return '';
+    }
+    return '(${_formatBytes(item.downloadBytes)})';
+  }
+
+  VoidCallback? _onTap(BuildContext context) {
+    if (item.status == TafsirItemStatus.available ||
+        item.status == TafsirItemStatus.failed) {
+      return () => context.read<TafsirCubit>().install(item.slug);
+    }
+    return null;
   }
 }
 
-class _InlineNotice extends StatelessWidget {
-  const _InlineNotice({required this.text});
+class _Leading extends StatelessWidget {
+  const _Leading({required this.item});
+
+  final TafsirItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return switch (item.status) {
+      TafsirItemStatus.installed => Icon(
+          Icons.check_circle_rounded,
+          color: cs.primary,
+          size: 22,
+        ),
+      TafsirItemStatus.installing => SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            value: item.progress == 0 ? null : item.progress,
+            strokeWidth: 2,
+          ),
+        ),
+      TafsirItemStatus.failed => Icon(
+          Icons.error_outline_rounded,
+          color: cs.error,
+          size: 22,
+        ),
+      TafsirItemStatus.available ||
+      TafsirItemStatus.unavailable =>
+        const SizedBox.shrink(),
+    };
+  }
+}
+
+class _Action extends StatelessWidget {
+  const _Action({required this.item});
+
+  final TafsirItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return switch (item.status) {
+      TafsirItemStatus.installed => SizedBox(
+          width: 34,
+          child: Icon(
+            Icons.check_rounded,
+            color: cs.onSurfaceVariant,
+            size: 22,
+          ),
+        ),
+      TafsirItemStatus.available || TafsirItemStatus.failed => IconButton(
+          key: WidgetKeys.tafsirDownload(item.slug),
+          tooltip: 'Download ${item.name}',
+          iconSize: 22,
+          constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+          padding: EdgeInsets.zero,
+          icon: Icon(Icons.download_rounded, color: cs.primary),
+          onPressed: () => context.read<TafsirCubit>().install(item.slug),
+        ),
+      TafsirItemStatus.installing => const SizedBox(width: 34),
+      TafsirItemStatus.unavailable => SizedBox(
+          width: 34,
+          child: Icon(
+            Icons.lock_clock_rounded,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.62),
+            size: 21,
+          ),
+        ),
+    };
+  }
+}
+
+class _Notice extends StatelessWidget {
+  const _Notice(this.text);
 
   final String text;
 
@@ -225,21 +604,18 @@ class _InlineNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: cs.secondaryContainer.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Text(
-            text,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSecondaryContainer,
-              height: 1.3,
-            ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text(
+          text,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: cs.onSecondaryContainer,
+            height: 1.3,
           ),
         ),
       ),
@@ -247,40 +623,40 @@ class _InlineNotice extends StatelessWidget {
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
+class _EmptyLine extends StatelessWidget {
+  const _EmptyLine(this.text);
 
-  final TafsirItemStatus status;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final installed = status == TafsirItemStatus.installed;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: installed
-            ? cs.primaryContainer.withValues(alpha: 0.82)
-            : cs.secondaryContainer.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        child: Text(
-          switch (status) {
-            TafsirItemStatus.installed => 'On Device',
-            TafsirItemStatus.installing => 'Installing',
-            TafsirItemStatus.failed => 'Retry',
-            TafsirItemStatus.available => 'Available',
-            TafsirItemStatus.unavailable => 'Planned',
-          },
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: installed ? cs.onPrimaryContainer : cs.onSecondaryContainer,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+    return Center(
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
       ),
     );
   }
+}
+
+String _languageLabel(String code) {
+  return switch (code.toLowerCase()) {
+    'ar' => 'Arabic',
+    'bn' => 'Bangla',
+    'en' => 'English',
+    'hi' => 'Hindi',
+    'id' => 'Bahasa Indonesia',
+    'ur' => 'Urdu',
+    _ => code.toUpperCase(),
+  };
+}
+
+String _formatBytes(int bytes) {
+  if (bytes <= 0) return '';
+  final mb = bytes / (1024 * 1024);
+  if (mb >= 1) return '${mb.toStringAsFixed(mb >= 10 ? 0 : 1)} MB';
+  final kb = bytes / 1024;
+  return '${kb.toStringAsFixed(kb >= 10 ? 0 : 1)} KB';
 }
