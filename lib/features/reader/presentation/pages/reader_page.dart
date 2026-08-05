@@ -21,6 +21,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/translations/translation_recommendations.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../navigation/presentation/pages/app_settings_actions.dart';
+import '../../../tafsir/presentation/tafsir_sheet.dart';
 import '../../../translations/presentation/translations_sheet.dart';
 import '../safe_focus_alignment.dart';
 import '../../domain/entities/arabic_script.dart';
@@ -585,6 +586,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         onRegisterFlush:
             interactive ? (cb) => _flushCurrentPosition = cb : null,
         onOpenTranslations: interactive ? _openTranslationsSheet : null,
+        onOpenTafsir: interactive ? _openTafsirForAyah : null,
         bookmarkedAyahIds: _bookmarks.bookmarkedAyahIds,
         onToggleBookmark: interactive ? _toggleBookmark : null,
         // Only the live page drives immersion (forward-scroll hides the chrome).
@@ -729,6 +731,14 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // it safe to setState here (this also fires from MushafView.dispose()).
     _focusAyahId = ayah.id;
     _cubit.saveProgress(ayah);
+  }
+
+  void _openTafsirForAyah(Ayah ayah) {
+    showTafsirForAyahSheet(
+      context,
+      ayah: ayah,
+      surahName: _cubit.state.headings[ayah.surahId]?.nameEnglish,
+    );
   }
 
   // --- Pinch-to-zoom (two-finger) -------------------------------------------
@@ -1118,6 +1128,7 @@ class _DetailedList extends StatefulWidget {
     this.onVisibleAyah,
     this.onRegisterFlush,
     this.onOpenTranslations,
+    this.onOpenTafsir,
     this.onToggleBookmark,
     this.bookmarkedAyahIds = const {},
     this.onImmersionChanged,
@@ -1156,6 +1167,9 @@ class _DetailedList extends StatefulWidget {
 
   /// Opens the shared reader translation picker from an ayah's ⋯ menu.
   final VoidCallback? onOpenTranslations;
+
+  /// Opens Tafsir for the selected ayah from an ayah's ⋯ menu.
+  final ValueChanged<Ayah>? onOpenTafsir;
 
   /// Toggles an ayah bookmark from the visible bookmark affordance or menu.
   final ValueChanged<Ayah>? onToggleBookmark;
@@ -1494,6 +1508,7 @@ class _DetailedListState extends State<_DetailedList> {
       isBookmarked: widget.bookmarkedAyahIds.contains(ayah.id),
       onToggleBookmark: () => widget.onToggleBookmark?.call(ayah),
       onOpenTranslations: widget.onOpenTranslations,
+      onOpenTafsir: () => widget.onOpenTafsir?.call(ayah),
       // The ⋯ menu's Screenshot captures the whole visible page (this list's
       // RepaintBoundary), not this one verse.
       onScreenshotPage: _shareVisiblePage,

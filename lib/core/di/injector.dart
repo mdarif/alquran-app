@@ -37,15 +37,20 @@ import '../../features/reminders/presentation/cubit/reminders_cubit.dart';
 import '../../features/surahs/data/repositories/surah_repository_impl.dart';
 import '../../features/surahs/domain/repositories/surah_repository.dart';
 import '../../features/surahs/presentation/cubit/surah_list_cubit.dart';
+import '../../features/tafsir/data/repositories/tafsir_repository_impl.dart';
+import '../../features/tafsir/domain/repositories/tafsir_repository.dart';
+import '../../features/tafsir/presentation/cubit/tafsir_cubit.dart';
 import '../audio/ayah_recitation_player.dart';
 import '../app_update_config.dart';
 import '../database/app_database.dart';
 import '../database/editions_database.dart';
+import '../database/tafsir_database.dart';
 import '../editions_config.dart';
 import '../feature_flags.dart';
 import '../database/db_seeder.dart';
 import '../hijri/hijri_anchor_repository.dart';
 import '../home_widget/widget_bridge.dart';
+import '../tafsir_config.dart';
 import '../home_widget/widget_publisher.dart';
 import '../theme/mushaf_palette.dart';
 import '../theme/prayer_phase.dart';
@@ -64,6 +69,7 @@ Future<void> configureDependencies() async {
   // never touches. Merging them into quran.db would destroy every download on
   // the next app update, silently. → EditionsDatabase
   final editionsFile = await editionsDatabaseFile();
+  final tafsirFile = await tafsirDatabaseFile();
   final supportDir = await getApplicationSupportDirectory();
   getIt
     // Data sources
@@ -72,6 +78,7 @@ Future<void> configureDependencies() async {
       HijriAnchorRepository(getIt<AppDatabase>()),
     )
     ..registerSingleton<EditionsDatabase>(EditionsDatabase(editionsFile))
+    ..registerSingleton<TafsirDatabase>(TafsirDatabase(tafsirFile))
     ..registerSingleton<SharedPreferences>(prefs)
     // Repositories
     ..registerLazySingleton<SurahRepository>(
@@ -89,6 +96,13 @@ Future<void> configureDependencies() async {
         db: getIt<EditionsDatabase>(),
         supportDir: supportDir,
         catalogueUrl: Uri.parse(editionCatalogueUrl),
+      ),
+    )
+    ..registerLazySingleton<TafsirRepository>(
+      () => TafsirRepositoryImpl(
+        db: getIt<TafsirDatabase>(),
+        supportDir: supportDir,
+        catalogueUrl: Uri.parse(tafsirCatalogueUrl),
       ),
     )
     ..registerLazySingleton<IndexRepository>(
@@ -225,6 +239,10 @@ Future<void> configureDependencies() async {
           (getIt<AyahRepository>() as AyahRepositoryImpl)
               .invalidateTranslations(),
     ),
+  );
+
+  getIt.registerLazySingleton<TafsirCubit>(
+    () => TafsirCubit(getIt<TafsirRepository>()),
   );
 
   // Audio recitation. Registered UNCONDITIONALLY but LAZILY: the player (lazy

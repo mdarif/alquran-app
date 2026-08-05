@@ -20,6 +20,9 @@ class WidgetKeys {
   static const translationsMenuButton = Key('home-translations-menu-button');
   static const tafsirMenuButton = Key('home-tafsir-menu-button');
   static const tafsirPage = Key('tafsir-page');
+  static const tafsirAyahSheet = Key('tafsir-ayah-sheet');
+  static Key tafsirResourceRow(String slug) => Key('tafsir-row-$slug');
+  static Key tafsirDownload(String slug) => Key('tafsir-download-$slug');
   static const bookmarksMenuButton = Key('home-bookmarks-menu-button');
   static const bookmarksPage = Key('bookmarks-page');
   static const appUpdateBanner = Key('app-update-banner');

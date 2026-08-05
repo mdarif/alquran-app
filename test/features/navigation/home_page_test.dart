@@ -36,6 +36,11 @@ import 'package:al_quran/features/surahs/domain/entities/surah.dart';
 import 'package:al_quran/features/surahs/domain/repositories/surah_repository.dart';
 import 'package:al_quran/features/surahs/presentation/cubit/surah_list_cubit.dart';
 import 'package:al_quran/features/surahs/presentation/pages/surah_list_page.dart';
+import 'package:al_quran/features/tafsir/domain/entities/tafsir_catalogue_entry.dart';
+import 'package:al_quran/features/tafsir/domain/entities/tafsir_entry.dart';
+import 'package:al_quran/features/tafsir/domain/entities/tafsir_resource.dart';
+import 'package:al_quran/features/tafsir/domain/repositories/tafsir_repository.dart';
+import 'package:al_quran/features/tafsir/presentation/cubit/tafsir_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,6 +186,44 @@ class _FakePrayerTimesRepository implements PrayerTimesRepository {
   DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) => null;
 }
 
+class _FakeTafsirRepository implements TafsirRepository {
+  @override
+  Future<TafsirCatalogue> catalogue() async => const TafsirCatalogue(
+        resources: [
+          TafsirCatalogueEntry(
+            slug: 'en-ibn-kathir-abridged',
+            languageCode: 'en',
+            name: 'Tafsir Ibn Kathir',
+            file: 'en-ibn-kathir-abridged.db.gz',
+            bytes: 0,
+            sha256: 'sha256',
+            uncompressedBytes: 0,
+            uncompressedSha256: 'raw-sha256',
+            ayahCount: 6236,
+            textGroupCount: 0,
+            abridged: true,
+          ),
+        ],
+      );
+
+  @override
+  Future<TafsirEntry?> entryForAyah({
+    required String slug,
+    required int surah,
+    required int ayah,
+  }) async =>
+      null;
+
+  @override
+  Future<void> install(
+    TafsirCatalogueEntry entry, {
+    void Function(double progress)? onProgress,
+  }) async {}
+
+  @override
+  Future<List<TafsirResource>> installed() async => const [];
+}
+
 class _FakeNotificationScheduler implements NotificationScheduler {
   @override
   Future<void> init({void Function(String? payload)? onSelect}) async {}
@@ -319,6 +362,10 @@ void main() {
       )
       ..registerLazySingleton<AppUpdateRepository>(
         _FakeAppUpdateRepository.new,
+      )
+      ..registerLazySingleton<TafsirRepository>(_FakeTafsirRepository.new)
+      ..registerLazySingleton<TafsirCubit>(
+        () => TafsirCubit(GetIt.I<TafsirRepository>()),
       );
   });
   tearDown(GetIt.I.reset);
@@ -608,9 +655,9 @@ void main() {
 
       expect(find.byKey(WidgetKeys.tafsirPage), findsOneWidget);
       expect(find.text('Tafsir Ibn Kathir'), findsOneWidget);
-      expect(find.text('English abridged edition'), findsOneWidget);
+      expect(find.text('EN · abridged'), findsOneWidget);
       expect(
-        find.widgetWithText(FilledButton, 'Preparing Download'),
+        find.widgetWithText(FilledButton, 'Download'),
         findsOneWidget,
       );
     });

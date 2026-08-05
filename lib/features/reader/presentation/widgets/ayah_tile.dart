@@ -26,6 +26,7 @@ class AyahTile extends StatelessWidget {
     this.isBookmarked = false,
     this.onToggleBookmark,
     this.onOpenTranslations,
+    this.onOpenTafsir,
     this.onScreenshotPage,
     super.key,
   });
@@ -63,6 +64,9 @@ class AyahTile extends StatelessWidget {
 
   /// Opens the reader-wide translation picker from this ayah's menu.
   final VoidCallback? onOpenTranslations;
+
+  /// Opens the installed Tafsir text for this ayah from the ⋯ menu.
+  final VoidCallback? onOpenTafsir;
 
   /// Capture the whole visible page as an image and share it — wired from the
   /// Detailed list (which owns the RepaintBoundary). Null hides the ⋯ menu's
@@ -203,6 +207,16 @@ class AyahTile extends StatelessWidget {
                         label: 'Translations',
                       ),
                     ),
+                  if (onOpenTafsir != null)
+                    const PopupMenuItem(
+                      value: _AyahAction.tafsir,
+                      height: _CompactMenuItem.height,
+                      padding: EdgeInsets.zero,
+                      child: _CompactMenuItem(
+                        icon: AppIcons.alKahf,
+                        label: 'Tafsir',
+                      ),
+                    ),
                   // Whole-page image, not just this verse — captures every verse
                   // currently on screen (see [onScreenshotPage]).
                   if (onScreenshotPage != null)
@@ -301,6 +315,10 @@ class AyahTile extends StatelessWidget {
       onOpenTranslations?.call();
       return;
     }
+    if (action == _AyahAction.tafsir) {
+      onOpenTafsir?.call();
+      return;
+    }
     if (action == _AyahAction.bookmark) {
       onToggleBookmark?.call();
       return;
@@ -325,6 +343,7 @@ class AyahTile extends StatelessWidget {
           await SharePlus.instance.share(ShareParams(text: text));
         case _AyahAction.bookmark:
         case _AyahAction.translations:
+        case _AyahAction.tafsir:
           break; // handled above
         case _AyahAction.screenshot:
           break; // handled above
@@ -343,7 +362,7 @@ class AyahTile extends StatelessWidget {
   }
 }
 
-enum _AyahAction { copy, share, bookmark, translations, screenshot }
+enum _AyahAction { copy, share, bookmark, translations, tafsir, screenshot }
 
 class _CompactMenuItem extends StatelessWidget {
   const _CompactMenuItem({
