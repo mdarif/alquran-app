@@ -84,5 +84,19 @@ void main() {
         isTrue,
       );
     });
+
+    test('keeps loose Urdu surah headings out of the Quran Arabic font path',
+        () {
+      final blocks = htmlToTafsirBlocks(
+        'تفسیر سورۃ النساء:'
+        '<div lang="ur" class="ur"><p class="ur">سیدنا ابن عباس رضی اللہ '
+        'عنہما فرماتے ہیں۔</p></div>',
+      );
+
+      expect(blocks, hasLength(2));
+      expect(blocks[0].text, 'تفسیر سورۃ النساء:');
+      expect(blocks[0].isArabic, isFalse);
+      expect(blocks[1].isArabic, isFalse);
+    });
   });
 }

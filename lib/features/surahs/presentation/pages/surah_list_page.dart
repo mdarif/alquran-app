@@ -69,7 +69,7 @@ class SurahListBody extends StatelessWidget {
                   child: Divider(
                     height: 1,
                     thickness: 1,
-                    color: cs.outlineVariant.withValues(alpha: 0.24),
+                    color: cs.outlineVariant.withValues(alpha: 0.18),
                   ),
                 );
               },

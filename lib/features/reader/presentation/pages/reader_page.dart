@@ -580,6 +580,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         arabicStyle: _arabicStyle,
         focusAyahId: focus,
         contentInsets: contentInsets,
+        viewportHeight: viewportHeight,
         showArabic: _showArabicMatn,
         chromeHidden: _chromeHidden,
         onVisibleAyah: interactive ? _onVisibleAyah : null,
@@ -973,10 +974,20 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // across swipes) but is intentionally NOT persisted as the open default — a
     // fresh open always starts in Reading. It IS recorded on the Last Read point
     // though, so resuming returns to the view you were last in.
+    // A viewport toggle always restores the chrome — otherwise a toggle mid
+    // forward-scroll (chrome hidden) lands in the new view with no app/player
+    // bar and no scroll-down gesture yet made to bring them back. Reset it
+    // AFTER the incoming viewport has mounted and had its first frame (not
+    // before/during the setState below) so it wins over anything the new
+    // viewport's own construction — its initial jump to the resume verse —
+    // might otherwise report.
     setState(() {
       _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
     });
     _cubit.setViewportDetailed(detailed);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _setChromeHidden(false, applySystemUiNow: true);
+    });
   }
 
   /// The reader's active editions, as SLUGS — shared by the Reading peek and
@@ -1128,6 +1139,7 @@ class _DetailedList extends StatefulWidget {
     required this.headings,
     required this.arabicFontSize,
     required this.contentInsets,
+    required this.viewportHeight,
     this.arabicStyle = QuranTextStyle.madani,
     this.showArabic = true,
     this.chromeHidden = false,
@@ -1158,6 +1170,10 @@ class _DetailedList extends StatefulWidget {
 
   /// Padding to keep the first/last verse clear of the (edge-to-edge) bars.
   final EdgeInsets contentInsets;
+
+  /// The full viewport height used by scroll-to-focus alignment. Detailed also
+  /// runs edge-to-edge, so a target verse must clear the app bar/status inset.
+  final double viewportHeight;
 
   /// Whether each tile renders the Arabic matn (off = translations-only).
   final bool showArabic;
@@ -1334,7 +1350,11 @@ class _DetailedListState extends State<_DetailedList> {
     if (idx == null) return;
     _scrollController.scrollTo(
       index: idx,
-      alignment: 0.06,
+      alignment: safeFocusAlignment(
+        contentInsetTop: widget.contentInsets.top,
+        viewportHeight: widget.viewportHeight,
+        preferred: 0.06,
+      ),
       duration: const Duration(milliseconds: 450),
       curve: Curves.easeOutCubic,
     );
@@ -1456,7 +1476,11 @@ class _DetailedListState extends State<_DetailedList> {
                 itemScrollController: _scrollController,
                 itemPositionsListener: _positions,
                 initialScrollIndex: _initialRowIndex,
-                initialAlignment: 0.06,
+                initialAlignment: safeFocusAlignment(
+                  contentInsetTop: widget.contentInsets.top,
+                  viewportHeight: MediaQuery.sizeOf(context).height,
+                  preferred: 0.06,
+                ),
                 // Hard-clamp at the surah's first/last ayah — no rubber-band
                 // past the true content edges (mid-content still bounces).
                 physics: const QuranClampEdgesPhysics(),

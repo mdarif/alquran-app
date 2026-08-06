@@ -20,6 +20,17 @@ void main() {
     expect(alignment, greaterThan(100 / 800));
   });
 
+  test('raises Detailed view focus above its old fixed 0.06 alignment', () {
+    final alignment = safeFocusAlignment(
+      contentInsetTop: 103,
+      viewportHeight: 932,
+      preferred: 0.06,
+    );
+
+    expect(alignment, greaterThan(0.06));
+    expect(alignment * 932, greaterThanOrEqualTo(111));
+  });
+
   test('never renders the verse behind the reserved top inset', () {
     const insets = [0.0, 40.0, 80.0, 100.0, 140.0];
     const heights = [600.0, 800.0, 932.0];

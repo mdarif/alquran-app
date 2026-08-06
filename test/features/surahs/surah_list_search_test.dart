@@ -56,6 +56,13 @@ void main() {
     expect(find.byType(SurahTile), findsNWidgets(3));
   });
 
+  testWidgets('uses soft separators between surah rows', (tester) async {
+    await pump(tester);
+
+    final divider = tester.widget<Divider>(find.byType(Divider).first);
+    expect(divider.color?.a, closeTo(0.18, 0.01));
+  });
+
   testWidgets('a name query narrows the list; clearing restores it',
       (tester) async {
     await pump(tester);

@@ -131,6 +131,26 @@ class AyahTile extends StatelessWidget {
               ],
               const Spacer(),
               if (onTogglePlay != null) _playButton(theme),
+              IconButton(
+                tooltip: 'Copy',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _onAction(context, _AyahAction.copy),
+                icon: AppIcon(
+                  AppIcons.copy,
+                  size: AppIconSize.action,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Share',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _onAction(context, _AyahAction.share),
+                icon: AppIcon(
+                  AppIcons.share,
+                  size: AppIconSize.action,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
               if (onToggleBookmark != null)
                 IconButton(
                   key: WidgetKeys.ayahBookmarkButton(ayah.id),
@@ -189,16 +209,6 @@ class AyahTile extends StatelessWidget {
                       : controller.open(),
                 ),
                 menuChildren: [
-                  _AyahMenuItem(
-                    icon: AppIcons.copy,
-                    label: 'Copy',
-                    onPressed: () => _onAction(context, _AyahAction.copy),
-                  ),
-                  _AyahMenuItem(
-                    icon: AppIcons.share,
-                    label: 'Share',
-                    onPressed: () => _onAction(context, _AyahAction.share),
-                  ),
                   if (onOpenTranslations != null)
                     _AyahMenuItem(
                       icon: AppIcons.viewReading,

@@ -199,11 +199,18 @@ TafsirTextBlock _looseTafsirBlock(String text, bool hasHeadingMarker) {
 }
 
 String _cleanTafsirMarkers(String text) {
-  return text.replaceAll(RegExp(r'[٭۝۞۩◌\u06DD\u06DE\u06E9]+'), '').trim();
+  return text
+      .replaceAll(
+        RegExp(r'[٭۝۞۩◌ۣ۟۠ۡۢۤۥۦۭۧۨ۫۬\u06DD-\u06E0\u06E5-\u06ED]+'),
+        '',
+      )
+      .trim();
 }
 
 bool _hasDecorativeHeadingMarker(String text) {
-  return RegExp(r'[٭۝۞۩◌\u06DD\u06DE\u06E9]{2,}').hasMatch(text);
+  return RegExp(
+    r'[٭۝۞۩◌ۣ۟۠ۡۢۤۥۦۭۧۨ۫۬\u06DD-\u06E0\u06E5-\u06ED]{2,}',
+  ).hasMatch(text);
 }
 
 bool _isArabicBlock(String attrs, String text) {
@@ -253,6 +260,7 @@ bool _hasClass(String attrs, String className) {
 }
 
 bool _looksArabic(String text) {
+  if (_hasUrduSpecificLetters(text)) return false;
   final letters =
       RegExp(r'[\p{Letter}]', unicode: true).allMatches(text).length;
   if (letters == 0) return false;
@@ -260,4 +268,8 @@ bool _looksArabic(String text) {
     r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]',
   ).allMatches(text).length;
   return arabic / letters >= 0.45;
+}
+
+bool _hasUrduSpecificLetters(String text) {
+  return RegExp(r'[ٹڈڑںےہھگپچژکگیۀۃ]').hasMatch(text);
 }

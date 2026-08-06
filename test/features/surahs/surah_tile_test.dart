@@ -30,7 +30,8 @@ void main() {
       expect(find.text('Makki · 7 Ayah'), findsOneWidget);
     });
 
-    testWidgets('Arabic chapter name is rendered prominently', (tester) async {
+    testWidgets('uses restrained metadata and number badge typography',
+        (tester) async {
       await tester.pumpWidget(
         _wrap(
           SurahTile(
@@ -46,7 +47,33 @@ void main() {
         ),
       );
 
-      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 30);
+      final metadata = tester.widget<Text>(find.text('Makki · 7 Ayah'));
+      expect(metadata.style?.fontSize, 14);
+      expect(metadata.style?.fontWeight, FontWeight.w400);
+
+      final badge = tester.widget<Text>(find.text('1'));
+      expect(badge.style?.fontSize, 13);
+      expect(badge.style?.fontWeight, FontWeight.w600);
+    });
+
+    testWidgets('Arabic chapter name is calm but still prominent',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          SurahTile(
+            surah: const Surah(
+              id: 1,
+              nameArabic: 'الفاتحة',
+              nameEnglish: 'Al-Fatihah',
+              totalAyahs: 7,
+              revelationPlace: 'makkah',
+            ),
+            onTap: () {},
+          ),
+        ),
+      );
+
+      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 28);
     });
 
     testWidgets('keeps minimum row height compact enough for fast scanning',
@@ -76,7 +103,7 @@ void main() {
       ];
       expect(
         minHeights,
-        contains(70),
+        contains(68),
       );
     });
 

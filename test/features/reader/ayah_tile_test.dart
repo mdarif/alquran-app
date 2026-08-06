@@ -206,7 +206,7 @@ void main() {
       expect(find.textContaining('p. 2'), findsNothing);
     });
 
-    testWidgets('offers a Copy / Share menu', (tester) async {
+    testWidgets('offers visible Copy / Share actions', (tester) async {
       const ayah = Ayah(
         id: 1,
         surahId: 2,
@@ -221,13 +221,12 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(AppIcons.more));
-      await tester.pumpAndSettle();
-      expect(find.text('Copy'), findsOneWidget);
-      expect(find.text('Share'), findsOneWidget);
+      expect(find.byTooltip('Copy'), findsOneWidget);
+      expect(find.byTooltip('Share'), findsOneWidget);
     });
 
-    testWidgets('ayah menu uses compact rows instead of padded ListTiles',
+    testWidgets(
+        'ayah overflow menu uses compact rows instead of padded ListTiles',
         (tester) async {
       const ayah = Ayah(
         id: 1,
@@ -239,7 +238,12 @@ void main() {
 
       await tester.pumpWidget(
         _wrap(
-          const AyahTile(ayah: ayah, resources: [], arabicFontSize: 24),
+          AyahTile(
+            ayah: ayah,
+            resources: const [],
+            arabicFontSize: 24,
+            onOpenTranslations: () {},
+          ),
         ),
       );
 
@@ -247,11 +251,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.ancestor(of: find.text('Copy'), matching: find.byType(ListTile)),
-        findsNothing,
-      );
-      expect(
-        find.ancestor(of: find.text('Share'), matching: find.byType(ListTile)),
+        find.ancestor(
+          of: find.text('Translations'),
+          matching: find.byType(ListTile),
+        ),
         findsNothing,
       );
     });
@@ -355,9 +358,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(AppIcons.more));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Copy'));
+      await tester.tap(find.byTooltip('Copy'));
       await tester.pumpAndSettle();
 
       expect(
@@ -396,9 +397,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(AppIcons.more));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Share'));
+      await tester.tap(find.byTooltip('Share'));
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull); // no unhandled exception

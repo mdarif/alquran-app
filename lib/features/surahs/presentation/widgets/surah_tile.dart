@@ -38,9 +38,9 @@ class SurahTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 70),
+        constraints: const BoxConstraints(minHeight: 68),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 20, 6),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 5, 20, 5),
           child: Row(
             children: [
               _SurahNumberBadge(number: surah.id),
@@ -69,9 +69,10 @@ class SurahTile extends StatelessWidget {
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color:
                               verse == null ? cs.onSurfaceVariant : cs.primary,
+                          fontSize: 14,
                           fontWeight:
-                              verse == null ? FontWeight.w500 : FontWeight.w700,
-                          height: 1.16,
+                              verse == null ? FontWeight.w400 : FontWeight.w600,
+                          height: 1.12,
                         ),
                       ),
                     ],
@@ -96,7 +97,7 @@ class SurahTile extends StatelessWidget {
                           color: cs.onSurface.withValues(alpha: 0.78),
                           fontFamily: AppTheme.arabicFontFamily,
                           fontFeatures: AppTheme.arabicFontFeatures,
-                          fontSize: 30,
+                          fontSize: 28,
                           height: 1.2,
                         ),
                       ),
@@ -118,7 +119,7 @@ class _SurahNumberBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox.square(
-      dimension: 38,
+      dimension: 36,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: cs.primaryContainer.withValues(alpha: 0.78),
@@ -129,7 +130,8 @@ class _SurahNumberBadge extends StatelessWidget {
             '$number',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: cs.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                   height: 1,
                 ),
           ),

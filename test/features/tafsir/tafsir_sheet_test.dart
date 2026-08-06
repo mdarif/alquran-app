@@ -6,6 +6,8 @@ import 'package:al_quran/features/tafsir/domain/entities/tafsir_resource.dart';
 import 'package:al_quran/features/tafsir/domain/repositories/tafsir_repository.dart';
 import 'package:al_quran/features/tafsir/presentation/cubit/tafsir_cubit.dart';
 import 'package:al_quran/features/tafsir/presentation/tafsir_sheet.dart';
+import 'package:al_quran/core/testing/widget_keys.dart';
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,8 +18,9 @@ void main() {
 
   testWidgets('ayah Tafsir sheet shows Arabic and enabled translations',
       (tester) async {
+    final repository = _FakeTafsirRepository();
     GetIt.I
-      ..registerLazySingleton<TafsirRepository>(_FakeTafsirRepository.new)
+      ..registerLazySingleton<TafsirRepository>(() => repository)
       ..registerLazySingleton<TafsirCubit>(
         () => TafsirCubit(GetIt.I<TafsirRepository>()),
       );
@@ -107,16 +110,8 @@ void main() {
       urduHeading.textSpan?.style?.fontFamily,
       AppTheme.urduFontFamily,
     );
-    expect(
-      find.text(
-        'اردو تفسیر «ذَلِكَ»۔',
-        findRichText: true,
-        skipOffstage: false,
-      ),
-      findsOneWidget,
-    );
     final urduCommentary = tester.widget<SelectableText>(
-      _selectableText('اردو تفسیر «ذَلِكَ»۔'),
+      _selectableTextContaining('اردو تفسیر «ذَلِكَ»۔'),
     );
     final urduSpan = urduCommentary.textSpan!;
     expect(urduSpan.style?.fontFamily, AppTheme.urduFontFamily);
@@ -151,6 +146,184 @@ void main() {
     expect(arabicBlock.textDirection, TextDirection.rtl);
     expect(arabicBlock.textAlign, TextAlign.right);
   });
+
+  testWidgets('ayah Tafsir sheet keeps one entry future across rebuilds',
+      (tester) async {
+    final repository = _FakeTafsirRepository();
+    GetIt.I
+      ..registerLazySingleton<TafsirRepository>(() => repository)
+      ..registerLazySingleton<TafsirCubit>(
+        () => TafsirCubit(GetIt.I<TafsirRepository>()),
+      );
+
+    const ayah = Ayah(
+      id: 1,
+      surahId: 1,
+      ayahNumber: 1,
+      textArabic: 'بِسْمِ اللَّهِ',
+      isSajda: false,
+      translations: {},
+    );
+
+    late StateSetter setHostState;
+    var useDark = false;
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          setHostState = setState;
+          return MaterialApp(
+            theme: useDark ? ThemeData.dark() : ThemeData.light(),
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showTafsirForAyahSheet(
+                  context,
+                  ayah: ayah,
+                  resources: const [],
+                  surahName: 'Al-Fatihah',
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    expect(repository.entryForAyahCalls, 2);
+
+    setHostState(() => useDark = true);
+    await tester.pumpAndSettle();
+
+    expect(repository.entryForAyahCalls, 2);
+    final sheetBox = tester.getSize(find.byKey(WidgetKeys.tafsirAyahSheet));
+    final screenHeight =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    expect(sheetBox.height, greaterThan(screenHeight * 0.9));
+  });
+
+  testWidgets('ayah Tafsir sheet has size, search, jump, and top controls',
+      (tester) async {
+    final repository = _FakeTafsirRepository();
+    GetIt.I
+      ..registerLazySingleton<TafsirRepository>(() => repository)
+      ..registerLazySingleton<TafsirCubit>(
+        () => TafsirCubit(GetIt.I<TafsirRepository>()),
+      );
+
+    const ayah = Ayah(
+      id: 1,
+      surahId: 1,
+      ayahNumber: 1,
+      textArabic: 'بِسْمِ اللَّهِ',
+      isSajda: false,
+      translations: {},
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showTafsirForAyahSheet(
+              context,
+              ayah: ayah,
+              resources: const [],
+              surahName: 'Al-Fatihah',
+            ),
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(WidgetKeys.tafsirTextDecrease), findsOneWidget);
+    expect(find.byKey(WidgetKeys.tafsirTextIncrease), findsOneWidget);
+    expect(find.text('Ayah'), findsOneWidget);
+    expect(find.text('English'), findsOneWidget);
+    expect(find.text('Urdu'), findsOneWidget);
+    final searchFieldSizeBefore =
+        tester.getSize(find.byKey(WidgetKeys.tafsirInTextSearchField));
+    final jumpBarTopBefore =
+        tester.getTopLeft(find.widgetWithText(ActionChip, 'Ayah')).dy;
+
+    await tester.tap(find.byKey(WidgetKeys.tafsirTextIncrease));
+    await tester.pumpAndSettle();
+    expect(find.byKey(WidgetKeys.tafsirTextIncrease), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(WidgetKeys.tafsirInTextSearchField),
+      'طویل',
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('matches'), findsOneWidget);
+    expect(
+      tester.getSize(find.byKey(WidgetKeys.tafsirInTextSearchField)),
+      searchFieldSizeBefore,
+    );
+    expect(
+      tester.getTopLeft(find.widgetWithText(ActionChip, 'Ayah')).dy,
+      jumpBarTopBefore,
+    );
+
+    for (var i = 0; i < 8; i++) {
+      await tester.tap(find.byKey(WidgetKeys.tafsirSearchNext));
+      await tester.pumpAndSettle();
+    }
+    final afterSearch = _tafsirScrollPixels(tester);
+    expect(afterSearch, greaterThan(0));
+    expect(find.textContaining('طویل اردو تفسیر'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Ayah'));
+    await tester.pumpAndSettle();
+    expect(_tafsirScrollPixels(tester), lessThan(afterSearch));
+
+    await tester.tap(find.widgetWithText(ActionChip, 'Urdu'));
+    await tester.pumpAndSettle();
+    expect(_tafsirScrollPixels(tester), greaterThan(0));
+    expect(
+      find.text('Urdu - Tafsir Ibn Kathir', skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('طویل اردو تفسیر', skipOffstage: false),
+      findsWidgets,
+    );
+
+    for (var i = 0; i < 4; i++) {
+      await tester.drag(
+        find.byKey(WidgetKeys.tafsirEntryList),
+        const Offset(0, -260),
+        touchSlopY: 0,
+      );
+      await tester.pump(const Duration(milliseconds: 80));
+    }
+    await tester.pumpAndSettle();
+    expect(find.byKey(WidgetKeys.tafsirBackToTop), findsOneWidget);
+    final topIcon = tester.widget<AppIcon>(
+      find.descendant(
+        of: find.byKey(WidgetKeys.tafsirBackToTop),
+        matching: find.byType(AppIcon),
+      ),
+    );
+    expect(topIcon.icon, AppIcons.scrollTop);
+  });
+}
+
+double _tafsirScrollPixels(WidgetTester tester) {
+  final scrollables = tester.stateList<ScrollableState>(
+    find.descendant(
+      of: find.byKey(WidgetKeys.tafsirEntryList),
+      matching: find.byType(Scrollable),
+    ),
+  );
+  final scrollable = scrollables.firstWhere(
+    (state) => state.position.maxScrollExtent > 0,
+  );
+  return scrollable.position.pixels;
 }
 
 Finder _selectableText(String text) {
@@ -162,7 +335,19 @@ Finder _selectableText(String text) {
   );
 }
 
+Finder _selectableTextContaining(String text) {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is SelectableText &&
+        ((widget.data?.contains(text) ?? false) ||
+            (widget.textSpan?.toPlainText().contains(text) ?? false)),
+    description: 'SelectableText containing "$text"',
+  );
+}
+
 class _FakeTafsirRepository implements TafsirRepository {
+  int entryForAyahCalls = 0;
+
   @override
   Future<TafsirCatalogue> catalogue() async =>
       const TafsirCatalogue(resources: []);
@@ -173,6 +358,7 @@ class _FakeTafsirRepository implements TafsirRepository {
     required int surah,
     required int ayah,
   }) async {
+    entryForAyahCalls++;
     if (slug == 'ur-ibn-kathir') {
       return const TafsirEntry(
         resource: 'ur-ibn-kathir',
@@ -183,7 +369,18 @@ class _FakeTafsirRepository implements TafsirRepository {
         ayahKeys: ['1:1'],
         text: 'تحقیقات کتاب ٭٭'
             '<div lang="ur" class="ur"><p class="ur">اردو تفسیر '
-            '<span class="arabic qpc-hafs">«ذَلِكَ»</span>۔</p></div>',
+            '<span class="arabic qpc-hafs">«ذَلِكَ»</span>۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '<p class="ur">طویل اردو تفسیر کا متن یہاں جاری ہے۔</p>'
+            '</div>',
       );
     }
     return const TafsirEntry(
@@ -195,7 +392,28 @@ class _FakeTafsirRepository implements TafsirRepository {
       ayahKeys: ['1:1'],
       text: '<div lang="en" class="en">'
           '<h2>Guidance is granted to Those Who have Taqwa</h2></div>'
-          '<p>Commentary body.</p><p>الم</p>',
+          '<p>Commentary body.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>More commentary body text for a long Tafsir section.</p>'
+          '<p>الم</p>',
     );
   }
 
