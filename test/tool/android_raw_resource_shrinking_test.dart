@@ -20,13 +20,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// standard Android resource-shrinker keep rule
 /// (https://developer.android.com/build/shrink-code#keep-resources).
 void main() {
-  test('res/raw/keep.xml keeps salat_nudge from the release resource shrinker', () {
+  test('res/raw/keep.xml keeps salat_nudge from the release resource shrinker',
+      () {
     final keepFile = File('android/app/src/main/res/raw/keep.xml');
     expect(
       keepFile.existsSync(),
       isTrue,
-      reason:
-          'Without this keep rule, release builds silently strip '
+      reason: 'Without this keep rule, release builds silently strip '
           'salat_nudge.wav and every Salat notification fails to schedule.',
     );
     expect(keepFile.readAsStringSync(), contains('@raw/salat_nudge'));
