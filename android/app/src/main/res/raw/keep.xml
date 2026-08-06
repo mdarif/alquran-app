@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release builds run Android's resource shrinker, which only detects
+  resources referenced by a static R.raw.* reference. salat_nudge is looked
+  up by string name at runtime (flutter_local_notifications'
+  RawResourceAndroidNotificationSound('salat_nudge')), so the shrinker can't
+  see the reference and strips the file from release APKs — every scheduled
+  Salat notification then fails with PlatformException(invalid_sound).
+  This keep rule is the standard fix: https://developer.android.com/build/shrink-code#keep-resources
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/salat_nudge" />
