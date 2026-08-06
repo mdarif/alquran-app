@@ -75,6 +75,7 @@ class _FakeScheduler implements NotificationScheduler {
   int batteryExemptionCalls = 0;
   final List<int> cancelledIds = [];
   final List<_Scheduled> oneShots = [];
+  final List<_Scheduled> shownNow = [];
   final List<String?> openedSettingsChannelIds = [];
 
   @override
@@ -91,6 +92,9 @@ class _FakeScheduler implements NotificationScheduler {
 
   @override
   Future<void> requestExactAlarmPermission() async => exactAlarmCalls++;
+
+  @override
+  bool lastScheduleWasExact = true;
 
   @override
   Future<bool> canScheduleExact() async => true;
@@ -146,6 +150,26 @@ class _FakeScheduler implements NotificationScheduler {
       _Scheduled(
         id: id,
         fireAt: fireAt,
+        title: title,
+        body: body,
+        payload: payload,
+        soundName: soundName,
+      ),
+    );
+  }
+
+  @override
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+    String? soundName,
+  }) async {
+    shownNow.add(
+      _Scheduled(
+        id: id,
+        fireAt: DateTime(0),
         title: title,
         body: body,
         payload: payload,
@@ -398,29 +422,47 @@ void main() {
     expect(scheduler.exactAlarmCalls, 1);
   });
 
-  test('sendSoundCheck schedules an immediate test with the salat sound',
+  test('sendSoundCheck posts immediately, NOT through the alarm path',
       () async {
     final scheduler = _FakeScheduler();
     final cubit = build(scheduler: scheduler);
 
     await cubit.sendSoundCheck();
 
-    expect(scheduler.oneShots, hasLength(1));
-    final scheduled = scheduler.oneShots.single;
-    expect(scheduled.id, PrayerNotificationsCubit.soundCheckId);
-    expect(scheduled.soundName, 'salat_nudge');
-    expect(scheduled.fireAt, now.add(const Duration(seconds: 3)));
+    // Regression: the check used to be scheduled "3 seconds out" via
+    // AlarmManager, which the OS batches — so the "did you hear it?" prompt
+    // asked about a notification that hadn't been posted yet.
+    expect(scheduler.oneShots, isEmpty);
+    expect(scheduler.shownNow, hasLength(1));
+    final shown = scheduler.shownNow.single;
+    expect(shown.id, PrayerNotificationsCubit.soundCheckId);
+    expect(shown.soundName, 'salat_nudge');
   });
 
-  test('openSoundSettings opens the salat channel settings', () async {
+  test('notificationIds covers the sound-check and delivery-test ids', () {
+    // Salat notifications are autoCancel:false, so any id NOT cancelled on
+    // reschedule/disable lingers in the shade forever and gets the app
+    // auto-bundled by the OS (which then drops the alert).
+    expect(
+      PrayerNotificationsCubit.notificationIds,
+      containsAll([
+        PrayerNotificationsCubit.soundCheckId,
+        PrayerNotificationsCubit.debugTestId,
+      ]),
+    );
+  });
+
+  test('openSoundSettings opens the APP settings, not the channel page',
+      () async {
     final scheduler = _FakeScheduler();
     final cubit = build(scheduler: scheduler);
 
     await cubit.openSoundSettings();
 
-    expect(
-      scheduler.openedSettingsChannelIds,
-      ['salat_notifications_nature_v4'],
-    );
+    // Regression: this used to deep-link to the Salat channel. On
+    // ColorOS/OxygenOS the Ring/Vibrate switches that actually silence
+    // everything live on the APP page — the channel page can't show them, so
+    // "No, didn't notice" led users to a dead end.
+    expect(scheduler.openedSettingsChannelIds, [null]);
   });
 }

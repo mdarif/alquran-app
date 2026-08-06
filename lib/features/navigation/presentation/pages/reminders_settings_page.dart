@@ -319,8 +319,9 @@ class _SalatNotificationsSection extends StatelessWidget {
         title: const Text('Did you hear or feel it?'),
         content: const Text(
           'We just sent a test Salat notification. If your phone stayed '
-          'silent, Ring or Vibrate may be off for Al Quran in your phone '
-          'Settings — prayer notifications would be silent too.',
+          'silent, open Al Quran in your phone\'s notification Settings and '
+          'turn on Ring and Vibrate — some phones keep those off, which '
+          'silences prayer notifications no matter what the app does.',
         ),
         actions: [
           TextButton(

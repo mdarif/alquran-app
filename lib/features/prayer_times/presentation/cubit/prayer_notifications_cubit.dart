@@ -28,9 +28,17 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
   static const int _windowDays = 2;
   static const int _maxPerDay = 5;
 
+  /// Every id this feature owns — the rolling prayer window PLUS the two test
+  /// ids. The test ids must be in here: salat notifications are `autoCancel:
+  /// false` (a prayer nudge shouldn't vanish on the next unlock), so a sound
+  /// check or delivery test that nothing cancels sits in the shade forever,
+  /// and once ~4 of ours are stacked the OS auto-bundles the app's
+  /// notifications into its "Aggregate" group.
   static List<int> get notificationIds => [
         for (var id = _idBase; id < _idBase + (_windowDays * _maxPerDay); id++)
           id,
+        soundCheckId,
+        debugTestId,
       ];
 
   Future<void> enable() async {
@@ -67,30 +75,37 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
     await refresh();
   }
 
-  /// Fires an immediate test Salat notification (a few seconds out, through
-  /// the real alarm path) so a fresh "enable" can confirm — right away,
-  /// instead of at the next actual prayer time — whether the user will
-  /// actually hear/feel it. Some OEM skins (ColorOS/OxygenOS confirmed) hide
+  /// Posts a test Salat notification IMMEDIATELY (not via AlarmManager) so a
+  /// fresh "enable" can confirm — right away, instead of at the next actual
+  /// prayer time — whether the user will actually hear/feel it. It used to go
+  /// through the alarm path "3 seconds out", which the OS is free to batch
+  /// minutes away: the "did you hear it?" prompt then asked about a
+  /// notification that hadn't been posted yet. Some OEM skins (ColorOS/OxygenOS confirmed) hide
   /// an app-level Ring/Vibrate toggle above the notification channel that this
   /// app cannot set programmatically; [openSoundSettings] is the follow-up
   /// when the answer is "no". See docs/notification-reliability-notes.md.
   Future<void> sendSoundCheck() async {
-    final fireAt = _clock().add(const Duration(seconds: 3));
-    await _scheduler.scheduleOneShot(
+    await _scheduler.showNow(
       id: soundCheckId,
-      fireAt: fireAt,
       title: 'Salat Notifications',
       body: 'This is what a Salat notification sounds/feels like.',
       soundName: 'salat_nudge',
     );
   }
 
-  /// Deep-links to the Salat channel's OS notification settings (Ring/Vibrate
-  /// toggles), for a user who didn't hear/feel the sound check.
+  /// Opens the APP-level notification settings for a user who didn't hear the
+  /// sound check — deliberately NOT the Salat channel page.
+  ///
+  /// On ColorOS/OxygenOS the `Ring` and `Vibrate` switches that actually
+  /// silence everything live on the app page, above the channels; the channel
+  /// page only offers "Allow notifications / Set as silent / Lock screen /
+  /// Banner". Confirmed on a OnePlus where both were off while every channel
+  /// dump looked perfectly healthy (they are invisible to `dumpsys` and to
+  /// every Android API, so the app can neither read nor set them — pointing the
+  /// user at the right screen is all we can do). Deep-linking to the channel
+  /// sent people to the one page where the cause could not be seen.
   Future<void> openSoundSettings() async {
-    await _scheduler.openNotificationSettings(
-      channelId: _scheduler.salatChannelId,
-    );
+    await _scheduler.openNotificationSettings();
   }
 
   Future<void> refresh() async {
@@ -186,7 +201,10 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
     );
     if (error != null) return 'Schedule FAILED - $error';
     final pending = await _scheduler.pendingCount();
-    return 'Scheduled - $pending queued. Lock the phone, wait ~2 min.';
+    final mode = _scheduler.lastScheduleWasExact
+        ? 'exact'
+        : 'INEXACT - OS refused exact alarms, delivery may be up to an hour late';
+    return 'Scheduled ($mode) - $pending queued. Lock the phone, wait ~2 min.';
   }
 
   /// The salah whose time is closest to [at] — so a debug test fired "now"

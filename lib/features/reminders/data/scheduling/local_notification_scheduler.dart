@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show MethodChannel;
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -25,6 +25,8 @@ class LocalNotificationScheduler implements NotificationScheduler {
   static const String _salatChannelName = 'Salat Notifications';
   static const String _salatChannelDesc =
       'Gentle salat-time nudges with a soft natural sound';
+  static const String _salatGroupKey = 'com.almarfa.alquran.salat';
+  static const String _sunnahGroupKey = 'com.almarfa.alquran.sunnah';
   static final Int64List _salatVibrationPattern = Int64List.fromList(
     const [0, 250, 160, 250],
   );
@@ -150,14 +152,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
     String? soundName,
   }) async {
     try {
-      await _plugin.zonedSchedule(
+      await _zonedSchedule(
         id: id,
+        fireAt: fireAt,
         title: title,
         body: body,
-        scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
-        notificationDetails: _details(soundName: soundName),
-        androidScheduleMode: await _scheduleMode(),
         payload: payload,
+        soundName: soundName,
       );
       return null;
     } catch (e) {
@@ -207,6 +208,25 @@ class LocalNotificationScheduler implements NotificationScheduler {
   }
 
   @override
+  Future<void> showNow({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+    String? soundName,
+  }) async {
+    try {
+      await _plugin.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: _details(soundName: soundName),
+        payload: payload,
+      );
+    } catch (_) {}
+  }
+
+  @override
   Future<void> scheduleOneShot({
     required int id,
     required DateTime fireAt,
@@ -216,14 +236,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
     String? soundName,
   }) async {
     try {
-      await _plugin.zonedSchedule(
+      await _zonedSchedule(
         id: id,
+        fireAt: fireAt,
         title: title,
         body: body,
-        scheduledDate: tz.TZDateTime.from(fireAt, tz.local),
-        notificationDetails: _details(soundName: soundName),
-        androidScheduleMode: await _scheduleMode(),
         payload: payload,
+        soundName: soundName,
       );
     } catch (_) {}
   }
@@ -239,15 +258,13 @@ class LocalNotificationScheduler implements NotificationScheduler {
     String? payload,
   }) async {
     try {
-      await _plugin.zonedSchedule(
+      await _zonedSchedule(
         id: id,
+        scheduledDate: _nextInstanceOf(weekday, hour, minute),
         title: title,
         body: body,
-        scheduledDate: _nextInstanceOf(weekday, hour, minute),
-        notificationDetails: _details(),
-        androidScheduleMode: await _scheduleMode(),
-        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
         payload: payload,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
     } catch (_) {}
   }
@@ -276,16 +293,56 @@ class LocalNotificationScheduler implements NotificationScheduler {
     return null;
   }
 
-  /// Exact alarms when the OS permits them (precise minute, survives Doze),
-  /// else inexact — so scheduling NEVER throws when exact isn't granted.
-  Future<AndroidScheduleMode> _scheduleMode() async {
+  /// Schedules with EXACT alarms, falling back to inexact only if the platform
+  /// actually REFUSES the exact alarm.
+  ///
+  /// It used to ask `canScheduleExactNotifications()` first and downgrade when
+  /// that said no — but OxygenOS returns false from `canScheduleExactAlarms()`
+  /// even with `USE_EXACT_ALARM` granted and `exactAllowReason=policy_permission`
+  /// on the alarms it accepts. Trusting the gate meant every salat nudge was
+  /// scheduled `setAndAllowWhileIdle`: `dumpsys alarm` showed `window=+1h0m0s0ms
+  /// flags=0x8`, i.e. up to an hour late, batched, and posted in Doze without a
+  /// sound. So: attempt exact, and let the plugin's own
+  /// `ExactAlarmPermissionException` — not a pre-flight guess — be what
+  /// downgrades us. Scheduling still never throws.
+  bool _lastScheduleWasExact = true;
+
+  @override
+  bool get lastScheduleWasExact => _lastScheduleWasExact;
+
+  Future<void> _zonedSchedule({
+    required int id,
+    required String title,
+    required String body,
+    DateTime? fireAt,
+    tz.TZDateTime? scheduledDate,
+    String? payload,
+    String? soundName,
+    DateTimeComponents? matchDateTimeComponents,
+  }) async {
+    final when = scheduledDate ?? tz.TZDateTime.from(fireAt!, tz.local);
+    Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
+          id: id,
+          title: title,
+          body: body,
+          scheduledDate: when,
+          notificationDetails: _details(soundName: soundName),
+          androidScheduleMode: mode,
+          matchDateTimeComponents: matchDateTimeComponents,
+          payload: payload,
+        );
+
     try {
-      final exact = await _android?.canScheduleExactNotifications() ?? false;
-      return exact
-          ? AndroidScheduleMode.exactAllowWhileIdle
-          : AndroidScheduleMode.inexactAllowWhileIdle;
-    } catch (_) {
-      return AndroidScheduleMode.inexactAllowWhileIdle;
+      await schedule(AndroidScheduleMode.alarmClock);
+      _lastScheduleWasExact = true;
+    } on PlatformException {
+      try {
+        await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+        _lastScheduleWasExact = true;
+      } on PlatformException {
+        _lastScheduleWasExact = false;
+        await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+      }
     }
   }
 
@@ -308,6 +365,14 @@ class LocalNotificationScheduler implements NotificationScheduler {
         // Tag as a REMINDER so the OS (and aggressive OEM skins) treat it as a
         // time-sensitive nudge rather than a disposable alert.
         category: AndroidNotificationCategory.reminder,
+        // Our OWN group, so the OS never force-bundles these into its
+        // "Aggregate" autogroup. It only autogroups UNGROUPED notifications,
+        // and once ours were bundled the children stopped alerting: a salat
+        // notification posted exactly on time (verified) but completely
+        // silent, because a lingering sound-check notification had already
+        // triggered the bundle. GROUP_ALERT_ALL keeps every prayer audible.
+        groupKey: salatSound ? _salatGroupKey : _sunnahGroupKey,
+        groupAlertBehavior: GroupAlertBehavior.all,
         // Linger in the shade until the user swipes it away — a Sunnah nudge
         // shouldn't vanish on the next unlock (autoCancel defaults to true,
         // which clears it the moment it's tapped/brushed). Tapping still opens

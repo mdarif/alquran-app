@@ -252,6 +252,9 @@ class _FakeNotificationScheduler implements NotificationScheduler {
   Future<void> requestExactAlarmPermission() async {}
 
   @override
+  bool lastScheduleWasExact = true;
+
+  @override
   Future<bool> canScheduleExact() async => true;
 
   @override
@@ -284,6 +287,15 @@ class _FakeNotificationScheduler implements NotificationScheduler {
   Future<void> scheduleOneShot({
     required int id,
     required DateTime fireAt,
+    required String title,
+    required String body,
+    String? payload,
+    String? soundName,
+  }) async {}
+
+  @override
+  Future<void> showNow({
+    required int id,
     required String title,
     required String body,
     String? payload,

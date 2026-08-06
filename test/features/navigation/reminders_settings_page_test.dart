@@ -41,6 +41,9 @@ class _FakeScheduler implements NotificationScheduler {
   @override
   Future<void> requestExactAlarmPermission() async {}
   @override
+  bool lastScheduleWasExact = true;
+
+  @override
   Future<bool> canScheduleExact() async => true;
   @override
   Future<bool> isBatteryOptimizationExempt() async => batteryExempt;
@@ -67,6 +70,14 @@ class _FakeScheduler implements NotificationScheduler {
   Future<void> scheduleOneShot({
     required int id,
     required DateTime fireAt,
+    required String title,
+    required String body,
+    String? payload,
+    String? soundName,
+  }) async {}
+  @override
+  Future<void> showNow({
+    required int id,
     required String title,
     required String body,
     String? payload,
@@ -300,8 +311,8 @@ void main() {
     });
 
     testWidgets(
-        'Salat: enabling runs a sound check, and "No" opens the channel '
-        'settings', (tester) async {
+        'Salat: enabling runs a sound check, and "No" opens the APP '
+        'notification settings', (tester) async {
       final scheduler = _FakeScheduler();
       final prayerNotifications = PrayerNotificationsCubit(
         _FakePrayerNotificationSettingsRepository(),
@@ -321,10 +332,9 @@ void main() {
       await tester.tap(find.text("No, didn't notice"));
       await tester.pumpAndSettle();
 
-      expect(
-        scheduler.openedSettingsChannelIds,
-        ['salat_notifications_nature_v4'],
-      );
+      // Not the channel page: the Ring/Vibrate switches that silence
+      // everything on ColorOS/OxygenOS live on the app page above it.
+      expect(scheduler.openedSettingsChannelIds, [null]);
     });
 
     testWidgets(

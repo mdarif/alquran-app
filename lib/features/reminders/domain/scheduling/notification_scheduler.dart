@@ -18,6 +18,12 @@ abstract interface class NotificationScheduler {
   /// (older Android, iOS). Without this, reminders fall back to inexact timing.
   Future<void> requestExactAlarmPermission();
 
+  /// Whether the LAST schedule call actually got an exact alarm, or was
+  /// downgraded because the platform refused one. Unlike [canScheduleExact]
+  /// (a pre-flight question some OEMs answer wrongly) this reports what the OS
+  /// really did — the debug delivery test surfaces it.
+  bool get lastScheduleWasExact;
+
   /// Whether the OS will honor EXACT alarm timing right now (Android 12+ gate;
   /// always true where not applicable). When false, scheduled reminders fall back
   /// to inexact timing that Doze can defer. Surfaced in the debug delivery panel.
@@ -49,6 +55,18 @@ abstract interface class NotificationScheduler {
   Future<String?> scheduleOneShotDebug({
     required int id,
     required DateTime fireAt,
+    required String title,
+    required String body,
+    String? payload,
+    String? soundName,
+  });
+
+  /// Post a notification RIGHT NOW, bypassing AlarmManager. The sound check
+  /// uses this: routing a "3 seconds from now" check through the alarm path
+  /// meant the OS could batch it minutes away, so the "did you hear it?" prompt
+  /// asked about a notification that hadn't been posted yet.
+  Future<void> showNow({
+    required int id,
     required String title,
     required String body,
     String? payload,

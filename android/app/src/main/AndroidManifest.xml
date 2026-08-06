@@ -6,13 +6,23 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Local notifications with EXACT-time delivery, shared by Sunnah reminders
          and salat (prayer-time) notifications — same scheduler/channel infra.
-         SCHEDULE_EXACT_ALARM fires the reminder at the set minute even in Doze
-         (user-granted on Android 14+); REQUEST_IGNORE_BATTERY_OPTIMIZATIONS lets
-         the app prompt to exempt itself so aggressive OEMs don't freeze the alarm.
+         USE_EXACT_ALARM (Android 13+) is granted at install and is the one that
+         actually fires a salat nudge at the minute: SCHEDULE_EXACT_ALARM is NOT
+         auto-granted on Android 14+, so with it alone the app silently degraded
+         to inexact alarms with a delivery window of up to an HOUR (confirmed by
+         `dumpsys alarm` on OxygenOS: window=+1h0m0s, flags=0x8) — late, batched
+         and, in Doze, posted without the alert. Prayer times are wall-clock
+         alarms, which is exactly the USE_EXACT_ALARM use case. Keep the older
+         SCHEDULE_EXACT_ALARM capped at API 32 (Play rejects declaring both
+         unbounded). REQUEST_IGNORE_BATTERY_OPTIMIZATIONS lets the app prompt to
+         exempt itself so aggressive OEMs don't freeze the alarm.
          Re-apply after a `flutter create` regen — see `make notif-perms`. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Audio recitation: stream verse audio from the CDN (and cache it). The
          release manifest doesn't get INTERNET for free — see `make audio-perms`. -->
