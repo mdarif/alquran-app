@@ -58,5 +58,17 @@ void main() {
     expect(entry!.ayahKey, '1:2');
     expect(entry.groupAyahKey, '1:1');
     expect(entry.text, 'Grouped commentary.');
+
+    await db.removeResource('en-ibn-kathir-abridged');
+
+    expect(await db.installed(), isEmpty);
+    expect(
+      await db.entryForAyah(
+        slug: 'en-ibn-kathir-abridged',
+        surah: 1,
+        ayah: 1,
+      ),
+      isNull,
+    );
   });
 }

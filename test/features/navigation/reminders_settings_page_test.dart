@@ -214,26 +214,43 @@ void main() {
       expect(prayerNotifications.state.enabled, isFalse);
     });
 
-    testWidgets('the info button opens an explanation without toggling',
+    testWidgets('the info buttons open compact explanations without toggling',
         (tester) async {
       final reminders = RemindersCubit(
         _FakeReminderSettingsRepository(),
         _FakeScheduler(),
         clock: () => _now,
       );
+      final prayerNotifications = PrayerNotificationsCubit(
+        _FakePrayerNotificationSettingsRepository(),
+        _FakeScheduler(),
+        _FakePrayerTimesRepository(saved: _loc),
+      );
       addTearDown(reminders.close);
-      await _pump(tester, reminders: reminders);
+      addTearDown(prayerNotifications.close);
+      await _pump(
+        tester,
+        reminders: reminders,
+        prayerNotifications: prayerNotifications,
+      );
 
       await tester.tap(find.byKey(WidgetKeys.sunnahRemindersInfoButton));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Surah Al-Kahf'), findsOneWidget);
       expect(reminders.state.enabled, isFalse);
+      expect(find.byType(PopupMenuItem<void>), findsNothing);
 
       // Dismiss like a tooltip — tap outside the popover, not a dialog button.
       await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
       expect(find.textContaining('Surah Al-Kahf'), findsNothing);
+
+      await tester.tap(find.byKey(WidgetKeys.prayerNotificationsInfoButton));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('daily prayer'), findsOneWidget);
+      expect(prayerNotifications.state.enabled, isFalse);
     });
 
     testWidgets('shows the permission-denied hint instead of a silent revert',

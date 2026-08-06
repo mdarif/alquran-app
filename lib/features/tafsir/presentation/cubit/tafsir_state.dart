@@ -51,6 +51,7 @@ class TafsirItem extends Equatable {
     required this.status,
     this.catalogueEntry,
     this.resource,
+    this.selected = false,
     this.progress = 0,
     this.plannedName,
     this.plannedSubtitle,
@@ -60,6 +61,7 @@ class TafsirItem extends Equatable {
   final TafsirItemStatus status;
   final TafsirCatalogueEntry? catalogueEntry;
   final TafsirResource? resource;
+  final bool selected;
   final double progress;
   final String? plannedName;
   final String? plannedSubtitle;
@@ -99,6 +101,7 @@ class TafsirItem extends Equatable {
 
   TafsirItem copyWith({
     TafsirItemStatus? status,
+    bool? selected,
     double? progress,
   }) =>
       TafsirItem(
@@ -106,6 +109,7 @@ class TafsirItem extends Equatable {
         status: status ?? this.status,
         catalogueEntry: catalogueEntry,
         resource: resource,
+        selected: selected ?? this.selected,
         progress: progress ?? this.progress,
         plannedName: plannedName,
         plannedSubtitle: plannedSubtitle,
@@ -117,6 +121,7 @@ class TafsirItem extends Equatable {
         status,
         catalogueEntry,
         resource,
+        selected,
         progress,
         plannedName,
         plannedSubtitle,

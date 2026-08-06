@@ -26,6 +26,7 @@ abstract interface class TafsirRepository {
     TafsirCatalogueEntry entry, {
     void Function(double progress)? onProgress,
   });
+  Future<void> remove(String slug);
   Future<TafsirEntry?> entryForAyah({
     required String slug,
     required int surah,

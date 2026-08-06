@@ -31,7 +31,9 @@ class WidgetKeys {
   static const tafsirSearchField = Key('tafsir-search-field');
   static const tafsirSearchClear = Key('tafsir-search-clear');
   static Key tafsirResourceRow(String slug) => Key('tafsir-row-$slug');
+  static Key tafsirInstalled(String slug) => Key('tafsir-installed-$slug');
   static Key tafsirDownload(String slug) => Key('tafsir-download-$slug');
+  static Key tafsirRemove(String slug) => Key('tafsir-remove-$slug');
   static Key tafsirLanguageFilter(String code) =>
       Key('tafsir-language-filter-$code');
   static const bookmarksMenuButton = Key('home-bookmarks-menu-button');

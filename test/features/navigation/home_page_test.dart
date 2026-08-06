@@ -235,6 +235,9 @@ class _FakeTafsirRepository implements TafsirRepository {
   }) async {}
 
   @override
+  Future<void> remove(String slug) async {}
+
+  @override
   Future<List<TafsirResource>> installed() async => const [];
 }
 

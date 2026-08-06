@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/widgets/confirm_dialog.dart';
 import '../cubit/tafsir_cubit.dart';
 
 class TafsirPage extends StatefulWidget {
@@ -290,9 +291,13 @@ class _List extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final installed = _filter([
+    final shown = _filter([
       for (final item in state.items)
-        if (item.status == TafsirItemStatus.installed) item,
+        if (item.status == TafsirItemStatus.installed && item.selected) item,
+    ]);
+    final downloaded = _filter([
+      for (final item in state.items)
+        if (item.status == TafsirItemStatus.installed && !item.selected) item,
     ]);
     final available = _filter([
       for (final item in state.items)
@@ -314,18 +319,26 @@ class _List extends StatelessWidget {
             padding: EdgeInsets.only(bottom: 16),
             child: _Notice('New Tafsir downloads are unavailable offline.'),
           ),
-        _Section(title: 'On device', items: installed),
-        if (installed.isNotEmpty && available.isNotEmpty)
+        _Section(title: 'Shown in reader', items: shown),
+        if (shown.isNotEmpty && downloaded.isNotEmpty)
+          const SizedBox(height: 14),
+        _Section(title: 'Downloaded', items: downloaded),
+        if ((shown.isNotEmpty || downloaded.isNotEmpty) && available.isNotEmpty)
           const SizedBox(height: 14),
         _Section(title: 'Available for download', items: available),
-        if ((installed.isNotEmpty || available.isNotEmpty) &&
+        if ((shown.isNotEmpty ||
+                downloaded.isNotEmpty ||
+                available.isNotEmpty) &&
             planned.isNotEmpty) ...[
           const SizedBox(height: 14),
           const Divider(height: 1),
           const SizedBox(height: 14),
         ],
         _Section(title: 'Planned', items: planned),
-        if (installed.isEmpty && available.isEmpty && planned.isEmpty)
+        if (shown.isEmpty &&
+            downloaded.isEmpty &&
+            available.isEmpty &&
+            planned.isEmpty)
           const Padding(
             padding: EdgeInsets.only(top: 24),
             child: _EmptyLine('No Tafsir found'),
@@ -476,13 +489,6 @@ class _TafsirRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (item.status == TafsirItemStatus.installing)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: LinearProgressIndicator(
-                        value: item.progress == 0 ? null : item.progress,
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -498,10 +504,7 @@ class _TafsirRow extends StatelessWidget {
 
   String get _subtitleLabel {
     final suffix = item.abridged ? ' (Abridged)' : '';
-    final author = item.author?.trim();
-    final base = '${item.name}$suffix';
-    if (author == null || author.isEmpty || author == item.name) return base;
-    return '$base · $author';
+    return '${item.name}$suffix';
   }
 
   String get _sizeLabel {
@@ -518,6 +521,9 @@ class _TafsirRow extends StatelessWidget {
         item.status == TafsirItemStatus.failed) {
       return () => context.read<TafsirCubit>().install(item.slug);
     }
+    if (item.status == TafsirItemStatus.installed) {
+      return () => context.read<TafsirCubit>().toggleSelected(item.slug);
+    }
     return null;
   }
 }
@@ -532,28 +538,36 @@ class _Leading extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return switch (item.status) {
       TafsirItemStatus.installed => Icon(
-          Icons.check_circle_rounded,
-          color: cs.primary,
+          key: WidgetKeys.tafsirInstalled(item.slug),
+          item.selected
+              ? Icons.check_box_rounded
+              : Icons.check_box_outline_blank_rounded,
+          color: item.selected ? cs.primary : cs.onSurfaceVariant,
           size: 22,
-        ),
-      TafsirItemStatus.installing => SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            value: item.progress == 0 ? null : item.progress,
-            strokeWidth: 2,
-          ),
         ),
       TafsirItemStatus.failed => Icon(
           Icons.error_outline_rounded,
           color: cs.error,
           size: 22,
         ),
+      TafsirItemStatus.installing => const SizedBox.shrink(),
       TafsirItemStatus.available ||
       TafsirItemStatus.unavailable =>
         const SizedBox.shrink(),
     };
   }
+}
+
+Future<void> _confirmRemove(BuildContext context, TafsirItem item) async {
+  final confirmed = await confirmAction(
+    context,
+    title: 'Remove ${item.name}?',
+    message: 'This deletes the downloaded Tafsir text. You can download it '
+        'again later from this screen.',
+    confirmLabel: 'Remove',
+  );
+  if (!confirmed || !context.mounted) return;
+  await context.read<TafsirCubit>().remove(item.slug);
 }
 
 class _Action extends StatelessWidget {
@@ -565,13 +579,14 @@ class _Action extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return switch (item.status) {
-      TafsirItemStatus.installed => SizedBox(
-          width: 34,
-          child: Icon(
-            Icons.check_rounded,
-            color: cs.onSurfaceVariant,
-            size: 22,
-          ),
+      TafsirItemStatus.installed => IconButton(
+          key: WidgetKeys.tafsirRemove(item.slug),
+          tooltip: 'Remove ${item.name}',
+          iconSize: 22,
+          constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+          padding: EdgeInsets.zero,
+          icon: Icon(Icons.delete_outline_rounded, color: cs.onSurfaceVariant),
+          onPressed: () => _confirmRemove(context, item),
         ),
       TafsirItemStatus.available || TafsirItemStatus.failed => IconButton(
           key: WidgetKeys.tafsirDownload(item.slug),
@@ -579,10 +594,29 @@ class _Action extends StatelessWidget {
           iconSize: 22,
           constraints: const BoxConstraints.tightFor(width: 34, height: 34),
           padding: EdgeInsets.zero,
-          icon: Icon(Icons.download_rounded, color: cs.primary),
+          icon: Icon(
+            item.status == TafsirItemStatus.failed
+                ? Icons.refresh_rounded
+                : Icons.file_download_outlined,
+            color: item.status == TafsirItemStatus.failed
+                ? cs.error
+                : cs.onSurfaceVariant,
+          ),
           onPressed: () => context.read<TafsirCubit>().install(item.slug),
         ),
-      TafsirItemStatus.installing => const SizedBox(width: 34),
+      TafsirItemStatus.installing => SizedBox(
+          width: 40,
+          child: Center(
+            child: SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                value: item.progress == 0 ? null : item.progress,
+                strokeWidth: 2,
+              ),
+            ),
+          ),
+        ),
       TafsirItemStatus.unavailable => SizedBox(
           width: 34,
           child: Icon(

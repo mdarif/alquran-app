@@ -111,6 +111,9 @@ class TafsirRepositoryImpl implements TafsirRepository {
   }) =>
       _db.entryForAyah(slug: slug, surah: surah, ayah: ayah);
 
+  @override
+  Future<void> remove(String slug) => _db.removeResource(slug);
+
   Future<List<int>> _download(
     Uri url,
     TafsirCatalogueEntry entry,

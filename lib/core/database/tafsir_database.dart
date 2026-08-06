@@ -160,6 +160,34 @@ INSERT INTO tafsir_entries(
     }
   }
 
+  Future<void> removeResource(String slug) async {
+    final db = _open();
+    try {
+      db.execute('BEGIN IMMEDIATE');
+      try {
+        final deleteEntries = db.prepare(
+          'DELETE FROM tafsir_entries WHERE resource_slug = ?',
+        );
+        final deleteResource = db.prepare(
+          'DELETE FROM tafsir_resources WHERE slug = ?',
+        );
+        try {
+          deleteEntries.execute([slug]);
+          deleteResource.execute([slug]);
+        } finally {
+          deleteEntries.close();
+          deleteResource.close();
+        }
+        db.execute('COMMIT');
+      } catch (_) {
+        db.execute('ROLLBACK');
+        rethrow;
+      }
+    } finally {
+      db.close();
+    }
+  }
+
   Future<TafsirEntry?> entryForAyah({
     required String slug,
     required int surah,

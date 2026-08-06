@@ -242,7 +242,10 @@ Future<void> configureDependencies() async {
   );
 
   getIt.registerLazySingleton<TafsirCubit>(
-    () => TafsirCubit(getIt<TafsirRepository>()),
+    () => TafsirCubit(
+      getIt<TafsirRepository>(),
+      prefs: getIt<SharedPreferences>(),
+    ),
   );
 
   // Audio recitation. Registered UNCONDITIONALLY but LAZILY: the player (lazy

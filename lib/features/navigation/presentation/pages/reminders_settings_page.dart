@@ -68,9 +68,9 @@ class RemindersSettingsPage extends StatelessWidget {
   }
 }
 
-/// A small card anchored to the tapped info button — dismisses on an outside
-/// tap, like a tooltip, instead of a full-screen modal dialog. Content is kept
-/// to a few short lines rather than one dense paragraph.
+/// A small anchored tooltip — dismisses on an outside tap instead of opening a
+/// modal dialog. Content is kept to a few short lines rather than one dense
+/// paragraph.
 Future<void> _showInfoPopover(
   BuildContext context, {
   required String title,
@@ -78,53 +78,175 @@ Future<void> _showInfoPopover(
 }) {
   final box = context.findRenderObject()! as RenderBox;
   final overlay = Overlay.of(context).context.findRenderObject()! as RenderBox;
-  final topLeft = box.localToGlobal(
-    Offset(0, box.size.height),
-    ancestor: overlay,
+  final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+  final bottomRight =
+      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay);
+  final iconCenter = topLeft.dx + box.size.width / 2;
+  const width = 228.0;
+  final bubbleLeft = (iconCenter - width + 28).clamp(
+    16.0,
+    overlay.size.width - width - 16,
   );
-  final bottomRight = box.localToGlobal(
-    Offset(box.size.width, box.size.height),
-    ancestor: overlay,
+  final bubbleTop = bottomRight.dy + 2;
+  final arrowCenter = (topLeft.dx + box.size.width / 2 - bubbleLeft).clamp(
+    18.0,
+    width - 18,
   );
-  final theme = Theme.of(context);
-  return showMenu<void>(
+  return showGeneralDialog<void>(
     context: context,
-    position: RelativeRect.fromLTRB(
-      topLeft.dx,
-      topLeft.dy,
-      overlay.size.width - bottomRight.dx,
-      0,
-    ),
-    color: theme.colorScheme.surfaceContainerHighest,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-    items: [
-      PopupMenuItem<void>(
-        enabled: false,
-        padding: EdgeInsets.zero,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 260),
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              for (final line in lines)
-                Padding(
-                  padding: const EdgeInsets.only(top: 3),
-                  child: Text(line, style: theme.textTheme.bodySmall),
-                ),
-            ],
+    barrierColor: Colors.transparent,
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
+    transitionDuration: const Duration(milliseconds: 110),
+    pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      return Stack(
+        children: [
+          Positioned(
+            left: bubbleLeft,
+            top: bubbleTop,
+            width: width,
+            child: _InfoTooltip(
+              title: title,
+              lines: lines,
+              arrowCenter: arrowCenter.toDouble(),
+            ),
           ),
+        ],
+      );
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.98, end: 1).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+          ),
+          alignment: Alignment.topRight,
+          child: child,
         ),
-      ),
-    ],
+      );
+    },
   );
+}
+
+class _InfoTooltip extends StatelessWidget {
+  const _InfoTooltip({
+    required this.title,
+    required this.lines,
+    required this.arrowCenter,
+  });
+
+  final String title;
+  final List<String> lines;
+  final double arrowCenter;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final background = isDark ? cs.inverseSurface : cs.surface;
+    final foreground = isDark ? cs.onInverseSurface : cs.onSurface;
+    final secondary = isDark
+        ? cs.onInverseSurface.withValues(alpha: 0.82)
+        : cs.onSurfaceVariant;
+    final borderColor =
+        isDark ? null : cs.outlineVariant.withValues(alpha: 0.6);
+    return Material(
+      type: MaterialType.transparency,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(left: arrowCenter - 8),
+            child: CustomPaint(
+              painter: _TooltipCaretPainter(
+                color: background,
+                borderColor: borderColor,
+              ),
+              child: const SizedBox(width: 16, height: 8),
+            ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(7),
+              border:
+                  borderColor == null ? null : Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.10),
+                  blurRadius: isDark ? 10 : 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(11, 9, 11, 10),
+              child: DefaultTextStyle(
+                style: theme.textTheme.bodySmall!.copyWith(
+                  color: secondary,
+                  height: 1.24,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    for (final line in lines)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(line),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TooltipCaretPainter extends CustomPainter {
+  const _TooltipCaretPainter({required this.color, this.borderColor});
+
+  final Color color;
+  final Color? borderColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+    final stroke = borderColor;
+    if (stroke != null) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = stroke
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TooltipCaretPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.borderColor != borderColor;
+  }
 }
 
 class _SunnahRemindersSection extends StatelessWidget {
@@ -154,10 +276,9 @@ class _SunnahRemindersSection extends StatelessWidget {
             iconContext,
             title: 'Sunnah Reminders',
             lines: const [
-              'Surah Al-Kahf — every Friday before Maghrib.',
-              'White Days fast — 13th–15th of each Hijri month.',
-              'Ashura, Arafah & the first 10 days of Dhul Hijjah.',
-              'All with authentic virtue reported in hadith.',
+              'Surah Al-Kahf before Maghrib on Fridays.',
+              'White Days: 13th-15th of each Hijri month.',
+              'Ashura, Arafah, and the first 10 days of Dhul Hijjah.',
             ],
           ),
           child: !state.enabled
@@ -240,9 +361,9 @@ class _SalatNotificationsSection extends StatelessWidget {
             iconContext,
             title: 'Salat Notifications',
             lines: const [
-              'One reminder at each of the 5 daily prayers.',
-              'Times are calculated from your device location.',
-              'Scheduled entirely on-device — nothing is sent anywhere.',
+              'One reminder for each daily prayer.',
+              'Times use your device location.',
+              'Scheduled on-device; nothing is sent anywhere.',
             ],
           ),
           child: !state.enabled
@@ -428,15 +549,19 @@ class _ReminderRow extends StatelessWidget {
               Expanded(
                 child: Text(title, style: theme.textTheme.titleMedium),
               ),
-              Builder(
-                builder: (iconContext) => IconButton(
-                  key: infoKey,
-                  tooltip: 'About $title',
-                  icon: const AppIcon(
-                    AppIcons.about,
-                    size: AppIconSize.label,
+              SizedBox.square(
+                key: infoKey,
+                dimension: 40,
+                child: Builder(
+                  builder: (iconContext) => IconButton(
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    icon: const AppIcon(
+                      AppIcons.about,
+                      size: AppIconSize.label,
+                    ),
+                    onPressed: () => onInfo(iconContext),
                   ),
-                  onPressed: () => onInfo(iconContext),
                 ),
               ),
               Switch.adaptive(

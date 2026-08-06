@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/tafsir_catalogue_entry.dart';
 import '../../domain/entities/tafsir_entry.dart';
@@ -9,9 +10,16 @@ import '../../domain/repositories/tafsir_repository.dart';
 part 'tafsir_state.dart';
 
 class TafsirCubit extends Cubit<TafsirState> {
-  TafsirCubit(this._repository) : super(const TafsirState());
+  TafsirCubit(
+    this._repository, {
+    SharedPreferences? prefs,
+  })  : _prefs = prefs,
+        super(const TafsirState());
+
+  static const String _kSelectedTafsir = 'tafsir_selected_slugs';
 
   final TafsirRepository _repository;
+  final SharedPreferences? _prefs;
 
   Future<void> load() async {
     emit(state.copyWith(status: TafsirStatus.loading));
@@ -54,6 +62,7 @@ class TafsirCubit extends Cubit<TafsirState> {
           }
         },
       );
+      await _selectInstalled(slug);
       await load();
     } catch (e) {
       final current = state.item(slug);
@@ -70,6 +79,32 @@ class TafsirCubit extends Cubit<TafsirState> {
     }
   }
 
+  Future<void> remove(String slug) async {
+    await _repository.remove(slug);
+    await _deselectRemoved(slug);
+    await load();
+  }
+
+  Future<void> toggleSelected(String slug) async {
+    final item = state.item(slug);
+    if (item == null || item.status != TafsirItemStatus.installed) return;
+    final prefs = _prefs;
+    if (prefs == null) return;
+    final installedSlugs = [
+      for (final i in state.items)
+        if (i.status == TafsirItemStatus.installed) i.slug,
+    ];
+    final current = (_selectedTafsirSlugs() ?? installedSlugs).toSet();
+    if (current.contains(slug)) {
+      if (current.length == 1) return;
+      current.remove(slug);
+    } else {
+      current.add(slug);
+    }
+    await prefs.setStringList(_kSelectedTafsir, current.toList());
+    _updateItem(slug, item.copyWith(selected: current.contains(slug)));
+  }
+
   Future<TafsirAyahResult?> entryForAyah({
     required int surah,
     required int ayah,
@@ -83,8 +118,10 @@ class TafsirCubit extends Cubit<TafsirState> {
     required int ayah,
   }) async {
     final installed = await _repository.installed();
+    final selected = _selectedTafsirSlugs()?.toSet();
     final results = <TafsirAyahResult>[];
     for (final resource in installed) {
+      if (selected != null && !selected.contains(resource.slug)) continue;
       final entry = await _repository.entryForAyah(
         slug: resource.slug,
         surah: surah,
@@ -113,6 +150,8 @@ class TafsirCubit extends Cubit<TafsirState> {
     required List<TafsirResource> installed,
   }) {
     final installedBySlug = {for (final r in installed) r.slug: r};
+    final selectedSlugs =
+        (_selectedTafsirSlugs() ?? installedBySlug.keys.toList()).toSet();
     final hiddenSlugs = {
       for (final entry in available)
         if (!entry.visible) entry.slug,
@@ -143,6 +182,7 @@ class TafsirCubit extends Cubit<TafsirState> {
           slug: slug,
           catalogueEntry: visibleCatalogueBySlug[slug],
           resource: installedBySlug[slug],
+          selected: selectedSlugs.contains(slug),
           status: installedBySlug.containsKey(slug)
               ? TafsirItemStatus.installed
               : TafsirItemStatus.available,
@@ -151,6 +191,32 @@ class TafsirCubit extends Cubit<TafsirState> {
     if (items.isEmpty) return const [_plannedIbnKathir];
     return items;
   }
+
+  Future<void> _selectInstalled(String slug) async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    final installed = await _repository.installed();
+    final installedSlugs = {for (final resource in installed) resource.slug};
+    final current = (_selectedTafsirSlugs() ?? installedSlugs.toList()).toSet();
+    if (current.contains(slug)) return;
+    current.add(slug);
+    await prefs.setStringList(_kSelectedTafsir, current.toList());
+  }
+
+  Future<void> _deselectRemoved(String slug) async {
+    final prefs = _prefs;
+    if (prefs == null) return;
+    final current = _selectedTafsirSlugs();
+    if (current == null || !current.contains(slug)) return;
+    await prefs.setStringList(_kSelectedTafsir, [
+      for (final s in current)
+        if (s != slug) s,
+    ]);
+  }
+
+  List<String>? _selectedTafsirSlugs() => _prefs?.getStringList(
+        _kSelectedTafsir,
+      );
 }
 
 const _plannedIbnKathir = TafsirItem(
