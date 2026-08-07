@@ -92,6 +92,11 @@ class WidgetKeys {
   // Settings-sheet switch (Detailed): show the Arabic matn above translations
   // (default on; off = translations-only reading).
   static const showArabicToggle = Key('reader-show-arabic-toggle');
+  // Settings-sheet switch (Detailed, Al-Fatihah translation-audio POC only —
+  // FeatureFlags.translationAudioFatihaPoc): chain Sahih International audio
+  // after each Fatiha verse's Arabic (default off; session-only, not persisted).
+  static const translationAudioPocToggle =
+      Key('reader-translation-audio-poc-toggle');
   // The Arabic matn line inside a Detailed tile (shared by every verse); used to
   // observe the "Show Arabic" toggle hiding it.
   static const ayahArabicText = Key('ayah-arabic-text');

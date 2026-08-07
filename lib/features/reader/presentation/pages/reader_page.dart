@@ -237,6 +237,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Whether the Detailed view shows the Arabic matn above each translation. On by
   // default; off = a translations-only reading. Opt-out from Settings; persisted.
   late bool _showArabicMatn = _settings.showArabicMatn;
+  // Al-Fatihah translation-audio POC (FeatureFlags.translationAudioFatihaPoc)
+  // — session-only, not persisted; resets to off on every reader open.
+  bool _translationAudioPocEnabled = false;
 
   // Immersive reading (both viewports): reading forward (swipe up) hides the app
   // bar, player bar, and OS system bars; a reverse swipe (down) brings them back;
@@ -856,6 +859,8 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           onToggleTranslationPeek: _toggleShowTranslationPeek,
           showArabicMatn: _showArabicMatn,
           onToggleShowArabic: _toggleShowArabicMatn,
+          translationAudioPocEnabled: _translationAudioPocEnabled,
+          onToggleTranslationAudioPoc: _toggleTranslationAudioPoc,
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(context),
         ),
@@ -1074,6 +1079,13 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void _toggleShowArabicMatn(bool value) {
     setState(() => _showArabicMatn = value);
     unawaited(_settings.setShowArabicMatn(value));
+  }
+
+  /// Al-Fatihah translation-audio POC toggle (docs/translation-audio-chaining-plan.md
+  /// Phase 2) — forwards straight to the cubit; session-only, no persistence.
+  void _toggleTranslationAudioPoc(bool value) {
+    setState(() => _translationAudioPocEnabled = value);
+    _audioCubit?.setTranslationAudioEnabled(value);
   }
 
   /// The active viewport reported a sustained scroll direction: hide the chrome

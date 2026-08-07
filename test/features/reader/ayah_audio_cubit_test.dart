@@ -1,11 +1,33 @@
 import 'dart:async';
 
 import 'package:al_quran/core/audio/ayah_recitation_player.dart';
+import 'package:al_quran/core/audio/translation_audio_player.dart';
 import 'package:al_quran/features/reader/domain/entities/arabic_script.dart';
 import 'package:al_quran/features/reader/domain/repositories/reader_settings_repository.dart';
 import 'package:al_quran/features/reader/presentation/cubit/ayah_audio_cubit.dart';
 import 'package:al_quran/features/reader/domain/entities/translation_resource.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// Records what the cubit asks for and lets a test control when a clip
+/// "finishes" (via [completeCurrent]) — mirrors [_FakePlayer]'s role but for
+/// the one-shot translation-audio POC player (no status stream needed since
+/// the cubit only ever awaits one clip at a time).
+class _FakeTranslationPlayer implements TranslationAudioPlayer {
+  final List<String> calls = [];
+  Completer<void>? _pending;
+
+  @override
+  Future<void> playAsset(String assetPath) {
+    calls.add('playAsset($assetPath)');
+    _pending = Completer<void>();
+    return _pending!.future;
+  }
+
+  void completeCurrent() => _pending?.complete();
+
+  @override
+  Future<void> stop() async => calls.add('stop');
+}
 
 /// Records what the cubit asks of the player and lets a test push playback
 /// events back — no just_audio plugin in sight (that's the whole point of the
@@ -343,6 +365,68 @@ void main() {
       await pumpEventQueue();
       // A fresh playback event must NOT reset speed to the default.
       expect(cubit.state.speed, 1.25);
+    });
+  });
+
+  group('Al-Fatihah translation-audio POC', () {
+    test(
+        'plays translation audio between Arabic completion and the next verse',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([1, 2, 3]); // global ids 1-3 = Fatiha 1:1-1:3
+      c.setTranslationAudioEnabled(true);
+
+      await c.toggle(1);
+      player.push(1, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      expect(translation.calls, [
+        'playAsset(assets/audio/poc/en-sahih-international/001001.mp3)',
+      ]);
+      expect(player.calls, ['play(1)']); // next verse withheld mid-chain
+
+      translation.completeCurrent();
+      await pumpEventQueue();
+      expect(player.calls, ['play(1)', 'play(2)']);
+    });
+
+    test('toggle off skips translation audio entirely (unchanged behavior)',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([1, 2, 3]);
+
+      await c.toggle(1);
+      player.push(1, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      expect(translation.calls, isEmpty);
+      expect(player.calls, ['play(1)', 'play(2)']);
+    });
+
+    test('outside Al-Fatihah, translation audio never plays even when enabled',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([8, 9]); // global id 8 = Baqarah 2:1, outside POC scope
+      c.setTranslationAudioEnabled(true);
+
+      await c.toggle(8);
+      player.push(8, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      expect(translation.calls, isEmpty);
+      expect(player.calls, ['play(8)', 'play(9)']);
     });
   });
 

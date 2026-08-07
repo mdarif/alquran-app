@@ -4,6 +4,8 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/audio/ayah_recitation_player.dart';
+import '../../../../core/audio/translation_audio_player.dart';
+import '../../../../core/audio/translation_audio_source.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 
 part 'ayah_audio_state.dart';
@@ -19,7 +21,7 @@ enum RecitationRepeat { off, one, all }
 /// + now-playing highlight stay in sync. Plugin-free (depends only on the
 /// [AyahRecitationPlayer] interface) → unit-testable with a fake.
 class AyahAudioCubit extends Cubit<AyahAudioState> {
-  AyahAudioCubit(this._player, [this._settings])
+  AyahAudioCubit(this._player, [this._settings, this._translationPlayer])
       : super(const AyahAudioState()) {
     _sub = _player.playbackStream.listen(_onPlayback);
     // Restore the persisted playback speed and apply it to the shared player.
@@ -33,6 +35,11 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
 
   final AyahRecitationPlayer _player;
   final ReaderSettingsRepository? _settings;
+  // Al-Fatihah translation-audio POC (docs/translation-audio-chaining-plan.md
+  // Phase 2). Null outside the POC — every existing code path is untouched
+  // when no translation player is wired in.
+  final TranslationAudioPlayer? _translationPlayer;
+  bool _translationAudioEnabled = false;
   StreamSubscription<RecitationPlayback>? _sub;
 
   // The active section's verse ids in reading order. Set by the reader whenever
@@ -63,6 +70,13 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
         repeat: _repeat,
       );
 
+  /// Toggle Al-Fatihah translation audio (POC), independent of the text
+  /// translation picker — enabling a translation's text never implies its
+  /// audio (see plan decision #2). No-op outside the POC's Fatiha scope; a
+  /// verse elsewhere in the Quran just never has anything to play.
+  void setTranslationAudioEnabled(bool value) =>
+      _translationAudioEnabled = value;
+
   /// Teach the cubit the order of the verses on screen, so that when one finishes
   /// it can roll into the next. Idempotent; the reader re-pushes on load/swipe.
   void setSequence(List<int> ayahIds) => _sequence = ayahIds;
@@ -74,6 +88,51 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     final i = _sequence.indexOf(id);
     if (i < 0 || i + 1 >= _sequence.length) return null;
     return _sequence[i + 1];
+  }
+
+  /// Al-Fatihah POC only: global ids 1-7 ARE Fatiha ayahs 1-7 (Fatiha is the
+  /// first surah, so the global 1..6236 index and the ayah number coincide
+  /// for it alone — this shortcut breaks for every other surah, which is why
+  /// it's gated to `isFatihaPocAyah` and must not be reused past this POC).
+  bool _inFatihaPocScope(int? ayahId) =>
+      ayahId != null && isFatihaPocAyah(surah: 1, ayah: ayahId);
+
+  /// Runs after an Arabic verse completes: optionally chains the Al-Fatihah
+  /// translation-audio clip (POC), then applies the existing next-verse /
+  /// repeat / hand-off logic exactly as before. Split out from [_onPlayback]
+  /// so that logic doesn't have to change shape to gain an `await`.
+  Future<void> _advanceAfterCompletion(int? completedAyahId) async {
+    if (_translationAudioEnabled &&
+        _translationPlayer != null &&
+        _inFatihaPocScope(completedAyahId)) {
+      await _translationPlayer.playAsset(
+        sahihInternationalAssetPath(surah: 1, ayah: completedAyahId!),
+      );
+    }
+
+    int? next;
+    if (_repeat == RecitationRepeat.all) {
+      // Loop the surah: roll to the next verse, or back to the first at the end.
+      next = _nextAfter(completedAyahId) ??
+          (_sequence.isNotEmpty ? _sequence.first : null);
+    } else {
+      // Autoplay is ALWAYS on (no single-verse mode; pause is the only stop).
+      // Roll to the next verse; at the surah's LAST verse hand off to the reader
+      // to roll into the next surah (keeping the non-idle state so the bar
+      // doesn't flicker during the hand-off).
+      next = _nextAfter(completedAyahId);
+      if (next == null && onSequenceEnd != null) {
+        onSequenceEnd!.call();
+        return;
+      }
+    }
+    if (next != null) {
+      unawaited(_player.play(next)); // continues: emits loading→playing for `next`
+    } else {
+      // Nothing left to play (last verse, no next-section hand-off) → idle
+      // (keeps transport settings).
+      emit(_withSettings(const AyahAudioState()));
+    }
   }
 
   /// The verse before [id] in the current sequence, or null at the start.
@@ -88,29 +147,7 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     // here so the UI never sees `completed`. (repeat-verse loops at the player,
     // so `completed` won't even fire for it.)
     if (p.status == RecitationStatus.completed) {
-      int? next;
-      if (_repeat == RecitationRepeat.all) {
-        // Loop the surah: roll to the next verse, or back to the first at the end.
-        next = _nextAfter(p.ayahId) ??
-            (_sequence.isNotEmpty ? _sequence.first : null);
-      } else {
-        // Autoplay is ALWAYS on (no single-verse mode; pause is the only stop).
-        // Roll to the next verse; at the surah's LAST verse hand off to the reader
-        // to roll into the next surah (keeping the non-idle state so the bar
-        // doesn't flicker during the hand-off).
-        next = _nextAfter(p.ayahId);
-        if (next == null && onSequenceEnd != null) {
-          onSequenceEnd!.call();
-          return;
-        }
-      }
-      if (next != null) {
-        _player.play(next); // continues: emits loading→playing for `next`
-      } else {
-        // Nothing left to play (last verse, no next-section hand-off) → idle
-        // (keeps transport settings).
-        emit(_withSettings(const AyahAudioState()));
-      }
+      unawaited(_advanceAfterCompletion(p.ayahId));
       return;
     }
     // While a verse plays, warm the NEXT one into the cache so continuous play

@@ -114,4 +114,15 @@ abstract final class FeatureFlags {
   /// the installed version is older than `latestVersion`, shows a dismissible
   /// update nudge. Optional only for now; forced updates need a separate UX pass.
   static const bool softUpdateReminder = true;
+
+  /// Al-Fatihah translation-audio POC (docs/translation-audio-chaining-plan.md
+  /// Phase 2): in Detailed mode, chains the bundled Sahih International audio
+  /// clip after each Fatiha verse's Arabic recitation, when the (session-only,
+  /// not yet surfaced in Settings) translation-audio toggle is on. OFF by
+  /// default — while false, `AyahAudioCubit` is never given a
+  /// `TranslationAudioPlayer`, so the chain never fires and every existing
+  /// path (including outside Al-Fatihah) is untouched. Scope is deliberately
+  /// narrow: 7 bundled verses, no CDN, no Rowwad, no full-Quran rollout —
+  /// see the plan's exit criteria before expanding past Al-Fatihah.
+  static const bool translationAudioFatihaPoc = true;
 }

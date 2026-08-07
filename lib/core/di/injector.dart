@@ -42,6 +42,7 @@ import '../../features/tafsir/data/repositories/tafsir_repository_impl.dart';
 import '../../features/tafsir/domain/repositories/tafsir_repository.dart';
 import '../../features/tafsir/presentation/cubit/tafsir_cubit.dart';
 import '../audio/ayah_recitation_player.dart';
+import '../audio/translation_audio_player.dart';
 import '../app_update_config.dart';
 import '../database/app_database.dart';
 import '../database/editions_database.dart';
@@ -261,10 +262,19 @@ Future<void> configureDependencies() async {
   // so the reloaded UI saw flag=true but GetIt had no AyahAudioCubit).
   getIt
     ..registerLazySingleton<AyahRecitationPlayer>(JustAudioRecitationPlayer.new)
+    // Al-Fatihah translation-audio POC (docs/translation-audio-chaining-plan.md
+    // Phase 2). Same "unconditional but lazy" reasoning as the recitation
+    // player above: registered regardless of FeatureFlags.translationAudioFatihaPoc
+    // so flipping the flag survives a hot reload, but never constructed (no
+    // just_audio instance, no asset touched) unless the reader actually reads it.
+    ..registerLazySingleton<TranslationAudioPlayer>(
+      JustAudioTranslationPlayer.new,
+    )
     ..registerFactory<AyahAudioCubit>(
       () => AyahAudioCubit(
         getIt<AyahRecitationPlayer>(),
         getIt<ReaderSettingsRepository>(),
+        getIt<TranslationAudioPlayer>(),
       ),
     );
 
