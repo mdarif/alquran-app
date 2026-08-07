@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/utils/launch_url_with_fallback.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import '../../../app_update/domain/entities/app_update_prompt.dart';
 import '../../../app_update/presentation/cubit/app_update_cubit.dart';
@@ -130,9 +130,11 @@ Future<void> _showUpdateAvailableDialog(
           FilledButton(
             onPressed: () async {
               Navigator.of(dialogContext).pop();
-              await launchUrl(
+              if (!context.mounted) return;
+              await launchUrlWithFallback(
+                context,
                 prompt.storeUrl,
-                mode: LaunchMode.externalApplication,
+                failureMessage: 'Couldn’t open the Play Store',
               );
             },
             child: const Text('Update'),

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
+import '../../../../core/utils/launch_url_with_fallback.dart';
 import '../../../app_update/domain/entities/app_update_prompt.dart';
 import '../../../app_update/presentation/cubit/app_update_cubit.dart';
 import '../../../app_update/presentation/cubit/app_update_state.dart';
@@ -144,7 +144,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _openUpdate(AppUpdatePrompt prompt) async {
-    await launchUrl(prompt.storeUrl, mode: LaunchMode.externalApplication);
+    await launchUrlWithFallback(
+      context,
+      prompt.storeUrl,
+      failureMessage: 'Couldn’t open the Play Store',
+    );
   }
 
   /// The default bar: the title, the prayer pill, a search icon, and the

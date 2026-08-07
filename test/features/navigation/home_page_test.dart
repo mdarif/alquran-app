@@ -48,6 +48,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher_platform_interface/link.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
+
+/// Simulates a device with no Play Store / no handler for the URL — every
+/// launch attempt reports failure, as the real plugin does in that case.
+class _FailingUrlLauncher extends UrlLauncherPlatform {
+  @override
+  LinkDelegate? get linkDelegate => null;
+
+  @override
+  Future<bool> canLaunch(String url) async => false;
+
+  @override
+  Future<bool> launchUrl(String url, LaunchOptions options) async => false;
+}
 
 class _FakeSurahRepository implements SurahRepository {
   @override
@@ -581,6 +596,34 @@ void main() {
       expect(find.byKey(WidgetKeys.appUpdateBanner), findsOneWidget);
       expect(find.text('Update required'), findsOneWidget);
       expect(find.byKey(WidgetKeys.appUpdateLaterButton), findsNothing);
+    });
+
+    testWidgets(
+        'tapping Update shows a copy-link fallback when the Play Store '
+        'can\'t be opened', (tester) async {
+      final originalPlatform = UrlLauncherPlatform.instance;
+      UrlLauncherPlatform.instance = _FailingUrlLauncher();
+      addTearDown(() => UrlLauncherPlatform.instance = originalPlatform);
+
+      await GetIt.I.unregister<AppUpdateRepository>();
+      final updates = _FakeAppUpdateRepository(
+        AppUpdatePrompt(
+          currentVersion: '1.2.1',
+          latestVersion: '1.2.2',
+          storeUrl: Uri.parse(androidPlayStoreUrl),
+          message: 'A newer version is available.',
+        ),
+      );
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(() => updates);
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(WidgetKeys.appUpdateNowButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Couldn’t open the Play Store'), findsOneWidget);
+      expect(find.text('Copy link'), findsOneWidget);
     });
 
     testWidgets(
