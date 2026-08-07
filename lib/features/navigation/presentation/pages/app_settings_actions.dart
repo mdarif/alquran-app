@@ -59,7 +59,7 @@ Future<void> _checkForUpdate(
       );
     return;
   }
-  await updateCubit.check();
+  await updateCubit.checkManually();
   if (!context.mounted) return;
   final state = updateCubit.state;
   messenger.hideCurrentSnackBar();
@@ -84,11 +84,8 @@ Future<void> _checkForUpdate(
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('Couldn\'t check for updates'),
-          content: Text(
-            state.error ??
-                'Check your connection and try again in a moment.',
-          ),
+          title: const Text('Couldn\'t check right now'),
+          content: const Text('Check your connection and try again.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
@@ -117,7 +114,7 @@ Future<void> _showUpdateAvailableDialog(
       child: AlertDialog(
         title: Text(prompt.required ? 'Update required' : 'Update available'),
         content: Text(
-          '${prompt.required ? 'This version of Al Quran is no longer supported. ' : 'A newer version of Al Quran is available.\n\n'}'
+          '${prompt.message}\n\n'
           'Installed: ${prompt.currentVersion}\n'
           'Latest: ${prompt.latestVersion}',
         ),

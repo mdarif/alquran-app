@@ -10,9 +10,13 @@ class _FakeRepo implements AppUpdateRepository {
 
   AppUpdateCheckResult result;
   String? dismissedVersion;
+  bool? lastIgnoreDismissal;
 
   @override
-  Future<AppUpdateCheckResult> check() async => result;
+  Future<AppUpdateCheckResult> check({bool ignoreDismissal = false}) async {
+    lastIgnoreDismissal = ignoreDismissal;
+    return result;
+  }
 
   @override
   Future<void> dismiss(String latestVersion) async {
@@ -87,6 +91,29 @@ void main() {
       expect(cubit.state.phase, AppUpdatePhase.available);
       expect(cubit.state.prompt!.required, isTrue);
       expect(repo.dismissedVersion, isNull);
+      await cubit.close();
+    });
+
+    test('the passive check() respects a prior dismissal', () async {
+      final repo = _FakeRepo(AppUpdateCheckResult.available(_prompt()));
+      final cubit = AppUpdateCubit(repo);
+
+      await cubit.check();
+
+      expect(repo.lastIgnoreDismissal, isFalse);
+      await cubit.close();
+    });
+
+    test(
+        'a manual check always tells the truth — it ignores a prior '
+        '"Later" dismissal', () async {
+      final repo = _FakeRepo(AppUpdateCheckResult.available(_prompt()));
+      final cubit = AppUpdateCubit(repo);
+
+      await cubit.checkManually();
+
+      expect(repo.lastIgnoreDismissal, isTrue);
+      expect(cubit.state.phase, AppUpdatePhase.available);
       await cubit.close();
     });
 

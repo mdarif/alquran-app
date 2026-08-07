@@ -12,9 +12,18 @@ class AppUpdateCubit extends Cubit<AppUpdateState> {
 
   final AppUpdateRepository _repo;
 
-  Future<void> check() async {
+  /// Passive check — used on Home open/resume. Respects a prior "Later": a
+  /// dismissed optional version stays quiet until its reminder window lapses.
+  Future<void> check() => _run(ignoreDismissal: false);
+
+  /// Manual "Check for Updates" — always tells the truth. A prior "Later"
+  /// tap must never make an explicit check say "up to date" when a real
+  /// update exists.
+  Future<void> checkManually() => _run(ignoreDismissal: true);
+
+  Future<void> _run({required bool ignoreDismissal}) async {
     emit(state.checking);
-    final result = await _repo.check();
+    final result = await _repo.check(ignoreDismissal: ignoreDismissal);
     switch (result.status) {
       case AppUpdateCheckStatus.available:
         emit(state.available(result.prompt!));

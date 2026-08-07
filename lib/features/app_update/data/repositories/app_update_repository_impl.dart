@@ -35,10 +35,11 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
   static const String _dismissedVersionKey = 'dismissed_update_version';
   static const String _dismissedAtKey = 'dismissed_update_at';
   static const int _defaultRemindAfterDays = 30;
-  static const String _fallbackMessage = 'A newer version is available.';
+  static const String _optionalMessage = 'A new version is available.';
+  static const String _requiredMessage = 'Please update to continue.';
 
   @override
-  Future<AppUpdateCheckResult> check() async {
+  Future<AppUpdateCheckResult> check({bool ignoreDismissal = false}) async {
     String current;
     try {
       current = await _currentVersion();
@@ -85,7 +86,9 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
         requiredVersion is String && _isNewer(requiredVersion, current);
     final remindAfterDays = _remindAfterDays(json['remindAfterDays']);
     final dismissedVersion = _prefs.getString(_dismissedVersionKey);
-    if (!required && _isDismissed(latest, remindAfterDays)) {
+    if (!required &&
+        !ignoreDismissal &&
+        _isDismissed(latest, remindAfterDays)) {
       _log('latest=$latest suppressed: dismissed=$dismissedVersion');
       return const AppUpdateCheckResult.upToDate();
     }
@@ -100,9 +103,13 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
         currentVersion: current,
         latestVersion: latest,
         storeUrl: uri,
-        message: message is String && message.trim().isNotEmpty
-            ? message.trim()
-            : _fallbackMessage,
+        // Required always speaks plainly regardless of the JSON's message —
+        // "why should I bother" copy is the wrong tone when it's mandatory.
+        message: required
+            ? _requiredMessage
+            : (message is String && message.trim().isNotEmpty
+                ? message.trim()
+                : _optionalMessage),
         required: required,
       ),
     );

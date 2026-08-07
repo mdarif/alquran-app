@@ -117,6 +117,60 @@ void main() {
       expect((await repo.check()).status, AppUpdateCheckStatus.available);
     });
 
+    test(
+        'a manual check (ignoreDismissal) always tells the truth, even for '
+        'a dismissed optional version', () async {
+      final repo = await _repo(
+        body: '''
+          {
+            "latestVersion": "1.2.2",
+            "storeUrl": "https://example.test",
+            "remindAfterDays": 30
+          }
+        ''',
+      );
+
+      await repo.dismiss('1.2.2');
+
+      final passive = await repo.check();
+      expect(passive.status, AppUpdateCheckStatus.upToDate);
+
+      final manual = await repo.check(ignoreDismissal: true);
+      expect(manual.status, AppUpdateCheckStatus.available);
+      expect(manual.prompt!.latestVersion, '1.2.2');
+    });
+
+    test('falls back to calm default copy when the config has no message',
+        () async {
+      final repo = await _repo(
+        body: '{"latestVersion":"1.2.2","storeUrl":"https://example.test"}',
+      );
+
+      final result = await repo.check();
+
+      expect(result.prompt!.message, 'A new version is available.');
+    });
+
+    test(
+        'a required update always says "please update", ignoring any '
+        'custom config message', () async {
+      final repo = await _repo(
+        body: '''
+          {
+            "latestVersion": "1.2.2",
+            "minimumSupportedVersion": "1.2.2",
+            "storeUrl": "$androidPlayStoreUrl",
+            "message": "Custom marketing copy that should not show for a required update."
+          }
+        ''',
+      );
+
+      final result = await repo.check();
+
+      expect(result.prompt!.required, isTrue);
+      expect(result.prompt!.message, 'Please update to continue.');
+    });
+
     test('does not suppress a required update after dismissal', () async {
       final repo = await _repo(
         body: '''

@@ -164,12 +164,23 @@ class _FakeAppUpdateRepository implements AppUpdateRepository {
   AppUpdatePrompt? prompt;
   String? error;
   String? dismissedVersion;
+  bool? lastIgnoreDismissal;
+  int checkCount = 0;
 
   @override
-  Future<AppUpdateCheckResult> check() async {
+  Future<AppUpdateCheckResult> check({bool ignoreDismissal = false}) async {
+    lastIgnoreDismissal = ignoreDismissal;
+    checkCount += 1;
     if (error != null) return AppUpdateCheckResult.error(error!);
     final p = prompt;
-    return p == null
+    if (p == null) return const AppUpdateCheckResult.upToDate();
+    // Mirror the real repository's dismissal gate, so a test can verify a
+    // manual check truly ignores it rather than only checking the flag was
+    // passed through.
+    final suppressed = !ignoreDismissal &&
+        !p.required &&
+        dismissedVersion == p.latestVersion;
+    return suppressed
         ? const AppUpdateCheckResult.upToDate()
         : AppUpdateCheckResult.available(p);
   }
@@ -177,7 +188,6 @@ class _FakeAppUpdateRepository implements AppUpdateRepository {
   @override
   Future<void> dismiss(String latestVersion) async {
     dismissedVersion = latestVersion;
-    prompt = null;
   }
 }
 
@@ -576,6 +586,35 @@ void main() {
       expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
     });
 
+    testWidgets(
+        'the update banner refreshes when the app resumes from background',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      final updates = _FakeAppUpdateRepository();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(() => updates);
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
+      expect(updates.checkCount, 1);
+
+      // A newer version got published server-side while the app sat
+      // backgrounded — simulate the OS resuming the app.
+      updates.prompt = AppUpdatePrompt(
+        currentVersion: '1.2.1',
+        latestVersion: '1.2.2',
+        storeUrl: Uri.parse(androidPlayStoreUrl),
+        message: 'A new version is available.',
+      );
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding
+          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(updates.checkCount, 2);
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsOneWidget);
+    });
+
     testWidgets('a required update banner has no Later button and stays put',
         (tester) async {
       await GetIt.I.unregister<AppUpdateRepository>();
@@ -729,6 +768,44 @@ void main() {
       expect(find.text('Update'), findsWidgets);
     });
 
+    testWidgets(
+        'a manual Settings check always tells the truth, even after '
+        'dismissing that exact version on Home', (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      final updates = _FakeAppUpdateRepository(
+        AppUpdatePrompt(
+          currentVersion: '1.2.1',
+          latestVersion: '1.2.2',
+          storeUrl: Uri.parse(androidPlayStoreUrl),
+          message: 'A new version is available.',
+        ),
+      );
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(() => updates);
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsOneWidget);
+
+      await tester.tap(find.byKey(WidgetKeys.appUpdateLaterButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
+      expect(updates.dismissedVersion, '1.2.2');
+
+      // Settings' manual "Check for Updates" must still report the truth —
+      // a "Later" tap on Home must not make an explicit check lie.
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.appUpdateMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(updates.lastIgnoreDismissal, isTrue);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Update available'), findsWidgets);
+      expect(find.text('Al Quran is up to date'), findsNothing);
+    });
+
     testWidgets('Settings check shows an in-app current-version result',
         (tester) async {
       await GetIt.I.unregister<AppUpdateRepository>();
@@ -770,8 +847,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('Couldn\'t check for updates'), findsOneWidget);
-      expect(find.text('Network request failed'), findsOneWidget);
+      expect(find.text('Couldn\'t check right now'), findsOneWidget);
+      expect(find.text('Check your connection and try again.'), findsOneWidget);
+      // The raw failure detail is for logs, not the reader — must not leak in.
+      expect(find.text('Network request failed'), findsNothing);
     });
 
     testWidgets('Settings shows a required update as non-dismissible',

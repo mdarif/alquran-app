@@ -59,7 +59,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // The surah-list cubit is provided at this level (not inside the body) so the
   // app-bar search can drive it: SurahListBody reads it ambiently below.
   late final SurahListCubit _surahs = GetIt.I<SurahListCubit>()..load();
@@ -77,15 +77,27 @@ class _HomePageState extends State<HomePage> {
     if (widget.softUpdateReminder &&
         GetIt.I.isRegistered<AppUpdateCubit>()) {
       _updateCubit = GetIt.I<AppUpdateCubit>()..check();
+      WidgetsBinding.instance.addObserver(this);
     }
   }
 
   @override
   void dispose() {
+    if (_updateCubit != null) WidgetsBinding.instance.removeObserver(this);
     _searchCtrl.dispose();
     _searchFocus.dispose();
     _surahs.close();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A newer version may have been published while the app sat backgrounded
+    // — re-check on resume so the banner doesn't need a full app restart to
+    // catch up.
+    if (state == AppLifecycleState.resumed) {
+      _updateCubit?.check();
+    }
   }
 
   void _openSearch() {

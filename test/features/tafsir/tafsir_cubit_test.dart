@@ -161,6 +161,31 @@ void main() {
     ]);
   });
 
+  test(
+      'load() survives a local installed() read failure and still shows '
+      'the catalogue', () async {
+    final cubit = TafsirCubit(
+      _FakeTafsirRepository(
+        catalogue: const TafsirCatalogue(resources: [_visibleEnglish]),
+        installedThrows: Exception('db locked'),
+      ),
+    );
+    addTearDown(cubit.close);
+
+    await cubit.load();
+
+    expect(cubit.state.status, TafsirStatus.ready);
+    expect(cubit.state.catalogueUnavailable, isFalse);
+    expect(
+      cubit.state.items.map((item) => item.slug),
+      const ['en-ibn-kathir-abridged'],
+    );
+    expect(
+      cubit.state.item('en-ibn-kathir-abridged')?.status,
+      TafsirItemStatus.available,
+    );
+  });
+
   test('a checksum failure is reported as such, not as a network error',
       () async {
     // The distinction matters: "try again" is the wrong advice when the
@@ -327,6 +352,7 @@ class _FakeTafsirRepository implements TafsirRepository {
     List<TafsirResource> installedResources = const [],
     Map<String, TafsirEntry> entriesBySlug = const {},
     this.installThrows,
+    this.installedThrows,
   })  : _catalogue = catalogue,
         _installedResources = List<TafsirResource>.of(installedResources),
         _entriesBySlug = entriesBySlug;
@@ -348,6 +374,10 @@ class _FakeTafsirRepository implements TafsirRepository {
   /// When set, [install] throws this instead of succeeding — simulates a
   /// download failure (integrity or otherwise) for retry-path tests.
   Object? installThrows;
+
+  /// When set, [installed] throws this instead of returning — simulates a
+  /// local DB read failure during [TafsirCubit.load].
+  Object? installedThrows;
 
   @override
   Future<TafsirCatalogue> catalogue() async => _catalogue;
@@ -382,7 +412,11 @@ class _FakeTafsirRepository implements TafsirRepository {
   }
 
   @override
-  Future<List<TafsirResource>> installed() async => _installedResources;
+  Future<List<TafsirResource>> installed() async {
+    final error = installedThrows;
+    if (error != null) throw error;
+    return _installedResources;
+  }
 
   @override
   Future<void> remove(String slug) async {

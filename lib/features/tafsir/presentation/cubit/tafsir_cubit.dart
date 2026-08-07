@@ -25,7 +25,14 @@ class TafsirCubit extends Cubit<TafsirState> {
     emit(state.copyWith(status: TafsirStatus.loading));
     var catalogueUnavailable = false;
     List<TafsirCatalogueEntry> available = const [];
-    final installed = await _repository.installed();
+    List<TafsirResource> installed = const [];
+    try {
+      installed = await _repository.installed();
+    } catch (_) {
+      // A local read failing is unexpected; show the catalogue rather than
+      // an empty screen — already-installed rows just won't be marked as
+      // installed for this one load.
+    }
     try {
       available = (await _repository.catalogue()).resources;
     } catch (_) {
