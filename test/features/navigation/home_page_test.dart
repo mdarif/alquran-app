@@ -694,7 +694,9 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
       await tester.pumpAndSettle();
 
-      expect(find.text('Check for Updates'), findsOneWidget);
+      // Settings' own open-time check already ran against the (dismissed)
+      // repo state, so the row reflects "up to date" — not a blind button.
+      expect(find.text('Up to date'), findsOneWidget);
     });
 
     testWidgets('Settings offers the moved app actions', (tester) async {
@@ -709,7 +711,9 @@ void main() {
       // Reminders moved to the overflow as a Settings peer — not in this list.
       expect(find.byKey(WidgetKeys.remindersButton), findsNothing);
       expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
-      expect(find.text('Check for Updates'), findsOneWidget);
+      // The fake repo has no prompt, so Settings' own open-time check
+      // resolves to "up to date" rather than staying a blind button.
+      expect(find.text('Up to date'), findsOneWidget);
       expect(find.byKey(WidgetKeys.aboutMenuButton), findsOneWidget);
       expect(find.text('About'), findsOneWidget);
     });
@@ -736,6 +740,23 @@ void main() {
 
       expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
       expect(find.text('Update available'), findsWidgets);
+    });
+
+    testWidgets('Settings row shows "Couldn\'t check" when offline/unreachable',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository()..error = 'Network request failed',
+      );
+
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateMenuButton), findsOneWidget);
+      expect(find.text("Couldn't check"), findsOneWidget);
     });
 
     testWidgets('Settings check shows update details before opening the store',

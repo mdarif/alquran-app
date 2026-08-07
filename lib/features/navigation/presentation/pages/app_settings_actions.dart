@@ -29,9 +29,7 @@ List<SettingsAction> appSettingsActions(
         SettingsAction(
           key: WidgetKeys.appUpdateMenuButton,
           icon: AppIcons.autoSelected,
-          title: updateState?.phase == AppUpdatePhase.available
-              ? 'Update available'
-              : 'Check for Updates',
+          title: _updateRowTitle(updateState),
           onTap: () => _checkForUpdate(context, updateCubit),
         ),
       SettingsAction(
@@ -42,6 +40,24 @@ List<SettingsAction> appSettingsActions(
         onTap: () => _openAbout(context),
       ),
     ];
+
+/// Settings shouldn't stay a blind "Check for Updates" button once we
+/// already know the answer — reflect the last check's result right on the
+/// row so opening Settings alone tells the reader something.
+String _updateRowTitle(AppUpdateState? state) {
+  switch (state?.phase) {
+    case AppUpdatePhase.available:
+      return 'Update available';
+    case AppUpdatePhase.upToDate:
+      return 'Up to date';
+    case AppUpdatePhase.error:
+      return "Couldn't check";
+    case AppUpdatePhase.idle:
+    case AppUpdatePhase.checking:
+    case null:
+      return 'Check for Updates';
+  }
+}
 
 Future<void> _checkForUpdate(
   BuildContext context,
