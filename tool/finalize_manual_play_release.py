@@ -46,6 +46,20 @@ def verify_update_json(path: Path, version: str) -> None:
         raise SystemExit(f"{path} latestVersion is {data.get('latestVersion')}, expected {version}")
 
 
+def verify_live_update_json(repo: Path, public_update_url: str, version: str, tag: str) -> bool:
+    urls = [public_update_url, f"{public_update_url}?cachebust={tag}"]
+    for url in urls:
+        live = run(["curl", "-fsSL", url], cwd=repo, check=False)
+        if live.returncode != 0:
+            continue
+        live_json = json.loads(live.stdout)
+        if live_json.get("latestVersion") != version:
+            raise SystemExit(f"Live app-update.json latestVersion is {live_json.get('latestVersion')}")
+        print(f"Verified live app-update.json advertises {version}.")
+        return True
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True, help="Semver released on Play, for example 1.2.6")
@@ -124,13 +138,7 @@ def main() -> int:
             ],
             cwd=repo,
         )
-        live = run(["curl", "-fsSL", f"{args.public_update_url}?cachebust={tag}"], cwd=repo, check=False)
-        if live.returncode == 0:
-            live_json = json.loads(live.stdout)
-            if live_json.get("latestVersion") != args.version:
-                raise SystemExit(f"Live app-update.json latestVersion is {live_json.get('latestVersion')}")
-            print(f"Verified live app-update.json advertises {args.version}.")
-        else:
+        if not verify_live_update_json(repo, args.public_update_url, args.version, tag):
             print(
                 "::warning::R2 object uploaded, but the public app-update URL did not verify. "
                 "Check/deploy infra/app-update-worker before relying on the in-app banner."
