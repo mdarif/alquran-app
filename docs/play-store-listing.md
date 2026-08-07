@@ -156,8 +156,9 @@ Follow Al-Tawheed's `docs/store-assets/feature-graphic-spec.md` approach:
      "Everyone/PEGI 3".
    - **SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM declaration:** required — pick
      the *alarm & reminder* use case (prayer-time and Sunnah reminders fire at
-     precise times), then set `PLAY_EXACT_ALARM_DECLARED=true` in GitHub
-     Secrets so release automation can proceed.
+     precise times). If Play has not surfaced the form yet, run once with
+     `PLAY_EXACT_ALARM_DECLARED=bootstrap`; after completing the form, set
+     `PLAY_EXACT_ALARM_DECLARED=true` so release automation can proceed.
    - **App access:** all functionality available without credentials.
 5. **Release → Production:** upload the signed AAB (grab it from the GitHub
    Release the CD created; the pipeline skips the direct Play upload until

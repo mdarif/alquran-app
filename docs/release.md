@@ -88,15 +88,23 @@ promoting internal → **production** (with the staged rollout) stays a manual
 Play Console gate.
 
 Al Quran declares `USE_EXACT_ALARM` for precise prayer-time and Sunnah
-reminders. Complete the Play Console exact-alarm declaration once under **App
-content**, then set the guard secret:
+reminders. Play only shows the exact-alarm declaration after an uploaded AAB
+requests it. For the first declaration-triggering run, set:
+
+```bash
+gh secret set PLAY_EXACT_ALARM_DECLARED --repo mdarif/alquran-app --body "bootstrap"
+```
+
+If Play stops the release and surfaces the declaration, complete it in Play
+Console, then change the guard secret to:
 
 ```bash
 gh secret set PLAY_EXACT_ALARM_DECLARED --repo mdarif/alquran-app --body "true"
 ```
 
-The release workflow refuses to upload an AAB while this secret is missing,
-because Play rejects the release after consuming the version code.
+After that, every release stays fully automated. The workflow refuses to upload
+an AAB while the secret is missing, because Play rejects the release after
+consuming the version code.
 
 ### 3. Codecov token (optional)
 
@@ -239,7 +247,9 @@ the release build succeeds.
   the app must already be created in the Play Console with package
   `com.almarfa.alquran` and at least one manual upload on the internal track.
   If the error says the exact-alarm declaration is missing, complete the Play
-  Console declaration and set `PLAY_EXACT_ALARM_DECLARED=true`. Do **not**
+  Console declaration and set `PLAY_EXACT_ALARM_DECLARED=true`. If App content
+  is blank because Play has not surfaced the form yet, set
+  `PLAY_EXACT_ALARM_DECLARED=bootstrap` for one release attempt. Do **not**
   upload the same AAB manually after a failed Play edit; its version code may
   already be consumed. Bump to the next build number and re-run the release.
 - **Owner pre-submission gates** (not CI): translation/font/audio licensing,

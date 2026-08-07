@@ -154,12 +154,23 @@ def require_exact_alarm_declaration(manifest: Path) -> None:
         return
 
     declared = os.environ.get("PLAY_EXACT_ALARM_DECLARED", "").strip().lower()
+    if declared == "bootstrap":
+        print(
+            "::warning::Exact alarm preflight: bootstrap mode enabled. "
+            "This upload may be stopped by Play so the exact-alarm declaration "
+            "form can be completed. After the declaration is accepted, set "
+            "PLAY_EXACT_ALARM_DECLARED=true."
+        )
+        return
+
     if declared not in {"1", "true", "yes"}:
         raise RuntimeError(
             "AndroidManifest.xml declares USE_EXACT_ALARM, but PLAY_EXACT_ALARM_DECLARED "
-            "is not true. Complete the Play Console exact-alarm declaration once, then set "
-            "the repository secret PLAY_EXACT_ALARM_DECLARED=true. Refusing to upload an "
-            "AAB that Play will reject after burning its version code."
+            "is not true. If Play Console is not showing the declaration form yet, set "
+            "PLAY_EXACT_ALARM_DECLARED=bootstrap for one release attempt so Play can "
+            "surface the form. After the declaration is accepted, set the repository "
+            "secret PLAY_EXACT_ALARM_DECLARED=true. Refusing to upload an AAB that Play "
+            "will reject after burning its version code."
         )
     print("Exact alarm preflight: declaration flag is present.")
 
