@@ -203,6 +203,22 @@ make release-dry BUMP=patch
 Recommended before the first real cut, to confirm the signing secrets decode and
 the release build succeeds.
 
+### Manual Play release recovery
+
+If Play Console must be used manually after a workflow Play-upload failure,
+finish the release by running the finalizer from a clean `develop` checkout:
+
+```bash
+make finalize-manual-release \
+  RELEASE_VERSION=1.2.6 \
+  RELEASE_BUILD=11 \
+  RELEASE_AAB=build/app/outputs/bundle/release/al-quran-1.2.6+11.aab
+```
+
+The finalizer updates `pubspec.yaml`, generates and publishes `app-update.json`,
+creates the `chore: release vX.Y.Z` commit and tag, pushes both `develop` and
+`main`, and creates the GitHub Release with the manual AAB attached.
+
 ## What a real run does
 
 0. **Promote** (develop dispatch only): fast-forwards `main` to `develop` and

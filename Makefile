@@ -1,6 +1,6 @@
 # Al Quran — developer task runner. Run `make help` to list targets.
 .DEFAULT_GOAL := help
-.PHONY: help setup get gen watch analyze format format-check test coverage run run-update-local serve-update-config generate-update-config android-update-reverse android-update-reverse-clear clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry ci-logs version apk aab ipa
+.PHONY: help setup get gen watch analyze format format-check test coverage run run-update-local serve-update-config generate-update-config android-update-reverse android-update-reverse-clear clean ci hooks seed-version patch-font location-perms notif-perms audio-perms diag-prayer diag-arabic e2e e2e-setup perf release release-auto release-dry finalize-manual-release ci-logs version apk aab ipa
 
 # Release defaults — override on the command line, e.g. `make release BUMP=minor`.
 REPO ?= mdarif/alquran-app
@@ -9,6 +9,9 @@ UPDATE_CONFIG ?= update-available.json
 UPDATE_CONFIG_HOST ?= 127.0.0.1
 UPDATE_CONFIG_PORT ?= 8787
 UPDATE_VERSION ?= 1.2.2
+RELEASE_VERSION ?=
+RELEASE_BUILD ?=
+RELEASE_AAB ?=
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -141,6 +144,12 @@ release: ## Escape hatch: cut a release directly from main (no develop promote):
 release-dry: ## Validate the pipeline from develop (no promote/tag/release/push): make release-dry BUMP=patch
 	gh workflow run flutter-release.yml --repo $(REPO) --ref develop --field bump=$(BUMP) --field dry_run=true
 	@echo "✓ Dry run triggered — watch: https://github.com/$(REPO)/actions/workflows/flutter-release.yml"
+
+finalize-manual-release: ## Finalize repo/tag/GitHub Release/update JSON after manual Play upload: make finalize-manual-release RELEASE_VERSION=1.2.6 RELEASE_BUILD=11 RELEASE_AAB=...
+	@test -n "$(RELEASE_VERSION)" || { echo "usage: make finalize-manual-release RELEASE_VERSION=1.2.6 RELEASE_BUILD=11 RELEASE_AAB=path/to.aab"; exit 2; }
+	@test -n "$(RELEASE_BUILD)" || { echo "usage: make finalize-manual-release RELEASE_VERSION=1.2.6 RELEASE_BUILD=11 RELEASE_AAB=path/to.aab"; exit 2; }
+	@test -n "$(RELEASE_AAB)" || { echo "usage: make finalize-manual-release RELEASE_VERSION=1.2.6 RELEASE_BUILD=11 RELEASE_AAB=path/to.aab"; exit 2; }
+	python3 tool/finalize_manual_play_release.py --version "$(RELEASE_VERSION)" --build-number "$(RELEASE_BUILD)" --aab "$(RELEASE_AAB)"
 
 ci-logs: ## Show the failed-step logs of the most recent workflow run
 	@RUN_ID=$$(gh run list --repo $(REPO) --limit 1 --json databaseId --jq '.[0].databaseId'); \
