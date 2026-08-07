@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
-import '../../../../core/theme/app_icons.dart';
 import '../../../../core/translations/translation_recommendations.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
 import '../../../../core/widgets/experimental_pill.dart';
+import '../../../../core/widgets/sheet_manager_header.dart';
 import '../cubit/translations_cubit.dart';
 
 class TranslationsPage extends StatefulWidget {
@@ -128,85 +128,67 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final languageCount = {
+      for (final item in items) item.languageCode.trim().toLowerCase(),
+    }.where((code) => code.isNotEmpty).length;
+    return SheetManagerHeader(
+      title: 'Translations',
+      titleMeta: _LanguageCountBadge(count: languageCount),
+      search: search,
+      searchFieldKey: WidgetKeys.translationsSearchField,
+      searchClearKey: WidgetKeys.translationsSearchClear,
+      filters: _TranslationHeaderMeta(
+        items: items,
+        languageFilter: languageFilter,
+        onLanguageFilterChanged: onLanguageFilterChanged,
+      ),
+    );
+  }
+}
+
+class _TranslationHeaderMeta extends StatelessWidget {
+  const _TranslationHeaderMeta({
+    required this.items,
+    required this.languageFilter,
+    required this.onLanguageFilterChanged,
+  });
+
+  final List<EditionItem> items;
+  final String languageFilter;
+  final ValueChanged<String> onLanguageFilterChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 30,
+      child: _LanguageFilters(
+        items: items,
+        selected: languageFilter,
+        onSelected: onLanguageFilterChanged,
+      ),
+    );
+  }
+}
+
+class _LanguageCountBadge extends StatelessWidget {
+  const _LanguageCountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.28),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 40,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    tooltip: 'Close',
-                    icon: const AppIcon(AppIcons.close),
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
-                ),
-                Text(
-                  'Translations',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: WidgetKeys.translationsSearchField,
-            controller: search,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Search',
-              prefixIcon: const AppIcon(AppIcons.search),
-              suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: search,
-                builder: (context, value, _) {
-                  if (value.text.isEmpty) return const SizedBox.shrink();
-                  return IconButton(
-                    key: WidgetKeys.translationsSearchClear,
-                    tooltip: 'Clear search',
-                    icon: const AppIcon(AppIcons.close),
-                    onPressed: search.clear,
-                  );
-                },
-              ),
-              filled: true,
-              fillColor: cs.surface,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(
-                  color: cs.outlineVariant.withValues(alpha: 0.65),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: cs.primary),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _LanguageFilters(
-            items: items,
-            selected: languageFilter,
-            onSelected: onLanguageFilterChanged,
-          ),
-        ],
+    final label =
+        count == 1 ? '1 language available' : '$count languages available';
+    return Text(
+      key: WidgetKeys.translationsLanguageCount,
+      label,
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: cs.onSurfaceVariant,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0,
+        height: 1,
       ),
     );
   }

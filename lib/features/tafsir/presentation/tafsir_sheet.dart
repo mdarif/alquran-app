@@ -102,6 +102,8 @@ class _AyahTafsirSheetState extends State<_AyahTafsirSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final label = '${widget.surahName ?? 'Surah ${widget.ayah.surahId}'} '
+        '· ${widget.ayah.surahId}:${widget.ayah.ayahNumber}';
     return Material(
       key: WidgetKeys.tafsirAyahSheet,
       color: cs.surface,
@@ -112,7 +114,7 @@ class _AyahTafsirSheetState extends State<_AyahTafsirSheet> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
+              padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
               child: Column(
                 children: [
                   Container(
@@ -123,9 +125,9 @@ class _AyahTafsirSheetState extends State<_AyahTafsirSheet> {
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   SizedBox(
-                    height: 40,
+                    height: 38,
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
@@ -137,11 +139,28 @@ class _AyahTafsirSheetState extends State<_AyahTafsirSheet> {
                             onPressed: () => Navigator.of(context).maybePop(),
                           ),
                         ),
-                        Text(
-                          'Tafsir',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Tafsir',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0,
+                                height: 1.05,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              label,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0,
+                                height: 1.05,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -167,9 +186,6 @@ class _AyahTafsirSheetState extends State<_AyahTafsirSheet> {
                     ayah: widget.ayah,
                     resources: widget.resources,
                     results: results,
-                    label:
-                        '${widget.surahName ?? 'Surah ${widget.ayah.surahId}'} '
-                        '${widget.ayah.surahId}:${widget.ayah.ayahNumber}',
                   );
                 },
               ),
@@ -186,13 +202,11 @@ class _TafsirEntryView extends StatefulWidget {
     required this.ayah,
     required this.resources,
     required this.results,
-    required this.label,
   });
 
   final Ayah ayah;
   final List<TranslationResource> resources;
   final List<TafsirAyahResult> results;
-  final String label;
 
   @override
   State<_TafsirEntryView> createState() => _TafsirEntryViewState();
@@ -211,6 +225,7 @@ class _TafsirEntryViewState extends State<_TafsirEntryView> {
   String _query = '';
   int? _activeSearchResultIndex;
   int? _activeSearchBlockIndex;
+  int? _activeJumpSection;
   bool _showBackToTop = false;
 
   @override
@@ -282,13 +297,17 @@ class _TafsirEntryViewState extends State<_TafsirEntryView> {
 
   Future<void> _openAndScrollToSection(int index) async {
     if (index < 0 || index >= _sectionKeys.length) return;
-    setState(() => _expandedSections[index] = true);
+    setState(() {
+      _activeJumpSection = index;
+      _expandedSections[index] = true;
+    });
     await _settleLayout();
     await _scrollTo(_sectionKeys[index]);
   }
 
   Future<void> _scrollToTop() async {
     if (!_scrollController.hasClients) return;
+    setState(() => _activeJumpSection = null);
     await _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 260),
@@ -314,6 +333,7 @@ class _TafsirEntryViewState extends State<_TafsirEntryView> {
     setState(() {
       _activeSearchResultIndex = match.resultIndex;
       _activeSearchBlockIndex = match.blockIndex;
+      _activeJumpSection = match.resultIndex;
       _expandedSections[match.resultIndex] = true;
     });
     await _settleLayout();
@@ -386,18 +406,10 @@ class _TafsirEntryViewState extends State<_TafsirEntryView> {
         Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
+              padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    widget.label,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: cs.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   _TafsirControls(
                     textScale: _textScale,
                     queryController: _searchController,
@@ -412,10 +424,11 @@ class _TafsirEntryViewState extends State<_TafsirEntryView> {
                       _searchFocus.unfocus();
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _TafsirJumpBar(
                     results: widget.results,
                     labelFor: _tafsirDisplayLabel,
+                    activeSection: _activeJumpSection,
                     onAyah: _scrollToTop,
                     onSection: _openAndScrollToSection,
                   ),
@@ -604,108 +617,115 @@ class _TafsirControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final matchLabel = queryController.text.isEmpty
         ? ''
         : '$hitCount ${hitCount == 1 ? 'match' : 'matches'}';
     return SizedBox(
-      height: 52,
+      height: 38,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: IconButton(
-              key: WidgetKeys.tafsirTextDecrease,
-              tooltip: 'Smaller Tafsir text',
-              onPressed: textScale <= 0.85 ? null : onDecreaseText,
-              style: IconButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                minimumSize: const Size.square(34),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              icon: const Text('A', textScaler: TextScaler.linear(0.9)),
+          IconButton(
+            key: WidgetKeys.tafsirTextDecrease,
+            tooltip: 'Smaller Tafsir text',
+            onPressed: textScale <= 0.85 ? null : onDecreaseText,
+            style: IconButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: const Size.square(30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
+            icon: const Text('A', textScaler: TextScaler.linear(0.9)),
           ),
-          const SizedBox(width: 4),
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: IconButton.filledTonal(
-              key: WidgetKeys.tafsirTextIncrease,
-              tooltip: 'Larger Tafsir text',
-              onPressed: textScale >= 1.35 ? null : onIncreaseText,
-              style: IconButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                minimumSize: const Size.square(34),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              icon: const Text('A', textScaler: TextScaler.linear(1.12)),
+          const SizedBox(width: 2),
+          IconButton.filledTonal(
+            key: WidgetKeys.tafsirTextIncrease,
+            tooltip: 'Larger Tafsir text',
+            onPressed: textScale >= 1.35 ? null : onIncreaseText,
+            style: IconButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: const Size.square(30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
+            icon: const Text('A', textScaler: TextScaler.linear(1.12)),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
+            child: TextField(
+              key: WidgetKeys.tafsirInTextSearchField,
+              controller: queryController,
+              focusNode: searchFocus,
+              textInputAction: TextInputAction.search,
+              onSubmitted: onSubmitSearch,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.1,
+                letterSpacing: 0,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                filled: true,
+                fillColor: cs.surface,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                prefixIcon: const AppIcon(AppIcons.search, size: 20),
+                prefixIconConstraints: const BoxConstraints.tightFor(
+                  width: 40,
                   height: 38,
-                  child: TextField(
-                    key: WidgetKeys.tafsirInTextSearchField,
-                    controller: queryController,
-                    focusNode: searchFocus,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: onSubmitSearch,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 8,
+                ),
+                suffixIcon: queryController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: onClearSearch,
+                        icon: const AppIcon(AppIcons.close, size: 18),
                       ),
-                      prefixIcon: const AppIcon(AppIcons.search, size: 18),
-                      prefixIconConstraints: const BoxConstraints.tightFor(
-                        width: 34,
-                        height: 34,
-                      ),
-                      suffixIcon: queryController.text.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear search',
-                              onPressed: onClearSearch,
-                              icon: const AppIcon(AppIcons.close, size: 18),
-                            ),
-                      hintText: 'Find in Tafsir',
-                      border: const OutlineInputBorder(),
-                    ),
+                suffixIconConstraints: const BoxConstraints.tightFor(
+                  width: 40,
+                  height: 38,
+                ),
+                hintText: 'Find in Tafsir',
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.65),
                   ),
                 ),
-                SizedBox(
-                  height: 14,
-                  child: Text(
-                    matchLabel,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.1,
-                    ),
-                  ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: cs.primary),
                 ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: IconButton.filledTonal(
-              key: WidgetKeys.tafsirSearchNext,
-              tooltip: 'Next match',
-              onPressed: hitCount == 0 ? null : onNextSearchHit,
-              style: IconButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                minimumSize: const Size.square(34),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          if (matchLabel.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 58),
+              child: Text(
+                matchLabel,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+                textAlign: TextAlign.right,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1,
+                ),
               ),
-              icon: const AppIcon(AppIcons.expand),
             ),
+          ],
+          const SizedBox(width: 6),
+          IconButton.filledTonal(
+            key: WidgetKeys.tafsirSearchNext,
+            tooltip: 'Next match',
+            onPressed: hitCount == 0 ? null : onNextSearchHit,
+            style: IconButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              minimumSize: const Size.square(30),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const AppIcon(AppIcons.expand),
           ),
         ],
       ),
@@ -717,41 +737,40 @@ class _TafsirJumpBar extends StatelessWidget {
   const _TafsirJumpBar({
     required this.results,
     required this.labelFor,
+    required this.activeSection,
     required this.onAyah,
     required this.onSection,
   });
 
   final List<TafsirAyahResult> results;
   final String Function(TafsirResource resource) labelFor;
+  final int? activeSection;
   final VoidCallback onAyah;
   final ValueChanged<int> onSection;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 32,
+      height: 30,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
           if (index == 0) {
-            return ActionChip(
-              visualDensity: VisualDensity.compact,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              avatar: const AppIcon(AppIcons.viewReading, size: 16),
+            return _JumpChip(
+              selected: activeSection == null,
               label: const Text('Ayah'),
               onPressed: onAyah,
             );
           }
           final resultIndex = index - 1;
           final result = results[resultIndex];
-          return ActionChip(
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+          return _JumpChip(
+            selected: activeSection == resultIndex,
             label: Text(_shortJumpLabel(labelFor(result.resource))),
             onPressed: () => onSection(resultIndex),
           );
         },
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemCount: results.length + 1,
       ),
     );
@@ -762,6 +781,45 @@ class _TafsirJumpBar extends StatelessWidget {
     if (label.startsWith('Urdu - ')) return 'Urdu';
     if (label.startsWith('Arabic - ')) return 'Arabic';
     return label;
+  }
+}
+
+class _JumpChip extends StatelessWidget {
+  const _JumpChip({
+    required this.selected,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final bool selected;
+  final Widget label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return ChoiceChip(
+      selected: selected,
+      showCheckmark: false,
+      label: label,
+      onSelected: (_) => onPressed(),
+      selectedColor: cs.primaryContainer,
+      backgroundColor: cs.surface,
+      side: BorderSide(
+        color: selected
+            ? cs.primary.withValues(alpha: 0.42)
+            : cs.outlineVariant.withValues(alpha: 0.72),
+      ),
+      labelStyle: theme.textTheme.labelMedium?.copyWith(
+        color: selected ? cs.primary : cs.onSurface,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
   }
 }
 

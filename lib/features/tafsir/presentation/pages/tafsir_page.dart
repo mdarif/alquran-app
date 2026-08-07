@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/testing/widget_keys.dart';
-import '../../../../core/theme/app_icons.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
+import '../../../../core/widgets/sheet_manager_header.dart';
 import '../cubit/tafsir_cubit.dart';
 
 class TafsirPage extends StatefulWidget {
@@ -100,85 +100,15 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-      child: Column(
-        children: [
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.28),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 40,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    tooltip: 'Close',
-                    icon: const AppIcon(AppIcons.close),
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
-                ),
-                Text(
-                  'Tafsir',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: WidgetKeys.tafsirSearchField,
-            controller: search,
-            textInputAction: TextInputAction.search,
-            decoration: InputDecoration(
-              hintText: 'Search',
-              prefixIcon: const AppIcon(AppIcons.search),
-              suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: search,
-                builder: (context, value, _) {
-                  if (value.text.isEmpty) return const SizedBox.shrink();
-                  return IconButton(
-                    key: WidgetKeys.tafsirSearchClear,
-                    tooltip: 'Clear search',
-                    icon: const AppIcon(AppIcons.close),
-                    onPressed: search.clear,
-                  );
-                },
-              ),
-              filled: true,
-              fillColor: cs.surface,
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(
-                  color: cs.outlineVariant.withValues(alpha: 0.65),
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(28),
-                borderSide: BorderSide(color: cs.primary),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          _LanguageFilters(
-            items: items,
-            selected: languageFilter,
-            onSelected: onLanguageFilterChanged,
-          ),
-        ],
+    return SheetManagerHeader(
+      title: 'Tafsir',
+      search: search,
+      searchFieldKey: WidgetKeys.tafsirSearchField,
+      searchClearKey: WidgetKeys.tafsirSearchClear,
+      filters: _LanguageFilters(
+        items: items,
+        selected: languageFilter,
+        onSelected: onLanguageFilterChanged,
       ),
     );
   }

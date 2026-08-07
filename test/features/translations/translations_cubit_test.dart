@@ -1199,6 +1199,12 @@ void main() {
       await cubit.load();
 
       await pumpTranslationsPage(tester, cubit);
+      expect(
+        find.byKey(WidgetKeys.translationsLanguageCount),
+        findsOneWidget,
+      );
+      expect(find.text('3 languages available'), findsOneWidget);
+
       await tester.tap(find.byKey(WidgetKeys.translationsLanguageFilter('hi')));
       await tester.pumpAndSettle();
 

@@ -82,8 +82,8 @@ void main() {
     expect(find.text('Hidden translation'), findsNothing);
     expect(
       find.byWidgetPredicate(
-        (widget) => widget is Text && widget.data == 'Al-Fatihah 1:1',
-        description: 'Al-Fatihah 1:1 title',
+        (widget) => widget is Text && widget.data == 'Al-Fatihah · 1:1',
+        description: 'Al-Fatihah · 1:1 title',
       ),
       findsOneWidget,
     );
@@ -245,10 +245,16 @@ void main() {
     expect(find.text('Ayah'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
     expect(find.text('Urdu'), findsOneWidget);
-    final searchFieldSizeBefore =
-        tester.getSize(find.byKey(WidgetKeys.tafsirInTextSearchField));
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Ayah'))
+          .selected,
+      isTrue,
+    );
+    final searchFieldHeightBefore =
+        tester.getSize(find.byKey(WidgetKeys.tafsirInTextSearchField)).height;
     final jumpBarTopBefore =
-        tester.getTopLeft(find.widgetWithText(ActionChip, 'Ayah')).dy;
+        tester.getTopLeft(find.widgetWithText(ChoiceChip, 'Ayah')).dy;
 
     await tester.tap(find.byKey(WidgetKeys.tafsirTextIncrease));
     await tester.pumpAndSettle();
@@ -261,11 +267,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('matches'), findsOneWidget);
     expect(
-      tester.getSize(find.byKey(WidgetKeys.tafsirInTextSearchField)),
-      searchFieldSizeBefore,
+      tester.getSize(find.byKey(WidgetKeys.tafsirInTextSearchField)).height,
+      searchFieldHeightBefore,
     );
     expect(
-      tester.getTopLeft(find.widgetWithText(ActionChip, 'Ayah')).dy,
+      tester.getTopLeft(find.widgetWithText(ChoiceChip, 'Ayah')).dy,
       jumpBarTopBefore,
     );
 
@@ -277,12 +283,24 @@ void main() {
     expect(afterSearch, greaterThan(0));
     expect(find.textContaining('طویل اردو تفسیر'), findsWidgets);
 
-    await tester.tap(find.widgetWithText(ActionChip, 'Ayah'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Ayah'));
     await tester.pumpAndSettle();
     expect(_tafsirScrollPixels(tester), lessThan(afterSearch));
 
-    await tester.tap(find.widgetWithText(ActionChip, 'Urdu'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Urdu'));
     await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Urdu'))
+          .selected,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Ayah'))
+          .selected,
+      isFalse,
+    );
     expect(_tafsirScrollPixels(tester), greaterThan(0));
     expect(
       find.text('Urdu - Tafsir Ibn Kathir', skipOffstage: false),

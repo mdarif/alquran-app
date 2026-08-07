@@ -80,6 +80,9 @@ class WidgetKeys {
   static Key editionRemove(String slug) => Key('edition-remove-$slug');
   static const translationsSearchField = Key('translations-search-field');
   static const translationsSearchClear = Key('translations-search-clear');
+  static const translationsLanguageCount = Key(
+    'translations-language-count',
+  );
   static Key translationsLanguageFilter(String code) =>
       Key('translations-language-filter-$code');
   // Collapse/expand the peek card's translation (read/listen to Arabic alone).
