@@ -40,6 +40,16 @@ Keep the Reader screen outside the tab shell once a Surah/section is opened, so
 audio controls, page swipes, immersive chrome hiding, and font controls stay
 focused.
 
+Final IA:
+
+- **Read** → Continue Reading, Surahs, Search
+- **Prayer** → Prayer Times, Hijri Date, Reminders
+- **Library** → Bookmarks, Translations, Tafsir
+- **More** → Reading Theme, Settings, Updates, About
+
+Use a restrained Material 3 `NavigationBar` with always-visible labels and the
+existing mint accent.
+
 ## Tab Definitions
 
 ### Read
@@ -57,6 +67,9 @@ Primary content:
 Do not move the full Reader into a tab body. Opening a Surah still navigates to
 the existing Reader route.
 
+The prayer-time pill stays on Read as contextual information, but tapping it
+switches to the Prayer tab instead of opening the old bottom sheet.
+
 ### Prayer
 
 A dedicated prayer surface, initially reusing existing prayer-time logic.
@@ -68,6 +81,8 @@ Phase 1 scope:
 - Hijri date.
 - Entry point to Reminders.
 - Existing location/settings affordance.
+
+Reminders live only under Prayer in the new IA. Do not duplicate them in More.
 
 Later scope:
 
@@ -82,6 +97,7 @@ The content-management home for Quran resources.
 
 Phase 1 scope:
 
+- Bookmarks.
 - Translations.
 - Tafsir.
 - Download status hints if already available cheaply.
@@ -96,13 +112,15 @@ Later scope:
 The goal is discoverability: a reader should not need to know that Tafsir or
 Translations are hidden behind the Home overflow.
 
+Bookmarks belong here because they are saved Quran content, not a generic app
+utility.
+
 ### More
 
 Secondary app utilities and preferences.
 
 Phase 1 scope:
 
-- Bookmarks.
 - Reading theme / appearance.
 - Settings.
 - Check for Updates.
@@ -123,10 +141,10 @@ Move or keep as follows:
 | Reader screen | Separate immersive route |
 | Page/Juz/Hizb/Ruku jump | Read, behind existing flag |
 | Prayer Times sheet | Prayer |
-| Reminders | Prayer, with secondary access from More if useful |
+| Reminders | Prayer only |
 | Translations | Library |
 | Tafsir | Library |
-| Bookmarks | More |
+| Bookmarks | Library |
 | Reading theme | More, and possibly Reader settings |
 | Check for Updates | More / Settings |
 | About / credits / privacy | More |
@@ -135,11 +153,10 @@ Move or keep as follows:
 
 ### Phase 0 — Design Decisions
 
-- Confirm final tab names: `Read`, `Prayer`, `Library`, `More`.
-- Confirm whether `Bookmarks` belongs in `More` or deserves a Library row.
-- Confirm whether the Home prayer pill remains on Read after Prayer tab exists.
-- Confirm whether the Home overflow menu disappears or stays with only local
-  contextual actions.
+- Use final tab names: `Read`, `Prayer`, `Library`, `More`.
+- Put Bookmarks in Library.
+- Keep the prayer-time pill on Read; tapping it switches to Prayer.
+- Remove the Home three-dot overflow menu once bottom navigation is live.
 
 ### Phase 1 — Shell Without Behavior Changes
 
@@ -155,25 +172,27 @@ Move or keep as follows:
 ### Phase 2 — Library Tab
 
 - Move Translations and Tafsir discovery into Library.
+- Move Bookmarks into Library.
 - Keep existing Translations/Tafsir screens intact.
 - Add simple descriptions and status hints:
+  - "Saved verses"
   - "Manage translations"
   - "Read Tafsir"
   - "On device" / "Available" counts only if cheap and reliable.
-- Remove Translations/Tafsir from the Home overflow after Library is live.
+- Remove the Home overflow after the bottom navigation shell is live.
 
 ### Phase 3 — More Tab
 
-- Move Bookmarks, Reading Theme, Settings, Updates, About/Credits/Privacy into
-  More.
+- Move Reading Theme, Settings, Updates, About/Credits/Privacy into More.
 - Keep Settings for true configuration, not as a feature index.
-- Simplify the old Home overflow.
+- Do not add Reminders here; they belong under Prayer.
 
 ### Phase 4 — Prayer Tab
 
 - Promote today's Prayer Times sheet into a full page.
 - Link Reminders from this tab.
 - Keep existing scheduling/permission behavior unchanged.
+- Update the Read prayer pill so tapping it switches to this tab.
 - Do not add qibla/monthly calendar in this pass.
 
 ### Phase 5 — Polish And Usability Check
@@ -202,7 +221,9 @@ Move or keep as follows:
 
 - Widget tests for tab switching.
 - Widget tests that Library opens Translations and Tafsir.
-- Widget tests that More opens Bookmarks, Settings, About, and update check.
+- Widget tests that Library opens Bookmarks.
+- Widget tests that More opens Settings, About, and update check.
+- Widget tests that Read prayer pill switches to Prayer.
 - Widget tests that Prayer renders existing prayer-time content when permissions
   and location state are available.
 - Navigation tests:
@@ -215,7 +236,8 @@ Move or keep as follows:
 
 - A new user can identify where to read, pray, manage content, and find settings
   without opening an overflow menu.
-- Tafsir and Translations are visible from a top-level tab.
+- Bookmarks, Tafsir, and Translations are visible from a top-level tab.
+- The Home three-dot overflow is removed after the shell is live.
 - Reader remains immersive and unchanged in feel.
 - Existing tests continue to pass.
 - No shipped feature becomes harder to reach than before.
