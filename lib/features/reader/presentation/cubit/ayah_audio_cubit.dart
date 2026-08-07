@@ -127,7 +127,8 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
       }
     }
     if (next != null) {
-      unawaited(_player.play(next)); // continues: emits loading→playing for `next`
+      unawaited(
+          _player.play(next)); // continues: emits loading→playing for `next`
     } else {
       // Nothing left to play (last verse, no next-section hand-off) → idle
       // (keeps transport settings).

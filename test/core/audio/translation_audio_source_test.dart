@@ -30,7 +30,8 @@ void main() {
       final fatihaKeys = [
         for (var a = 1; a <= 7; a++) translationAudioKey(surah: 1, ayah: a),
       ];
-      expect(fatihaKeys, isNot(contains(translationAudioKey(surah: 2, ayah: 1))));
+      expect(
+          fatihaKeys, isNot(contains(translationAudioKey(surah: 2, ayah: 1))));
       expect(
         sahihInternationalAssetPath(surah: 2, ayah: 1),
         'assets/audio/poc/en-sahih-international/002001.mp3',

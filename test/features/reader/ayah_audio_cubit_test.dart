@@ -369,8 +369,7 @@ void main() {
   });
 
   group('Al-Fatihah translation-audio POC', () {
-    test(
-        'plays translation audio between Arabic completion and the next verse',
+    test('plays translation audio between Arabic completion and the next verse',
         () async {
       final translation = _FakeTranslationPlayer();
       final c = AyahAudioCubit(player, null, translation);
