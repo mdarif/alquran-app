@@ -25,6 +25,8 @@ priorities, and release gate.
 - **Bookmarks** — ayah-level, multiple, with a bookmarks screen (`AyahBookmarkRepository`, verse address only — no notes/tags yet).
 - **Sunnah reminders** — local notifications for Al-Kahf (Friday), White Days, Ashura, Arafah, Dhul Hijjah; the Al-Kahf one routes into the reader and resumes where you left off.
 - **Salat notifications** — local notifications at each of the 5 daily prayer times (2026-08-04, `FeatureFlags.prayerTimeNotifications`); tapping one opens the Prayer Times sheet. Both reminder types now live on one unified "Reminders" screen (uniform toggle + info popover per row), reachable from the Home overflow.
+- **Tafsir** — **SHIPPED 2026-08-06/07** (was Roadmap #1 / "Missing" below — both now stale). Per-ayah tafsir surfaced in the Detailed view via a bottom sheet, plus a Translations-style manager screen (browse a CDN catalogue, download/remove editions, catalogue visibility flags). No `FeatureFlags` gate — ships unconditionally. Data side: a `tafsir` resource type + table parallel to `translations`, ayah-range aware. See `lib/features/tafsir/`.
+- **Soft app-update reminder** — a dismissible Home banner + a Settings "Check for Updates" row read a shared `AppUpdateCubit`, backed by a small remote JSON config (`FeatureFlags.softUpdateReminder`). Manual checks always resolve to an in-app result (available / up to date / couldn't check); required updates (via `minimumSupportedVersion`) can't be dismissed; "Later" only suppresses the exact version dismissed. See `lib/features/app_update/` and `docs/error-handling-runbook.md`.
 
 ## Built but flagged OFF for v1
 
@@ -33,9 +35,8 @@ priorities, and release gate.
 
 ## Missing — no ingestion/implementation started anywhere in the 3 repos
 
-- **Tafsir** — → **Roadmap #1**. No data source ingested, no schema, no reader UI. Would need: pick a tafsir edition (QUL/QuranEnc carry tafsir resources), extend `alquran-data` schema (new `tafsir` resource type + table, parallel to `translations`), then app + web UI to surface it per-ayah.
 - **Word-by-word translation** — Arabic word-by-word text is already used internally (QUL `quran-script/312` powers ayah reconstruction), but no per-word *translation* is ingested or rendered. Needs its own QUL source + schema + UI (word-tap popovers).
-- **Tajweed (color-coded pronunciation rules)** — → **Roadmap #7**. Not started; needs a tajweed-annotated Arabic source (QUL has tajweed-rule Uthmani exports) and rendering support (likely a different font/markup approach than the current KFGQPC text).
+- **Tajweed (color-coded pronunciation rules)** — → **Roadmap #8**. Not started; needs a tajweed-annotated Arabic source (QUL has tajweed-rule Uthmani exports) and rendering support (likely a different font/markup approach than the current KFGQPC text).
 - **Exact-Mushaf page rendering** (line-for-line matching the print Mushaf, not flowing text) — not started. Current reader flows paragraphs; page number is tracked but line-breaks aren't reproduced.
 - **Full-text / verse-text search** — not started in the app. Web has surah-*name* search only (quickMatch), not verse-content search.
 - **Bookmark notes / naming** — ayah bookmarks themselves shipped (see above); naming or annotating them has not. The web backlog's local-storage/privacy decision still applies if these ever sync.
@@ -52,14 +53,14 @@ priorities, and release gate.
 Ordered as the owner raised them, not by priority. Each notes where the work
 actually lands, since most of these start in `../alquran-data`, not here.
 
-1. **Tafsir in the Detailed view** — a per-ayah tafsir surfaced alongside the
-   translations. Biggest of the list: pick an edition first (QUL/QuranEnc carry
-   tafsir resources; an Urdu tafsir matching the audience, and the *creed* of the
-   tafsir matters more than its availability), then extend the data pipeline with
-   a `tafsir` resource type + table parallel to `translations`, then the reader
-   UI. Tafsir entries are long-form and often span a range of ayat rather than
-   one — that shapes both the schema (ayah range, not ayah id) and the UI
-   (expandable panel / sheet, not an inline block under the verse).
+1. ~~**Tafsir in the Detailed view**~~ — **SHIPPED 2026-08-06/07** (see Shipped
+   above). Per-ayah tafsir sheet + a downloadable-editions manager, ayah-range
+   schema. Two editions ingested so far (Tafsir Ibn Kathir, English abridged +
+   Urdu — `../alquran-data/config/tafsir.yaml`); more editions (and picking the
+   right creed/audience per language) is now data-side work, tracked with the
+   rest of translation editions in `../alquran-data/TRANSLATIONS-ROADMAP.md`,
+   not a separate app roadmap item. Licensing on both is still marked "VERIFY"
+   — part of the pre-release licensing gate.
 2. **Downloadable script / Mushaf text packs** — **P1**. Add separately
    downloadable Arabic text editions so the reader can switch between Classic
    Madani Mushaf, Naskh/IndoPak, and the current Mushaf Unicode text. Model this
@@ -184,6 +185,15 @@ actually lands, since most of these start in `../alquran-data`, not here.
    recitation/translation audio for the core audience. Confirm what is wanted:
    Arabic recitation by a Pakistani/Indian qari, or Urdu *translation* audio
    played after each verse — they are different products and different data.
+   **Deferred until authentic assets are handy** (owner, 2026-08-07): the
+   desired product is Arabic ayah audio followed by Muhammad Junagarhi Urdu
+   translation audio, and it should appear only in Detailed view (Reading mode
+   remains Arabic-only). Public ayah-split Junagarhi audio has not been verified
+   yet; Dar-us-Salam's Sudais/Shuraim + Maulana Muhammad Junagarhi MP3 set is
+   the likely authoritative acquisition path, but needs source/licensing and
+   ayah-splitting verification before implementation. Start with a Surah
+   Al-Fatihah-only POC when revisited.
+   **→ POC plan: [`dual-audio-urdu-poc-plan.md`](dual-audio-urdu-poc-plan.md)**
 8. **Tajweed colours** — colour-coded pronunciation rules over the Arabic. Needs
    a tajweed-annotated source (QUL exports tajweed-rule Uthmani) and a rendering
    approach: the current KFGQPC text is a single styled run, so per-rule colour
