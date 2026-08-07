@@ -14,11 +14,7 @@ class WidgetKeys {
   static const surahSearchButton = Key('home-surah-search-button');
   static const surahSearchField = Key('home-surah-search');
   static const surahSearchBack = Key('home-surah-search-back');
-  static const homeOverflowMenu = Key('home-overflow-menu');
-  static const homeSettingsMenuButton = Key('home-settings-menu-button');
   static const appSettingsPage = Key('app-settings-page');
-  static const translationsMenuButton = Key('home-translations-menu-button');
-  static const tafsirMenuButton = Key('home-tafsir-menu-button');
   static const tafsirPage = Key('tafsir-page');
   static const tafsirAyahSheet = Key('tafsir-ayah-sheet');
   static const tafsirEndMarker = Key('tafsir-end-marker');
@@ -36,7 +32,6 @@ class WidgetKeys {
   static Key tafsirRemove(String slug) => Key('tafsir-remove-$slug');
   static Key tafsirLanguageFilter(String code) =>
       Key('tafsir-language-filter-$code');
-  static const bookmarksMenuButton = Key('home-bookmarks-menu-button');
   static const bookmarksPage = Key('bookmarks-page');
   static const appUpdateBanner = Key('app-update-banner');
   static const appUpdateNowButton = Key('app-update-now-button');
@@ -129,4 +124,19 @@ class WidgetKeys {
       Key('about-credits-link'); // About → Credits screen
   static const creditsPage = Key('credits-page');
   static const aboutLicenses = Key('about-licenses');
+
+  // Bottom navigation shell (Read / Prayer / Library / More)
+  static const bottomNavRead = Key('bottom-nav-read');
+  static const bottomNavPrayer = Key('bottom-nav-prayer');
+  static const bottomNavLibrary = Key('bottom-nav-library');
+  static const bottomNavMore = Key('bottom-nav-more');
+  static const prayerPage = Key('prayer-page');
+  static const libraryPage = Key('library-page');
+  static const libraryTranslationsRow = Key('library-translations-row');
+  static const libraryTafsirRow = Key('library-tafsir-row');
+  static const libraryBookmarksRow = Key('library-bookmarks-row');
+  static const morePage = Key('more-page');
+  static const moreReadingThemeRow = Key('more-reading-theme-row');
+  static const moreSettingsRow = Key('more-settings-row');
+  static const moreAboutRow = Key('more-about-row');
 }

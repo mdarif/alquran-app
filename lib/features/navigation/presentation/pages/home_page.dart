@@ -15,7 +15,6 @@ import '../../../reader/presentation/widgets/last_read_banner.dart';
 import '../../../surahs/presentation/cubit/surah_list_cubit.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
-import '../widgets/home_overflow_menu.dart';
 import 'index_list_page.dart';
 
 /// App home: an immersive, full-width Surah list with the "continue reading"
@@ -29,8 +28,8 @@ class HomePage extends StatefulWidget {
     this.hijriDate = FeatureFlags.hijriDate,
     this.sunnahReminders = FeatureFlags.sunnahReminders,
     this.lastReadBanner = FeatureFlags.lastReadBanner,
-    this.lightOfDay = FeatureFlags.lightOfDay,
     this.softUpdateReminder = FeatureFlags.softUpdateReminder,
+    this.onOpenPrayerTab,
   });
 
   /// Whether to surface Page/Juz/Hizb/Ruku navigation. Injectable for tests.
@@ -49,11 +48,12 @@ class HomePage extends StatefulWidget {
   /// Whether to show the "continue reading" resume banner. Injectable for tests.
   final bool lastReadBanner;
 
-  /// Whether to show the reading-light (Light of Day) toggle. Injectable for tests.
-  final bool lightOfDay;
-
   /// Whether Home checks for and shows a soft app-update reminder.
   final bool softUpdateReminder;
+
+  /// When set (the shell wires this), tapping the prayer pill switches to
+  /// the Prayer tab instead of opening the old bottom sheet.
+  final VoidCallback? onOpenPrayerTab;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -186,17 +186,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             icon: const AppIcon(AppIcons.jumpMenu),
             onPressed: () => _openJumpSheet(context),
           ),
-        if (widget.prayerTimes) const NextPrayerPill(),
+        if (widget.prayerTimes)
+          NextPrayerPill(onOpenPrayerTab: widget.onOpenPrayerTab),
         IconButton(
           key: WidgetKeys.surahSearchButton,
           tooltip: 'Search surah',
           icon: const AppIcon(AppIcons.search),
           onPressed: _openSearch,
-        ),
-        // Secondary sections and settings fold into one overflow so the bar
-        // stays uncrowded next to the title, prayer pill and search.
-        HomeOverflowMenu(
-          showReadingLight: widget.lightOfDay,
         ),
       ],
     );

@@ -15,7 +15,7 @@ import 'core/theme/theme_cubit.dart';
 import 'core/warmup/reader_warmup.dart';
 import 'features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import 'features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
-import 'features/navigation/presentation/pages/home_page.dart';
+import 'features/navigation/presentation/pages/app_shell.dart';
 import 'features/reminders/domain/scheduling/notification_scheduler.dart';
 import 'features/reminders/presentation/cubit/reminders_cubit.dart';
 import 'features/translations/presentation/cubit/translations_cubit.dart';
@@ -142,7 +142,7 @@ class _AlQuranAppState extends State<AlQuranApp> with WidgetsBindingObserver {
             themeAnimationCurve: Curves.easeInOut,
             scrollBehavior: const QuranScrollBehavior(),
             navigatorObservers: [routeObserver],
-            home: const HomePage(),
+            home: const AppShell(),
           );
         },
       ),

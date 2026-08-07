@@ -21,7 +21,12 @@ import 'prayer_times_sheet.dart';
 /// Reads the cubit DEFENSIVELY (like [ThemeToggleButton]) so a screen pumped in
 /// isolation doesn't crash.
 class NextPrayerPill extends StatelessWidget {
-  const NextPrayerPill({super.key});
+  const NextPrayerPill({this.onOpenPrayerTab, super.key});
+
+  /// When set, tapping the pill switches to the Prayer tab instead of
+  /// opening the modal sheet — the shell wires this; standalone/test usage
+  /// leaves it null and keeps the old sheet behavior.
+  final VoidCallback? onOpenPrayerTab;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +64,7 @@ class NextPrayerPill extends StatelessWidget {
         if (forbidden != null) {
           return _ForbiddenPill(
             window: forbidden,
-            onTap: () => _openSheet(context, bloc),
+            onTap: () => _handleTap(context, bloc),
           );
         }
 
@@ -81,7 +86,7 @@ class NextPrayerPill extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(20),
-                  onTap: () => _openSheet(context, bloc),
+                  onTap: () => _handleTap(context, bloc),
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -115,6 +120,15 @@ class NextPrayerPill extends StatelessWidget {
         duration: const Duration(seconds: 3),
       ),
     );
+  }
+
+  void _handleTap(BuildContext context, PrayerTimesCubit cubit) {
+    final switchTab = onOpenPrayerTab;
+    if (switchTab != null) {
+      switchTab();
+      return;
+    }
+    _openSheet(context, cubit);
   }
 
   void _openSheet(BuildContext context, PrayerTimesCubit cubit) {

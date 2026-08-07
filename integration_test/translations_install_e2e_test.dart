@@ -38,9 +38,9 @@ void main() {
 
     await _boot(tester);
 
-    await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+    await tester.tap(find.byKey(WidgetKeys.bottomNavLibrary));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(WidgetKeys.translationsMenuButton));
+    await tester.tap(find.byKey(WidgetKeys.libraryTranslationsRow));
     await tester.pumpAndSettle();
 
     await _pumpUntil(tester, find.byKey(WidgetKeys.translationsSearchField));
@@ -58,6 +58,8 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(WidgetKeys.bottomNavRead));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(WidgetKeys.surahTile(1)));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(WidgetKeys.viewportToggle));
@@ -68,9 +70,9 @@ void main() {
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+    await tester.tap(find.byKey(WidgetKeys.bottomNavLibrary));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(WidgetKeys.translationsMenuButton));
+    await tester.tap(find.byKey(WidgetKeys.libraryTranslationsRow));
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(WidgetKeys.translationsSearchField),

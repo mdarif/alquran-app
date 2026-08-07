@@ -53,8 +53,15 @@ PrayerTimesCubit _cubit({GeoLocation? saved, int hour = 17, int minute = 0}) {
   return cubit;
 }
 
-Future<void> _pump(WidgetTester tester, PrayerTimesCubit? cubit) {
-  const bar = Scaffold(appBar: null, body: Center(child: NextPrayerPill()));
+Future<void> _pump(
+  WidgetTester tester,
+  PrayerTimesCubit? cubit, {
+  VoidCallback? onOpenPrayerTab,
+}) {
+  final bar = Scaffold(
+    appBar: null,
+    body: Center(child: NextPrayerPill(onOpenPrayerTab: onOpenPrayerTab)),
+  );
   return tester.pumpWidget(
     MaterialApp(
       home: cubit == null
@@ -114,6 +121,38 @@ void main() {
     await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
     await tester.pumpAndSettle();
     expect(find.byKey(WidgetKeys.prayerTimesSheet), findsOneWidget);
+  });
+
+  testWidgets(
+      'with onOpenPrayerTab set, tapping switches tabs instead of opening '
+      'the sheet', (tester) async {
+    var opened = 0;
+    await _pump(
+      tester,
+      _cubit(saved: _loc, hour: 17),
+      onOpenPrayerTab: () => opened++,
+    );
+    await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
+    await tester.pumpAndSettle();
+
+    expect(opened, 1);
+    expect(find.byKey(WidgetKeys.prayerTimesSheet), findsNothing);
+  });
+
+  testWidgets(
+      'with onOpenPrayerTab set, the forbidden-window pill also switches '
+      'tabs', (tester) async {
+    var opened = 0;
+    await _pump(
+      tester,
+      _cubit(saved: _loc, hour: 18, minute: 30),
+      onOpenPrayerTab: () => opened++,
+    );
+    await tester.tap(find.byKey(WidgetKeys.nextPrayerPill));
+    await tester.pumpAndSettle();
+
+    expect(opened, 1);
+    expect(find.byKey(WidgetKeys.prayerTimesSheet), findsNothing);
   });
 
   testWidgets('no location → a discreet enable affordance', (tester) async {
