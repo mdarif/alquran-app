@@ -87,6 +87,17 @@ The secret is the raw JSON (the workflow reads it via
 promoting internal → **production** (with the staged rollout) stays a manual
 Play Console gate.
 
+Al Quran declares `USE_EXACT_ALARM` for precise prayer-time and Sunnah
+reminders. Complete the Play Console exact-alarm declaration once under **App
+content**, then set the guard secret:
+
+```bash
+gh secret set PLAY_EXACT_ALARM_DECLARED --repo mdarif/alquran-app --body "true"
+```
+
+The release workflow refuses to upload an AAB while this secret is missing,
+because Play rejects the release after consuming the version code.
+
 ### 3. Codecov token (optional)
 
 Public-repo coverage uploads are tokenless. If the repo is private, add
@@ -146,6 +157,9 @@ Branches); a *required status check* on develop would additionally need a PAT
 for the sync push (Al-Tawheed's `DEVELOP_SYNC_TOKEN` pattern), because
 bot-token pushes can't satisfy required checks.
 
+If `mdarif/alquran-data` is private and the default workflow token cannot read
+it, add a repo secret named `DATA_REPO_TOKEN` with read access to that repo.
+
 ## Cutting a release
 
 From `develop`, clean working tree, CI green:
@@ -161,6 +175,10 @@ develop is still synced afterwards): `make release BUMP=…` from `main`.
 
 - Every release bumps the version so the build number (`+N` / Android
   versionCode) keeps climbing, which the Play Store requires for each upload.
+- Play Store notes are generated automatically from both repos by
+  `tool/generate_reader_release_notes.py`. The workflow checks out
+  `mdarif/alquran-data`, writes reader-friendly `play-store-notes.txt`, and
+  attaches `release-note-metadata.txt` with the exact app/data commit counts.
 - Watch the run: `make ci-logs` (failed-step logs of the latest run), or the
   Actions tab.
 
@@ -185,8 +203,8 @@ the release build succeeds.
 2. Quality gate: `build_runner` codegen → `dart format` check → `flutter
    analyze --fatal-warnings` → `flutter test`.
 3. Decodes the keystore from secrets and builds a signed APK + AAB.
-4. Generates the changelog (git-cliff, [cliff.toml](../cliff.toml)) and Play
-   "What's new" text.
+4. Generates the GitHub changelog (git-cliff, [cliff.toml](../cliff.toml)) and
+   reader-friendly Play "What's new" text from the app + data repo histories.
 5. Generates `app-update.json` from the bumped semver and publishes it when the
    Cloudflare secrets are configured.
 6. Commits the bump, tags `vX.Y.Z`, pushes both to `main`.
@@ -220,6 +238,10 @@ the release build succeeds.
 - **Play upload failed** — the service account needs Release Manager access and
   the app must already be created in the Play Console with package
   `com.almarfa.alquran` and at least one manual upload on the internal track.
+  If the error says the exact-alarm declaration is missing, complete the Play
+  Console declaration and set `PLAY_EXACT_ALARM_DECLARED=true`. Do **not**
+  upload the same AAB manually after a failed Play edit; its version code may
+  already be consumed. Bump to the next build number and re-run the release.
 - **Owner pre-submission gates** (not CI): translation/font/audio licensing,
   privacy-policy URL, `SCHEDULE_EXACT_ALARM` Play declaration, store assets.
   See the v1 readiness notes.

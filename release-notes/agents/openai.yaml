@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Notes"
+  short_description: "Draft release notes from app and data diffs"
+  default_prompt: "Use $release-notes to draft Al Quran release notes from the app and data repos."

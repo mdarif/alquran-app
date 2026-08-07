@@ -91,8 +91,11 @@ These are **not** enforced by CI. Tick each before going public:
       exempt from Play's new-personal-account closed-testing gate (~12–20
       testers / 14 days). Al Quran goes straight to production. (A fresh
       personal account would need the closed test first.)
-- [ ] **Android `SCHEDULE_EXACT_ALARM`** — either file the Play Console
-      declaration, or accept the scheduler's inexact fallback. Decide and record.
+- [ ] **Android exact alarm declaration** — file the Play Console declaration
+      for precise prayer-time/Sunnah reminders, then set
+      `PLAY_EXACT_ALARM_DECLARED=true` in GitHub Secrets. The release workflow
+      blocks before upload if this is missing, so it cannot burn another Play
+      version code on this policy gate.
 - [ ] **Store assets** ready: icon, screenshots (phone + tablet), feature
       graphic, listing copy ("offline reading + optional audio recitation"),
       content rating questionnaire (expect Everyone / 4+). Ready-to-paste copy,

@@ -29,6 +29,9 @@
 #   - Repo secret for Play upload (optional): GOOGLE_PLAY_SERVICE_ACCOUNT —
 #     the AAB upload is skipped (not failed) when this is absent, so the
 #     pipeline is fully usable before the app exists on the Play Console.
+#     When Play upload is enabled and the manifest declares USE_EXACT_ALARM,
+#     set PLAY_EXACT_ALARM_DECLARED=true after completing the Play Console
+#     exact-alarm declaration; otherwise the workflow fails before upload.
 #   - Branching is convention-only: neither main nor develop is protected, so
 #     the default GITHUB_TOKEN (permissions: contents: write) can push both.
 #     If either branch is ever protected, add github-actions[bot] to its
@@ -149,6 +152,14 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ needs.promote.outputs.sha || github.ref_name }}
+
+      - name: Checkout companion data repository
+        uses: actions/checkout@v6
+        with:
+          repository: mdarif/alquran-data
+          path: alquran-data
+          fetch-depth: 0
+          token: ${{ secrets.DATA_REPO_TOKEN || github.token }}
 
       # ------------------------------------------------------------------ #
       # Free disk space — ubuntu-latest ships large unused toolchains (.NET,
@@ -319,29 +330,20 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
 
       # ------------------------------------------------------------------ #
-      # 11. Play Store "What's new" — strip Markdown + truncate to 480 chars
-      #     (the field caps at 500). Attached to the Release as a copy-ready
-      #     artifact even when the automated upload is skipped.
+      # 11. Play Store "What's new" — generate reader-friendly release notes
+      #     from both the app repo and companion data repo. The generator keeps
+      #     the output within Play's 500-character cap and writes exact commit
+      #     counts to release-note-metadata.txt for review.
       # ------------------------------------------------------------------ #
       - name: Generate Play Store release notes
-        env:
-          # Via env, not inline interpolation — a quote/backtick in a commit
-          # subject would otherwise break this script (Al-Tawheed hit this).
-          MARKDOWN: ${{ steps.cliff.outputs.content }}
         run: |
-          PLAIN=$(echo "$MARKDOWN" \
-            | sed 's/^### //g' \
-            | sed 's/\*\*//g' \
-            | sed 's/^- /• /g' \
-            | sed '/^$/d')
-          [ -z "$PLAIN" ] && PLAIN="• Maintenance release"
-          TRUNCATED=$(echo "$PLAIN" | head -c 480)
-          FULL_LEN=$(echo "$PLAIN" | wc -c | tr -d ' ')
-          if [ "$FULL_LEN" -gt 480 ]; then
-            echo "::warning::Play Store notes truncated to 480 chars (was ${FULL_LEN}). Review before submitting."
-          fi
-          echo "$TRUNCATED" > play-store-notes.txt
+          python3 tool/generate_reader_release_notes.py \
+            --app-repo . \
+            --data-repo alquran-data \
+            --output play-store-notes.txt \
+            --metadata-output release-note-metadata.txt
           echo "Play Store notes:"; cat play-store-notes.txt
+          echo "Release-note metadata:"; cat release-note-metadata.txt
 
       # ------------------------------------------------------------------ #
       # 12. Soft update config — generated from the release version so every
@@ -389,6 +391,17 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "::notice::GOOGLE_PLAY_SERVICE_ACCOUNT not set — skipping Play upload. The signed AAB is attached to the GitHub Release. Set the secret to enable internal-track upload (docs/release.md)."
           fi
+
+      - name: Play release preflight
+        if: steps.play.outputs.enabled == 'true' && inputs.dry_run != true
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          PLAY_EXACT_ALARM_DECLARED: ${{ secrets.PLAY_EXACT_ALARM_DECLARED }}
+        run: |
+          python3 tool/play_release_preflight.py \
+            --package-name com.almarfa.alquran \
+            --manifest android/app/src/main/AndroidManifest.xml \
+            --pubspec pubspec.yaml
 
       - name: Prepare Play Store release notes for upload
         if: steps.play.outputs.enabled == 'true' && inputs.dry_run != true
@@ -511,6 +524,7 @@ jobs:
             "${APK}#Al Quran Android APK (release, signed)" \
             "${AAB}#Al Quran Android App Bundle (release, signed — Play upload)" \
             "play-store-notes.txt#Play Store release notes (plain text)" \
+            "release-note-metadata.txt#Release note source metadata" \
             "app-update.json#Soft update config" \
             --title "Al Quran ${TAG}" \
             --notes-file release-notes.md

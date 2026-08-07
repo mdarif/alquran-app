@@ -155,9 +155,9 @@ Follow Al-Tawheed's `docs/store-assets/feature-graphic-spec.md` approach:
      reference/religious text, no user-generated content → expect
      "Everyone/PEGI 3".
    - **SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM declaration:** required — pick
-     the *alarm & reminder* use case (user-scheduled Sunnah reminders fire at
-     precise times). Alternative: accept the inexact fallback and drop the
-     permission (owner decision, see v1 readiness notes).
+     the *alarm & reminder* use case (prayer-time and Sunnah reminders fire at
+     precise times), then set `PLAY_EXACT_ALARM_DECLARED=true` in GitHub
+     Secrets so release automation can proceed.
    - **App access:** all functionality available without credentials.
 5. **Release → Production:** upload the signed AAB (grab it from the GitHub
    Release the CD created; the pipeline skips the direct Play upload until
@@ -200,6 +200,7 @@ Assalamu alaikum! This is the first release of Al Quran:
 Read. Reflect. Remember.
 ```
 
-For later versions the CD auto-generates notes from the changelog
-(git-cliff → `play-store-notes.txt` on the GitHub Release); prefer rewriting
-them by hand here, per-version, before pasting into the consoles.
+For later versions the CD auto-generates reader-friendly notes from the app and
+data repo histories (`tool/generate_reader_release_notes.py` →
+`play-store-notes.txt` on the GitHub Release and Play upload). The companion
+`release-note-metadata.txt` artifact records the exact commit counts used.
