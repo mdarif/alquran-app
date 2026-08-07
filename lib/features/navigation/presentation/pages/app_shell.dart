@@ -41,32 +41,42 @@ class _AppShellState extends State<AppShell> {
           const MorePage(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) =>
-            setState(() => _selectedIndex = index),
-        destinations: const [
-          NavigationDestination(
-            key: WidgetKeys.bottomNavRead,
-            icon: AppIcon(AppIcons.viewReading),
-            label: 'Read',
+      bottomNavigationBar: DecoratedBox(
+        // A hairline top border stands in for the elevation/shadow the flat
+        // theme turns off — the same "flat with a crisp edge" language the
+        // AppBar and reader dividers already use, instead of a stock M3 tint.
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
           ),
-          NavigationDestination(
-            key: WidgetKeys.bottomNavPrayer,
-            icon: AppIcon(AppIcons.phaseDuha),
-            label: 'Prayer',
-          ),
-          NavigationDestination(
-            key: WidgetKeys.bottomNavLibrary,
-            icon: AppIcon(AppIcons.alKahf),
-            label: 'Library',
-          ),
-          NavigationDestination(
-            key: WidgetKeys.bottomNavMore,
-            icon: AppIcon(AppIcons.more),
-            label: 'More',
-          ),
-        ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) =>
+              setState(() => _selectedIndex = index),
+          destinations: const [
+            NavigationDestination(
+              key: WidgetKeys.bottomNavRead,
+              icon: AppIcon(AppIcons.viewReading),
+              label: 'Read',
+            ),
+            NavigationDestination(
+              key: WidgetKeys.bottomNavPrayer,
+              icon: AppIcon(AppIcons.phaseDuha),
+              label: 'Prayer',
+            ),
+            NavigationDestination(
+              key: WidgetKeys.bottomNavLibrary,
+              icon: AppIcon(AppIcons.alKahf),
+              label: 'Library',
+            ),
+            NavigationDestination(
+              key: WidgetKeys.bottomNavMore,
+              icon: AppIcon(AppIcons.more),
+              label: 'More',
+            ),
+          ],
+        ),
       ),
     );
   }

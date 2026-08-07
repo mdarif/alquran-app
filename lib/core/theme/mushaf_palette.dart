@@ -115,6 +115,29 @@ class MushafPalette {
           fontWeight: FontWeight.w600,
         ),
       ),
+      // Flat and seamless with the rest of the chrome (no default M3 surface
+      // tint/elevation), the mint accent on the selected tab — matches the
+      // AppBar above rather than the stock Material look.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: background,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: accentContainer,
+        elevation: 0,
+        height: 64,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return theme.textTheme.labelSmall?.copyWith(
+            color: selected ? accent : ink.withValues(alpha: 0.62),
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? onAccentContainer : ink.withValues(alpha: 0.62),
+          );
+        }),
+      ),
       extensions: [MushafColors(gold: gold)],
     );
   }

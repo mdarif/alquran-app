@@ -54,6 +54,38 @@ void main() {
         expect(theme.extension<MushafColors>()?.gold, p.gold, reason: reason);
       }
     });
+
+    test(
+        'the bottom nav bar is flat and seamless with the surface (no stock '
+        'M3 tint/elevation), accented with the palette\'s own colours', () {
+      for (final p in MushafPalette.ordered) {
+        final theme = p.toTheme();
+        final navTheme = theme.navigationBarTheme;
+        final reason = '${p.phase}';
+        expect(navTheme.backgroundColor, p.background, reason: reason);
+        expect(navTheme.surfaceTintColor, Colors.transparent, reason: reason);
+        expect(navTheme.elevation, 0, reason: reason);
+        expect(navTheme.indicatorColor, p.accentContainer, reason: reason);
+
+        const selected = {WidgetState.selected};
+        expect(
+          navTheme.labelTextStyle?.resolve(selected)?.color,
+          p.accent,
+          reason: reason,
+        );
+        expect(
+          navTheme.iconTheme?.resolve(selected)?.color,
+          p.onAccentContainer,
+          reason: reason,
+        );
+        // Unselected tabs read as muted ink, not the stock M3 grey.
+        expect(
+          navTheme.labelTextStyle?.resolve(const {})?.color,
+          isNot(p.accent),
+          reason: reason,
+        );
+      }
+    });
   });
 
   group('MushafPalette.phaseForHour — the day → its light', () {
