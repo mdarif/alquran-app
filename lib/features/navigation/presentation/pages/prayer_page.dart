@@ -57,7 +57,8 @@ class _PrayerBody extends StatelessWidget {
               PrayerTimesSheet(
                 times: today,
                 next: state.next?.prayer,
-                hijriBaseDate: FeatureFlags.hijriDate ? cubit.hijriBaseDate : null,
+                hijriBaseDate:
+                    FeatureFlags.hijriDate ? cubit.hijriBaseDate : null,
                 gregorianDate: cubit.gregorianDate,
               ),
               const Divider(height: 1),

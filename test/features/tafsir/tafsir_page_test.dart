@@ -101,8 +101,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets(
-      'a failed download shows calm retry copy and can be retried',
+  testWidgets('a failed download shows calm retry copy and can be retried',
       (tester) async {
     final repository = _FakeTafsirRepository()..failNext = true;
     final cubit = TafsirCubit(repository);

@@ -35,8 +35,7 @@ void main() {
       expect(result.prompt, isNull);
     });
 
-    test(
-        'reports up to date when the installed app is newer than the config',
+    test('reports up to date when the installed app is newer than the config',
         () async {
       final repo = await _repo(
         currentVersion: '1.2.2',

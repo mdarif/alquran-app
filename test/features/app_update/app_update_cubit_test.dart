@@ -49,8 +49,7 @@ void main() {
       await cubit.close();
     });
 
-    test('check() surfaces up-to-date and error results distinctly',
-        () async {
+    test('check() surfaces up-to-date and error results distinctly', () async {
       final upToDate = AppUpdateCubit(
         _FakeRepo(const AppUpdateCheckResult.upToDate()),
       );

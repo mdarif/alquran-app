@@ -25,7 +25,8 @@ Future<void> launchUrlWithFallback(
         content: Text(failureMessage ?? 'Couldn’t open ${uri.host}'),
         action: SnackBarAction(
           label: 'Copy link',
-          onPressed: () => Clipboard.setData(ClipboardData(text: uri.toString())),
+          onPressed: () =>
+              Clipboard.setData(ClipboardData(text: uri.toString())),
         ),
       ),
     );

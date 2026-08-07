@@ -141,9 +141,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     if (n case ScrollUpdateNotification(:final scrollDelta?)) {
       if (scrollDelta == 0) return false;
-      final directionMatchesState =
-          (_chromeCollapsed && scrollDelta < 0) ||
-              (!_chromeCollapsed && scrollDelta > 0);
+      final directionMatchesState = (_chromeCollapsed && scrollDelta < 0) ||
+          (!_chromeCollapsed && scrollDelta > 0);
       _chromeScrollIntent =
           directionMatchesState ? _chromeScrollIntent + scrollDelta.abs() : 0;
       if (_chromeScrollIntent < _chromeScrollThreshold) return false;
@@ -201,8 +200,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         onSurah: () =>
                             setState(() => _readMode = ReadMode.surah),
                         onJuz: () => setState(() => _readMode = ReadMode.juz),
-                        onPage: () =>
-                            setState(() => _readMode = ReadMode.page),
+                        onPage: () => setState(() => _readMode = ReadMode.page),
                       ),
                     ],
                   ),

@@ -155,9 +155,8 @@ class _FakeAppUpdateRepository implements AppUpdateRepository {
   Future<AppUpdateCheckResult> check({bool ignoreDismissal = false}) async {
     final p = prompt;
     if (p == null) return const AppUpdateCheckResult.upToDate();
-    final suppressed = !ignoreDismissal &&
-        !p.required &&
-        dismissedVersion == p.latestVersion;
+    final suppressed =
+        !ignoreDismissal && !p.required && dismissedVersion == p.latestVersion;
     return suppressed
         ? const AppUpdateCheckResult.upToDate()
         : AppUpdateCheckResult.available(p);
@@ -482,7 +481,8 @@ void main() {
     expect(tester.getSize(find.byKey(WidgetKeys.bottomNavChrome)).height, 56);
   });
 
-  testWidgets('the Read prayer pill switches to the Prayer tab', (tester) async {
+  testWidgets('the Read prayer pill switches to the Prayer tab',
+      (tester) async {
     await _pumpShell(
       tester,
       prayerTimesRepository: _FakePrayerTimesRepositoryWithLocation(),
@@ -499,7 +499,8 @@ void main() {
     expect(find.byKey(WidgetKeys.bottomNavPrayer), findsOneWidget);
   });
 
-  testWidgets('pushing a page from a tab covers the shell; back returns to '
+  testWidgets(
+      'pushing a page from a tab covers the shell; back returns to '
       'that tab', (tester) async {
     await _pumpShell(tester);
 

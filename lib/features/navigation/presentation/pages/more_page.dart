@@ -40,8 +40,7 @@ class MorePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        FeatureFlags.lightOfDay ? _cubit<ThemeCubit>(context) : null;
+    final theme = FeatureFlags.lightOfDay ? _cubit<ThemeCubit>(context) : null;
     return Scaffold(
       key: WidgetKeys.morePage,
       appBar: AppBar(title: const Text('More')),
@@ -66,7 +65,9 @@ class MorePage extends StatelessWidget {
               title: const Text('Settings'),
               trailing: const AppIcon(AppIcons.chevronRight),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const AppSettingsPage()),
+                MaterialPageRoute<void>(
+                  builder: (_) => const AppSettingsPage(),
+                ),
               ),
             ),
             ListTile(

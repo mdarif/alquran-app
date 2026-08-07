@@ -377,14 +377,18 @@ void main() {
       await tester.tap(find.byKey(WidgetKeys.moreSettingsRow));
       await tester.pumpAndSettle();
 
-      final shareTop = tester.getTopLeft(
-        find.byKey(WidgetKeys.shareAppButton),
-      ).dy;
+      final shareTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.shareAppButton),
+          )
+          .dy;
       await tester.ensureVisible(find.byKey(WidgetKeys.readerSettingsReset));
       await tester.pumpAndSettle();
-      final resetTop = tester.getTopLeft(
-        find.byKey(WidgetKeys.readerSettingsReset),
-      ).dy;
+      final resetTop = tester
+          .getTopLeft(
+            find.byKey(WidgetKeys.readerSettingsReset),
+          )
+          .dy;
 
       expect(find.widgetWithText(ListTile, 'Translations'), findsNothing);
       expect(find.byKey(WidgetKeys.readingThemeMenuButton), findsNothing);
@@ -393,7 +397,8 @@ void main() {
       expect(resetTop, greaterThan(shareTop));
     });
 
-    testWidgets('opens the About screen (nested, via Settings)', (tester) async {
+    testWidgets('opens the About screen (nested, via Settings)',
+        (tester) async {
       await _pumpMore(tester);
       await tester.tap(find.byKey(WidgetKeys.moreSettingsRow));
       await tester.pumpAndSettle();
