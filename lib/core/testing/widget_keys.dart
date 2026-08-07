@@ -10,6 +10,9 @@ class WidgetKeys {
   // Home / navigation
   static const jumpButton = Key('home-jump-button');
   static const lastReadCard = Key('home-last-read-card');
+  static const startReadingSurah = Key('home-start-reading-surah');
+  static const startReadingJuz = Key('home-start-reading-juz');
+  static const startReadingPage = Key('home-start-reading-page');
   static Key surahTile(int surahId) => Key('surah-tile-$surahId');
   static const surahSearchButton = Key('home-surah-search-button');
   static const surahSearchField = Key('home-surah-search');
@@ -126,6 +129,7 @@ class WidgetKeys {
   static const aboutLicenses = Key('about-licenses');
 
   // Bottom navigation shell (Read / Prayer / Library / More)
+  static const bottomNavChrome = Key('bottom-nav-chrome');
   static const bottomNavRead = Key('bottom-nav-read');
   static const bottomNavPrayer = Key('bottom-nav-prayer');
   static const bottomNavLibrary = Key('bottom-nav-library');

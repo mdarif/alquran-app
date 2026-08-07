@@ -59,16 +59,21 @@ The current Home experience becomes the Read tab.
 Primary content:
 
 - Continue reading banner.
+- Compact Surah/Juz/Page switcher below Continue Reading.
 - Surah list and Surah-name search.
 - Home prayer pill may remain as a lightweight glance.
 - Friday shortcut / Juma mode later.
-- Advanced navigation entry only if `FeatureFlags.advancedNavigation` is on.
 
 Do not move the full Reader into a tab body. Opening a Surah still navigates to
 the existing Reader route.
 
 The prayer-time pill stays on Read as contextual information, but tapping it
 switches to the Prayer tab instead of opening the old bottom sheet.
+
+Juz and Page should be visible on Read through the compact Surah/Juz/Page
+switcher, not hidden behind an app-bar Jump sheet. Tapping Juz or Page updates
+the current Read body in place instead of pushing a separate index screen.
+Hizb/Ruku remain out of scope for the first navigation slice.
 
 ### Prayer
 
@@ -138,8 +143,9 @@ Move or keep as follows:
 | Surah list | Read |
 | Surah search | Read |
 | Continue reading | Read |
+| Surah/Juz/Page switcher | Read |
 | Reader screen | Separate immersive route |
-| Page/Juz/Hizb/Ruku jump | Read, behind existing flag |
+| Page/Juz/Hizb/Ruku jump | Replace with visible Surah/Juz/Page switcher; keep Hizb/Ruku out of first slice |
 | Prayer Times sheet | Prayer |
 | Reminders | Prayer only |
 | Translations | Library |
@@ -162,6 +168,7 @@ Move or keep as follows:
 
 - Add a top-level navigation shell.
 - Keep existing Home page as the `Read` tab.
+- Add the compact Surah/Juz/Page switcher under Continue Reading.
 - Add placeholder or minimally reused pages for `Prayer`, `Library`, and `More`.
 - Preserve all existing routes and deep links.
 - Ensure Android back behavior is predictable:

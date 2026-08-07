@@ -123,10 +123,12 @@ class MushafPalette {
         surfaceTintColor: Colors.transparent,
         indicatorColor: accentContainer,
         elevation: 0,
-        height: 64,
+        height: 56,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return theme.textTheme.labelSmall?.copyWith(
+            fontSize: 11,
+            height: 1,
             color: selected ? accent : ink.withValues(alpha: 0.62),
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           );

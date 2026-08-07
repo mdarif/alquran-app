@@ -73,7 +73,7 @@ void main() {
         ),
       );
 
-      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 28);
+      expect(tester.widget<Text>(find.text('الفاتحة')).style?.fontSize, 26);
     });
 
     testWidgets('keeps minimum row height compact enough for fast scanning',
@@ -103,7 +103,7 @@ void main() {
       ];
       expect(
         minHeights,
-        contains(68),
+        contains(60),
       );
     });
 

@@ -1,10 +1,8 @@
 /// Compile-time feature flags. We're fully offline (no remote config), so these
 /// are simple constants — flip and rebuild.
 abstract final class FeatureFlags {
-  /// Page / Juz / Hizb / Ruku navigation, surfaced via the home "Jump to" sheet.
-  /// Surah browsing is always available. Off for a Surah-only experience — keeps
-  /// the reading-first home dead simple. The capability/code is retained (PRD
-  /// MVP nav); flip back to true to resurface it.
+  /// Reserved for deeper navigation options such as Hizb/Ruku. Surah/Juz/Page
+  /// are now surfaced directly on Read through the compact mode switcher.
   static const bool advancedNavigation = false;
 
   /// IndoPak (South-Asian Naskh) script option in the reader — the standard-

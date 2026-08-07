@@ -38,13 +38,13 @@ class SurahTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 68),
+        constraints: const BoxConstraints(minHeight: 60),
         child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 5, 20, 5),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 3, 20, 3),
           child: Row(
             children: [
               _SurahNumberBadge(number: surah.id),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -79,7 +79,7 @@ class SurahTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
               verse != null
                   ? AppIcon(
                       AppIcons.chevronRight,
@@ -97,7 +97,7 @@ class SurahTile extends StatelessWidget {
                           color: cs.onSurface.withValues(alpha: 0.78),
                           fontFamily: AppTheme.arabicFontFamily,
                           fontFeatures: AppTheme.arabicFontFeatures,
-                          fontSize: 28,
+                          fontSize: 26,
                           height: 1.2,
                         ),
                       ),
@@ -119,7 +119,7 @@ class _SurahNumberBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return SizedBox.square(
-      dimension: 36,
+      dimension: 32,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: cs.primaryContainer.withValues(alpha: 0.78),

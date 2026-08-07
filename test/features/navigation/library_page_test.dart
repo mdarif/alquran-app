@@ -140,6 +140,12 @@ void main() {
     expect(translationsTop, lessThan(tafsirTop));
   });
 
+  testWidgets('root menu is fixed, not scrollable', (tester) async {
+    await _pumpLibrary(tester);
+
+    expect(find.byType(Scrollable), findsNothing);
+  });
+
   testWidgets('tapping Bookmarks opens the Bookmarks page', (tester) async {
     await _pumpLibrary(tester);
 

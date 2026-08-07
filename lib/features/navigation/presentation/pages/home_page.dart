@@ -12,28 +12,28 @@ import '../../../app_update/presentation/cubit/app_update_state.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
+import '../../../reader/domain/entities/reader_target.dart';
+import '../../../reader/presentation/pages/reader_page.dart';
 import '../../../surahs/presentation/cubit/surah_list_cubit.dart';
 import '../../../surahs/presentation/pages/surah_list_page.dart';
 import '../../domain/entities/index_kind.dart';
-import 'index_list_page.dart';
+import '../widgets/index_list_view.dart';
+import '../widgets/start_reading_row.dart';
 
 /// App home: an immersive, full-width Surah list with the "continue reading"
-/// resume card. Page/Juz/Hizb/Ruku stay out of the way behind a single "Jump to"
-/// sheet (gated by [FeatureFlags.advancedNavigation]) so the reader keeps focus.
+/// resume card and a visible Surah/Juz/Page switcher so Juz and
+/// Page navigation don't hide behind a discoverability-poor app-bar icon.
 class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
-    this.advancedNavigation = FeatureFlags.advancedNavigation,
     this.prayerTimes = FeatureFlags.prayerTimes,
     this.hijriDate = FeatureFlags.hijriDate,
     this.sunnahReminders = FeatureFlags.sunnahReminders,
     this.lastReadBanner = FeatureFlags.lastReadBanner,
     this.softUpdateReminder = FeatureFlags.softUpdateReminder,
     this.onOpenPrayerTab,
+    this.onChromeCollapsedChanged,
   });
-
-  /// Whether to surface Page/Juz/Hizb/Ruku navigation. Injectable for tests.
-  final bool advancedNavigation;
 
   /// Whether to surface the next-prayer pill (and, through it, the times sheet
   /// and location request). Injectable for tests.
@@ -55,11 +55,17 @@ class HomePage extends StatefulWidget {
   /// the Prayer tab instead of opening the old bottom sheet.
   final VoidCallback? onOpenPrayerTab;
 
+  /// Reports Home's scroll-immersion state to the shell so the bottom nav can
+  /// collapse while readers browse Surah/Juz/Page lists.
+  final ValueChanged<bool>? onChromeCollapsedChanged;
+
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  static const double _chromeScrollThreshold = 36;
+
   // The surah-list cubit is provided at this level (not inside the body) so the
   // app-bar search can drive it: SurahListBody reads it ambiently below.
   late final SurahListCubit _surahs = GetIt.I<SurahListCubit>()..load();
@@ -70,12 +76,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
   AppUpdateCubit? _updateCubit;
+  ReadMode _readMode = ReadMode.surah;
+  bool _chromeCollapsed = false;
+  double _chromeScrollIntent = 0;
 
   @override
   void initState() {
     super.initState();
-    if (widget.softUpdateReminder &&
-        GetIt.I.isRegistered<AppUpdateCubit>()) {
+    if (widget.softUpdateReminder && GetIt.I.isRegistered<AppUpdateCubit>()) {
       _updateCubit = GetIt.I<AppUpdateCubit>()..check();
       WidgetsBinding.instance.addObserver(this);
     }
@@ -83,6 +91,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.onChromeCollapsedChanged?.call(false);
     if (_updateCubit != null) WidgetsBinding.instance.removeObserver(this);
     _searchCtrl.dispose();
     _searchFocus.dispose();
@@ -101,6 +110,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _openSearch() {
+    _setChromeCollapsed(false);
     setState(() => _searching = true);
     // Focus after the field is in the tree so the keyboard opens immediately.
     WidgetsBinding.instance
@@ -112,6 +122,38 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _surahs.search('');
     _searchFocus.unfocus();
     setState(() => _searching = false);
+  }
+
+  void _setChromeCollapsed(bool collapsed) {
+    if (_chromeCollapsed == collapsed) return;
+    _chromeScrollIntent = 0;
+    setState(() => _chromeCollapsed = collapsed);
+    widget.onChromeCollapsedChanged?.call(collapsed);
+  }
+
+  bool _onScrollNotification(ScrollNotification n) {
+    if (_searching) return false;
+    if (n.metrics.axis != Axis.vertical) return false;
+    if (n.metrics.pixels <= 0) {
+      _chromeScrollIntent = 0;
+      _setChromeCollapsed(false);
+      return false;
+    }
+    if (n case ScrollUpdateNotification(:final scrollDelta?)) {
+      if (scrollDelta == 0) return false;
+      final directionMatchesState =
+          (_chromeCollapsed && scrollDelta < 0) ||
+              (!_chromeCollapsed && scrollDelta > 0);
+      _chromeScrollIntent =
+          directionMatchesState ? _chromeScrollIntent + scrollDelta.abs() : 0;
+      if (_chromeScrollIntent < _chromeScrollThreshold) return false;
+      if (scrollDelta > 0 && !_chromeCollapsed) {
+        _setChromeCollapsed(true);
+      } else if (scrollDelta < 0 && _chromeCollapsed) {
+        _setChromeCollapsed(false);
+      }
+    }
+    return false;
   }
 
   @override
@@ -126,29 +168,48 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         },
         child: Scaffold(
           appBar: _searching ? _searchAppBar(context) : _defaultAppBar(context),
-          body: Column(
-            children: [
-              if (_updateCubit != null)
-                BlocBuilder<AppUpdateCubit, AppUpdateState>(
-                  bloc: _updateCubit,
-                  buildWhen: (a, b) => a.phase != b.phase,
-                  builder: (context, state) {
-                    if (state.phase != AppUpdatePhase.available) {
-                      return const SizedBox.shrink();
-                    }
-                    final prompt = state.prompt!;
-                    return _AppUpdateBanner(
-                      prompt: prompt,
-                      onUpdate: () => _openUpdate(prompt),
-                      onLater: prompt.required
-                          ? null
-                          : () => _updateCubit?.dismiss(),
-                    );
-                  },
+          body: NotificationListener<ScrollNotification>(
+            onNotification: _onScrollNotification,
+            child: Column(
+              children: [
+                _HomeContextChrome(
+                  collapsed: _chromeCollapsed,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_updateCubit != null)
+                        BlocBuilder<AppUpdateCubit, AppUpdateState>(
+                          bloc: _updateCubit,
+                          buildWhen: (a, b) => a.phase != b.phase,
+                          builder: (context, state) {
+                            if (state.phase != AppUpdatePhase.available) {
+                              return const SizedBox.shrink();
+                            }
+                            final prompt = state.prompt!;
+                            return _AppUpdateBanner(
+                              prompt: prompt,
+                              onUpdate: () => _openUpdate(prompt),
+                              onLater: prompt.required
+                                  ? null
+                                  : () => _updateCubit?.dismiss(),
+                            );
+                          },
+                        ),
+                      if (widget.lastReadBanner) const LastReadBanner(),
+                      StartReadingRow(
+                        selectedMode: _readMode,
+                        onSurah: () =>
+                            setState(() => _readMode = ReadMode.surah),
+                        onJuz: () => setState(() => _readMode = ReadMode.juz),
+                        onPage: () =>
+                            setState(() => _readMode = ReadMode.page),
+                      ),
+                    ],
+                  ),
                 ),
-              if (widget.lastReadBanner) const LastReadBanner(),
-              const Expanded(child: SurahListBody()),
-            ],
+                Expanded(child: _readBody()),
+              ],
+            ),
           ),
         ),
       ),
@@ -179,13 +240,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ],
       ),
       actions: [
-        if (widget.advancedNavigation)
-          IconButton(
-            key: WidgetKeys.jumpButton,
-            tooltip: 'Jump to (Page · Juz · Hizb · Ruku)',
-            icon: const AppIcon(AppIcons.jumpMenu),
-            onPressed: () => _openJumpSheet(context),
-          ),
         if (widget.prayerTimes)
           NextPrayerPill(onOpenPrayerTab: widget.onOpenPrayerTab),
         IconButton(
@@ -244,50 +298,66 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  void _openJumpSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Jump to',
-                  style: Theme.of(sheetContext).textTheme.titleMedium,
+  Widget _readBody() {
+    return switch (_readMode) {
+      ReadMode.surah => const SurahListBody(),
+      ReadMode.juz => IndexListView(
+          key: const ValueKey('read-index-juz'),
+          kind: IndexKind.juz,
+          label: 'Juz',
+          onTargetSelected: _openReader,
+        ),
+      ReadMode.page => IndexListView(
+          key: const ValueKey('read-index-page'),
+          kind: IndexKind.page,
+          label: 'Page',
+          onTargetSelected: _openReader,
+        ),
+    };
+  }
+
+  void _openReader(ReaderTarget target) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReaderPage(target: target),
+      ),
+    );
+  }
+}
+
+class _HomeContextChrome extends StatelessWidget {
+  const _HomeContextChrome({
+    required this.collapsed,
+    required this.child,
+  });
+
+  final bool collapsed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: collapsed ? 0 : 1),
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeInOutCubic,
+        builder: (context, t, _) {
+          return Align(
+            alignment: Alignment.topCenter,
+            heightFactor: t,
+            child: FractionalTranslation(
+              translation: Offset(0, -(1 - t)),
+              child: Opacity(
+                opacity: t.clamp(0.0, 1.0),
+                child: IgnorePointer(
+                  ignoring: collapsed,
+                  child: child,
                 ),
               ),
             ),
-            _JumpTile(
-              parentContext: context,
-              kind: IndexKind.page,
-              label: 'Page',
-              icon: AppIcons.page,
-            ),
-            _JumpTile(
-              parentContext: context,
-              kind: IndexKind.juz,
-              label: 'Juz',
-              icon: AppIcons.juz,
-            ),
-            _JumpTile(
-              parentContext: context,
-              kind: IndexKind.hizb,
-              label: 'Hizb',
-              icon: AppIcons.hizb,
-            ),
-            _JumpTile(
-              parentContext: context,
-              kind: IndexKind.ruku,
-              label: 'Ruku',
-              icon: AppIcons.ruku,
-            ),
-          ],
-        ),
+          );
+        },
+        child: child,
       ),
     );
   }
@@ -376,37 +446,6 @@ class _AppUpdateBanner extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _JumpTile extends StatelessWidget {
-  const _JumpTile({
-    required this.parentContext,
-    required this.kind,
-    required this.label,
-    required this.icon,
-  });
-
-  /// The page context (not the sheet's) — used to push after the sheet closes.
-  final BuildContext parentContext;
-  final IndexKind kind;
-  final String label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: AppIcon(icon),
-      title: Text(label),
-      onTap: () {
-        Navigator.of(context).pop(); // close the sheet
-        Navigator.of(parentContext).push(
-          MaterialPageRoute<void>(
-            builder: (_) => IndexListPage(kind: kind, label: label),
-          ),
-        );
-      },
     );
   }
 }

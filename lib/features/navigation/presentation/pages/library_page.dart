@@ -21,30 +21,33 @@ class LibraryPage extends StatelessWidget {
     return Scaffold(
       key: WidgetKeys.libraryPage,
       appBar: AppBar(title: const Text('Library')),
-      body: ListView(
-        children: [
-          _LibraryRow(
-            rowKey: WidgetKeys.libraryBookmarksRow,
-            icon: AppIcons.bookmark,
-            title: 'Bookmarks',
-            subtitle: 'Saved verses',
-            onTap: () => _openBookmarks(context),
-          ),
-          _LibraryRow(
-            rowKey: WidgetKeys.libraryTranslationsRow,
-            icon: AppIcons.alKahf,
-            title: 'Translations',
-            subtitle: 'Manage translations',
-            onTap: () => showTranslationsSheet(context),
-          ),
-          _LibraryRow(
-            rowKey: WidgetKeys.libraryTafsirRow,
-            icon: AppIcons.alKahf,
-            title: 'Tafsir',
-            subtitle: 'Read Tafsir',
-            onTap: () => showTafsirSheet(context),
-          ),
-        ],
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            _LibraryRow(
+              rowKey: WidgetKeys.libraryBookmarksRow,
+              icon: AppIcons.bookmark,
+              title: 'Bookmarks',
+              subtitle: 'Saved verses',
+              onTap: () => _openBookmarks(context),
+            ),
+            _LibraryRow(
+              rowKey: WidgetKeys.libraryTranslationsRow,
+              icon: AppIcons.alKahf,
+              title: 'Translations',
+              subtitle: 'Manage translations',
+              onTap: () => showTranslationsSheet(context),
+            ),
+            _LibraryRow(
+              rowKey: WidgetKeys.libraryTafsirRow,
+              icon: AppIcons.alKahf,
+              title: 'Tafsir',
+              subtitle: 'Read Tafsir',
+              onTap: () => showTafsirSheet(context),
+            ),
+          ],
+        ),
       ),
     );
   }

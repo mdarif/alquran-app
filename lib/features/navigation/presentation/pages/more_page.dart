@@ -45,38 +45,41 @@ class MorePage extends StatelessWidget {
     return Scaffold(
       key: WidgetKeys.morePage,
       appBar: AppBar(title: const Text('More')),
-      body: ListView(
-        children: [
-          if (theme != null)
-            ListTile(
-              key: WidgetKeys.moreReadingThemeRow,
-              leading: AppIcon(
-                _phaseIcon(theme.activePhase),
-                filled: _phaseFilled(theme.activePhase),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            if (theme != null)
+              ListTile(
+                key: WidgetKeys.moreReadingThemeRow,
+                leading: AppIcon(
+                  _phaseIcon(theme.activePhase),
+                  filled: _phaseFilled(theme.activePhase),
+                ),
+                title: const Text('Reading Theme'),
+                trailing: const AppIcon(AppIcons.chevronRight),
+                onTap: () => _openReadingLight(context, theme),
               ),
-              title: const Text('Reading Theme'),
+            ListTile(
+              key: WidgetKeys.moreSettingsRow,
+              leading: const AppIcon(AppIcons.settings),
+              title: const Text('Settings'),
               trailing: const AppIcon(AppIcons.chevronRight),
-              onTap: () => _openReadingLight(context, theme),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AppSettingsPage()),
+              ),
             ),
-          ListTile(
-            key: WidgetKeys.moreSettingsRow,
-            leading: const AppIcon(AppIcons.settings),
-            title: const Text('Settings'),
-            trailing: const AppIcon(AppIcons.chevronRight),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const AppSettingsPage()),
+            ListTile(
+              key: WidgetKeys.moreAboutRow,
+              leading: const AppIcon(AppIcons.about),
+              title: const Text('About'),
+              trailing: const AppIcon(AppIcons.chevronRight),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+              ),
             ),
-          ),
-          ListTile(
-            key: WidgetKeys.moreAboutRow,
-            leading: const AppIcon(AppIcons.about),
-            title: const Text('About'),
-            trailing: const AppIcon(AppIcons.chevronRight),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const AboutPage()),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

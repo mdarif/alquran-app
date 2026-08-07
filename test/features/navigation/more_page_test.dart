@@ -188,6 +188,12 @@ void main() {
     expect(settingsTop, lessThan(aboutTop));
   });
 
+  testWidgets('root menu is fixed, not scrollable', (tester) async {
+    await _pumpMore(tester);
+
+    expect(find.byType(Scrollable), findsNothing);
+  });
+
   testWidgets('tapping Reading Theme opens the Reading Theme sheet',
       (tester) async {
     await _pumpMore(tester);

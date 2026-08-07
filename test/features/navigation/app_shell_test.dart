@@ -55,14 +55,22 @@ const _loc = GeoLocation(latitude: 24.45, longitude: 54.38);
 
 class _FakeSurahRepository implements SurahRepository {
   @override
-  Future<List<Surah>> getSurahs() async => const [
-        Surah(
+  Future<List<Surah>> getSurahs() async => [
+        const Surah(
           id: 1,
           nameArabic: 'الفاتحة',
           nameEnglish: 'Al-Fatihah',
           totalAyahs: 7,
           revelationPlace: 'makkah',
         ),
+        for (var i = 2; i <= 30; i++)
+          Surah(
+            id: i,
+            nameArabic: 'سورة $i',
+            nameEnglish: 'Surah $i',
+            totalAyahs: 10 + i,
+            revelationPlace: i.isEven ? 'madinah' : 'makkah',
+          ),
       ];
 }
 
@@ -332,7 +340,19 @@ Future<void> _pumpShell(
   WidgetTester tester, {
   PrayerTimesRepository? prayerTimesRepository,
   AppUpdateRepository? appUpdateRepository,
+  EdgeInsets viewPadding = EdgeInsets.zero,
 }) async {
+  final dpr = tester.view.devicePixelRatio;
+  final fakePadding = FakeViewPadding(
+    left: viewPadding.left * dpr,
+    top: viewPadding.top * dpr,
+    right: viewPadding.right * dpr,
+    bottom: viewPadding.bottom * dpr,
+  );
+  tester.view
+    ..padding = fakePadding
+    ..viewPadding = fakePadding;
+  addTearDown(tester.view.reset);
   SharedPreferences.setMockInitialValues(const {'theme_choice': 'duha'});
   final theme = ThemeCubit(await SharedPreferences.getInstance());
   final reminders = RemindersCubit(
@@ -413,6 +433,15 @@ void main() {
     expect(find.byKey(WidgetKeys.bottomNavPrayer), findsOneWidget);
     expect(find.byKey(WidgetKeys.bottomNavLibrary), findsOneWidget);
     expect(find.byKey(WidgetKeys.bottomNavMore), findsOneWidget);
+    expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).height, 56);
+  });
+
+  testWidgets('bottom nav reserves iOS safe-area space below the compact bar',
+      (tester) async {
+    await _pumpShell(tester, viewPadding: const EdgeInsets.only(bottom: 34));
+
+    expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).height, 56);
+    expect(tester.getSize(find.byKey(WidgetKeys.bottomNavChrome)).height, 90);
   });
 
   testWidgets('switches to each tab and preserves the others underneath',
@@ -436,6 +465,21 @@ void main() {
     await tester.tap(find.byKey(WidgetKeys.bottomNavRead));
     await tester.pumpAndSettle();
     expect(find.text('Al-Fatihah'), findsOneWidget);
+  });
+
+  testWidgets('Read scroll collapses and restores the bottom navigation',
+      (tester) async {
+    await _pumpShell(tester);
+
+    expect(tester.getSize(find.byKey(WidgetKeys.bottomNavChrome)).height, 56);
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -360));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(find.byKey(WidgetKeys.bottomNavChrome)).height, 0);
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, 220));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(find.byKey(WidgetKeys.bottomNavChrome)).height, 56);
   });
 
   testWidgets('the Read prayer pill switches to the Prayer tab', (tester) async {
