@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/app_update_config.dart';
+import '../../domain/entities/app_update_check_result.dart';
 import '../../domain/entities/app_update_prompt.dart';
 import '../../domain/repositories/app_update_repository.dart';
 
@@ -36,32 +38,65 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
   static const String _fallbackMessage = 'A newer version is available.';
 
   @override
-  Future<AppUpdatePrompt?> check() async {
+  Future<AppUpdateCheckResult> check() async {
+    String current;
     try {
-      final current = await _currentVersion();
-      final response = await _client.get(_configUrl);
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return null;
-      }
-      final json = jsonDecode(response.body);
-      if (json is! Map<String, Object?>) return null;
-      final latest = json['latestVersion'];
-      final storeUrl = json['storeUrl'];
-      if (latest is! String) return null;
-      if (!_isNewer(latest, current)) return null;
-      final requiredVersion = json['minimumSupportedVersion'];
-      final required =
-          requiredVersion is String && _isNewer(requiredVersion, current);
-      final remindAfterDays = _remindAfterDays(json['remindAfterDays']);
-      if (!required && _isDismissed(latest, remindAfterDays)) {
-        return null;
-      }
-      final parsedStoreUrl = storeUrl is String ? Uri.tryParse(storeUrl) : null;
-      final uri = parsedStoreUrl != null && parsedStoreUrl.hasScheme
-          ? parsedStoreUrl
-          : Uri.parse(androidPlayStoreUrl);
-      final message = json['message'];
-      return AppUpdatePrompt(
+      current = await _currentVersion();
+    } catch (e) {
+      _log('current version lookup failed: $e');
+      return const AppUpdateCheckResult.error('Could not read app version');
+    }
+    http.Response response;
+    try {
+      response = await _client.get(_configUrl);
+    } catch (e) {
+      _log('current=$current request failed: $e');
+      return const AppUpdateCheckResult.error('Network request failed');
+    }
+    _log('current=$current httpStatus=${response.statusCode}');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return AppUpdateCheckResult.error(
+        'Update check failed (HTTP ${response.statusCode})',
+      );
+    }
+    final Object? json;
+    try {
+      json = jsonDecode(response.body);
+    } catch (e) {
+      _log('malformed config body: $e');
+      return const AppUpdateCheckResult.error('Malformed update config');
+    }
+    if (json is! Map<String, Object?>) {
+      _log('config body was not a JSON object');
+      return const AppUpdateCheckResult.error('Malformed update config');
+    }
+    final latest = json['latestVersion'];
+    final storeUrl = json['storeUrl'];
+    if (latest is! String) {
+      _log('config missing latestVersion');
+      return const AppUpdateCheckResult.error('Malformed update config');
+    }
+    _log('current=$current latest=$latest');
+    if (!_isNewer(latest, current)) {
+      return const AppUpdateCheckResult.upToDate();
+    }
+    final requiredVersion = json['minimumSupportedVersion'];
+    final required =
+        requiredVersion is String && _isNewer(requiredVersion, current);
+    final remindAfterDays = _remindAfterDays(json['remindAfterDays']);
+    final dismissedVersion = _prefs.getString(_dismissedVersionKey);
+    if (!required && _isDismissed(latest, remindAfterDays)) {
+      _log('latest=$latest suppressed: dismissed=$dismissedVersion');
+      return const AppUpdateCheckResult.upToDate();
+    }
+    final parsedStoreUrl = storeUrl is String ? Uri.tryParse(storeUrl) : null;
+    final uri = parsedStoreUrl != null && parsedStoreUrl.hasScheme
+        ? parsedStoreUrl
+        : Uri.parse(androidPlayStoreUrl);
+    final message = json['message'];
+    _log('latest=$latest required=$required dismissed=$dismissedVersion');
+    return AppUpdateCheckResult.available(
+      AppUpdatePrompt(
         currentVersion: current,
         latestVersion: latest,
         storeUrl: uri,
@@ -69,11 +104,11 @@ class AppUpdateRepositoryImpl implements AppUpdateRepository {
             ? message.trim()
             : _fallbackMessage,
         required: required,
-      );
-    } catch (_) {
-      return null;
-    }
+      ),
+    );
   }
+
+  void _log(String message) => developer.log(message, name: 'AppUpdate');
 
   @override
   Future<void> dismiss(String latestVersion) async {

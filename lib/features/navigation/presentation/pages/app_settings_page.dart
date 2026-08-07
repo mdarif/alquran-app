@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
@@ -5,8 +7,8 @@ import 'package:get_it/get_it.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/widgets/confirm_dialog.dart';
-import '../../../app_update/domain/entities/app_update_prompt.dart';
-import '../../../app_update/domain/repositories/app_update_repository.dart';
+import '../../../app_update/presentation/cubit/app_update_cubit.dart';
+import '../../../app_update/presentation/cubit/app_update_state.dart';
 import '../../../reader/domain/entities/translation_resource.dart';
 import '../../../reader/domain/repositories/ayah_repository.dart';
 import '../../../reader/domain/repositories/reader_settings_repository.dart';
@@ -32,7 +34,8 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   final ReaderSettingsRepository _settings =
       GetIt.I<ReaderSettingsRepository>();
   late Future<List<TranslationResource>> _resources = _loadResources();
-  AppUpdatePrompt? _updatePrompt;
+  AppUpdateCubit? _updateCubit;
+  StreamSubscription<AppUpdateState>? _updateSub;
 
   Future<List<TranslationResource>> _loadResources() {
     if (!GetIt.I.isRegistered<AyahRepository>()) {
@@ -44,17 +47,23 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
   @override
   void initState() {
     super.initState();
-    _loadUpdatePrompt();
+    if (FeatureFlags.softUpdateReminder &&
+        GetIt.I.isRegistered<AppUpdateCubit>()) {
+      final cubit = GetIt.I<AppUpdateCubit>();
+      _updateCubit = cubit;
+      // The cubit is a shared singleton (Home reads it too), so re-render
+      // whenever its state changes rather than only after our own check().
+      _updateSub = cubit.stream.listen((_) {
+        if (mounted) setState(() {});
+      });
+      cubit.check();
+    }
   }
 
-  Future<void> _loadUpdatePrompt() async {
-    if (!FeatureFlags.softUpdateReminder ||
-        !GetIt.I.isRegistered<AppUpdateRepository>()) {
-      return;
-    }
-    final prompt = await GetIt.I<AppUpdateRepository>().check();
-    if (!mounted) return;
-    setState(() => _updatePrompt = prompt);
+  @override
+  void dispose() {
+    _updateSub?.cancel();
+    super.dispose();
   }
 
   @override
@@ -72,6 +81,7 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
       future: _resources,
       builder: (context, snapshot) {
         final resources = snapshot.data ?? const <TranslationResource>[];
+        final updateCubit = _updateCubit;
         return ReaderSettingsPage(
           key: WidgetKeys.appSettingsPage,
           fontSize: _settings.fontSize,
@@ -98,7 +108,8 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(
             context,
-            updatePrompt: _updatePrompt,
+            updateCubit: updateCubit,
+            updateState: updateCubit?.state,
           ),
         );
       },

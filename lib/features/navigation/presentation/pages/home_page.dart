@@ -7,7 +7,8 @@ import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../app_update/domain/entities/app_update_prompt.dart';
-import '../../../app_update/domain/repositories/app_update_repository.dart';
+import '../../../app_update/presentation/cubit/app_update_cubit.dart';
+import '../../../app_update/presentation/cubit/app_update_state.dart';
 import '../../../prayer_times/presentation/widgets/hijri_date_line.dart';
 import '../../../prayer_times/presentation/widgets/next_prayer_pill.dart';
 import '../../../reader/presentation/widgets/last_read_banner.dart';
@@ -68,23 +69,15 @@ class _HomePageState extends State<HomePage> {
   bool _searching = false;
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
-  AppUpdateRepository? _updates;
-  AppUpdatePrompt? _updatePrompt;
+  AppUpdateCubit? _updateCubit;
 
   @override
   void initState() {
     super.initState();
     if (widget.softUpdateReminder &&
-        GetIt.I.isRegistered<AppUpdateRepository>()) {
-      _updates = GetIt.I<AppUpdateRepository>();
-      _loadUpdatePrompt();
+        GetIt.I.isRegistered<AppUpdateCubit>()) {
+      _updateCubit = GetIt.I<AppUpdateCubit>()..check();
     }
-  }
-
-  Future<void> _loadUpdatePrompt() async {
-    final prompt = await _updates?.check();
-    if (!mounted || prompt == null) return;
-    setState(() => _updatePrompt = prompt);
   }
 
   @override
@@ -123,11 +116,23 @@ class _HomePageState extends State<HomePage> {
           appBar: _searching ? _searchAppBar(context) : _defaultAppBar(context),
           body: Column(
             children: [
-              if (_updatePrompt != null)
-                _AppUpdateBanner(
-                  prompt: _updatePrompt!,
-                  onUpdate: () => _openUpdate(_updatePrompt!),
-                  onLater: () => _dismissUpdate(_updatePrompt!),
+              if (_updateCubit != null)
+                BlocBuilder<AppUpdateCubit, AppUpdateState>(
+                  bloc: _updateCubit,
+                  buildWhen: (a, b) => a.phase != b.phase,
+                  builder: (context, state) {
+                    if (state.phase != AppUpdatePhase.available) {
+                      return const SizedBox.shrink();
+                    }
+                    final prompt = state.prompt!;
+                    return _AppUpdateBanner(
+                      prompt: prompt,
+                      onUpdate: () => _openUpdate(prompt),
+                      onLater: prompt.required
+                          ? null
+                          : () => _updateCubit?.dismiss(),
+                    );
+                  },
                 ),
               if (widget.lastReadBanner) const LastReadBanner(),
               const Expanded(child: SurahListBody()),
@@ -140,11 +145,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openUpdate(AppUpdatePrompt prompt) async {
     await launchUrl(prompt.storeUrl, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> _dismissUpdate(AppUpdatePrompt prompt) async {
-    await _updates?.dismiss(prompt.latestVersion);
-    if (mounted) setState(() => _updatePrompt = null);
   }
 
   /// The default bar: the title, the prayer pill, a search icon, and the
@@ -290,7 +290,9 @@ class _AppUpdateBanner extends StatelessWidget {
 
   final AppUpdatePrompt prompt;
   final VoidCallback onUpdate;
-  final VoidCallback onLater;
+
+  /// Null for a required update — "Later" isn't offered.
+  final VoidCallback? onLater;
 
   @override
   Widget build(BuildContext context) {
@@ -325,10 +327,10 @@ class _AppUpdateBanner extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Update available',
+                      prompt.required ? 'Update required' : 'Update available',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: cs.onSurface,
+                        color: prompt.required ? cs.error : cs.onSurface,
                         height: 1.1,
                       ),
                     ),
@@ -350,13 +352,14 @@ class _AppUpdateBanner extends StatelessWidget {
                 onPressed: onUpdate,
                 child: const Text('Update'),
               ),
-              IconButton(
-                key: WidgetKeys.appUpdateLaterButton,
-                tooltip: 'Later',
-                visualDensity: VisualDensity.compact,
-                onPressed: onLater,
-                icon: const AppIcon(AppIcons.close, size: AppIconSize.label),
-              ),
+              if (onLater != null)
+                IconButton(
+                  key: WidgetKeys.appUpdateLaterButton,
+                  tooltip: 'Later',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onLater,
+                  icon: const AppIcon(AppIcons.close, size: AppIconSize.label),
+                ),
             ],
           ),
         ),

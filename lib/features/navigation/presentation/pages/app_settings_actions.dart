@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get_it/get_it.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -8,14 +7,16 @@ import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import '../../../app_update/domain/entities/app_update_prompt.dart';
-import '../../../app_update/domain/repositories/app_update_repository.dart';
+import '../../../app_update/presentation/cubit/app_update_cubit.dart';
+import '../../../app_update/presentation/cubit/app_update_state.dart';
 import '../../../reader/presentation/pages/reader_settings_page.dart';
 
 const String _downloadUrl = 'https://alquranreader.com/download';
 
 List<SettingsAction> appSettingsActions(
   BuildContext context, {
-  AppUpdatePrompt? updatePrompt,
+  AppUpdateCubit? updateCubit,
+  AppUpdateState? updateState,
 }) =>
     [
       const SettingsAction(
@@ -28,9 +29,10 @@ List<SettingsAction> appSettingsActions(
         SettingsAction(
           key: WidgetKeys.appUpdateMenuButton,
           icon: AppIcons.autoSelected,
-          title:
-              updatePrompt == null ? 'Check for Updates' : 'Update available',
-          onTap: () => _checkForUpdate(context),
+          title: updateState?.phase == AppUpdatePhase.available
+              ? 'Update available'
+              : 'Check for Updates',
+          onTap: () => _checkForUpdate(context, updateCubit),
         ),
       SettingsAction(
         key: WidgetKeys.aboutMenuButton,
@@ -41,9 +43,12 @@ List<SettingsAction> appSettingsActions(
       ),
     ];
 
-Future<void> _checkForUpdate(BuildContext context) async {
+Future<void> _checkForUpdate(
+  BuildContext context,
+  AppUpdateCubit? updateCubit,
+) async {
   final messenger = ScaffoldMessenger.of(context);
-  if (!GetIt.I.isRegistered<AppUpdateRepository>()) {
+  if (updateCubit == null) {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -54,51 +59,86 @@ Future<void> _checkForUpdate(BuildContext context) async {
       );
     return;
   }
-  final prompt = await GetIt.I<AppUpdateRepository>().check();
+  await updateCubit.check();
   if (!context.mounted) return;
-  if (prompt == null) {
-    messenger.hideCurrentSnackBar();
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Al Quran is up to date'),
-        content: const Text('You are already using the latest version.'),
+  final state = updateCubit.state;
+  messenger.hideCurrentSnackBar();
+  switch (state.phase) {
+    case AppUpdatePhase.available:
+      await _showUpdateAvailableDialog(context, updateCubit, state.prompt!);
+    case AppUpdatePhase.upToDate:
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Al Quran is up to date'),
+          content: const Text('You are already using the latest version.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    case AppUpdatePhase.error:
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Couldn\'t check for updates'),
+          content: Text(
+            state.error ??
+                'Check your connection and try again in a moment.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    case AppUpdatePhase.idle:
+    case AppUpdatePhase.checking:
+      // check() always resolves to one of the three terminal phases above.
+      break;
+  }
+}
+
+Future<void> _showUpdateAvailableDialog(
+  BuildContext context,
+  AppUpdateCubit updateCubit,
+  AppUpdatePrompt prompt,
+) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: !prompt.required,
+    builder: (dialogContext) => PopScope(
+      canPop: !prompt.required,
+      child: AlertDialog(
+        title: Text(prompt.required ? 'Update required' : 'Update available'),
+        content: Text(
+          '${prompt.required ? 'This version of Al Quran is no longer supported. ' : 'A newer version of Al Quran is available.\n\n'}'
+          'Installed: ${prompt.currentVersion}\n'
+          'Latest: ${prompt.latestVersion}',
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('OK'),
+          if (!prompt.required)
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Not now'),
+            ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              await launchUrl(
+                prompt.storeUrl,
+                mode: LaunchMode.externalApplication,
+              );
+            },
+            child: const Text('Update'),
           ),
         ],
       ),
-    );
-    return;
-  }
-  messenger.hideCurrentSnackBar();
-  await showDialog<void>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Update available'),
-      content: Text(
-        'A newer version of Al Quran is available.\n\n'
-        'Installed: ${prompt.currentVersion}\n'
-        'Latest: ${prompt.latestVersion}',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Not now'),
-        ),
-        FilledButton(
-          onPressed: () async {
-            Navigator.of(dialogContext).pop();
-            await launchUrl(
-              prompt.storeUrl,
-              mode: LaunchMode.externalApplication,
-            );
-          },
-          child: const Text('Update'),
-        ),
-      ],
     ),
   );
 }

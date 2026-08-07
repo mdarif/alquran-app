@@ -3,8 +3,10 @@ import 'package:al_quran/core/app_update_config.dart';
 import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/core/theme/theme_cubit.dart';
 import 'package:al_quran/core/theme/theme_toggle_button.dart';
+import 'package:al_quran/features/app_update/domain/entities/app_update_check_result.dart';
 import 'package:al_quran/features/app_update/domain/entities/app_update_prompt.dart';
 import 'package:al_quran/features/app_update/domain/repositories/app_update_repository.dart';
+import 'package:al_quran/features/app_update/presentation/cubit/app_update_cubit.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_entry.dart';
 import 'package:al_quran/features/navigation/domain/entities/index_kind.dart';
 import 'package:al_quran/features/navigation/domain/repositories/index_repository.dart';
@@ -145,10 +147,17 @@ class _FakeAppUpdateRepository implements AppUpdateRepository {
   _FakeAppUpdateRepository([this.prompt]);
 
   AppUpdatePrompt? prompt;
+  String? error;
   String? dismissedVersion;
 
   @override
-  Future<AppUpdatePrompt?> check() async => prompt;
+  Future<AppUpdateCheckResult> check() async {
+    if (error != null) return AppUpdateCheckResult.error(error!);
+    final p = prompt;
+    return p == null
+        ? const AppUpdateCheckResult.upToDate()
+        : AppUpdateCheckResult.available(p);
+  }
 
   @override
   Future<void> dismiss(String latestVersion) async {
@@ -398,6 +407,9 @@ void main() {
       ..registerLazySingleton<AppUpdateRepository>(
         _FakeAppUpdateRepository.new,
       )
+      ..registerLazySingleton<AppUpdateCubit>(
+        () => AppUpdateCubit(GetIt.I<AppUpdateRepository>()),
+      )
       ..registerLazySingleton<TafsirRepository>(_FakeTafsirRepository.new)
       ..registerLazySingleton<TafsirCubit>(
         () => TafsirCubit(GetIt.I<TafsirRepository>()),
@@ -549,6 +561,60 @@ void main() {
       expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
     });
 
+    testWidgets('a required update banner has no Later button and stays put',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      final updates = _FakeAppUpdateRepository(
+        AppUpdatePrompt(
+          currentVersion: '1.0.0',
+          latestVersion: '1.2.2',
+          storeUrl: Uri.parse(androidPlayStoreUrl),
+          message: 'A newer version is available.',
+          required: true,
+        ),
+      );
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(() => updates);
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsOneWidget);
+      expect(find.text('Update required'), findsOneWidget);
+      expect(find.byKey(WidgetKeys.appUpdateLaterButton), findsNothing);
+    });
+
+    testWidgets(
+        'Home and Settings share one update check — Settings sees what Home '
+        'already found', (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      final updates = _FakeAppUpdateRepository(
+        AppUpdatePrompt(
+          currentVersion: '1.2.1',
+          latestVersion: '1.2.2',
+          storeUrl: Uri.parse(androidPlayStoreUrl),
+          message: 'A newer version is available.',
+        ),
+      );
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(() => updates);
+
+      await _pumpHome(tester);
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsOneWidget);
+
+      // Dismiss via Home's shared cubit, then open Settings: it must reflect
+      // the same (now-dismissed) state instead of re-deriving its own.
+      await tester.tap(find.byKey(WidgetKeys.appUpdateLaterButton));
+      await tester.pumpAndSettle();
+      expect(find.byKey(WidgetKeys.appUpdateBanner), findsNothing);
+
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Check for Updates'), findsOneWidget);
+    });
+
     testWidgets('Settings offers the moved app actions', (tester) async {
       await _pumpHome(tester);
       await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
@@ -642,6 +708,56 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('OK'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Settings check surfaces an in-app result when offline / unreachable',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository()..error = 'Network request failed',
+      );
+
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.appUpdateMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Couldn\'t check for updates'), findsOneWidget);
+      expect(find.text('Network request failed'), findsOneWidget);
+    });
+
+    testWidgets('Settings shows a required update as non-dismissible',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository(
+          AppUpdatePrompt(
+            currentVersion: '1.0.0',
+            latestVersion: '1.2.2',
+            storeUrl: Uri.parse(androidPlayStoreUrl),
+            message: 'A newer version is available.',
+            required: true,
+          ),
+        ),
+      );
+
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.appUpdateMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Update required'), findsWidgets);
+      expect(find.text('Not now'), findsNothing);
+      expect(find.text('Update'), findsOneWidget);
     });
 
     testWidgets('Settings only shows chevrons for navigation rows',

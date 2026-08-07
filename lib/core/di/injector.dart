@@ -8,6 +8,7 @@ import '../../features/navigation/domain/repositories/index_repository.dart';
 import '../../features/navigation/presentation/cubit/index_list_cubit.dart';
 import '../../features/app_update/data/repositories/app_update_repository_impl.dart';
 import '../../features/app_update/domain/repositories/app_update_repository.dart';
+import '../../features/app_update/presentation/cubit/app_update_cubit.dart';
 import '../../features/prayer_times/data/location/geolocator_location_provider.dart';
 import '../../features/prayer_times/data/repositories/prayer_notification_settings_repository_impl.dart';
 import '../../features/prayer_times/data/repositories/prayer_times_repository_impl.dart';
@@ -113,6 +114,9 @@ Future<void> configureDependencies() async {
         prefs: getIt<SharedPreferences>(),
         configUrl: Uri.parse(appUpdateConfigUrl),
       ),
+    )
+    ..registerLazySingleton<AppUpdateCubit>(
+      () => AppUpdateCubit(getIt<AppUpdateRepository>()),
     )
     // Prayer times: location (geolocator) + on-device adhan calc. Registered
     // before ThemeCubit since its resolver reads this repo.

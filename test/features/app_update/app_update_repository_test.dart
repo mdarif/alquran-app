@@ -1,5 +1,6 @@
 import 'package:al_quran/features/app_update/data/repositories/app_update_repository_impl.dart';
 import 'package:al_quran/core/app_update_config.dart';
+import 'package:al_quran/features/app_update/domain/entities/app_update_check_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -23,22 +24,28 @@ Future<AppUpdateRepositoryImpl> _repo({
 
 void main() {
   group('AppUpdateRepositoryImpl', () {
-    test('returns null when the installed app is current', () async {
+    test('reports up to date when the installed app is current', () async {
       final repo = await _repo(
         body: '{"latestVersion":"1.2.1","storeUrl":"https://example.test"}',
       );
 
-      expect(await repo.check(), isNull);
+      final result = await repo.check();
+
+      expect(result.status, AppUpdateCheckStatus.upToDate);
+      expect(result.prompt, isNull);
     });
 
-    test('returns null when the installed app is newer than the config',
+    test(
+        'reports up to date when the installed app is newer than the config',
         () async {
       final repo = await _repo(
         currentVersion: '1.2.2',
         body: '{"latestVersion":"1.2.1","storeUrl":"https://example.test"}',
       );
 
-      expect(await repo.check(), isNull);
+      final result = await repo.check();
+
+      expect(result.status, AppUpdateCheckStatus.upToDate);
     });
 
     test('returns an optional prompt when a newer version exists', () async {
@@ -53,18 +60,20 @@ void main() {
         ''',
       );
 
-      final prompt = await repo.check();
+      final result = await repo.check();
 
-      expect(prompt, isNotNull);
-      expect(prompt!.currentVersion, '1.2.1');
+      expect(result.status, AppUpdateCheckStatus.available);
+      final prompt = result.prompt!;
+      expect(prompt.currentVersion, '1.2.1');
       expect(prompt.latestVersion, '1.2.2');
       expect(prompt.storeUrl, Uri.parse(androidPlayStoreUrl));
       expect(prompt.message, 'A newer version is available.');
       expect(prompt.required, isFalse);
     });
 
-    test('suppresses a dismissed optional version inside the reminder window',
-        () async {
+    test(
+        'suppresses (reports up to date for) a dismissed optional version '
+        'inside the reminder window', () async {
       final repo = await _repo(
         body: '''
           {
@@ -77,7 +86,7 @@ void main() {
 
       await repo.dismiss('1.2.2');
 
-      expect(await repo.check(), isNull);
+      expect((await repo.check()).status, AppUpdateCheckStatus.upToDate);
     });
 
     test('shows a dismissed optional version after the reminder window',
@@ -105,7 +114,7 @@ void main() {
         ),
       );
 
-      expect(await repo.check(), isNotNull);
+      expect((await repo.check()).status, AppUpdateCheckStatus.available);
     });
 
     test('does not suppress a required update after dismissal', () async {
@@ -120,12 +129,15 @@ void main() {
       );
 
       await repo.dismiss('1.2.2');
-      final prompt = await repo.check();
+      final result = await repo.check();
 
-      expect(prompt, isNotNull);
-      expect(prompt!.required, isTrue);
+      expect(result.status, AppUpdateCheckStatus.available);
+      expect(result.prompt!.required, isTrue);
     });
 
+    // "Later" must only ever hide the exact version it was tapped for — a
+    // dismissal of 1.2.2 must never suppress a later 1.2.3 prompt, or a
+    // regression here would silently stop reminding users forever.
     test('does not suppress a later version after dismissing an older one',
         () async {
       SharedPreferences.setMockInitialValues({
@@ -144,7 +156,10 @@ void main() {
         ),
       );
 
-      expect(await repo.check(), isNotNull);
+      final result = await repo.check();
+
+      expect(result.status, AppUpdateCheckStatus.available);
+      expect(result.prompt!.latestVersion, '1.2.3');
     });
 
     test('falls back to the Play Store URL when config has no valid store URL',
@@ -153,16 +168,43 @@ void main() {
         body: '{"latestVersion":"1.2.2","storeUrl":"not-a-url"}',
       );
 
-      final prompt = await repo.check();
+      final result = await repo.check();
 
-      expect(prompt, isNotNull);
-      expect(prompt!.storeUrl, Uri.parse(androidPlayStoreUrl));
+      expect(result.status, AppUpdateCheckStatus.available);
+      expect(result.prompt!.storeUrl, Uri.parse(androidPlayStoreUrl));
     });
 
-    test('returns null on network or malformed config failures', () async {
+    test('reports an error on an HTTP failure', () async {
       final repo = await _repo(body: 'nope', status: 500);
 
-      expect(await repo.check(), isNull);
+      final result = await repo.check();
+
+      expect(result.status, AppUpdateCheckStatus.error);
+      expect(result.error, isNotNull);
+    });
+
+    test('reports an error on a malformed config body', () async {
+      final repo = await _repo(body: 'not json');
+
+      final result = await repo.check();
+
+      expect(result.status, AppUpdateCheckStatus.error);
+    });
+
+    test('reports an error when the network request throws', () async {
+      SharedPreferences.setMockInitialValues(const {});
+      final repo = AppUpdateRepositoryImpl(
+        prefs: await SharedPreferences.getInstance(),
+        configUrl: Uri.parse('https://example.test/app-update.json'),
+        currentVersion: () async => '1.2.1',
+        now: () => DateTime.utc(2026, 7, 31),
+        client: MockClient((_) async => throw Exception('offline')),
+      );
+
+      final result = await repo.check();
+
+      expect(result.status, AppUpdateCheckStatus.error);
+      expect(result.error, isNotNull);
     });
   });
 }

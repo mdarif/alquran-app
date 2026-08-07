@@ -1,6 +1,6 @@
-import '../entities/app_update_prompt.dart';
+import '../entities/app_update_check_result.dart';
 
 abstract interface class AppUpdateRepository {
-  Future<AppUpdatePrompt?> check();
+  Future<AppUpdateCheckResult> check();
   Future<void> dismiss(String latestVersion);
 }
