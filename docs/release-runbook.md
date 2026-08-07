@@ -246,6 +246,8 @@ Notes:
 - [ ] `git tag` is on `main`; `pubspec.yaml` version matches (for bumped releases).
 - [ ] `develop` is in sync: `git fetch && git log origin/develop..origin/main`
       prints nothing (the sync-develop job fast-forwarded the bump commit back).
+- [ ] Soft-update JSON is live and points at the release:
+      `curl -fsSL https://alquranreader.com/app-update.json`.
 - [ ] Install the **store build** (internal track / TestFlight) on a real device
       and re-run the smoke test — fonts, translations, audio, prayer times,
       reminders.
@@ -289,6 +291,75 @@ Notes:
 - **"src refspec main does not match any"** — shouldn't recur (the workflow
   pushes `HEAD:main` precisely because the release job runs on a detached-HEAD
   SHA checkout); if it appears, someone edited the push refspec.
+
+### Manual Play release recovery
+
+Use this path when Play Console had to be completed by hand: exact-alarm policy
+form, a draft release submitted manually, a CI Play edit that consumed a version
+code, or any other case where the app is live/in review but git, tags, GitHub
+Release, and the update banner are not yet synced.
+
+1. **Confirm the Play state first.**
+   - If the release is still a draft, submit it in Play Console before syncing
+     repo state.
+   - If Play says `Version code N has already been used`, do not upload that
+     same AAB again. Build/upload the next version code.
+   - If the exact-alarm declaration appears, complete it, submit that app
+     content change, and set:
+     ```bash
+     gh secret set PLAY_EXACT_ALARM_DECLARED --repo mdarif/alquran-app --body "true"
+     ```
+
+2. **Identify the exact shipped build.**
+   Use the version visible in Play Console and the AAB filename or bundle table:
+   `1.2.6+11` means:
+   - `RELEASE_VERSION=1.2.6`
+   - `RELEASE_BUILD=11`
+   - AAB path like
+     `build/app/outputs/bundle/release/al-quran-1.2.6+11.aab`
+
+3. **Run the finalizer from clean `develop`.**
+   ```bash
+   git checkout develop
+   git pull --ff-only origin develop
+   git status --short
+
+   make finalize-manual-release \
+     RELEASE_VERSION=1.2.6 \
+     RELEASE_BUILD=11 \
+     RELEASE_AAB=build/app/outputs/bundle/release/al-quran-1.2.6+11.aab
+   ```
+
+   This single command updates `pubspec.yaml`, regenerates Play notes using both
+   `alquran-app` and `../alquran-data`, publishes `app-update.json`, creates the
+   release commit, tags `vX.Y.Z`, pushes `develop` and `main`, and creates the
+   GitHub Release with the manual AAB attached.
+
+4. **If update JSON does not verify, redeploy the path Worker.**
+   The app reads the exact URL below. The Worker route is scoped to
+   `alquranreader.com/app-update.json` and reads the object from the
+   `al-quran-editions` R2 bucket.
+   ```bash
+   cd infra/app-update-worker
+   npx wrangler deploy
+   curl -fsSL https://alquranreader.com/app-update.json
+   ```
+
+5. **Close-out checks.**
+   ```bash
+   git fetch origin --tags
+   git log --oneline --decorate -n 5
+   git log origin/develop..origin/main
+   gh release view v1.2.6 --repo mdarif/alquran-app --json tagName,name,isDraft,isPrerelease,assets,url
+   curl -fsSL https://alquranreader.com/app-update.json
+   ```
+
+   Expected:
+   - `develop` and `main` point at the same release/follow-up automation state,
+   - `git log origin/develop..origin/main` prints nothing,
+   - `vX.Y.Z` exists,
+   - the GitHub Release is not draft/prerelease and includes the AAB,
+   - `app-update.json` advertises the live Play version.
 
 ---
 

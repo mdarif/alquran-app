@@ -205,8 +205,18 @@ the release build succeeds.
 
 ### Manual Play release recovery
 
-If Play Console must be used manually after a workflow Play-upload failure,
-finish the release by running the finalizer from a clean `develop` checkout:
+Use this only when Play Console forced a manual path after CI built or attempted
+to upload a signed AAB — for example an App content declaration surfaced late,
+an edit failed after consuming a version code, or you had to create/submit the
+release in Play Console by hand.
+
+Do **not** re-run the failed workflow with the same build number. Google Play may
+have already consumed that `versionCode` even when the edit failed. If Play says
+the version code has already been used, bump to the next build number, build a
+fresh AAB, and upload that one manually.
+
+After the manual Play release is live or sent for review, finish the repo/CD
+state from a clean `develop` checkout:
 
 ```bash
 make finalize-manual-release \
@@ -215,9 +225,56 @@ make finalize-manual-release \
   RELEASE_AAB=build/app/outputs/bundle/release/al-quran-1.2.6+11.aab
 ```
 
-The finalizer updates `pubspec.yaml`, generates and publishes `app-update.json`,
-creates the `chore: release vX.Y.Z` commit and tag, pushes both `develop` and
-`main`, and creates the GitHub Release with the manual AAB attached.
+The finalizer is the source-of-truth repair step. It:
+
+- refuses to run unless the working tree is clean and you are on `develop`,
+- fetches tags and refuses to reuse an existing `vX.Y.Z`,
+- updates `pubspec.yaml` to `RELEASE_VERSION+RELEASE_BUILD`,
+- regenerates reader-friendly Play notes from this repo plus `../alquran-data`,
+- generates `app-update.json` for the shipped semver,
+- publishes `app-update.json` to the `al-quran-editions` R2 bucket,
+- verifies the public update URL the app reads:
+  `https://alquranreader.com/app-update.json`,
+- creates `chore: release vX.Y.Z`,
+- creates the annotated tag `vX.Y.Z`,
+- pushes the same release state to both `develop` and `main`,
+- creates the GitHub Release and attaches the manual AAB, Play notes, metadata,
+  and soft-update config.
+
+If the R2 upload succeeds but the public URL does not verify, deploy the
+path-scoped Worker and check the URL again:
+
+```bash
+cd infra/app-update-worker
+npx wrangler deploy
+curl -fsSL https://alquranreader.com/app-update.json
+```
+
+The expected JSON must contain the released version:
+
+```json
+{
+  "latestVersion": "1.2.6",
+  "minimumSupportedVersion": "1.0.0",
+  "storeUrl": "https://play.google.com/store/apps/details?id=com.almarfa.alquran",
+  "message": "A newer version is available.",
+  "remindAfterDays": 7
+}
+```
+
+Before closing the manual release, verify:
+
+```bash
+git fetch origin --tags
+git log --oneline --decorate -n 3
+git log origin/develop..origin/main
+gh release view v1.2.6 --repo mdarif/alquran-app --web
+curl -fsSL https://alquranreader.com/app-update.json
+```
+
+`origin/develop..origin/main` should print nothing, the GitHub Release should
+show the AAB plus generated files, and the live JSON should advertise the
+released version.
 
 ## What a real run does
 
@@ -267,7 +324,9 @@ creates the `chore: release vX.Y.Z` commit and tag, pushes both `develop` and
   is blank because Play has not surfaced the form yet, set
   `PLAY_EXACT_ALARM_DECLARED=bootstrap` for one release attempt. Do **not**
   upload the same AAB manually after a failed Play edit; its version code may
-  already be consumed. Bump to the next build number and re-run the release.
+  already be consumed. Bump to the next build number and re-run the release, or
+  use [Manual Play release recovery](#manual-play-release-recovery) if the Play
+  Console release has already been completed manually.
 - **Owner pre-submission gates** (not CI): translation/font/audio licensing,
   privacy-policy URL, `SCHEDULE_EXACT_ALARM` Play declaration, store assets.
   See the v1 readiness notes.

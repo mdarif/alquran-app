@@ -447,7 +447,8 @@ jobs:
           EXPECTED_VERSION: ${{ steps.version.outputs.new_semver }}
         run: |
           sleep 5  # let R2/edge cache settle
-          curl -fsSL "https://alquranreader.com/app-update.json?cachebust=$(date +%s)" -o live-app-update.json
+          curl -fsSL "https://alquranreader.com/app-update.json" -o live-app-update.json \
+            || curl -fsSL "https://alquranreader.com/app-update.json?cachebust=$(date +%s)" -o live-app-update.json
           LIVE_VERSION=$(node -e "const fs = require('fs'); const json = JSON.parse(fs.readFileSync('live-app-update.json', 'utf8')); process.stdout.write(json.latestVersion || '');")
           echo "Expected: $EXPECTED_VERSION | Live: $LIVE_VERSION"
           if [ "$LIVE_VERSION" != "$EXPECTED_VERSION" ]; then
