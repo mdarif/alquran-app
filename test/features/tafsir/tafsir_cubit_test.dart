@@ -161,6 +161,70 @@ void main() {
     ]);
   });
 
+  test('a checksum failure is reported as such, not as a network error',
+      () async {
+    // The distinction matters: "try again" is the wrong advice when the
+    // bytes did not match what the catalogue described.
+    final repository = _FakeTafsirRepository(
+      catalogue: const TafsirCatalogue(resources: [_visibleEnglish]),
+      installThrows: const TafsirIntegrityException(
+        'en-ibn-kathir-abridged',
+        'bad',
+      ),
+    );
+    final cubit = TafsirCubit(repository);
+    addTearDown(cubit.close);
+
+    await cubit.load();
+    await cubit.install('en-ibn-kathir-abridged');
+
+    final item = cubit.state.item('en-ibn-kathir-abridged')!;
+    expect(item.status, TafsirItemStatus.failed);
+    expect(item.error, contains('checksum'));
+  });
+
+  test('a generic download failure gets calm, non-technical copy', () async {
+    final repository = _FakeTafsirRepository(
+      catalogue: const TafsirCatalogue(resources: [_visibleEnglish]),
+      installThrows: const TafsirDownloadException('HTTP 500'),
+    );
+    final cubit = TafsirCubit(repository);
+    addTearDown(cubit.close);
+
+    await cubit.load();
+    await cubit.install('en-ibn-kathir-abridged');
+
+    final item = cubit.state.item('en-ibn-kathir-abridged')!;
+    expect(item.status, TafsirItemStatus.failed);
+    expect(item.error, isNotNull);
+    // The raw exception/HTTP detail must never leak into reader-facing copy.
+    expect(item.error, isNot(contains('500')));
+    expect(item.error, isNot(contains('Exception')));
+  });
+
+  test('retrying a failed install clears the row error on success', () async {
+    final repository = _FakeTafsirRepository.mutable(
+      catalogue: const TafsirCatalogue(resources: [_visibleEnglish]),
+      installThrows: const TafsirDownloadException('offline'),
+    );
+    final cubit = TafsirCubit(repository);
+    addTearDown(cubit.close);
+
+    await cubit.load();
+    await cubit.install('en-ibn-kathir-abridged');
+    expect(
+      cubit.state.item('en-ibn-kathir-abridged')?.status,
+      TafsirItemStatus.failed,
+    );
+
+    repository.installThrows = null;
+    await cubit.install('en-ibn-kathir-abridged');
+
+    final item = cubit.state.item('en-ibn-kathir-abridged')!;
+    expect(item.status, TafsirItemStatus.installed);
+    expect(item.error, isNull);
+  });
+
   test('entriesForAyah only returns selected installed Tafsir', () async {
     SharedPreferences.setMockInitialValues({
       'tafsir_selected_slugs': ['ur-ibn-kathir'],
@@ -262,6 +326,7 @@ class _FakeTafsirRepository implements TafsirRepository {
     required TafsirCatalogue catalogue,
     List<TafsirResource> installedResources = const [],
     Map<String, TafsirEntry> entriesBySlug = const {},
+    this.installThrows,
   })  : _catalogue = catalogue,
         _installedResources = List<TafsirResource>.of(installedResources),
         _entriesBySlug = entriesBySlug;
@@ -270,6 +335,7 @@ class _FakeTafsirRepository implements TafsirRepository {
     required TafsirCatalogue catalogue,
     List<TafsirResource> installedResources = const [],
     Map<String, TafsirEntry> entriesBySlug = const {},
+    this.installThrows,
   })  : _catalogue = catalogue,
         _installedResources = List<TafsirResource>.of(installedResources),
         _entriesBySlug = entriesBySlug;
@@ -278,6 +344,10 @@ class _FakeTafsirRepository implements TafsirRepository {
   final List<TafsirResource> _installedResources;
   final Map<String, TafsirEntry> _entriesBySlug;
   final List<String> removedSlugs = [];
+
+  /// When set, [install] throws this instead of succeeding — simulates a
+  /// download failure (integrity or otherwise) for retry-path tests.
+  Object? installThrows;
 
   @override
   Future<TafsirCatalogue> catalogue() async => _catalogue;
@@ -294,7 +364,22 @@ class _FakeTafsirRepository implements TafsirRepository {
   Future<void> install(
     TafsirCatalogueEntry entry, {
     void Function(double progress)? onProgress,
-  }) async {}
+  }) async {
+    final error = installThrows;
+    if (error != null) throw error;
+    _installedResources.add(
+      TafsirResource(
+        slug: entry.slug,
+        languageCode: entry.languageCode,
+        name: entry.name,
+        nativeName: entry.nativeName,
+        direction: entry.direction,
+        abridged: entry.abridged,
+        ayahCount: entry.ayahCount,
+        bytes: entry.uncompressedBytes,
+      ),
+    );
+  }
 
   @override
   Future<List<TafsirResource>> installed() async => _installedResources;

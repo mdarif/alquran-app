@@ -101,6 +101,58 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets(
+      'a failed download shows calm retry copy and can be retried',
+      (tester) async {
+    final repository = _FakeTafsirRepository()..failNext = true;
+    final cubit = TafsirCubit(repository);
+    addTearDown(cubit.close);
+    await cubit.load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider.value(
+          value: cubit,
+          child: const TafsirPage(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(WidgetKeys.tafsirDownload('en-ibn-kathir-abridged')),
+    );
+    await tester.pump();
+    repository.completeInstall();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Download failed. Check your connection and try again.'),
+      findsOneWidget,
+    );
+    expect(
+      cubit.state.item('en-ibn-kathir-abridged')?.status,
+      TafsirItemStatus.failed,
+    );
+
+    // Retry taps the same download affordance, now shown in the failed color.
+    await tester.tap(
+      find.byKey(WidgetKeys.tafsirDownload('en-ibn-kathir-abridged')),
+    );
+    await tester.pump();
+    repository.completeInstall();
+    await tester.pumpAndSettle();
+
+    expect(
+      cubit.state.item('en-ibn-kathir-abridged')?.status,
+      TafsirItemStatus.installed,
+    );
+    expect(
+      find.text('Download failed. Check your connection and try again.'),
+      findsNothing,
+    );
+  });
+
   testWidgets('installed Tafsir can be checked and unchecked in the manager',
       (tester) async {
     SharedPreferences.setMockInitialValues({
@@ -166,6 +218,10 @@ class _FakeTafsirRepository implements TafsirRepository {
   final List<TafsirResource> _installedResources;
   Completer<void>? _installCompleter;
 
+  /// When true, the next [install] call fails instead of succeeding — used
+  /// to exercise the failed/retry row state.
+  bool failNext = false;
+
   @override
   Future<TafsirCatalogue> catalogue() async => const TafsirCatalogue(
         resources: [
@@ -201,6 +257,10 @@ class _FakeTafsirRepository implements TafsirRepository {
     _installCompleter = Completer<void>();
     onProgress?.call(0.4);
     await _installCompleter!.future;
+    if (failNext) {
+      failNext = false;
+      throw const TafsirDownloadException('offline');
+    }
     _installedResources.add(entry.toResource());
   }
 

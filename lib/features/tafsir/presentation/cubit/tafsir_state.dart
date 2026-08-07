@@ -9,13 +9,11 @@ class TafsirState extends Equatable {
     this.status = TafsirStatus.initial,
     this.items = const [],
     this.catalogueUnavailable = false,
-    this.failure,
   });
 
   final TafsirStatus status;
   final List<TafsirItem> items;
   final bool catalogueUnavailable;
-  final String? failure;
 
   bool isInstalling(String slug) =>
       item(slug)?.status == TafsirItemStatus.installing;
@@ -31,18 +29,15 @@ class TafsirState extends Equatable {
     TafsirStatus? status,
     List<TafsirItem>? items,
     bool? catalogueUnavailable,
-    String? failure,
-    bool clearFailure = false,
   }) =>
       TafsirState(
         status: status ?? this.status,
         items: items ?? this.items,
         catalogueUnavailable: catalogueUnavailable ?? this.catalogueUnavailable,
-        failure: clearFailure ? null : failure ?? this.failure,
       );
 
   @override
-  List<Object?> get props => [status, items, catalogueUnavailable, failure];
+  List<Object?> get props => [status, items, catalogueUnavailable];
 }
 
 class TafsirItem extends Equatable {
@@ -55,6 +50,7 @@ class TafsirItem extends Equatable {
     this.progress = 0,
     this.plannedName,
     this.plannedSubtitle,
+    this.error,
   });
 
   final String slug;
@@ -65,6 +61,10 @@ class TafsirItem extends Equatable {
   final double progress;
   final String? plannedName;
   final String? plannedSubtitle;
+
+  /// Reader-facing failure copy — calm and non-technical, set only when
+  /// [status] is [TafsirItemStatus.failed]. Never the raw exception text.
+  final String? error;
 
   String get name =>
       resource?.name ?? catalogueEntry?.name ?? plannedName ?? slug;
@@ -82,8 +82,6 @@ class TafsirItem extends Equatable {
   bool get abridged => resource?.abridged ?? catalogueEntry?.abridged ?? false;
 
   int get sortOrder => resource?.sortOrder ?? catalogueEntry?.sortOrder ?? 0;
-
-  String? get error => null;
 
   String get subtitle {
     final author = this.author;
@@ -103,6 +101,8 @@ class TafsirItem extends Equatable {
     TafsirItemStatus? status,
     bool? selected,
     double? progress,
+    String? error,
+    bool clearError = false,
   }) =>
       TafsirItem(
         slug: slug,
@@ -113,6 +113,7 @@ class TafsirItem extends Equatable {
         progress: progress ?? this.progress,
         plannedName: plannedName,
         plannedSubtitle: plannedSubtitle,
+        error: clearError ? null : (error ?? this.error),
       );
 
   @override
@@ -125,6 +126,7 @@ class TafsirItem extends Equatable {
         progress,
         plannedName,
         plannedSubtitle,
+        error,
       ];
 }
 

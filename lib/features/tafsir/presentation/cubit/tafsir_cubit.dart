@@ -36,7 +36,6 @@ class TafsirCubit extends Cubit<TafsirState> {
         status: TafsirStatus.ready,
         items: _merge(available: available, installed: installed),
         catalogueUnavailable: catalogueUnavailable,
-        clearFailure: true,
       ),
     );
   }
@@ -45,7 +44,10 @@ class TafsirCubit extends Cubit<TafsirState> {
     final item = state.item(slug);
     final entry = item?.catalogueEntry;
     if (entry == null || state.isInstalling(slug)) return;
-    _updateItem(slug, item!.copyWith(status: TafsirItemStatus.installing));
+    _updateItem(
+      slug,
+      item!.copyWith(status: TafsirItemStatus.installing, clearError: true),
+    );
     try {
       await _repository.install(
         entry,
@@ -64,6 +66,21 @@ class TafsirCubit extends Cubit<TafsirState> {
       );
       await _selectInstalled(slug);
       await load();
+    } on TafsirIntegrityException catch (e) {
+      // Say plainly that the file didn't match, rather than offering a retry
+      // that looks like a flaky network — this is a corrupted/wrong artifact.
+      final current = state.item(slug);
+      if (current != null) {
+        _updateItem(
+          slug,
+          current.copyWith(
+            status: TafsirItemStatus.failed,
+            progress: 0,
+            error: 'The download did not match its checksum and was discarded.',
+          ),
+        );
+      }
+      addError(e);
     } catch (e) {
       final current = state.item(slug);
       if (current != null) {
@@ -72,10 +89,11 @@ class TafsirCubit extends Cubit<TafsirState> {
           current.copyWith(
             status: TafsirItemStatus.failed,
             progress: 0,
+            error: 'Download failed. Check your connection and try again.',
           ),
         );
       }
-      emit(state.copyWith(failure: '$e'));
+      addError(e);
     }
   }
 
