@@ -726,11 +726,27 @@ class _MushafViewState extends State<MushafView>
     return null;
   }
 
+  /// Whether [chunk] is the first Mushaf-page chunk of its surah — i.e. it
+  /// sits directly under that surah's header/Bismillah.
+  bool _isSurahOpeningChunk(_ChunkRow chunk) {
+    final i = _rows.indexOf(chunk);
+    return i > 0 && _rows[i - 1] is _HeaderRow;
+  }
+
   void _updatePage() {
     if (!_multiPage) return;
-    final page = _topChunk()?.ayahs.first.page;
+    final chunk = _topChunk();
+    final page = chunk?.ayahs.first.page;
     if (page != null && page != _currentPage) {
       setState(() => _currentPage = page);
+    }
+    // A surah's opening page is short and sits right under the Bismillah —
+    // the pill has nowhere to float without overlapping the first lines, so
+    // skip it there rather than hide it after the fact.
+    if (chunk != null && _isSurahOpeningChunk(chunk)) {
+      _hideTimer?.cancel();
+      if (_showPage) setState(() => _showPage = false);
+      return;
     }
     if (!_showPage) setState(() => _showPage = true);
     _hideTimer?.cancel();

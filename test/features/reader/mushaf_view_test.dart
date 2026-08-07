@@ -1374,12 +1374,27 @@ void main() {
       await tester.pumpWidget(
         _wrap(_view(ayahs: scrollable(30, (n) => (n + 4) ~/ 5))),
       );
+      // Past the surah's opening page (deliberately pill-less, see the next
+      // group) and well into a later page.
+      await _scrollBy(tester, -1500, steps: 20);
+      expect(pillOpacity(tester), greaterThan(0));
+    });
+
+    testWidgets(
+        "stays hidden on a surah's opening page, even once it's scrolled",
+        (tester) async {
+      // The opening page's pill has nowhere to sit without overlapping the
+      // Bismillah/first lines, so it's suppressed there specifically —
+      // scrolling within that same page must not surface it.
+      await tester.pumpWidget(
+        _wrap(_view(ayahs: scrollable(30, (n) => (n + 9) ~/ 10))),
+      );
       await tester.drag(
         find.byType(MushafView),
         const Offset(0, -400),
       );
       await tester.pump();
-      expect(pillOpacity(tester), greaterThan(0));
+      expect(pillOpacity(tester), 0.0);
     });
   });
 
