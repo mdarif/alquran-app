@@ -57,17 +57,50 @@ Future<void> _checkForUpdate(BuildContext context) async {
   final prompt = await GetIt.I<AppUpdateRepository>().check();
   if (!context.mounted) return;
   if (prompt == null) {
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Al Quran is up to date'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+    messenger.hideCurrentSnackBar();
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Al Quran is up to date'),
+        content: const Text('You are already using the latest version.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
     return;
   }
-  await launchUrl(prompt.storeUrl, mode: LaunchMode.externalApplication);
+  messenger.hideCurrentSnackBar();
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Update available'),
+      content: Text(
+        'A newer version of Al Quran is available.\n\n'
+        'Installed: ${prompt.currentVersion}\n'
+        'Latest: ${prompt.latestVersion}',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Not now'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            Navigator.of(dialogContext).pop();
+            await launchUrl(
+              prompt.storeUrl,
+              mode: LaunchMode.externalApplication,
+            );
+          },
+          child: const Text('Update'),
+        ),
+      ],
+    ),
+  );
 }
 
 void _openAbout(BuildContext context) {

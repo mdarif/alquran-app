@@ -590,6 +590,60 @@ void main() {
       expect(find.text('Update available'), findsWidgets);
     });
 
+    testWidgets('Settings check shows update details before opening the store',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository(
+          AppUpdatePrompt(
+            currentVersion: '1.2.2',
+            latestVersion: '1.2.6',
+            storeUrl: Uri.parse(androidPlayStoreUrl),
+            message: 'A newer version is available.',
+          ),
+        ),
+      );
+
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.appUpdateMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Update available'), findsWidgets);
+      expect(find.textContaining('Installed: 1.2.2'), findsOneWidget);
+      expect(find.textContaining('Latest: 1.2.6'), findsOneWidget);
+      expect(find.text('Not now'), findsOneWidget);
+      expect(find.text('Update'), findsWidgets);
+    });
+
+    testWidgets('Settings check shows an in-app current-version result',
+        (tester) async {
+      await GetIt.I.unregister<AppUpdateRepository>();
+      GetIt.I.registerLazySingleton<AppUpdateRepository>(
+        () => _FakeAppUpdateRepository(),
+      );
+
+      await _pumpHome(tester);
+      await tester.tap(find.byKey(WidgetKeys.homeOverflowMenu));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.homeSettingsMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(WidgetKeys.appUpdateMenuButton));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.text('Al Quran is up to date'), findsOneWidget);
+      expect(
+        find.text('You are already using the latest version.'),
+        findsOneWidget,
+      );
+      expect(find.text('OK'), findsOneWidget);
+    });
+
     testWidgets('Settings only shows chevrons for navigation rows',
         (tester) async {
       await _pumpHome(tester);
