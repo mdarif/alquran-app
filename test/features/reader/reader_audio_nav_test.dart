@@ -220,22 +220,29 @@ void main() {
     expect(player.lastPlayed, 2003);
   });
 
-  testWidgets('the last verse autoplays into the next surah', (tester) async {
+  testWidgets('the last verse stops instead of rolling into the next surah',
+      (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: ReaderPage(target: ReaderTarget.surah(2, 'Al-Baqarah')),
       ),
     );
     await tester.pumpAndSettle();
+    player.controller.add(
+      const RecitationPlayback(ayahId: 2005, status: RecitationStatus.playing),
+    );
+    await tester.pump();
 
-    // Finishing the last verse of surah 2 (2005) rolls into surah 3's first verse
-    // (3001) — quran.com-style continuous playback across chapters.
+    // Finishing the last verse of surah 2 (2005) simply ends playback — it no
+    // longer rolls into surah 3's first verse (3001). `lastPlayed` stays null
+    // because `play()` is never called again (2005's "playing" state above was
+    // injected directly on the stream, not via `play()`).
     player.complete(2005);
     await tester.pumpAndSettle();
     expect(
       player.lastPlayed,
-      3001,
-      reason: 'autoplay rolls into the next surah',
+      isNull,
+      reason: 'autoplay must not continue into the next surah',
     );
   });
 

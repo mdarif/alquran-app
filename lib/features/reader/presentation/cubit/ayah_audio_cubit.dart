@@ -50,6 +50,10 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   // carry them (never reset to defaults). Speed persists; repeat is session-only.
   double _speed = 1.0;
   RecitationRepeat _repeat = RecitationRepeat.off;
+  // Mirrors the player's actual native loop mode (starts off, just_audio's own
+  // default) so _syncLoopMode only calls the player when the mode genuinely
+  // changes, not on every "playing" event.
+  RecitationLoop _playerLoopMode = RecitationLoop.off;
 
   /// Autoplay reached the section's LAST verse with nothing left in this section:
   /// the reader hooks this to roll into the next surah (the cubit only knows one
@@ -74,8 +78,32 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   /// translation picker — enabling a translation's text never implies its
   /// audio (see plan decision #2). No-op outside the POC's Fatiha scope; a
   /// verse elsewhere in the Quran just never has anything to play.
-  void setTranslationAudioEnabled(bool value) =>
-      _translationAudioEnabled = value;
+  void setTranslationAudioEnabled(bool value) {
+    _translationAudioEnabled = value;
+    unawaited(_syncLoopMode(state.playingAyahId));
+  }
+
+  /// Whether repeat-one on [ayahId] must replay the full Arabic+translation
+  /// chain at the cubit level (plan decision #6) rather than loop silently at
+  /// the player level — true only when there's actually a translation segment
+  /// to repeat alongside the Arabic.
+  bool _chainedRepeatOneActive(int? ayahId) =>
+      _translationAudioEnabled && _inFatihaPocScope(ayahId);
+
+  /// Keep the player's native loop mode in sync with repeat-one, EXCEPT when
+  /// translation audio must be chained in (decision #6): `just_audio`'s
+  /// `LoopMode.one` loops silently and never emits `completed`, which would
+  /// skip the translation segment forever. In that case leave the player's
+  /// loop off so the Arabic verse completes normally, and
+  /// [_advanceAfterCompletion] replays the same ayah (full chain) itself.
+  Future<void> _syncLoopMode(int? ayahId) async {
+    final loopsAtPlayerLevel =
+        _repeat == RecitationRepeat.one && !_chainedRepeatOneActive(ayahId);
+    final mode = loopsAtPlayerLevel ? RecitationLoop.one : RecitationLoop.off;
+    if (mode == _playerLoopMode) return;
+    _playerLoopMode = mode;
+    await _player.setLoopMode(mode);
+  }
 
   /// Teach the cubit the order of the verses on screen, so that when one finishes
   /// it can roll into the next. Idempotent; the reader re-pushes on load/swipe.
@@ -111,7 +139,12 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     }
 
     int? next;
-    if (_repeat == RecitationRepeat.all) {
+    if (_repeat == RecitationRepeat.one) {
+      // Only reachable here when the player's native loop was deliberately
+      // left off to let the translation chain play (see _syncLoopMode) — so
+      // "repeat one" means replay THIS verse's full chain, not just Arabic.
+      next = completedAyahId;
+    } else if (_repeat == RecitationRepeat.all) {
       // Loop the surah: roll to the next verse, or back to the first at the end.
       next = _nextAfter(completedAyahId) ??
           (_sequence.isNotEmpty ? _sequence.first : null);
@@ -157,6 +190,7 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     if (p.status == RecitationStatus.playing) {
       final next = _nextAfter(p.ayahId);
       if (next != null) _player.prefetch(next);
+      unawaited(_syncLoopMode(p.ayahId));
     }
     final isError = p.status == RecitationStatus.error;
     emit(
@@ -195,13 +229,13 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   }
 
   /// Set the repeat mode (session-only). `one` loops the current verse via the
-  /// player's loop mode, so it never `completed`s.
+  /// player's loop mode (so it never `completed`s) — unless a translation-audio
+  /// chain must play too, in which case [_syncLoopMode] loops at the cubit
+  /// level instead (decision #6).
   Future<void> setRepeat(RecitationRepeat mode) async {
     _repeat = mode;
     emit(_withSettings(state));
-    await _player.setLoopMode(
-      mode == RecitationRepeat.one ? RecitationLoop.one : RecitationLoop.off,
-    );
+    await _syncLoopMode(state.playingAyahId);
   }
 
   /// The one entry point the play buttons call. Same verse → pause/resume (or

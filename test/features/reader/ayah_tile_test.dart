@@ -479,5 +479,63 @@ void main() {
 
       expect(find.text('Experimental'), findsNothing);
     });
+
+    group('translation-audio toggle (Al-Fatihah POC)', () {
+      const ayah = Ayah(
+        id: 1,
+        surahId: 1,
+        ayahNumber: 1,
+        textArabic: 'بِسْمِ ٱللَّهِ',
+        isSajda: false,
+      );
+
+      testWidgets('hidden when onToggleTranslationAudio is null',
+          (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const AyahTile(ayah: ayah, resources: [], arabicFontSize: 24),
+          ),
+        );
+        expect(find.byIcon(AppIcons.translationAudio), findsNothing);
+      });
+
+      testWidgets('shown outlined when off, tap invokes the callback',
+          (tester) async {
+        var taps = 0;
+        await tester.pumpWidget(
+          _wrap(
+            AyahTile(
+              ayah: ayah,
+              resources: const [],
+              arabicFontSize: 24,
+              onToggleTranslationAudio: () => taps++,
+            ),
+          ),
+        );
+
+        expect(find.byIcon(AppIcons.translationAudio), findsOneWidget);
+        await tester.tap(find.byIcon(AppIcons.translationAudio));
+        expect(taps, 1);
+      });
+
+      testWidgets('renders filled when translationAudioEnabled is true',
+          (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            AyahTile(
+              ayah: ayah,
+              resources: const [],
+              arabicFontSize: 24,
+              translationAudioEnabled: true,
+              onToggleTranslationAudio: () {},
+            ),
+          ),
+        );
+
+        final icon =
+            tester.widget<Icon>(find.byIcon(AppIcons.translationAudio));
+        expect(icon.fill, 1);
+      });
+    });
   });
 }

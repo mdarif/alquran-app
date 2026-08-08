@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../../core/audio/translation_audio_source.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/scroll/quran_scroll_behavior.dart';
 import '../../../../core/testing/widget_keys.dart';
@@ -252,11 +253,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // highlight + the bar's idle label/Play target. Null = nothing queued yet.
   int? _queuedAyahId;
 
-  // True while autoplay is rolling from one surah into the next: it suppresses the
-  // stop-on-page-change and triggers playing the incoming section's first verse.
-  // Distinguishes an audio-driven advance from a user swipe.
-  bool _audioAdvancing = false;
-
   // Section paging is a PageView (one page per section in the active dimension),
   // but WE drive it (the PageView's own scroll physics is NeverScrollable) via a
   // directional swipe recognizer, so a scroll is never mistaken for a page turn.
@@ -297,9 +293,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // exists then); caching it here keeps the lifecycle callback context-free.
     if (FeatureFlags.audioRecitation) {
       _audioCubit = context.read<AyahAudioCubit>();
-      // Autoplay rolls into the next surah at a section's end (the cubit knows
-      // only one section, so the reader drives the navigation).
-      _audioCubit!.onSequenceEnd = _autoAdvanceSection;
       WidgetsBinding.instance.addObserver(this);
     }
   }
@@ -308,7 +301,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   void dispose() {
     if (_audioCubit != null) {
       WidgetsBinding.instance.removeObserver(this);
-      _audioCubit!.onSequenceEnd = null; // don't call into a disposed State
     }
     // Leaving the reader always restores the OS bars — immersion is a reading-only
     // mode, so the rest of the app (and a bar-less exit) never inherits it.
@@ -415,13 +407,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           listenWhen: (a, b) =>
               FeatureFlags.audioRecitation && a.ayahs != b.ayahs,
           listener: (context, state) {
-            final cubit = context.read<AyahAudioCubit>();
-            cubit.setSequence([for (final a in state.ayahs) a.id]);
-            // Autoplay just rolled into this section — start its first verse.
-            if (_audioAdvancing && state.ayahs.isNotEmpty) {
-              _audioAdvancing = false;
-              cubit.toggle(state.ayahs.first.id);
-            }
+            context
+                .read<AyahAudioCubit>()
+                .setSequence([for (final a in state.ayahs) a.id]);
           },
           builder: (context, state) {
             if (state.status == ReaderStatus.error) {
@@ -596,6 +584,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         // Only the live page drives immersion (forward-scroll hides the chrome).
         onImmersionChanged: interactive ? _setChromeHidden : null,
         onScrollSettled: interactive ? _applyPendingSystemUiMode : null,
+        translationAudioEnabled: _translationAudioPocEnabled,
+        onToggleTranslationAudio:
+            interactive ? _toggleTranslationAudioForVerse : null,
       );
     }
     return view;
@@ -654,10 +645,9 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     // re-syncs with the incoming list's fresh immersion detector — which starts
     // from "shown", so leaving it hidden would strand the bars off-screen.
     _setChromeHidden(false, applySystemUiNow: true);
-    // A user swipe stops the recitation; an autoplay-driven advance keeps it
-    // rolling (the incoming section's first verse plays via the setSequence
-    // listener above).
-    if (FeatureFlags.audioRecitation && !_audioAdvancing) {
+    // Navigating away always stops the recitation — autoplay no longer rolls
+    // into the next surah on its own (it stops at the section's last verse).
+    if (FeatureFlags.audioRecitation) {
       context.read<AyahAudioCubit>().stopAll();
     }
     setState(() {
@@ -665,22 +655,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       _focusAyahId = null; // a swiped-to section opens at its top, not a resume
     });
     _cubit.load(next);
-  }
-
-  /// Autoplay hit the section's last verse — roll into the next section (the next
-  /// surah) and keep playing. No next section (the last one) → let it end.
-  void _autoAdvanceSection() {
-    if (!_pageController.hasClients) return;
-    // Page indices are 0-based; the current section's index is value-1, so the
-    // next section's page index is `value`. Out of range → this was the last one.
-    final nextPage = _target.value;
-    if (nextPage > _target.dimension.count - 1) return;
-    _audioAdvancing = true;
-    _pageController.animateToPage(
-      nextPage,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   // --- Section swipe (driven by _HorizontalSwipeRecognizer) ------------------
@@ -859,8 +833,6 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           onToggleTranslationPeek: _toggleShowTranslationPeek,
           showArabicMatn: _showArabicMatn,
           onToggleShowArabic: _toggleShowArabicMatn,
-          translationAudioPocEnabled: _translationAudioPocEnabled,
-          onToggleTranslationAudioPoc: _toggleTranslationAudioPoc,
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(context),
         ),
@@ -892,6 +864,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           FeatureFlags.readingTranslationPeek && _settings.showTranslationPeek;
       _showArabicMatn = _settings.showArabicMatn;
     });
+    _syncTranslationAudioAvailability();
     if (scriptChanged) {
       _cubit.clearCache();
       unawaited(_cubit.load(_target));
@@ -928,9 +901,27 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           setState(() {
             _selected = _settings.selectedTranslations?.toSet();
           });
+          _syncTranslationAudioAvailability();
         }
       },
     );
+  }
+
+  /// After the reader's shown translations change (Translations sheet closed,
+  /// Reset reading preferences), turn translation audio OFF if none of the
+  /// newly-shown editions has an audio track — otherwise it would keep
+  /// silently chaining in an edition's audio the reader swapped away from,
+  /// with no headphones icon left to even show it's still on (the icon itself
+  /// is gated on `hasAnyTranslationAudio`, see `_ayahTile`).
+  void _syncTranslationAudioAvailability() {
+    if (!FeatureFlags.translationAudioFatihaPoc ||
+        !_translationAudioPocEnabled) {
+      return;
+    }
+    final shown = _activeLangs(_cubit.state.resources);
+    if (!hasAnyTranslationAudio(shown)) {
+      _toggleTranslationAudioPoc(false);
+    }
   }
 
   Future<void> _toggleBookmark(Ayah ayah) async {
@@ -1088,6 +1079,11 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     _audioCubit?.setTranslationAudioEnabled(value);
   }
 
+  /// Same toggle as [_toggleTranslationAudioPoc], but flipped from the ayah
+  /// row's headphones affordance (one tap, no Settings sheet detour).
+  void _toggleTranslationAudioForVerse() =>
+      _toggleTranslationAudioPoc(!_translationAudioPocEnabled);
+
   /// The active viewport reported a sustained scroll direction: hide the chrome
   /// (app bar + player bar + OS system bars) while reading forward, show it on a
   /// reverse scroll or at the top. Only the interactive page drives this.
@@ -1164,6 +1160,8 @@ class _DetailedList extends StatefulWidget {
     this.bookmarkedAyahIds = const {},
     this.onImmersionChanged,
     this.onScrollSettled,
+    this.translationAudioEnabled = false,
+    this.onToggleTranslationAudio,
     super.key,
   });
 
@@ -1217,6 +1215,14 @@ class _DetailedList extends StatefulWidget {
 
   /// See [MushafView.onScrollSettled] — applies deferred platform chrome.
   final VoidCallback? onScrollSettled;
+
+  /// Whether translation audio is chained in after Arabic (Al-Fatihah POC,
+  /// session-wide — docs/translation-audio-chaining-plan.md).
+  final bool translationAudioEnabled;
+
+  /// Toggle translation audio from an ayah row's headphones affordance. Null
+  /// hides it (non-interactive/off-screen pages don't drive playback).
+  final VoidCallback? onToggleTranslationAudio;
 
   /// The editions actually rendered in each tile: the enabled ones, falling back
   /// to all if a stale saved selection matches nothing available.
@@ -1548,6 +1554,15 @@ class _DetailedListState extends State<_DetailedList> {
       onTogglePlay: audio == null
           ? null
           : () => context.read<AyahAudioCubit>().toggle(ayah.id),
+      translationAudioEnabled: widget.translationAudioEnabled,
+      onToggleTranslationAudio: audio != null &&
+              FeatureFlags.translationAudioFatihaPoc &&
+              isFatihaPocAyah(surah: ayah.surahId, ayah: ayah.ayahNumber) &&
+              hasAnyTranslationAudio(
+                widget.shownResources.map((r) => r.slug),
+              )
+          ? widget.onToggleTranslationAudio
+          : null,
       isBookmarked: widget.bookmarkedAyahIds.contains(ayah.id),
       onToggleBookmark: () => widget.onToggleBookmark?.call(ayah),
       onOpenTranslations: widget.onOpenTranslations,

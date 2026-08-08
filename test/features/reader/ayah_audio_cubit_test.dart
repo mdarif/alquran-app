@@ -410,6 +410,65 @@ void main() {
       expect(player.calls, ['play(1)', 'play(2)']);
     });
 
+    test(
+        'repeat-one with translation audio on replays the FULL chain, not just Arabic',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([1, 2, 3]);
+      c.setTranslationAudioEnabled(true);
+      await c.setRepeat(RecitationRepeat.one);
+
+      await c.toggle(1);
+      player.push(1, RecitationStatus.playing);
+      await pumpEventQueue();
+      // Verse 1 is in Fatiha scope with translation audio on → chaining is
+      // needed, so once it starts playing the player's native loop must be
+      // synced OFF (it would otherwise loop silently and never let the
+      // translation clip play). setRepeat(one) earlier set it ON by default
+      // (nothing was playing yet to know chaining applied) — this corrects it.
+      expect(player.calls.last, 'setLoopMode(off)');
+
+      player.push(1, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      expect(translation.calls, [
+        'playAsset(assets/audio/poc/en-sahih-international/001001.mp3)',
+      ]);
+      translation.completeCurrent();
+      await pumpEventQueue();
+      // Replays the SAME verse (not verse 2) — repeat-one, not autoplay.
+      expect(
+        player.calls.where((c) => c.startsWith('play(')),
+        ['play(1)', 'play(1)'],
+      );
+    });
+
+    test('repeat-one with translation audio off loops at the player as before',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([1, 2, 3]);
+      await c.setRepeat(RecitationRepeat.one);
+      expect(player.calls, contains('setLoopMode(one)'));
+
+      await c.toggle(1);
+      player.push(1, RecitationStatus.playing);
+      await pumpEventQueue();
+
+      expect(translation.calls, isEmpty);
+      expect(
+        player.calls.where((c) => !c.startsWith('prefetch(')),
+        ['setLoopMode(one)', 'play(1)'],
+      );
+    });
+
     test('outside Al-Fatihah, translation audio never plays even when enabled',
         () async {
       final translation = _FakeTranslationPlayer();

@@ -59,4 +59,24 @@ void main() {
       expect(isFatihaPocAyah(surah: 1, ayah: 8), isFalse);
     });
   });
+
+  group('hasAnyTranslationAudio', () {
+    test('true when Sahih International is among the shown slugs', () {
+      expect(
+        hasAnyTranslationAudio(['ur-junagarhi', 'en-sahih-international']),
+        isTrue,
+      );
+    });
+
+    test('false when no shown slug has a translation-audio track', () {
+      expect(
+        hasAnyTranslationAudio(['ur-junagarhi', 'hi-tanzil']),
+        isFalse,
+      );
+    });
+
+    test('false for an empty selection', () {
+      expect(hasAnyTranslationAudio(const []), isFalse);
+    });
+  });
 }

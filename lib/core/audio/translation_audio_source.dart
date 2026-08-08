@@ -30,3 +30,18 @@ String sahihInternationalAssetPath({required int surah, required int ayah}) =>
 /// directly (see `AyahAudioCubit._inFatihaPocScope`'s POC-only shortcut).
 bool isFatihaPocAyah({required int surah, required int ayah}) =>
     surah == 1 && ayah >= 1 && ayah <= 7;
+
+/// Text-translation resource slugs that have a matching translation-audio
+/// track. POC: just Sahih International (`en-sahih-international` — see
+/// `../alquran-data/config/sources.yaml`). Adding an audio-backed edition
+/// later is a one-line addition here, not new UI code (mirrors how
+/// `translation_audio_resources` is meant to work once it leaves the POC —
+/// see the plan doc's Data layer section).
+const Set<String> translationAudioResourceSlugs = {'en-sahih-international'};
+
+/// Whether any of the reader's currently-shown translation slugs has a
+/// matching audio track. Gates the per-verse headphones affordance — it
+/// would otherwise show for a reader with only e.g. Urdu/Hindi enabled, where
+/// there is nothing for it to actually chain in.
+bool hasAnyTranslationAudio(Iterable<String> shownResourceSlugs) =>
+    shownResourceSlugs.any(translationAudioResourceSlugs.contains);

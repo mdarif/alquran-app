@@ -66,8 +66,6 @@ class ReaderSettingsPage extends StatefulWidget {
     required this.onToggleTranslationPeek,
     required this.showArabicMatn,
     required this.onToggleShowArabic,
-    required this.translationAudioPocEnabled,
-    required this.onToggleTranslationAudioPoc,
     required this.onReset,
     this.appActions = const [],
     super.key,
@@ -88,10 +86,6 @@ class ReaderSettingsPage extends StatefulWidget {
   final ValueChanged<bool> onToggleTranslationPeek;
   final bool showArabicMatn;
   final ValueChanged<bool> onToggleShowArabic;
-  // Al-Fatihah translation-audio POC (FeatureFlags.translationAudioFatihaPoc)
-  // — session-only, not persisted. See docs/translation-audio-chaining-plan.md.
-  final bool translationAudioPocEnabled;
-  final ValueChanged<bool> onToggleTranslationAudioPoc;
   final VoidCallback onReset;
   final List<SettingsAction> appActions;
 
@@ -108,7 +102,6 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
   late ArabicScript _script = widget.script;
   late bool _showPeek = widget.showTranslationPeek;
   late bool _showArabic = widget.showArabicMatn;
-  late bool _translationAudioPoc = widget.translationAudioPocEnabled;
 
   List<SettingsAction> _actions(SettingsActionSection section) => [
         for (final action in widget.appActions)
@@ -288,27 +281,6 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
                     style: rowSubtitleStyle,
                   ),
                 ),
-                if (FeatureFlags.translationAudioFatihaPoc) ...[
-                  SwitchListTile.adaptive(
-                    key: WidgetKeys.translationAudioPocToggle,
-                    value: _translationAudioPoc,
-                    onChanged: (v) {
-                      setState(() => _translationAudioPoc = v);
-                      widget.onToggleTranslationAudioPoc(v);
-                    },
-                    dense: true,
-                    minVerticalPadding: 4,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Translation audio (Al-Fatihah, POC)',
-                      style: rowTitleStyle,
-                    ),
-                    subtitle: Text(
-                      'Play Sahih International audio after each Fatiha verse.',
-                      style: rowSubtitleStyle,
-                    ),
-                  ),
-                ],
               ],
               _ActionSection(
                 label: SettingsActionSection.reminders.label,

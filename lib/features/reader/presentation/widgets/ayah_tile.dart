@@ -23,6 +23,8 @@ class AyahTile extends StatelessWidget {
     this.highlight = false,
     this.audioState,
     this.onTogglePlay,
+    this.translationAudioEnabled = false,
+    this.onToggleTranslationAudio,
     this.isBookmarked = false,
     this.onToggleBookmark,
     this.onOpenTranslations,
@@ -53,6 +55,15 @@ class AyahTile extends StatelessWidget {
   /// Toggle recitation for this verse. Null hides the play control entirely
   /// (the flag-off path renders exactly as before).
   final VoidCallback? onTogglePlay;
+
+  /// Whether translation audio is currently chained in after Arabic (Al-Fatihah
+  /// POC, session-wide — see docs/translation-audio-chaining-plan.md).
+  final bool translationAudioEnabled;
+
+  /// Toggle translation audio right from this verse row. Null hides the
+  /// headphones affordance entirely (outside the POC's Fatiha scope, or when
+  /// the audio feature/flag is off).
+  final VoidCallback? onToggleTranslationAudio;
 
   /// Whether this verse is saved as an ayah bookmark. The storage layer owns the
   /// truth; this tile only renders the affordance.
@@ -131,6 +142,23 @@ class AyahTile extends StatelessWidget {
               ],
               const Spacer(),
               if (onTogglePlay != null) _playButton(theme),
+              if (onToggleTranslationAudio != null)
+                IconButton(
+                  key: WidgetKeys.ayahTranslationAudioToggle(ayah.id),
+                  tooltip: translationAudioEnabled
+                      ? 'Translation audio on — tap to turn off'
+                      : 'Play translation audio after Arabic',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onToggleTranslationAudio,
+                  icon: AppIcon(
+                    AppIcons.translationAudio,
+                    filled: translationAudioEnabled,
+                    size: AppIconSize.action,
+                    color: translationAudioEnabled
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               IconButton(
                 tooltip: 'Copy',
                 visualDensity: VisualDensity.compact,

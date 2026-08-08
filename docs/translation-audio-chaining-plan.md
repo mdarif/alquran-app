@@ -237,8 +237,37 @@ Baqarah 2:1.
 ## Phase 2 status (2026-08-08)
 
 Built and verified on-device (iOS simulator): Arabic → Sahih International
-chains correctly through all 7 Al-Fatihah verses, toggle in Reader Settings
-(Detailed mode) works, flag is on.
+chains correctly through all 7 Al-Fatihah verses, flag is on.
+
+**Updates since the initial POC (same day):**
+- **Repeat-one now replays the full chain (decision #6 implemented).**
+  `AyahAudioCubit._syncLoopMode` keeps the player's native `LoopMode.one` for
+  the common case (no translation audio in play), but switches to a
+  cubit-level replay — Arabic completes normally, the translation clip plays,
+  then the SAME ayah replays — whenever translation audio is enabled for an
+  in-scope (Fatiha) verse, since `just_audio`'s native loop never emits
+  `completed` and would otherwise skip the translation segment forever.
+- **Autoplay no longer rolls into the next surah at all** (a related fix, not
+  originally in scope for this doc): the reader used to auto-advance
+  section-to-section on its own (`_autoAdvanceSection`/`onSequenceEnd`),
+  continuing Arabic recitation continuously across surah boundaries. That
+  wiring was removed — a section's last verse now simply stops playback.
+  Affects Arabic-only recitation too, not just this POC's chain.
+- **The Settings-sheet toggle is gone.** Translation audio is now controlled
+  per-verse from a headphones icon in the ayah row's toolbar (next to the
+  play button — `AppIcons.translationAudio`,
+  `WidgetKeys.ayahTranslationAudioToggle(ayahId)`), one tap, no Settings
+  detour. Still session-only (resets on reader reopen), still forwards to the
+  same `AyahAudioCubit.setTranslationAudioEnabled` flag.
+- **The icon only shows when it can do something:** gated on
+  `FeatureFlags.translationAudioFatihaPoc`, the verse being in Fatiha's POC
+  scope (`isFatihaPocAyah`), AND at least one of the reader's *currently shown*
+  translations actually having an audio track
+  (`hasAnyTranslationAudio` / `translationAudioResourceSlugs` in
+  `core/audio/translation_audio_source.dart` — POC: just
+  `en-sahih-international`). A reader showing only Urdu/Hindi never sees the
+  icon. This is the mapping Phase 4 extends by adding more slugs to that set —
+  no new UI code.
 
 **Deliberately NOT done yet, by design, not oversight:**
 - **No R2 upload.** The 7 clips are bundled app assets
@@ -254,8 +283,6 @@ chains correctly through all 7 Al-Fatihah verses, toggle in Reader Settings
 - No "now playing" segment highlight (Arabic vs. translation).
 - No continuous-playback master on/off switch (decision #3) — only
   single-ayah tap-to-play chains right now; continuous mode is untested.
-- Repeat-one loops the Arabic segment only, not the full chain (decision #6
-  not yet implemented).
 - Full-Quran Sahih International audio, Rowwad, and everything past
   Al-Fatihah (Phase 3/4) untouched.
 

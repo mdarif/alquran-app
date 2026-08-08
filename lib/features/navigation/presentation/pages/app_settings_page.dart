@@ -105,12 +105,6 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           onToggleTranslationPeek: (v) => _settings.setShowTranslationPeek(v),
           showArabicMatn: _settings.showArabicMatn,
           onToggleShowArabic: (v) => _settings.setShowArabicMatn(v),
-          // Al-Fatihah translation-audio POC is session-only and lives on the
-          // live reader's AyahAudioCubit — this Home-opened settings instance
-          // has no active playback session for it to control, so it's a
-          // fixed no-op here rather than wired to anything real.
-          translationAudioPocEnabled: false,
-          onToggleTranslationAudioPoc: (_) {},
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(
             context,
