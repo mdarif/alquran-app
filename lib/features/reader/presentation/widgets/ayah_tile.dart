@@ -56,13 +56,13 @@ class AyahTile extends StatelessWidget {
   /// (the flag-off path renders exactly as before).
   final VoidCallback? onTogglePlay;
 
-  /// Whether translation audio is currently chained in after Arabic (Al-Fatihah
-  /// POC, session-wide — see docs/translation-audio-chaining-plan.md).
+  /// Whether translation audio is currently chained in after Arabic,
+  /// session-wide — see docs/translation-audio-chaining-plan.md.
   final bool translationAudioEnabled;
 
   /// Toggle translation audio right from this verse row. Null hides the
-  /// headphones affordance entirely (outside the POC's Fatiha scope, or when
-  /// the audio feature/flag is off).
+  /// headphones affordance entirely (no shown translation has an audio
+  /// track, or the audio feature/flag is off).
   final VoidCallback? onToggleTranslationAudio;
 
   /// Whether this verse is saved as an ayah bookmark. The storage layer owns the

@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/audio/ayah_recitation_player.dart';
 import '../../../../core/audio/translation_audio_player.dart';
-import '../../../../core/audio/translation_audio_source.dart';
 import '../../domain/repositories/reader_settings_repository.dart';
 
 part 'ayah_audio_state.dart';
@@ -28,6 +27,8 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     final s = _settings;
     if (s != null) {
       _speed = s.recitationSpeed;
+      _translationAudioDuringContinuousPlayback =
+          s.translationAudioDuringContinuousPlayback;
       unawaited(_player.setSpeed(_speed));
       emit(_withSettings(state));
     }
@@ -35,16 +36,35 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
 
   final AyahRecitationPlayer _player;
   final ReaderSettingsRepository? _settings;
-  // Al-Fatihah translation-audio POC (docs/translation-audio-chaining-plan.md
-  // Phase 2). Null outside the POC — every existing code path is untouched
+  // Translation-audio chaining (docs/translation-audio-chaining-plan.md).
+  // Null when the feature is off — every existing code path is untouched
   // when no translation player is wired in.
   final TranslationAudioPlayer? _translationPlayer;
   bool _translationAudioEnabled = false;
+  // Decision #3: a single tapped verse always chains its translation audio;
+  // this setting only governs whether that continues once autoplay rolls on
+  // past it. Defaults on (matches the repository's own default) so a cubit
+  // built without a settings source — e.g. in a test — behaves like a fresh
+  // install.
+  bool _translationAudioDuringContinuousPlayback = true;
   StreamSubscription<RecitationPlayback>? _sub;
+
+  // The verse id the reader last explicitly asked to play (via [toggle],
+  // [playNext], or [playPrevious]) — as opposed to one autoplay rolled onto
+  // on its own. Only the manually-started verse is exempt from
+  // [_translationAudioDuringContinuousPlayback] (decision #3).
+  int? _manualPlayAyahId;
 
   // The active section's verse ids in reading order. Set by the reader whenever
   // the section loads/changes; drives continuous "play from here" advance.
   List<int> _sequence = const [];
+
+  // Global ayah id -> its real surah/ayah-number, for the SAME section the
+  // reader just pushed via setSequence. The recitation player only ever deals
+  // in global 1..6236 ids, but translation-audio is addressed by SSSAAA, so
+  // this is the seam that converts one into the other without the cubit
+  // needing to know the DB's numbering scheme itself.
+  Map<int, ({int surah, int ayahNumber})> _ayahLocation = const {};
 
   // Transport settings — held as fields so the fresh states built in _onPlayback
   // carry them (never reset to defaults). Speed persists; repeat is session-only.
@@ -74,13 +94,39 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
         repeat: _repeat,
       );
 
-  /// Toggle Al-Fatihah translation audio (POC), independent of the text
-  /// translation picker — enabling a translation's text never implies its
-  /// audio (see plan decision #2). No-op outside the POC's Fatiha scope; a
-  /// verse elsewhere in the Quran just never has anything to play.
+  /// Toggle translation audio, independent of the text translation picker —
+  /// enabling a translation's text never implies its audio (see plan decision
+  /// #2). No-op for a verse the reader hasn't pushed via [setAyahLocations]
+  /// (nothing to resolve a surah/ayah number for).
   void setTranslationAudioEnabled(bool value) {
     _translationAudioEnabled = value;
     unawaited(_syncLoopMode(state.playingAyahId));
+  }
+
+  /// Set whether translation audio keeps chaining once autoplay rolls past
+  /// the manually-tapped verse (decision #3); persisted.
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value) async {
+    _translationAudioDuringContinuousPlayback = value;
+    await _settings?.setTranslationAudioDuringContinuousPlayback(value);
+  }
+
+  /// Whether translation audio should chain for [ayahId] right now: always
+  /// true for the verse the reader manually started, otherwise gated on
+  /// [_translationAudioDuringContinuousPlayback] (decision #3).
+  bool _chainsTranslationAudioFor(int? ayahId) =>
+      _translationAudioDuringContinuousPlayback ||
+      (ayahId != null && ayahId == _manualPlayAyahId);
+
+  /// Teach the cubit each on-screen verse's real surah/ayah number, alongside
+  /// [setSequence] — the recitation player only knows global ids, but
+  /// translation-audio needs SSSAAA. Idempotent; the reader re-pushes on
+  /// load/swipe, same as setSequence.
+  void setAyahLocations(
+    Iterable<({int id, int surah, int ayahNumber})> ayahs,
+  ) {
+    _ayahLocation = {
+      for (final a in ayahs) a.id: (surah: a.surah, ayahNumber: a.ayahNumber),
+    };
   }
 
   /// Whether repeat-one on [ayahId] must replay the full Arabic+translation
@@ -88,7 +134,10 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   /// the player level — true only when there's actually a translation segment
   /// to repeat alongside the Arabic.
   bool _chainedRepeatOneActive(int? ayahId) =>
-      _translationAudioEnabled && _inFatihaPocScope(ayahId);
+      _translationAudioEnabled &&
+      ayahId != null &&
+      _ayahLocation.containsKey(ayahId) &&
+      _chainsTranslationAudioFor(ayahId);
 
   /// Keep the player's native loop mode in sync with repeat-one, EXCEPT when
   /// translation audio must be chained in (decision #6): `just_audio`'s
@@ -118,22 +167,24 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     return _sequence[i + 1];
   }
 
-  /// Al-Fatihah POC only: global ids 1-7 ARE Fatiha ayahs 1-7 (Fatiha is the
-  /// first surah, so the global 1..6236 index and the ayah number coincide
-  /// for it alone — this shortcut breaks for every other surah, which is why
-  /// it's gated to `isFatihaPocAyah` and must not be reused past this POC).
-  bool _inFatihaPocScope(int? ayahId) =>
-      ayahId != null && isFatihaPocAyah(surah: 1, ayah: ayahId);
-
-  /// Runs after an Arabic verse completes: optionally chains the Al-Fatihah
-  /// translation-audio clip (POC), then applies the existing next-verse /
-  /// repeat / hand-off logic exactly as before. Split out from [_onPlayback]
-  /// so that logic doesn't have to change shape to gain an `await`.
+  /// Runs after an Arabic verse completes: optionally chains the verse's
+  /// translation-audio clip, then applies the existing next-verse / repeat /
+  /// hand-off logic exactly as before. Split out from [_onPlayback] so that
+  /// logic doesn't have to change shape to gain an `await`. Per plan decision
+  /// #5, a missing/failed translation-audio segment is skipped by the player
+  /// itself (`TranslationAudioPlayer.play` swallows the failure) — this
+  /// method never needs to know the difference between "played" and "skipped".
   Future<void> _advanceAfterCompletion(int? completedAyahId) async {
+    final location =
+        completedAyahId == null ? null : _ayahLocation[completedAyahId];
     if (_translationAudioEnabled &&
         _translationPlayer != null &&
-        _inFatihaPocScope(completedAyahId)) {
-      await _translationPlayer.play(surah: 1, ayah: completedAyahId!);
+        location != null &&
+        _chainsTranslationAudioFor(completedAyahId)) {
+      await _translationPlayer.play(
+        surah: location.surah,
+        ayah: location.ayahNumber,
+      );
     }
 
     int? next;
@@ -206,12 +257,18 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
   /// the player bar's ‹/› transport controls.
   Future<void> playNext() async {
     final n = _nextAfter(state.playingAyahId);
-    if (n != null) await _player.play(n);
+    if (n != null) {
+      _manualPlayAyahId = n;
+      await _player.play(n);
+    }
   }
 
   Future<void> playPrevious() async {
     final p = _prevBefore(state.playingAyahId);
-    if (p != null) await _player.play(p);
+    if (p != null) {
+      _manualPlayAyahId = p;
+      await _player.play(p);
+    }
   }
 
   /// Seek within the current verse's file. A player capability with no UI in the
@@ -252,9 +309,11 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
         case RecitationStatus
               .completed: // never actually held in state; for exhaustiveness
         case RecitationStatus.error:
+          _manualPlayAyahId = ayahId;
           await _player.play(ayahId);
       }
     } else {
+      _manualPlayAyahId = ayahId;
       await _player.play(ayahId);
     }
   }

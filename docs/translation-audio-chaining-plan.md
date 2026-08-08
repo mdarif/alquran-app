@@ -377,6 +377,128 @@ chains correctly through all 7 Al-Fatihah verses, flag is on.
    editions are chosen, add them as additional `translation_audio_resources`
    rows — no new app code, same as adding a text translation today.
 
+## Phase 3 — full-Quran rollout plan (drafted 2026-08-08)
+
+Trigger: the full 6236-file Sahih International set is now live on R2 at
+`translation-audio/en-sahih-international/<SSSAAA>.mp3` (confirmed via the R2
+console — `001001.mp3`/`001002.mp3`/`001003.mp3` etc. present under
+`al-quran-audio/translation-audio/en-sahih-international/`), same layout the
+Phase 1.5 code already targets. This phase is app-only — no further data-repo
+work is required to widen scope past Al-Fatihah.
+
+### 3.1 Verification before flipping scope
+
+- [ ] Confirm object count in the R2 prefix is 6236 (not a partial sync) —
+  `rclone`/`aws s3 ls --recursive | wc -l` style count against the bucket, or
+  the R2 dashboard's object count for the prefix.
+- [ ] Spot-check the audit set from the original POC's exit criteria: last 10
+  surahs (114 down to 105), Ayat al-Kursi (2:255), a few long Baqarah verses —
+  confirm each file is non-empty and plays.
+- [ ] Confirm no `catalogue.json`/manifest is needed for v1: since every ayah
+  is now present, `buildAyahQueue`-style per-ayah availability checking can
+  stay a no-op (assume present, fail soft on a 404) rather than requiring a
+  loaded manifest — simpler than the "Per-ayah availability manifest format"
+  open question below, and matches decision #5 (skip only the missing
+  segment, don't block the toggle).
+
+### 3.2 Code changes
+
+All changes are narrow — the Phase 2 architecture (queue chaining, chained
+repeat-one, cache-key namespacing) is already scope-agnostic; only the
+Fatiha-only gate needs to widen.
+
+1. **`core/audio/translation_audio_source.dart`**
+   - Replace `isFatihaPocAyah` with a full-Quran scope check (or delete it
+     entirely — once every ayah has audio, the gate collapses to "surah/ayah
+     is a valid Qur'an reference", which the reader already guarantees before
+     this code ever runs). Simplest: delete the scope check altogether and
+     let `hasAnyTranslationAudio` (resource-slug gating) be the only gate —
+     an ayah either has the Sahih International text shown or it doesn't;
+     if shown, its audio is now always available.
+   - Keep `translationAudioResourceSlugs` as the extension point for Phase 4
+     (Rowwad, etc.) — no change needed there.
+
+2. **`features/reader/presentation/cubit/ayah_audio_cubit.dart`**
+   - Delete `_inFatihaPocScope` (and its Fatiha-specific global-id-equals-
+     ayah-number comment/shortcut) — `_advanceAfterCompletion` and
+     `_chainedRepeatOneActive` gate purely on `_translationAudioEnabled` plus
+     the ayah's actual `surah`/`ayahNumber` (already available via the
+     `Ayah` passed through from the reader, not the global id hack the POC
+     used because Fatiha made global-id and ayah-number coincide). This means
+     `_advanceAfterCompletion` needs the completed verse's real
+     `surah`/`ayahNumber`, not just its global id — thread that through from
+     wherever `play(ayahId)` already resolves an `Ayah` (the reader/repository
+     layer), since `_player.play` currently takes only a global id.
+   - Missing-asset handling: on a `TranslationAudioPlayer.play` failure
+     (network/404), swallow and continue the chain per decision #5 — confirm
+     `JustAudioTranslationPlayer` already does this (Phase 1.5 notes say yes,
+     "swallowed silently") and add a regression test for it now that misses
+     are an expected, non-Fatiha-only case.
+
+3. **`core/feature_flags.dart`**
+   - Rename `translationAudioFatihaPoc` → `translationAudio` (or similar),
+     update its doc comment to drop "Al-Fatihah"/"bundled"/"7 verses"
+     language now stale post-Phase-1.5. Keep it a flag (not delete) — still
+     useful as an emergency kill switch before the feature is fully proven at
+     full scope.
+
+4. **`features/reader/presentation/pages/reader_page.dart`**
+   - The two call sites gated on `isFatihaPocAyah(...)` (lines ~1560, in the
+     headphones-icon visibility check) drop that clause — visibility becomes
+     purely `FeatureFlags.translationAudio && hasAnyTranslationAudio(shown)`.
+   - `_syncTranslationAudioAvailability` (line 916) — same flag rename, no
+     other logic change (it already only depends on `hasAnyTranslationAudio`,
+     not the Fatiha gate).
+
+5. **Continuous-playback setting (plan decision #3, still open)**: add the
+   "Translation audio during continuous playback" toggle referenced in the
+   original architecture section — default **on**. Needed now because
+   continuous full-surah playback becomes a real, common path once scope
+   isn't limited to 7 verses (in the POC, nobody would "continuously play"
+   past Fatiha into silence). Lives in Settings/reader-options alongside
+   speed/repeat, read by `AyahAudioCubit` the same way `_speed` is.
+
+6. **Per-row toggle in the Translations sheet** (plan's "Presentation layer
+   additions", still open): today the only way to enable translation audio is
+   the per-verse headphones icon in the ayah toolbar. That stays as the
+   primary control (works fine at full scope), but the Translations sheet
+   should surface *which* shown translations have an audio track available
+   (small icon/badge next to "Sahih International") so the reader
+   understands why the headphones icon appeared — not a second toggle,
+   just discoverability. Optional for the first full-scope release; can slip
+   to a fast-follow if time-boxed.
+
+### 3.3 Tests
+
+- `translation_audio_source_test.dart`: delete/replace the `isFatihaPocAyah`
+  canary with tests confirming the URL/cache-path helpers work for ayahs
+  across multiple surahs (e.g. 2:255, 114:6), not just Fatiha's 1..7.
+- `ayah_audio_cubit_test.dart`: extend the existing chain/repeat-one fakes to
+  cover a non-Fatiha verse (e.g. surah 2), and add a case where the fake
+  translation player throws/errors mid-chain — assert playback continues to
+  the next verse rather than stalling (decision #5's missing-asset handling,
+  now testable since it's a real code path, not a hypothetical POC gap).
+- Manual device pass: pick 3-4 verses spread across different surahs
+  (not just Fatiha) in both single-verse and continuous playback, confirm the
+  chain (and chained repeat-one) still works, and confirm the flag/off state
+  is still byte-identical to Arabic-only playback.
+
+### 3.4 Rollout sequencing
+
+1. Land 3.1's verification (no code change) — confirms R2 is actually ready.
+2. Land 3.2 items 1-4 (scope widening) + 3.3 tests, flag stays **on** in a
+   build the owner tests on-device across several non-Fatiha surahs.
+3. Land 3.2 item 5 (continuous-playback setting) as a fast-follow once the
+   core widening is verified stable.
+4. Item 6 (Translations-sheet discoverability) and cache/download management
+   UI (explicitly deferred in the original plan) stay backlog items — track
+   in `docs/quality-backlog.md` per the existing convention, not blockers for
+   this rollout.
+5. Update this doc's Phase 2/1.5 status header and the `docs/quality-backlog.md`
+   entry (if any) once 3.2 ships, so "Fatiha POC" language doesn't linger
+   stale in the codebase the way `isFatihaPocAyah`'s name would otherwise
+   imply forever.
+
 ## Open questions
 
 - **Compression target for `english_rwwad`**: what bitrate/format reduction

@@ -10,8 +10,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Records what the cubit asks for and lets a test control when a clip
 /// "finishes" (via [completeCurrent]) — mirrors [_FakePlayer]'s role but for
-/// the one-shot translation-audio POC player (no status stream needed since
-/// the cubit only ever awaits one clip at a time).
+/// the one-shot translation-audio player (no status stream needed since the
+/// cubit only ever awaits one clip at a time).
 class _FakeTranslationPlayer implements TranslationAudioPlayer {
   final List<String> calls = [];
   Completer<void>? _pending;
@@ -368,7 +368,7 @@ void main() {
     });
   });
 
-  group('Al-Fatihah translation-audio POC', () {
+  group('translation-audio chaining', () {
     test('plays translation audio between Arabic completion and the next verse',
         () async {
       final translation = _FakeTranslationPlayer();
@@ -377,6 +377,11 @@ void main() {
         if (!c.isClosed) await c.close();
       });
       c.setSequence([1, 2, 3]); // global ids 1-3 = Fatiha 1:1-1:3
+      c.setAyahLocations([
+        (id: 1, surah: 1, ayahNumber: 1),
+        (id: 2, surah: 1, ayahNumber: 2),
+        (id: 3, surah: 1, ayahNumber: 3),
+      ]);
       c.setTranslationAudioEnabled(true);
 
       await c.toggle(1);
@@ -393,6 +398,220 @@ void main() {
       expect(player.calls, ['play(1)', 'play(2)']);
     });
 
+    // Phase 3 (full-Quran rollout): chaining is no longer hardcoded to
+    // Al-Fatihah — any verse the reader has pushed a location for chains,
+    // using its real surah/ayah number rather than the old global-id shortcut.
+    test('chains correctly for a verse outside Al-Fatihah (Baqarah 2:1)',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([8, 9]); // global id 8 = Baqarah 2:1
+      c.setAyahLocations([
+        (id: 8, surah: 2, ayahNumber: 1),
+        (id: 9, surah: 2, ayahNumber: 2),
+      ]);
+      c.setTranslationAudioEnabled(true);
+
+      await c.toggle(8);
+      player.push(8, RecitationStatus.completed);
+      await pumpEventQueue();
+
+      expect(translation.calls, ['play(surah: 2, ayah: 1)']);
+      expect(player.calls, ['play(8)']); // withheld mid-chain
+
+      translation.completeCurrent();
+      await pumpEventQueue();
+      expect(player.calls, ['play(8)', 'play(9)']);
+    });
+
+    group('translation audio during continuous playback (decision #3)', () {
+      test(
+          'defaults to on: chains for both the tapped verse and autoplay '
+          'past it', () async {
+        final translation = _FakeTranslationPlayer();
+        final c = AyahAudioCubit(player, null, translation);
+        addTearDown(() async {
+          if (!c.isClosed) await c.close();
+        });
+        c.setSequence([1, 2, 3]);
+        c.setAyahLocations([
+          (id: 1, surah: 1, ayahNumber: 1),
+          (id: 2, surah: 1, ayahNumber: 2),
+          (id: 3, surah: 1, ayahNumber: 3),
+        ]);
+        c.setTranslationAudioEnabled(true);
+
+        await c.toggle(1); // manually tapped
+        player.push(1, RecitationStatus.completed);
+        await pumpEventQueue();
+        translation.completeCurrent();
+        await pumpEventQueue(); // rolls autoplay onto verse 2
+
+        player.push(2, RecitationStatus.completed);
+        await pumpEventQueue();
+        // Verse 2 was reached by autoplay, not a tap — still chains by default.
+        expect(translation.calls, [
+          'play(surah: 1, ayah: 1)',
+          'play(surah: 1, ayah: 2)',
+        ]);
+      });
+
+      test(
+          'off: the manually-tapped verse still chains, but autoplay past it '
+          'does not', () async {
+        final translation = _FakeTranslationPlayer();
+        final c = AyahAudioCubit(player, null, translation);
+        addTearDown(() async {
+          if (!c.isClosed) await c.close();
+        });
+        c.setSequence([1, 2, 3]);
+        c.setAyahLocations([
+          (id: 1, surah: 1, ayahNumber: 1),
+          (id: 2, surah: 1, ayahNumber: 2),
+          (id: 3, surah: 1, ayahNumber: 3),
+        ]);
+        c.setTranslationAudioEnabled(true);
+        await c.setTranslationAudioDuringContinuousPlayback(false);
+
+        await c.toggle(1); // manually tapped: chains regardless
+        player.push(1, RecitationStatus.completed);
+        await pumpEventQueue();
+        expect(translation.calls, ['play(surah: 1, ayah: 1)']);
+        translation.completeCurrent();
+        await pumpEventQueue(); // autoplay rolls onto verse 2 (no chain to await)
+        expect(player.calls, ['play(1)', 'play(2)']);
+
+        player.push(2, RecitationStatus.completed);
+        await pumpEventQueue();
+        // Verse 2 was reached by autoplay — no translation clip requested for it,
+        // and playback proceeds straight to verse 3 without waiting.
+        expect(translation.calls, ['play(surah: 1, ayah: 1)']);
+        expect(player.calls, ['play(1)', 'play(2)', 'play(3)']);
+      });
+
+      test('off: tapping a NEW verse mid-playback resets which verse chains',
+          () async {
+        final translation = _FakeTranslationPlayer();
+        final c = AyahAudioCubit(player, null, translation);
+        addTearDown(() async {
+          if (!c.isClosed) await c.close();
+        });
+        c.setSequence([1, 2, 3]);
+        c.setAyahLocations([
+          (id: 1, surah: 1, ayahNumber: 1),
+          (id: 2, surah: 1, ayahNumber: 2),
+          (id: 3, surah: 1, ayahNumber: 3),
+        ]);
+        c.setTranslationAudioEnabled(true);
+        await c.setTranslationAudioDuringContinuousPlayback(false);
+
+        // Jump straight to verse 3 by tapping it directly.
+        await c.toggle(3);
+        player.push(3, RecitationStatus.completed);
+        await pumpEventQueue();
+        expect(translation.calls, ['play(surah: 1, ayah: 3)']);
+      });
+
+      test('setting persists via the settings repository', () async {
+        final settings = _FakeSettings();
+        final c = AyahAudioCubit(player, settings);
+        addTearDown(() async {
+          if (!c.isClosed) await c.close();
+        });
+        await c.setTranslationAudioDuringContinuousPlayback(false);
+        expect(settings.translationAudioDuringContinuousPlayback, isFalse);
+      });
+
+      test('restores the persisted value on open', () async {
+        final settings = _FakeSettings()
+          ..translationAudioDuringContinuousPlayback = false;
+        final translation = _FakeTranslationPlayer();
+        final c = AyahAudioCubit(player, settings, translation);
+        addTearDown(() async {
+          if (!c.isClosed) await c.close();
+        });
+        c.setSequence([1, 2]);
+        c.setAyahLocations([
+          (id: 1, surah: 1, ayahNumber: 1),
+          (id: 2, surah: 1, ayahNumber: 2),
+        ]);
+        c.setTranslationAudioEnabled(true);
+
+        await c.toggle(1);
+        player.push(1, RecitationStatus.completed);
+        await pumpEventQueue();
+        translation.completeCurrent();
+        await pumpEventQueue();
+
+        player.push(2, RecitationStatus.completed);
+        await pumpEventQueue();
+        // Restored setting was already off, so verse 2 (reached by autoplay)
+        // never requests translation audio.
+        expect(translation.calls, ['play(surah: 1, ayah: 1)']);
+      });
+
+      test('playNext counts as a manual play: the new verse still chains',
+          () async {
+        final translation = _FakeTranslationPlayer();
+        final c = AyahAudioCubit(player, null, translation);
+        addTearDown(() async {
+          if (!c.isClosed) await c.close();
+        });
+        c.setSequence([1, 2, 3]);
+        c.setAyahLocations([
+          (id: 1, surah: 1, ayahNumber: 1),
+          (id: 2, surah: 1, ayahNumber: 2),
+          (id: 3, surah: 1, ayahNumber: 3),
+        ]);
+        c.setTranslationAudioEnabled(true);
+        await c.setTranslationAudioDuringContinuousPlayback(false);
+
+        await c.toggle(1);
+        player.push(1, RecitationStatus.playing);
+        await pumpEventQueue();
+
+        await c.playNext(); // explicit transport tap, not autoplay
+        player.push(2, RecitationStatus.completed);
+        await pumpEventQueue();
+        expect(translation.calls, ['play(surah: 1, ayah: 2)']);
+      });
+    });
+
+    // Decision #5: a missing/failed translation-audio segment is skipped, not
+    // fatal — the chain must still roll on to the next verse. The real
+    // player swallows failures internally (JustAudioTranslationPlayer.play);
+    // this fake models the same contract by simply completing its future
+    // without the cubit needing to know play() "failed" vs. "finished".
+    test('a translation-audio segment that fails to play does not stall the chain',
+        () async {
+      final translation = _FakeTranslationPlayer();
+      final c = AyahAudioCubit(player, null, translation);
+      addTearDown(() async {
+        if (!c.isClosed) await c.close();
+      });
+      c.setSequence([1, 2]);
+      c.setAyahLocations([
+        (id: 1, surah: 1, ayahNumber: 1),
+        (id: 2, surah: 1, ayahNumber: 2),
+      ]);
+      c.setTranslationAudioEnabled(true);
+
+      await c.toggle(1);
+      player.push(1, RecitationStatus.completed);
+      await pumpEventQueue();
+      expect(translation.calls, ['play(surah: 1, ayah: 1)']);
+      expect(player.calls, ['play(1)']); // withheld awaiting the segment
+
+      // The segment "fails" (network/404) — the real player swallows this and
+      // completes its future rather than throwing; the chain must still move on.
+      translation.completeCurrent();
+      await pumpEventQueue();
+      expect(player.calls, ['play(1)', 'play(2)']);
+    });
+
     test('toggle off skips translation audio entirely (unchanged behavior)',
         () async {
       final translation = _FakeTranslationPlayer();
@@ -401,6 +620,11 @@ void main() {
         if (!c.isClosed) await c.close();
       });
       c.setSequence([1, 2, 3]);
+      c.setAyahLocations([
+        (id: 1, surah: 1, ayahNumber: 1),
+        (id: 2, surah: 1, ayahNumber: 2),
+        (id: 3, surah: 1, ayahNumber: 3),
+      ]);
 
       await c.toggle(1);
       player.push(1, RecitationStatus.completed);
@@ -419,13 +643,18 @@ void main() {
         if (!c.isClosed) await c.close();
       });
       c.setSequence([1, 2, 3]);
+      c.setAyahLocations([
+        (id: 1, surah: 1, ayahNumber: 1),
+        (id: 2, surah: 1, ayahNumber: 2),
+        (id: 3, surah: 1, ayahNumber: 3),
+      ]);
       c.setTranslationAudioEnabled(true);
       await c.setRepeat(RecitationRepeat.one);
 
       await c.toggle(1);
       player.push(1, RecitationStatus.playing);
       await pumpEventQueue();
-      // Verse 1 is in Fatiha scope with translation audio on → chaining is
+      // Verse 1 has a known location with translation audio on → chaining is
       // needed, so once it starts playing the player's native loop must be
       // synced OFF (it would otherwise loop silently and never let the
       // translation clip play). setRepeat(one) earlier set it ON by default
@@ -455,6 +684,11 @@ void main() {
         if (!c.isClosed) await c.close();
       });
       c.setSequence([1, 2, 3]);
+      c.setAyahLocations([
+        (id: 1, surah: 1, ayahNumber: 1),
+        (id: 2, surah: 1, ayahNumber: 2),
+        (id: 3, surah: 1, ayahNumber: 3),
+      ]);
       await c.setRepeat(RecitationRepeat.one);
       expect(player.calls, contains('setLoopMode(one)'));
 
@@ -469,14 +703,14 @@ void main() {
       );
     });
 
-    test('outside Al-Fatihah, translation audio never plays even when enabled',
+    test('a verse with no known location never plays translation audio',
         () async {
       final translation = _FakeTranslationPlayer();
       final c = AyahAudioCubit(player, null, translation);
       addTearDown(() async {
         if (!c.isClosed) await c.close();
       });
-      c.setSequence([8, 9]); // global id 8 = Baqarah 2:1, outside POC scope
+      c.setSequence([8, 9]); // no setAyahLocations call — locations unknown
       c.setTranslationAudioEnabled(true);
 
       await c.toggle(8);
@@ -546,6 +780,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   bool showArabicMatn = true;
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
+  bool translationAudioDuringContinuousPlayback = true;
+  @override
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value) async =>
+      translationAudioDuringContinuousPlayback = value;
   @override
   Future<void> resetToDefaults() async {}
   @override

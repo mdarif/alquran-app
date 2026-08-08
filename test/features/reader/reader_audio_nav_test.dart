@@ -144,6 +144,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
   @override
+  bool translationAudioDuringContinuousPlayback = true;
+  @override
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value) async =>
+      translationAudioDuringContinuousPlayback = value;
+  @override
   Future<void> resetToDefaults() async {}
 }
 

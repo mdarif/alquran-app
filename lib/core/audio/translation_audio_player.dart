@@ -10,10 +10,10 @@ import 'translation_audio_source.dart';
 
 /// Plays a single translation-audio clip to completion. Deliberately a
 /// one-shot, no-status-stream interface (unlike [AyahRecitationPlayer]) —
-/// the Al-Fatihah POC only ever awaits one clip at a time, between an Arabic
-/// verse completing and the chain advancing to the next verse. See
-/// `docs/translation-audio-chaining-plan.md` for the full design; this is
-/// Phase 2's narrow POC surface, now streaming from R2 (Phase 1.5).
+/// the cubit only ever awaits one clip at a time, between an Arabic verse
+/// completing and the chain advancing to the next verse. See
+/// `docs/translation-audio-chaining-plan.md` for the full design; streams +
+/// caches from R2, covering the full Quran as of Phase 3.
 abstract interface class TranslationAudioPlayer {
   /// Stream + cache the Sahih International clip for [surah]/[ayah] and
   /// complete when it finishes. Stopping mid-play (e.g. [stop]) completes the

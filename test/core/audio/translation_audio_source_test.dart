@@ -61,22 +61,21 @@ void main() {
     });
   });
 
-  group('isFatihaPocAyah', () {
-    test('true for surah 1, ayahs 1-7', () {
-      expect(isFatihaPocAyah(surah: 1, ayah: 1), isTrue);
-      expect(isFatihaPocAyah(surah: 1, ayah: 7), isTrue);
-    });
-
-    test('false for other surahs', () {
-      expect(isFatihaPocAyah(surah: 2, ayah: 1), isFalse);
-    });
-
-    // Regression: the cubit's Fatiha-scope shortcut treats a global recitation
-    // id 1-7 as "surah 1, ayah <id>" — an out-of-range ayah for surah 1 (which
-    // only has 7) must NOT read as in-scope, or global id 8 (Baqarah 2:1) would
-    // wrongly play Fatiha's translation audio.
-    test('false for surah 1 beyond its 7 ayahs', () {
-      expect(isFatihaPocAyah(surah: 1, ayah: 8), isFalse);
+  group('translationAudioUrl across surahs', () {
+    // Phase 3 (full-Quran rollout): the R2 prefix now has all 6236 files, so
+    // these helpers must resolve correctly for verses well outside
+    // Al-Fatihah, not just the original 7-verse pilot scope.
+    test('builds correct URLs for verses spread across the Quran', () {
+      expect(
+        translationAudioUrl(surah: 2, ayah: 255), // Ayat al-Kursi
+        'https://audio.alquranreader.com/translation-audio/'
+        'en-sahih-international/002255.mp3',
+      );
+      expect(
+        translationAudioUrl(surah: 114, ayah: 6), // last surah, last ayah
+        'https://audio.alquranreader.com/translation-audio/'
+        'en-sahih-international/114006.mp3',
+      );
     });
   });
 

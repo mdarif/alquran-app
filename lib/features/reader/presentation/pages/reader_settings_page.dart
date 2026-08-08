@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/audio/translation_audio_source.dart';
 import '../../../../core/feature_flags.dart';
 import '../../../../core/testing/widget_keys.dart';
 import '../../../../core/theme/app_icons.dart';
@@ -66,6 +67,8 @@ class ReaderSettingsPage extends StatefulWidget {
     required this.onToggleTranslationPeek,
     required this.showArabicMatn,
     required this.onToggleShowArabic,
+    required this.translationAudioDuringContinuousPlayback,
+    required this.onToggleTranslationAudioDuringContinuousPlayback,
     required this.onReset,
     this.appActions = const [],
     super.key,
@@ -86,6 +89,8 @@ class ReaderSettingsPage extends StatefulWidget {
   final ValueChanged<bool> onToggleTranslationPeek;
   final bool showArabicMatn;
   final ValueChanged<bool> onToggleShowArabic;
+  final bool translationAudioDuringContinuousPlayback;
+  final ValueChanged<bool> onToggleTranslationAudioDuringContinuousPlayback;
   final VoidCallback onReset;
   final List<SettingsAction> appActions;
 
@@ -102,6 +107,8 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
   late ArabicScript _script = widget.script;
   late bool _showPeek = widget.showTranslationPeek;
   late bool _showArabic = widget.showArabicMatn;
+  late bool _translationAudioContinuous =
+      widget.translationAudioDuringContinuousPlayback;
 
   List<SettingsAction> _actions(SettingsActionSection section) => [
         for (final action in widget.appActions)
@@ -281,6 +288,32 @@ class _ReaderSettingsPageState extends State<ReaderSettingsPage> {
                     style: rowSubtitleStyle,
                   ),
                 ),
+                if (FeatureFlags.translationAudio &&
+                    hasAnyTranslationAudio(
+                      widget.resources.map((r) => r.slug),
+                    )) ...[
+                  SwitchListTile.adaptive(
+                    key: WidgetKeys.translationAudioContinuousToggle,
+                    value: _translationAudioContinuous,
+                    onChanged: (v) {
+                      setState(() => _translationAudioContinuous = v);
+                      widget
+                          .onToggleTranslationAudioDuringContinuousPlayback(v);
+                    },
+                    dense: true,
+                    minVerticalPadding: 4,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      'Translation audio during continuous playback',
+                      style: rowTitleStyle,
+                    ),
+                    subtitle: Text(
+                      'When off, only the verse you tap keeps its '
+                      'translation audio as playback moves on.',
+                      style: rowSubtitleStyle,
+                    ),
+                  ),
+                ],
               ],
               _ActionSection(
                 label: SettingsActionSection.reminders.label,

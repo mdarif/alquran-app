@@ -145,8 +145,8 @@ class AppIcons {
     fontFamily: _kSymbolFamily,
   ); // error_rounded
 
-  /// Per-verse "include translation audio after Arabic" toggle (Al-Fatihah
-  /// POC — docs/translation-audio-chaining-plan.md). Filled when on.
+  /// Per-verse "include translation audio after Arabic" toggle
+  /// (docs/translation-audio-chaining-plan.md). Filled when on.
   static const IconData translationAudio = IconData(
     0xf01f,
     fontFamily: _kSymbolFamily,

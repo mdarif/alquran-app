@@ -92,6 +92,10 @@ class WidgetKeys {
   // Settings-sheet switch (Detailed): show the Arabic matn above translations
   // (default on; off = translations-only reading).
   static const showArabicToggle = Key('reader-show-arabic-toggle');
+  // Settings-sheet switch: keep chaining translation audio once autoplay
+  // rolls past the manually-tapped verse (default on).
+  static const translationAudioContinuousToggle =
+      Key('reader-translation-audio-continuous-toggle');
   // The Arabic matn line inside a Detailed tile (shared by every verse); used to
   // observe the "Show Arabic" toggle hiding it.
   static const ayahArabicText = Key('ayah-arabic-text');
@@ -99,8 +103,7 @@ class WidgetKeys {
 
   // Audio recitation (only rendered while FeatureFlags.audioRecitation is on).
   static Key ayahPlayButton(int ayahId) => Key('ayah-play-$ayahId');
-  // Per-verse translation-audio toggle (Al-Fatihah POC only — mirrors
-  // translationAudioPocToggle but lives on the verse row itself).
+  // Per-verse "include translation audio after Arabic" toggle.
   static Key ayahTranslationAudioToggle(int ayahId) =>
       Key('ayah-translation-audio-$ayahId');
   static const peekPlayButton = Key('reader-peek-play-button');

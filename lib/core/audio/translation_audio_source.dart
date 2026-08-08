@@ -6,8 +6,9 @@
 /// Addressed by `SSSAAA` (surah/ayah, zero-padded), NOT the global 1..6236 id
 /// `recitation_source.dart` uses for Arabic recitation — the two numbering
 /// schemes must never be conflated. See
-/// `docs/translation-audio-chaining-plan.md` for the full design; this file
-/// covers only the Al-Fatihah POC scope (Phase 2).
+/// `docs/translation-audio-chaining-plan.md` for the full design; the full
+/// 6236-file Sahih International edition is live on R2 as of Phase 3, so
+/// these helpers are valid for any surah/ayah, not just Al-Fatihah.
 library;
 
 /// `SSSAAA`: e.g. Fatiha 1:1 -> `001001`, Baqarah 2:1 -> `002001`.
@@ -51,20 +52,12 @@ String translationAudioCacheRelativePath({
     'translation-audio/$_sahihInternationalSlug/'
     '${translationAudioKey(surah: surah, ayah: ayah)}.mp3';
 
-/// Whether [surah]/[ayah] is in the Al-Fatihah POC's scope. Gates the
-/// translation-audio chain so it never fires outside the 7 bundled verses.
-/// Al-Fatihah has exactly 7 ayahs — the upper bound matters as much as the
-/// surah check, since a caller may pass a global recitation id as `ayah`
-/// directly (see `AyahAudioCubit._inFatihaPocScope`'s POC-only shortcut).
-bool isFatihaPocAyah({required int surah, required int ayah}) =>
-    surah == 1 && ayah >= 1 && ayah <= 7;
-
 /// Text-translation resource slugs that have a matching translation-audio
-/// track. POC: just Sahih International (`en-sahih-international` — see
+/// track. Currently just Sahih International (`en-sahih-international` — see
 /// `../alquran-data/config/sources.yaml`). Adding an audio-backed edition
 /// later is a one-line addition here, not new UI code (mirrors how
-/// `translation_audio_resources` is meant to work once it leaves the POC —
-/// see the plan doc's Data layer section).
+/// `translation_audio_resources` is meant to work long-term — see the plan
+/// doc's Data layer section).
 const Set<String> translationAudioResourceSlugs = {'en-sahih-international'};
 
 /// Whether any of the reader's currently-shown translation slugs has a

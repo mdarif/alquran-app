@@ -20,6 +20,8 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   static const String _kRecitationSpeed = 'reader_recitation_speed';
   static const String _kShowTranslationPeek = 'reader_show_translation_peek';
   static const String _kShowArabicMatn = 'reader_show_arabic_matn';
+  static const String _kTranslationAudioContinuous =
+      'reader_translation_audio_continuous';
 
   @override
   ArabicScript get script => _prefs.getString(_kScript) == 'indopak'
@@ -102,6 +104,10 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
   bool get showArabicMatn => _prefs.getBool(_kShowArabicMatn) ?? true;
 
   @override
+  bool get translationAudioDuringContinuousPlayback =>
+      _prefs.getBool(_kTranslationAudioContinuous) ?? true;
+
+  @override
   Future<void> setRecitationSpeed(double value) =>
       _prefs.setDouble(_kRecitationSpeed, value);
 
@@ -114,6 +120,10 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
       _prefs.setBool(_kShowArabicMatn, value);
 
   @override
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value) =>
+      _prefs.setBool(_kTranslationAudioContinuous, value);
+
+  @override
   Future<void> resetToDefaults() async {
     await Future.wait([
       _prefs.remove(_kFontSize),
@@ -123,6 +133,7 @@ class ReaderSettingsRepositoryImpl implements ReaderSettingsRepository {
       _prefs.remove(_kRecitationSpeed),
       _prefs.remove(_kShowTranslationPeek),
       _prefs.remove(_kShowArabicMatn),
+      _prefs.remove(_kTranslationAudioContinuous),
     ]);
   }
 }

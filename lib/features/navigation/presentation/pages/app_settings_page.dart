@@ -105,6 +105,10 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
           onToggleTranslationPeek: (v) => _settings.setShowTranslationPeek(v),
           showArabicMatn: _settings.showArabicMatn,
           onToggleShowArabic: (v) => _settings.setShowArabicMatn(v),
+          translationAudioDuringContinuousPlayback:
+              _settings.translationAudioDuringContinuousPlayback,
+          onToggleTranslationAudioDuringContinuousPlayback: (v) =>
+              _settings.setTranslationAudioDuringContinuousPlayback(v),
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(
             context,

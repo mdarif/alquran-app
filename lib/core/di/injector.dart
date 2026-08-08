@@ -272,11 +272,11 @@ Future<void> configureDependencies() async {
   // so the reloaded UI saw flag=true but GetIt had no AyahAudioCubit).
   getIt
     ..registerLazySingleton<AyahRecitationPlayer>(JustAudioRecitationPlayer.new)
-    // Al-Fatihah translation-audio POC (docs/translation-audio-chaining-plan.md
-    // Phase 2). Same "unconditional but lazy" reasoning as the recitation
-    // player above: registered regardless of FeatureFlags.translationAudioFatihaPoc
-    // so flipping the flag survives a hot reload, but never constructed (no
-    // just_audio instance, no asset touched) unless the reader actually reads it.
+    // Translation-audio chaining (docs/translation-audio-chaining-plan.md).
+    // Same "unconditional but lazy" reasoning as the recitation player above:
+    // registered regardless of FeatureFlags.translationAudio so flipping the
+    // flag survives a hot reload, but never constructed (no just_audio
+    // instance, no asset touched) unless the reader actually reads it.
     ..registerLazySingleton<TranslationAudioPlayer>(
       JustAudioTranslationPlayer.new,
     )

@@ -480,7 +480,7 @@ void main() {
       expect(find.text('Experimental'), findsNothing);
     });
 
-    group('translation-audio toggle (Al-Fatihah POC)', () {
+    group('translation-audio toggle', () {
       const ayah = Ayah(
         id: 1,
         surahId: 1,

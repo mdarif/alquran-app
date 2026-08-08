@@ -68,5 +68,28 @@ void main() {
       );
       expect(repo.script, ArabicScript.uthmani);
     });
+
+    test(
+        'translationAudioDuringContinuousPlayback defaults to true '
+        '(decision #3)', () async {
+      final repo = await _repo();
+      expect(repo.translationAudioDuringContinuousPlayback, isTrue);
+    });
+
+    test('persists translationAudioDuringContinuousPlayback', () async {
+      final repo = await _repo();
+      await repo.setTranslationAudioDuringContinuousPlayback(false);
+      expect(repo.translationAudioDuringContinuousPlayback, isFalse);
+      await repo.setTranslationAudioDuringContinuousPlayback(true);
+      expect(repo.translationAudioDuringContinuousPlayback, isTrue);
+    });
+
+    test('resetToDefaults restores translationAudioDuringContinuousPlayback',
+        () async {
+      final repo = await _repo();
+      await repo.setTranslationAudioDuringContinuousPlayback(false);
+      await repo.resetToDefaults();
+      expect(repo.translationAudioDuringContinuousPlayback, isTrue);
+    });
   });
 }

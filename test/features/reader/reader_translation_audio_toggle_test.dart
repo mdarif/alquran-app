@@ -148,7 +148,7 @@ class _EditionRepo implements EditionRepository {
   Future<void> remove(String slug) async {}
 }
 
-/// Al-Fatihah's 7 ayahs (surah 1) — the POC's scope.
+/// Al-Fatihah's 7 ayahs (surah 1) — a small, convenient fixture surah.
 class _FatihaRepo implements AyahRepository {
   _FatihaRepo(this.resources);
   final List<TranslationResource> resources;
@@ -224,6 +224,11 @@ class _FakeSettings implements ReaderSettingsRepository {
   bool showArabicMatn = true;
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
+  bool translationAudioDuringContinuousPlayback = true;
+  @override
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value) async =>
+      translationAudioDuringContinuousPlayback = value;
   @override
   Future<void> resetToDefaults() async {}
 }
@@ -370,6 +375,76 @@ void main() {
       // ...and playing ayah 1 again must NOT chain in Sahih's audio anymore —
       // this is the regression: the toggle used to stay silently ON.
       translationPlayer.calls.clear();
+      player.playing(1);
+      await tester.pump();
+      player.complete(1);
+      await tester.pumpAndSettle();
+      expect(translationPlayer.calls, isEmpty);
+    });
+  });
+
+  group('switching to Reading mode (regression)', () {
+    testWidgets(
+        'turns translation audio OFF when leaving Detailed — translation '
+        'audio is Detailed-only (plan decision #1)', (tester) async {
+      final player = _DrivablePlayer();
+      final translationPlayer = _RecordingTranslationPlayer();
+      final settings = _FakeSettings(
+        selectedTranslations: ['en-sahih-international'],
+      );
+      GetIt.I
+        ..registerFactory<ReaderCubit>(
+          () => ReaderCubit(
+            _FatihaRepo(const [_sahih, _urdu]),
+            _FakeLastRead(),
+          ),
+        )
+        ..registerLazySingleton<ReaderSettingsRepository>(() => settings)
+        ..registerFactory<AyahAudioCubit>(
+          () => AyahAudioCubit(player, settings, translationPlayer),
+        );
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ReaderPage(
+            target: ReaderTarget.surah(1, 'Al-Fatihah'),
+            initialDetailed: true,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Turn translation audio on in Detailed and prove it chains.
+      await tester.tap(find.byKey(WidgetKeys.ayahTranslationAudioToggle(1)));
+      await tester.pump();
+      player.playing(1);
+      await tester.pump();
+      player.complete(1);
+      await tester.pump();
+      expect(translationPlayer.calls, isNotEmpty);
+      translationPlayer.completeCurrent();
+      await tester.pumpAndSettle();
+
+      // Switch to Reading — no headphones affordance exists there to turn it
+      // off manually, so the reader must do it automatically.
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
+
+      // Playing a verse in Reading must NOT chain in translation audio — this
+      // is the regression: the flag used to survive the viewport switch with
+      // no way left to turn it off.
+      translationPlayer.calls.clear();
+      player.playing(1);
+      await tester.pump();
+      player.complete(1);
+      await tester.pumpAndSettle();
+      expect(translationPlayer.calls, isEmpty);
+
+      // Switching back to Detailed confirms the toggle reset, not just muted:
+      // the headphones icon is off (not merely hidden) and must be tapped
+      // again to re-enable chaining.
+      await tester.tap(find.byKey(WidgetKeys.viewportToggle));
+      await tester.pumpAndSettle();
       player.playing(1);
       await tester.pump();
       player.complete(1);

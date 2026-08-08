@@ -111,6 +111,11 @@ class _Settings implements ReaderSettingsRepository {
   bool showArabicMatn = true;
   @override
   Future<void> setShowArabicMatn(bool value) async => showArabicMatn = value;
+  @override
+  bool translationAudioDuringContinuousPlayback = true;
+  @override
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value) async =>
+      translationAudioDuringContinuousPlayback = value;
 
   int resetCalls = 0;
   @override

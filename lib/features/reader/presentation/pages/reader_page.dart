@@ -238,9 +238,13 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   // Whether the Detailed view shows the Arabic matn above each translation. On by
   // default; off = a translations-only reading. Opt-out from Settings; persisted.
   late bool _showArabicMatn = _settings.showArabicMatn;
-  // Al-Fatihah translation-audio POC (FeatureFlags.translationAudioFatihaPoc)
-  // — session-only, not persisted; resets to off on every reader open.
-  bool _translationAudioPocEnabled = false;
+  // Translation-audio chaining (FeatureFlags.translationAudio) — session-only,
+  // not persisted; resets to off on every reader open.
+  bool _translationAudioEnabled = false;
+  // Whether translation audio keeps chaining once autoplay rolls past the
+  // manually-tapped verse. On by default; persisted (unlike the toggle above).
+  late bool _translationAudioContinuous =
+      _settings.translationAudioDuringContinuousPlayback;
 
   // Immersive reading (both viewports): reading forward (swipe up) hides the app
   // bar, player bar, and OS system bars; a reverse swipe (down) brings them back;
@@ -407,9 +411,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           listenWhen: (a, b) =>
               FeatureFlags.audioRecitation && a.ayahs != b.ayahs,
           listener: (context, state) {
-            context
-                .read<AyahAudioCubit>()
-                .setSequence([for (final a in state.ayahs) a.id]);
+            final audioCubit = context.read<AyahAudioCubit>();
+            audioCubit.setSequence([for (final a in state.ayahs) a.id]);
+            audioCubit.setAyahLocations([
+              for (final a in state.ayahs)
+                (id: a.id, surah: a.surahId, ayahNumber: a.ayahNumber),
+            ]);
           },
           builder: (context, state) {
             if (state.status == ReaderStatus.error) {
@@ -584,7 +591,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
         // Only the live page drives immersion (forward-scroll hides the chrome).
         onImmersionChanged: interactive ? _setChromeHidden : null,
         onScrollSettled: interactive ? _applyPendingSystemUiMode : null,
-        translationAudioEnabled: _translationAudioPocEnabled,
+        translationAudioEnabled: _translationAudioEnabled,
         onToggleTranslationAudio:
             interactive ? _toggleTranslationAudioForVerse : null,
       );
@@ -833,6 +840,10 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           onToggleTranslationPeek: _toggleShowTranslationPeek,
           showArabicMatn: _showArabicMatn,
           onToggleShowArabic: _toggleShowArabicMatn,
+          translationAudioDuringContinuousPlayback:
+              _translationAudioContinuous,
+          onToggleTranslationAudioDuringContinuousPlayback:
+              _toggleTranslationAudioContinuous,
           onReset: _resetReadingPreferences,
           appActions: appSettingsActions(context),
         ),
@@ -863,7 +874,14 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
       _showTranslationPeek =
           FeatureFlags.readingTranslationPeek && _settings.showTranslationPeek;
       _showArabicMatn = _settings.showArabicMatn;
+      _translationAudioContinuous =
+          _settings.translationAudioDuringContinuousPlayback;
     });
+    unawaited(
+      _audioCubit?.setTranslationAudioDuringContinuousPlayback(
+        _translationAudioContinuous,
+      ),
+    );
     _syncTranslationAudioAvailability();
     if (scriptChanged) {
       _cubit.clearCache();
@@ -914,13 +932,12 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
   /// with no headphones icon left to even show it's still on (the icon itself
   /// is gated on `hasAnyTranslationAudio`, see `_ayahTile`).
   void _syncTranslationAudioAvailability() {
-    if (!FeatureFlags.translationAudioFatihaPoc ||
-        !_translationAudioPocEnabled) {
+    if (!FeatureFlags.translationAudio || !_translationAudioEnabled) {
       return;
     }
     final shown = _activeLangs(_cubit.state.resources);
     if (!hasAnyTranslationAudio(shown)) {
-      _toggleTranslationAudioPoc(false);
+      _toggleTranslationAudio(false);
     }
   }
 
@@ -980,6 +997,14 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     setState(() {
       _viewport = detailed ? _Viewport.detailed : _Viewport.reading;
     });
+    // Translation audio is Detailed-only (plan decision #1) — the headphones
+    // toggle only exists on Detailed's ayah tiles, so leaving Detailed with it
+    // still on would strand the chain running with no affordance left to stop
+    // it. Force it off; it's session-only anyway, so this never surprises a
+    // later Detailed re-entry with a state the reader didn't set there.
+    if (!detailed && _translationAudioEnabled) {
+      _toggleTranslationAudio(false);
+    }
     _cubit.setViewportDetailed(detailed);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _setChromeHidden(false, applySystemUiNow: true);
@@ -1072,17 +1097,26 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
     unawaited(_settings.setShowArabicMatn(value));
   }
 
-  /// Al-Fatihah translation-audio POC toggle (docs/translation-audio-chaining-plan.md
-  /// Phase 2) — forwards straight to the cubit; session-only, no persistence.
-  void _toggleTranslationAudioPoc(bool value) {
-    setState(() => _translationAudioPocEnabled = value);
+  /// Whether translation audio keeps chaining once autoplay rolls past the
+  /// manually-tapped verse (decision #3). On by default; persisted.
+  void _toggleTranslationAudioContinuous(bool value) {
+    setState(() => _translationAudioContinuous = value);
+    unawaited(
+      _audioCubit?.setTranslationAudioDuringContinuousPlayback(value),
+    );
+  }
+
+  /// Translation-audio chaining toggle (docs/translation-audio-chaining-plan.md)
+  /// — forwards straight to the cubit; session-only, no persistence.
+  void _toggleTranslationAudio(bool value) {
+    setState(() => _translationAudioEnabled = value);
     _audioCubit?.setTranslationAudioEnabled(value);
   }
 
-  /// Same toggle as [_toggleTranslationAudioPoc], but flipped from the ayah
+  /// Same toggle as [_toggleTranslationAudio], but flipped from the ayah
   /// row's headphones affordance (one tap, no Settings sheet detour).
   void _toggleTranslationAudioForVerse() =>
-      _toggleTranslationAudioPoc(!_translationAudioPocEnabled);
+      _toggleTranslationAudio(!_translationAudioEnabled);
 
   /// The active viewport reported a sustained scroll direction: hide the chrome
   /// (app bar + player bar + OS system bars) while reading forward, show it on a
@@ -1216,8 +1250,8 @@ class _DetailedList extends StatefulWidget {
   /// See [MushafView.onScrollSettled] — applies deferred platform chrome.
   final VoidCallback? onScrollSettled;
 
-  /// Whether translation audio is chained in after Arabic (Al-Fatihah POC,
-  /// session-wide — docs/translation-audio-chaining-plan.md).
+  /// Whether translation audio is chained in after Arabic, session-wide —
+  /// docs/translation-audio-chaining-plan.md.
   final bool translationAudioEnabled;
 
   /// Toggle translation audio from an ayah row's headphones affordance. Null
@@ -1556,8 +1590,7 @@ class _DetailedListState extends State<_DetailedList> {
           : () => context.read<AyahAudioCubit>().toggle(ayah.id),
       translationAudioEnabled: widget.translationAudioEnabled,
       onToggleTranslationAudio: audio != null &&
-              FeatureFlags.translationAudioFatihaPoc &&
-              isFatihaPocAyah(surah: ayah.surahId, ayah: ayah.ayahNumber) &&
+              FeatureFlags.translationAudio &&
               hasAnyTranslationAudio(
                 widget.shownResources.map((r) => r.slug),
               )

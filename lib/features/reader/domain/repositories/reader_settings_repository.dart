@@ -43,12 +43,21 @@ abstract interface class ReaderSettingsRepository {
   /// Arabic line is hidden). Detailed-only.
   bool get showArabicMatn;
 
+  /// Whether translation audio keeps chaining in as playback auto-advances
+  /// past the verse the reader actually tapped ("continuous" playback).
+  /// Defaults to **true**. A single tapped verse always chains its
+  /// translation audio regardless of this setting — it only governs whether
+  /// that continues once autoplay rolls on to verses the reader didn't
+  /// explicitly start (docs/translation-audio-chaining-plan.md decision #3).
+  bool get translationAudioDuringContinuousPlayback;
+
   Future<void> setFontSize(double value);
   Future<void> setDetailed(bool value);
   Future<void> setSelectedTranslations(List<String> slugs);
   Future<void> setRecitationSpeed(double value);
   Future<void> setShowTranslationPeek(bool value);
   Future<void> setShowArabicMatn(bool value);
+  Future<void> setTranslationAudioDuringContinuousPlayback(bool value);
 
   /// Resets every reading preference above back to its default: font size,
   /// script, viewport, selected translations, recitation speed, and the
