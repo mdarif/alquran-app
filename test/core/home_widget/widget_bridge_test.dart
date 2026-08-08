@@ -37,6 +37,12 @@ class _FakeRepo implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.ok, _loc);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
 }
 
 void main() {
@@ -100,9 +106,10 @@ void main() {
     final json =
         jsonDecode(bridge.buildPayload().encode()) as Map<String, dynamic>;
 
-    expect(json['schemaVersion'], 1);
+    expect(json['schemaVersion'], 2);
     expect(json['hasLocation'], true);
     expect(json['locationLabel'], 'Abu Dhabi');
+    expect(json['timezoneId'], isNull);
 
     final days = json['days'] as List;
     expect(days, hasLength(3));
@@ -113,6 +120,6 @@ void main() {
     final fajr = (firstDay['markers'] as List).first as Map<String, dynamic>;
     expect(fajr['name'], 'Fajr');
     expect(fajr['isSalah'], true);
-    expect(fajr['at'], '2026-06-23T04:30:00.000'); // device-local wall-clock
+    expect(fajr['at'], endsWith('Z')); // explicit UTC, not a wall-clock value
   });
 }

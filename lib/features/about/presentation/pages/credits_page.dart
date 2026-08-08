@@ -113,6 +113,16 @@ class CreditsPage extends StatelessWidget {
               ),
             ],
           ),
+          const _Section(
+            title: 'Location data',
+            children: [
+              _Credit(
+                name: 'GeoNames cities database',
+                detail: 'GeoNames · CC BY 4.0.',
+                url: 'https://www.geonames.org',
+              ),
+            ],
+          ),
           if (FeatureFlags.audioRecitation)
             const _Section(
               title: 'Recitation',

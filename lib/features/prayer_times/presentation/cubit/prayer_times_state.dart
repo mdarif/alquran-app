@@ -15,6 +15,7 @@ import '../../domain/location/location_provider.dart';
 class PrayerTimesState extends Equatable {
   const PrayerTimesState({
     this.today,
+    this.tomorrow,
     this.current,
     this.next,
     this.forbidden,
@@ -25,6 +26,7 @@ class PrayerTimesState extends Equatable {
 
   const PrayerTimesState.unset()
       : today = null,
+        tomorrow = null,
         current = null,
         next = null,
         forbidden = null,
@@ -33,6 +35,7 @@ class PrayerTimesState extends Equatable {
         status = null;
 
   final DailyPrayerTimes? today;
+  final DailyPrayerTimes? tomorrow;
   final (Prayer, DateTime)? current;
   final NextPrayer? next;
   final ForbiddenWindow? forbidden;
@@ -48,6 +51,7 @@ class PrayerTimesState extends Equatable {
 
   PrayerTimesState copyWith({LocationStatus? status}) => PrayerTimesState(
         today: today,
+        tomorrow: tomorrow,
         current: current,
         next: next,
         forbidden: forbidden,
@@ -59,6 +63,7 @@ class PrayerTimesState extends Equatable {
   @override
   List<Object?> get props => [
         today?.date,
+        tomorrow?.date,
         current?.$1,
         current?.$2,
         next?.prayer,

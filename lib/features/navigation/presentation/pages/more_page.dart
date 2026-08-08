@@ -9,6 +9,7 @@ import '../../../../core/theme/theme_cubit.dart';
 import '../../../../core/theme/theme_toggle_button.dart';
 import '../../../about/presentation/pages/about_page.dart';
 import 'app_settings_page.dart';
+import 'reminders_settings_page.dart';
 
 /// Phase → app-bar glyph (mirrors [ThemeToggleButton]'s private mapping); Dusk
 /// is the only filled one (the golden going-down light).
@@ -23,8 +24,8 @@ IconData _phaseIcon(DayPhase phase) => switch (phase) {
 bool _phaseFilled(DayPhase phase) => phase == DayPhase.maghrib;
 
 /// The More tab: secondary app utilities and preferences — Reading Theme,
-/// Settings (which itself carries Share/Check-for-updates), and About. Reuses
-/// existing sheets/pages; no new business logic.
+/// Reminders, Settings (which itself carries Share/Check-for-updates), and
+/// About. Reuses existing sheets/pages; no new business logic.
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
 
@@ -59,6 +60,18 @@ class MorePage extends StatelessWidget {
                 trailing: const AppIcon(AppIcons.chevronRight),
                 onTap: () => _openReadingLight(context, theme),
               ),
+            ListTile(
+              key: WidgetKeys.moreRemindersRow,
+              leading: const AppIcon(AppIcons.reminders),
+              title: const Text('Reminders'),
+              subtitle: const Text('Sunnah occasions + Salat notifications'),
+              trailing: const AppIcon(AppIcons.chevronRight),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const RemindersSettingsPage(),
+                ),
+              ),
+            ),
             ListTile(
               key: WidgetKeys.moreSettingsRow,
               leading: const AppIcon(AppIcons.settings),

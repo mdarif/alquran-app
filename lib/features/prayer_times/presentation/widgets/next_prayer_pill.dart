@@ -1,3 +1,5 @@
+// ignore_for_file: require_trailing_commas, unawaited_futures
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -9,6 +11,7 @@ import '../../domain/entities/forbidden_window.dart';
 import '../../domain/location/location_provider.dart';
 import '../cubit/prayer_times_cubit.dart';
 import '../cubit/prayer_times_state.dart';
+import '../pages/prayer_location_page.dart';
 import 'prayer_times_sheet.dart';
 
 /// The subtle app-bar indicator: a static `Asr 4:01` pill (matching the
@@ -108,18 +111,13 @@ class NextPrayerPill extends StatelessWidget {
   }
 
   Future<void> _enable(BuildContext context, PrayerTimesCubit cubit) async {
-    final messenger = ScaffoldMessenger.of(context);
     await cubit.enableLocation();
     final status = cubit.state.status;
     if (!context.mounted || status == null || status == LocationStatus.ok) {
       return;
     }
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(_statusMessage(status)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    Navigator.push(context,
+        MaterialPageRoute<void>(builder: (_) => const PrayerLocationPage()));
   }
 
   void _handleTap(BuildContext context, PrayerTimesCubit cubit) {
@@ -146,17 +144,10 @@ class NextPrayerPill extends StatelessWidget {
         // The Hijri date block is gated; null hides it (the sheet just renders).
         hijriBaseDate: FeatureFlags.hijriDate ? cubit.hijriBaseDate : null,
         gregorianDate: cubit.gregorianDate,
+        compact: true,
       ),
     );
   }
-
-  String _statusMessage(LocationStatus status) => switch (status) {
-        LocationStatus.serviceOff =>
-          'Turn on location services to see prayer times.',
-        LocationStatus.deniedForever =>
-          'Enable location for Al Quran in Settings to see prayer times.',
-        _ => 'Location is needed to show prayer times.',
-      };
 }
 
 /// The phase-tuned caution gold (also the ornamentation gold), read DEFENSIVELY:

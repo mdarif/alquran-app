@@ -97,6 +97,19 @@ class DailyPrayerTimes {
         ),
       );
 
+  /// Suhur ends at true dawn — precisely Fajr, without a precautionary offset.
+  DateTime get suhurEnd => fajr;
+
+  /// Iftar begins at sunset — precisely Maghrib, without a delay.
+  DateTime get iftar => maghrib;
+
+  /// Start of the last third of the night, calculated from tomorrow's Fajr.
+  DateTime lastThirdFrom(DateTime nextFajr) => maghrib.add(
+        Duration(
+          microseconds: (nextFajr.difference(maghrib).inMicroseconds * 2) ~/ 3,
+        ),
+      );
+
   /// The three daily periods in which prayer is prohibited, in clock order.
   /// Degenerate spans (start ≥ end) are dropped — a guard for unusual inputs;
   /// real data always has solar noon ≤ Dhuhr, so all three hold.

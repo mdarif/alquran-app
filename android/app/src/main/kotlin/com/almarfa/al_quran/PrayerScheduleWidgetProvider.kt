@@ -11,6 +11,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Wide "today's prayers" widget: the five salah across a row (Sunrise excluded —
@@ -51,7 +52,7 @@ class PrayerScheduleWidgetProvider : HomeWidgetProvider() {
             val (name, at) = salah[i]
             val highlight = i == nextIndex
             views.setTextViewText(NAME_IDS[i], name)
-            views.setTextViewText(TIME_IDS[i], TIME_FORMAT.format(Date(at)))
+            views.setTextViewText(TIME_IDS[i], timeFormat(raw).format(Date(at)))
             views.setTextColor(NAME_IDS[i], if (highlight) HL_NAME else DIM_NAME)
             views.setTextColor(TIME_IDS[i], if (highlight) HL_TIME else DIM_TIME)
             views.setInt(
@@ -109,11 +110,21 @@ class PrayerScheduleWidgetProvider : HomeWidgetProvider() {
         private val HL_NAME = Color.parseColor("#E4D9B8")
         private val HL_TIME = Color.parseColor("#FFFFFF")
 
-        // Dart writes device-local wall-clock with no offset; parse in the
-        // device's default zone (same device) to recover the right instant.
-        private val ISO_FORMAT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
+        // Dart serialises UTC instants; display them in the selected location.
+        private val ISO_FORMAT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        }
         // No AM/PM here: 5 columns stay uniform width, and prayer times are
         // unambiguous by time of day. (The single next-prayer widget keeps AM/PM.)
-        private val TIME_FORMAT = SimpleDateFormat("h:mm", Locale.getDefault())
+        private fun timeFormat(raw: String?): SimpleDateFormat {
+            val timezoneId = try {
+                raw?.let { JSONObject(it).optString("timezoneId") }
+            } catch (_: Exception) {
+                null
+            }
+            return SimpleDateFormat("h:mm", Locale.getDefault()).apply {
+                timeZone = TimeZone.getTimeZone(timezoneId ?: TimeZone.getDefault().id)
+            }
+        }
     }
 }

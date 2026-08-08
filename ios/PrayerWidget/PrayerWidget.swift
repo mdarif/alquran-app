@@ -19,6 +19,7 @@ private struct WidgetPayload: Decodable {
     let generatedAt: String
     let hasLocation: Bool
     let locationLabel: String?
+    let timezoneId: String?
     let days: [WidgetDay]
 }
 
@@ -34,15 +35,20 @@ private enum PrayerData {
     static let appGroup = "group.com.almarfa.alQuran"
     static let payloadKey = "prayer_widget_payload"
 
-    // Dart writes device-local wall-clock with no offset; parse in the device's
-    // own zone (same device) to recover the right instant.
-    static let isoFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
-        f.timeZone = .current
+    // Dart writes explicit UTC instants; the payload timezone controls display.
+    static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
+
+    static func format(_ date: Date, pattern: String, timezoneId: String?) -> String {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.dateFormat = pattern
+        f.timeZone = timezoneId.flatMap(TimeZone.init(identifier:)) ?? .current
+        return f.string(from: date)
+    }
 
     static func load() -> WidgetPayload? {
         guard
@@ -138,12 +144,6 @@ private struct PrayerProvider: TimelineProvider {
 private struct NextPrayerView: View {
     let entry: PrayerEntry
 
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm a"
-        return f
-    }()
-
     var body: some View {
         VStack(spacing: 2) {
             if let payload = entry.payload, payload.hasLocation,
@@ -152,7 +152,7 @@ private struct NextPrayerView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .tracking(1.2)
                     .foregroundColor(Palette.labelBright)
-                Text(Self.timeFormatter.string(from: next.date))
+                Text(PrayerData.format(next.date, pattern: "h:mm a", timezoneId: payload.timezoneId))
                     .font(.system(size: 26, weight: .bold))
                     .foregroundColor(Palette.hero)
             } else {
@@ -175,12 +175,6 @@ private struct NextPrayerView: View {
 private struct ScheduleView: View {
     let entry: PrayerEntry
 
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm" // no AM/PM — keeps the five columns uniform
-        return f
-    }()
-
     var body: some View {
         Group {
             if let payload = entry.payload, payload.hasLocation {
@@ -193,7 +187,7 @@ private struct ScheduleView: View {
                             Text(marker.name.uppercased())
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundColor(highlighted ? Palette.gold : Palette.label)
-                            Text(Self.timeFormatter.string(from: marker.date))
+                            Text(PrayerData.format(marker.date, pattern: "h:mm", timezoneId: payload.timezoneId))
                                 .font(.system(size: 15, weight: highlighted ? .bold : .regular))
                                 .foregroundColor(highlighted ? .white : Palette.time)
                         }

@@ -4,6 +4,7 @@ import 'package:al_quran/features/prayer_times/domain/entities/prayer.dart';
 import 'package:al_quran/features/prayer_times/presentation/widgets/prayer_times_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:al_quran/features/prayer_times/presentation/widgets/prayer_timeline.dart';
 
 DailyPrayerTimes _day() {
   final d = DateTime(2000, 1, 1);
@@ -56,6 +57,11 @@ Future<void> _pumpSheet(WidgetTester tester, {required DateTime base}) {
 }
 
 void main() {
+  test('clock tiles include AM/PM unless the device uses 24-hour time', () {
+    final morning = DateTime(2026, 8, 8, 1, 16);
+    expect(formatClockTime(morning, use24h: false), '1:16 AM');
+    expect(formatClockTime(morning, use24h: true), '01:16');
+  });
   testWidgets('shows the title-cased heading', (tester) async {
     await _pumpSheet(tester, base: DateTime(2000, 1, 1));
     expect(find.text("Today's Prayer Times"), findsOneWidget);
@@ -170,6 +176,67 @@ void main() {
     expect(find.text('Next'), findsNothing);
     expect(find.text('Dhuhr'), findsWidgets);
     expect(find.text('05:10:00'), findsOneWidget);
+  });
+
+  testWidgets('timeline highlights the next salah before Fajr', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PrayerTimesSheet(
+            times: _day(),
+            next: Prayer.fajr,
+            initialNow: DateTime(2000, 1, 1, 3),
+            liveCountdown: false,
+            compact: false,
+            showDetailedRows: false,
+          ),
+        ),
+      ),
+    );
+
+    final fajr = tester.widgetList<Text>(find.text('Fajr')).last;
+    expect(fajr.style?.fontWeight, FontWeight.w600);
+  });
+
+  testWidgets('full prayer page labels the timeline as today', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PrayerTimesSheet(
+            times: _day(),
+            next: Prayer.fajr,
+            initialNow: DateTime(2000, 1, 1, 3),
+            liveCountdown: false,
+            compact: false,
+            showDetailedRows: false,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Today'), findsOneWidget);
+  });
+
+  testWidgets('falls back to next calendar Fajr for Tahajjud', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PrayerTimesSheet(
+            times: _day(),
+            next: Prayer.fajr,
+            nextFajr: DateTime(2000, 1, 1, 5),
+            initialNow: DateTime(2000, 1, 1, 3),
+            liveCountdown: false,
+            compact: false,
+            showDetailedRows: false,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Tahajjud'), findsOneWidget);
+    expect(find.text('1:10 AM'), findsOneWidget);
+    expect(find.text('9:40 AM'), findsNothing);
   });
 
   testWidgets('skips the active salah when passed next is stale',

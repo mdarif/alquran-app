@@ -294,6 +294,18 @@ class AppIcons {
     0xe1b7,
     fontFamily: _kSymbolFamily,
   ); // location_searching_rounded
+  static const IconData myLocation = IconData(
+    0xe55c,
+    fontFamily: _kSymbolFamily,
+  ); // my_location_rounded
+  static const IconData editLocation = IconData(
+    0xe568,
+    fontFamily: _kSymbolFamily,
+  ); // edit_location_alt_rounded
+  static const IconData locationOn = IconData(
+    0xe55f,
+    fontFamily: _kSymbolFamily,
+  ); // location_on_rounded
 }
 
 /// The fixed in-app icon size scale. Use these instead of bare numbers so icons

@@ -11,6 +11,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 /**
  * Compact home-screen "Next prayer" widget: a tight caps prayer-name label over a
@@ -55,7 +56,7 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
             }
 
             views.setTextViewText(R.id.widget_prayer, next.name)
-            views.setTextViewText(R.id.widget_time, TIME_FORMAT.format(Date(next.at)))
+            views.setTextViewText(R.id.widget_time, timeFormat(root).format(Date(next.at)))
         } catch (e: Exception) {
             showPrompt(context, views)
         }
@@ -97,11 +98,7 @@ class PrayerWidgetProvider : HomeWidgetProvider() {
     companion object {
         private const val PAYLOAD_KEY = "prayer_widget_payload"
 
-        // Dart writes device-local wall-clock with no offset; parse in the
-        // device's default zone (same device) to recover the right instant.
-        private val ISO_FORMAT =
-            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
-        private val TIME_FORMAT =
-            SimpleDateFormat("h:mm a", Locale.getDefault())
+        private val ISO_FORMAT = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
+        private fun timeFormat(root: JSONObject) = SimpleDateFormat("h:mm a", Locale.getDefault()).apply { timeZone = TimeZone.getTimeZone(root.optString("timezoneId", TimeZone.getDefault().id)) }
     }
 }

@@ -4,6 +4,8 @@ import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest_10y.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 /// A scriptable LocationProvider so the repo can be tested without `geolocator`.
 class _FakeLocationProvider implements LocationProvider {
@@ -25,24 +27,23 @@ final _date = DateTime.utc(2026, 6, 23);
 Future<PrayerTimesRepositoryImpl> _repo(
   _FakeLocationProvider provider, {
   Map<String, Object> prefs = const {},
-  DateTime Function(DateTime)? toLocal,
+  tz.Location? zone,
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
+  final sharedPreferences = await SharedPreferences.getInstance();
+  if (zone == null) {
+    return PrayerTimesRepositoryImpl(sharedPreferences, provider);
+  }
   return PrayerTimesRepositoryImpl(
-    await SharedPreferences.getInstance(),
+    sharedPreferences,
     provider,
-    // Default: keep the UTC wall clock, so every expectation below is
-    // machine-timezone independent (the real app injects DateTime.toLocal).
-    toLocal: toLocal ?? _asIs,
+    zoneFor: (_) => zone,
   );
 }
 
-/// Identity conversion: times stay on the UTC clock, deterministic everywhere.
-DateTime _asIs(DateTime utc) =>
-    DateTime(utc.year, utc.month, utc.day, utc.hour, utc.minute);
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  tzdata.initializeTimeZones();
   final provider = _FakeLocationProvider(
     const LocationResult(LocationStatus.ok, _abuDhabi),
   );
@@ -90,17 +91,15 @@ void main() {
       );
     });
 
-    test('returns plain LOCAL times so isAfter(now) ranks the day correctly',
+    test('returns zoned times so isAfter(now) ranks instants correctly',
         () async {
-      // Regression: adhan's utcOffset path returns isUtc-flagged times whose
-      // instant is shifted by the offset, so late at night a long-passed prayer
-      // (e.g. Asr) still read as "after now". timesFor must hand back local
-      // DateTimes whose instant matches their wall clock.
+      // A TZDateTime can be UTC, but still represents the exact instant and
+      // supports DateTime's normal comparison APIs.
       final repo = await _repo(provider);
       final t = repo.timesFor(_abuDhabi, _date)!;
 
-      expect(t.asr.isUtc, isFalse);
-      expect(t.isha.isUtc, isFalse);
+      expect(t.asr, isA<tz.TZDateTime>());
+      expect(t.isha, isA<tz.TZDateTime>());
 
       // One minute past Isha, every prayer has passed → nextAfter is null and
       // the cubit rolls over to tomorrow's Fajr (instead of resurfacing Asr).
@@ -108,31 +107,39 @@ void main() {
       expect(t.asr.isAfter(afterIsha), isFalse);
       expect(t.nextAfter(afterIsha), isNull);
     });
+
+    test('the selected city controls wall-clock rendering, not the device',
+        () async {
+      final london = await _repo(provider);
+      final karachi = await _repo(provider);
+      final londonTimes = london.timesFor(
+        const GeoLocation(
+          latitude: 24.4539,
+          longitude: 54.3773,
+          timezoneId: 'Europe/London',
+        ),
+        _date,
+      )!;
+      final karachiTimes = karachi.timesFor(
+        const GeoLocation(
+          latitude: 24.4539,
+          longitude: 54.3773,
+          timezoneId: 'Asia/Karachi',
+        ),
+        _date,
+      )!;
+
+      expect(londonTimes.fajr.difference(karachiTimes.fajr), Duration.zero);
+      expect(londonTimes.fajr.hour, isNot(karachiTimes.fajr.hour));
+    });
   });
 
   group('PrayerTimesRepositoryImpl — daylight saving', () {
-    // London's clocks go back 02:00 BST → 01:00 GMT on 25 Oct 2026. Every
-    // prayer that day falls AFTER the switch, so all six must read GMT.
-    // Regression: the old code froze one offset for the whole day, taken from
-    // the moment the app happened to be opened — so opening at 00:30 (still
-    // BST) shifted the entire day an hour late (Fajr 05:49 instead of 04:49).
-    DateTime londonLocal(DateTime utc) {
-      final bst = utc.isBefore(DateTime.utc(2026, 10, 25, 1));
-      final shifted = utc.add(Duration(hours: bst ? 1 : 0));
-      return DateTime(
-        shifted.year,
-        shifted.month,
-        shifted.day,
-        shifted.hour,
-        shifted.minute,
-      );
-    }
-
     const london = GeoLocation(latitude: 51.5074, longitude: -0.1278);
 
     test('converts each time on its own instant, not one whole-day offset',
         () async {
-      final repo = await _repo(provider, toLocal: londonLocal);
+      final repo = await _repo(provider, zone: tz.getLocation('Europe/London'));
       final t = repo.timesFor(london, DateTime(2026, 10, 25))!;
 
       // GMT wall clock — what the clock on the wall reads at those moments.
@@ -144,7 +151,7 @@ void main() {
 
     test('the result does not depend on the time of day it was computed at',
         () async {
-      final repo = await _repo(provider, toLocal: londonLocal);
+      final repo = await _repo(provider, zone: tz.getLocation('Europe/London'));
       // Pre-switch (00:30 BST) vs post-switch (12:00 GMT) on the same date.
       final early = repo.timesFor(london, DateTime(2026, 10, 25, 0, 30))!;
       final later = repo.timesFor(london, DateTime(2026, 10, 25, 12))!;
@@ -222,6 +229,39 @@ void main() {
         prefs: {'prayer_lat': 25.2, 'prayer_lon': 55.27},
       );
       expect(repo.location?.latitude, 25.2);
+      expect(repo.location?.source, LocationSource.device);
+      expect(repo.location?.timezoneId, isNull);
+    });
+
+    test('saveLocation persists city timezone/source and clears stale labels',
+        () async {
+      final repo = await _repo(provider, prefs: {'prayer_label': 'Stale'});
+      await repo.saveLocation(
+        const GeoLocation(
+          latitude: 24.86,
+          longitude: 67.01,
+          timezoneId: 'Asia/Karachi',
+          source: LocationSource.city,
+        ),
+      );
+      expect(repo.location?.label, isNull);
+      expect(repo.location?.timezoneId, 'Asia/Karachi');
+      expect(repo.location?.source, LocationSource.city);
+    });
+
+    test('clearLocation removes every persisted field', () async {
+      final repo = await _repo(
+        provider,
+        prefs: {
+          'prayer_lat': 25.2,
+          'prayer_lon': 55.27,
+          'prayer_label': 'Dubai',
+          'prayer_tz': 'Asia/Dubai',
+          'prayer_source': 'city',
+        },
+      );
+      await repo.clearLocation();
+      expect(repo.location, isNull);
     });
   });
 }

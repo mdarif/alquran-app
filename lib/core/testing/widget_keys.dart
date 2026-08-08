@@ -118,7 +118,7 @@ class WidgetKeys {
   static const hijriDateLine = Key('hijri-date-line');
 
   // Reminders (Sunnah reminders + Salat notifications, one settings screen)
-  static const remindersButton = Key('reminders-button');
+  static const moreRemindersRow = Key('more-reminders-row');
   static const remindersPage = Key('reminders-page');
   static const sunnahRemindersToggle = Key('sunnah-reminders-toggle');
   static const sunnahRemindersInfoButton = Key('sunnah-reminders-info-button');
@@ -142,6 +142,11 @@ class WidgetKeys {
   static const bottomNavLibrary = Key('bottom-nav-library');
   static const bottomNavMore = Key('bottom-nav-more');
   static const prayerPage = Key('prayer-page');
+  static const prayerLocationPage = Key('prayer-location-page');
+  static const prayerLocationRow = Key('prayer-location-row');
+  static const prayerLocationUseGps = Key('prayer-location-use-gps');
+  static const prayerCitySearchField = Key('prayer-city-search');
+  static Key cityResult(int index) => Key('city-result-$index');
   static const libraryPage = Key('library-page');
   static const libraryTranslationsRow = Key('library-translations-row');
   static const libraryTafsirRow = Key('library-tafsir-row');

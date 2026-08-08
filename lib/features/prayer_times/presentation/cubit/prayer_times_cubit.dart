@@ -70,11 +70,10 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     // rollover below swaps `day` for tomorrow.
     final forbidden = day.forbiddenAt(now);
     final current = day.currentSalahAt(now);
+    final tomorrow = repo.timesFor(location, now.add(const Duration(days: 1)));
     var upcoming = day.nextAfter(now);
     if (upcoming == null) {
       // Every prayer today has passed → the next is tomorrow's Fajr.
-      final tomorrow =
-          repo.timesFor(location, now.add(const Duration(days: 1)));
       if (tomorrow == null) {
         return const PrayerTimesState(
           hasLocation: true,
@@ -87,6 +86,7 @@ class PrayerTimesCubit extends Cubit<PrayerTimesState> {
     final remaining = upcoming.$2.difference(now);
     return PrayerTimesState(
       today: day,
+      tomorrow: tomorrow,
       current: current == null ? null : (current.$1, current.$2),
       next: NextPrayer(
         prayer: upcoming.$1,

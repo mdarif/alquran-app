@@ -78,5 +78,20 @@ void main() {
       expect(_day.forbiddenAt(_t(10)), isNull); // mid-morning — permitted
       expect(_day.forbiddenAt(_day.dhuhr), isNull); // zawāl ends it
     });
+
+    test('extra timings follow the fixed devotional definitions', () {
+      final nextFajr = DateTime(2026, 6, 24, 4, 10);
+      expect(_day.suhurEnd, _day.fajr);
+      expect(_day.iftar, _day.maghrib);
+      expect(
+        _day.lastThirdFrom(nextFajr),
+        _day.maghrib.add(
+          Duration(
+            microseconds:
+                (nextFajr.difference(_day.maghrib).inMicroseconds * 2) ~/ 3,
+          ),
+        ),
+      );
+    });
   });
 }

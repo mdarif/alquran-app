@@ -153,6 +153,8 @@ flutter:
     # precedent (no CDN dependency during POC). Licensing not yet confirmed for
     # public release — see the plan's open questions.
     - assets/audio/poc/en-sahih-international/
+    # Compact GeoNames city index for the manual prayer-location picker.
+    - assets/geo/cities.bin.gz
 
   # KFGQPC HAFS Uthmanic Script — UthmanicHafs1 Ver18 (Regular, weight 400), the
   # primary Arabic face (PRD 4.1). This is the regular-weight KFGQPC face the

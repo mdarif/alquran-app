@@ -226,6 +226,12 @@ class _FakePrayerTimesRepositoryEmpty implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.unavailable, null);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
   @override
   DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) => null;
 }
@@ -236,6 +242,12 @@ class _FakePrayerTimesRepositoryWithLocation implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.ok, _loc);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
   @override
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
     final d = DateTime(date.year, date.month, date.day);
@@ -257,7 +269,11 @@ class _FakePrayerNotificationSettingsRepository
   @override
   bool enabled = false;
   @override
+  bool get allowZoneMismatchAlerts => false;
+  @override
   Future<void> setEnabled(bool value) async => enabled = value;
+  @override
+  Future<void> setAllowZoneMismatchAlerts(bool value) async {}
 }
 
 class _FakeNotificationScheduler implements NotificationScheduler {

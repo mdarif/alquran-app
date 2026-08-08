@@ -8,6 +8,7 @@ import 'package:al_quran/features/prayer_times/domain/scheduling/prayer_notifica
 import 'package:al_quran/features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import 'package:al_quran/features/reminders/domain/scheduling/notification_scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
 
 const _loc = GeoLocation(latitude: 24.45, longitude: 54.38);
 
@@ -22,6 +23,12 @@ class _FakePrayerRepo implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.ok, _loc);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
 
   @override
   DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) {
@@ -46,7 +53,14 @@ class _FakeSettings implements PrayerNotificationSettingsRepository {
   bool enabled;
 
   @override
+  bool allowZoneMismatchAlerts = false;
+
+  @override
   Future<void> setEnabled(bool value) async => enabled = value;
+
+  @override
+  Future<void> setAllowZoneMismatchAlerts(bool value) async =>
+      allowZoneMismatchAlerts = value;
 }
 
 class _Scheduled {
@@ -201,6 +215,7 @@ class _FakeScheduler implements NotificationScheduler {
 }
 
 void main() {
+  setUpAll(tzdata.initializeTimeZones);
   final now = DateTime(2026, 8, 3, 12);
 
   PrayerNotificationsCubit build({
@@ -255,6 +270,33 @@ void main() {
     final tap = parsePrayerTimesPayload(asrPayload);
     expect(tap?.prayer, Prayer.asr);
     expect(tap?.fireAt, DateTime(2026, 8, 3, 17, 35));
+  });
+
+  test('timezone mismatch pauses alerts until explicitly overridden', () async {
+    final settings = _FakeSettings();
+    final scheduler = _FakeScheduler();
+    final cubit = build(
+      settings: settings,
+      scheduler: scheduler,
+      repo: _FakePrayerRepo(
+        saved: const GeoLocation(
+          latitude: 40.7128,
+          longitude: -74.006,
+          timezoneId: 'America/New_York',
+        ),
+      ),
+    );
+
+    await cubit.enable();
+
+    expect(cubit.state.zoneMismatch, isTrue);
+    expect(scheduler.oneShots, isEmpty);
+
+    await cubit.turnOnAnyway();
+
+    expect(settings.allowZoneMismatchAlerts, isTrue);
+    expect(cubit.state.zoneMismatch, isFalse);
+    expect(scheduler.oneShots, isNotEmpty);
   });
 
   test('notification copy uses prayer name and formatted time', () async {

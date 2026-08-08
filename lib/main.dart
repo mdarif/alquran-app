@@ -13,6 +13,7 @@ import 'features/reminders/domain/scheduling/notification_scheduler.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await _initTimeZones();
   await configureDependencies();
   await _initReminders();
   if (FeatureFlags.audioRecitation) {
@@ -27,10 +28,9 @@ Future<void> main() async {
   runApp(const AlQuranApp());
 }
 
-/// Timezone init (required by the notification scheduler's `zonedSchedule`) +
-/// plugin init. Both are best-effort with a UTC fallback so a lookup failure
-/// can never block launch — reminders just won't fire, the reader is unaffected.
-Future<void> _initReminders() async {
+/// Initialise zones before dependency injection, so prayer calculations can
+/// never race timezone setup. A failure leaves timezone's UTC fallback active.
+Future<void> _initTimeZones() async {
   try {
     tzdata.initializeTimeZones();
     final local = await FlutterTimezone.getLocalTimezone();
@@ -38,5 +38,9 @@ Future<void> _initReminders() async {
   } catch (_) {
     // tz.local defaults to UTC.
   }
+}
+
+/// Initialise notifications after the dependency graph exists.
+Future<void> _initReminders() async {
   await GetIt.I<NotificationScheduler>().init(onSelect: routeFromPayload);
 }

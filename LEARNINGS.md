@@ -1364,6 +1364,39 @@ was chased, not how hard it was:
   `defaultPresentBanner/Alert/Sound` init flags already default to `true`, so it's
   the delegate, not the present flags. `ios/` is gitignored → re-applied by
   `make notif-perms` (`tool/apply_notification_config.py`), like the Android receivers.
+- **"Nearest city" is the wrong question for a location label — ask "which city
+  am I in".** The reverse-geocode-free label from `assets/geo/cities.bin.gz`
+  originally took the closest GeoNames record, then promoted it to the closest
+  city over 300k within 50 km *sharing its admin1*. Inside a metro the closest
+  record is always a ward or village, so Delhi read as Najafgarh / Rohini /
+  Karol Bagh — and because the admin1 filter was inherited from that village,
+  standing in Noida (UP) picked up a Haryana village and labelled the user
+  **Faridabad**, a different city in a different state. Two rules fix it, both
+  tuned against the real asset rather than guessed:
+  1. **Dominance, not proximity** — maximise `population / (distance + 2 km)`.
+     The softening constant is the whole design: at 2 km a big city reaches far
+     enough to absorb its own wards but not far enough to swallow Gurugram,
+     Faridabad or Rawalpindi. At 5 km Gurgaon starts reading as "Delhi".
+  2. **National capital (`PPLC`) within 25 km wins, but only if it is not more
+     than 10 km further than the dominant city.** GeoNames carries both "Delhi"
+     (11M) and "New Delhi" (318k), and users expect the capital's name. The
+     "not much further" clause is what keeps Rawalpindi (Islamabad is 14 km
+     away, Rawalpindi is underfoot) from being relabelled.
+  `PPLA` (state capitals) must NOT get the same treatment — Gandhinagar is 23 km
+  from Ahmedabad and would hijack it. Carrying the feature code cost one `u8`
+  flags byte per record (packed format v1 → v2, 26 → 27 bytes).
+- **Verify data-shaped bugs against the real asset, in a real test.** Decoding
+  `cities.bin.gz` in a throwaway Python script found the bug and let ranking
+  parameters be tuned across ~25 sampled cities in seconds; the same cases then
+  became table-driven cases in `city_repository_test.dart`, which loads the
+  shipped asset through `rootBundle`. A fixture-only test would have passed
+  throughout — the bug lived entirely in the interaction between the rule and
+  the real population/geography distribution.
+- **Screenshots can indict a stale build.** A reported "Suhur ends 5:09 PM /
+  Iftar begins 8:41 AM" looked like inverted meridiem logic, but the source was
+  correct and a two-line widget test proved it rendered `5:09 AM` / `8:41 PM`.
+  When a screenshot and the source disagree, render the widget in a test before
+  changing anything — and keep the test.
 
 ---
 

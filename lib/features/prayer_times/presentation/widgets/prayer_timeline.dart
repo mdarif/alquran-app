@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/daily_prayer_times.dart';
+import '../../domain/entities/prayer.dart';
 
 /// A clock time needs an AM/PM marker when it appears without a prayer name
 /// (notably Tahajjud); prayer rows deliberately keep their shorter format.
@@ -16,16 +17,20 @@ class PrayerTimeline extends StatelessWidget {
   const PrayerTimeline({
     required this.times,
     required this.now,
+    this.next,
     super.key,
   });
 
   final DailyPrayerTimes times;
   final DateTime now;
+  final Prayer? next;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final active = times.currentSalahAt(now)?.$1;
+    final inactiveColor = scheme.primary.withValues(alpha: 0.14);
+    final selected = times.currentSalahAt(now)?.$1 ??
+        (next?.isSalah == true ? next : times.nextSalahAfter(now)?.$1);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
       decoration: BoxDecoration(
@@ -40,7 +45,7 @@ class PrayerTimeline extends StatelessWidget {
             left: 26,
             right: 26,
             child: Divider(
-              color: scheme.primary.withValues(alpha: 0.22),
+              color: inactiveColor,
               height: 2,
             ),
           ),
@@ -51,13 +56,13 @@ class PrayerTimeline extends StatelessWidget {
                   child: Column(
                     children: [
                       Container(
-                        width: entry.$1 == active ? 26 : 18,
-                        height: entry.$1 == active ? 26 : 18,
+                        width: entry.$1 == selected ? 26 : 18,
+                        height: entry.$1 == selected ? 26 : 18,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: entry.$1 == active
+                          color: entry.$1 == selected
                               ? scheme.primary
-                              : scheme.primary.withValues(alpha: 0.14),
+                              : inactiveColor,
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -66,7 +71,7 @@ class PrayerTimeline extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               color: scheme.onSecondaryContainer,
-                              fontWeight: entry.$1 == active
+                              fontWeight: entry.$1 == selected
                                   ? FontWeight.w600
                                   : FontWeight.w500,
                             ),
@@ -109,82 +114,123 @@ class ExtraTimings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest.withValues(alpha: 0.86),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Row(
-              children: [
-                _tile(context, 'Suhur', times.suhurEnd),
-                _Divider(color: scheme.outlineVariant),
-                _tile(context, 'Iftar', times.iftar),
-                _Divider(color: scheme.outlineVariant),
-                _tile(
-                  context,
-                  'Tahajjud',
-                  nextFajr == null ? null : times.lastThirdFrom(nextFajr!),
-                ),
+    final entries = [
+      ('Suhur End', times.suhurEnd),
+      ('Iftar', times.iftar),
+      ('Tahajjud', _validTahajjudStart()),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Three across is the intended shape, but each card then gets under a
+        // third of the width: at a large text scale or on a narrow phone the
+        // labels would clip to "Suhur En…". Stack instead of clipping.
+        final scaled = MediaQuery.textScalerOf(context).scale(14);
+        if (constraints.maxWidth < _stackBelowWidth ||
+            scaled > _stackAboveTextSize) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (index, entry) in entries.indexed) ...[
+                if (index > 0) const SizedBox(height: _cardGap),
+                _card(context, entry.$1, entry.$2, stacked: true),
               ],
-            ),
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (index, entry) in entries.indexed) ...[
+                if (index > 0) const SizedBox(width: _cardGap),
+                Expanded(child: _card(context, entry.$1, entry.$2)),
+              ],
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _tile(BuildContext context, String label, DateTime? time) {
-    final use24h = MediaQuery.alwaysUse24HourFormatOf(context);
+  DateTime? _validTahajjudStart() {
+    final explicit = nextFajr;
+    final fajr = explicit != null && explicit.isAfter(times.maghrib)
+        ? explicit
+        : times.fajr.add(const Duration(days: 1));
+    if (!fajr.isAfter(times.maghrib)) return null;
+    return times.lastThirdFrom(fajr);
+  }
+
+  /// One timing as its own card. Stacked, the label and time sit on a single
+  /// line — a full-width card with two centred lines reads as a gap, not a card.
+  Widget _card(
+    BuildContext context,
+    String label,
+    DateTime? time, {
+    bool stacked = false,
+  }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            time == null ? '-' : formatClockTime(time, use24h: use24h),
-            maxLines: 1,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: scheme.onSurface,
-              fontWeight: FontWeight.w600,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
+    final labelText = Text(
+      label,
+      maxLines: 2,
+      style: theme.textTheme.labelMedium?.copyWith(
+        color: scheme.onSecondaryContainer.withValues(alpha: 0.78),
+        fontWeight: FontWeight.w500,
       ),
     );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  const _Divider({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
+    // scaleDown rather than an overflow marker: a clipped or ellipsised clock
+    // time is unreadable, a slightly smaller one is not.
+    final timeText = FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text(
+        time == null ? '-' : formatClockTime(time, use24h: _use24h(context)),
+        maxLines: 1,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: scheme.onSecondaryContainer,
+          fontWeight: FontWeight.w600,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
     return Container(
-      width: 1,
-      height: 34,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: color,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer.withValues(alpha: 0.52),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: stacked
+          ? Row(
+              children: [
+                Expanded(child: labelText),
+                const SizedBox(width: 12),
+                timeText,
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                labelText,
+                const SizedBox(height: 4),
+                timeText,
+              ],
+            ),
     );
   }
+
+  bool _use24h(BuildContext context) =>
+      MediaQuery.alwaysUse24HourFormatOf(context);
 }
+
+/// Below this width each of the three cards gets under ~110 logical px, which
+/// is not enough for "Suhur End" over a 12-hour clock time.
+const double _stackBelowWidth = 330;
+
+/// `labelMedium` is 12sp and the cards are laid out for roughly the default
+/// scale; past this the three-across form stops fitting whatever the width.
+const double _stackAboveTextSize = 19;
+
+/// House 8/12/16 spacing — matches the gap between the timeline and this row.
+const double _cardGap = 8;

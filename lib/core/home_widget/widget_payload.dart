@@ -5,9 +5,8 @@
 /// prayer-times math (Karachi method + Shafi Asr, the forbidden windows) stays
 /// in Dart, computed once and copied out.
 ///
-/// Times are **device-local wall-clock** ISO-8601 strings (no offset). The
-/// widget runs on the same device in the same zone, so the native side parses
-/// them as local — the simplest unambiguous encoding for v1.
+/// Times are explicit UTC ISO-8601 strings; native renderers convert them into
+/// the selected location's IANA timezone.
 library;
 
 import 'dart:convert';
@@ -25,12 +24,12 @@ class WidgetMarker {
 
   final String name; // e.g. "Fajr", "Sunrise" — the domain Prayer.label
   final bool isSalah; // Sunrise → false
-  final DateTime at; // device-local
+  final DateTime at;
 
   Map<String, dynamic> toJson() => {
         'name': name,
         'isSalah': isSalah,
-        'at': at.toIso8601String(),
+        'at': at.toUtc().toIso8601String(),
       };
 }
 
@@ -56,24 +55,27 @@ class WidgetPayload {
     required this.generatedAt,
     required this.hasLocation,
     required this.locationLabel,
+    required this.timezoneId,
     required this.days,
   });
 
   /// Bump when the JSON shape changes, so a stale native renderer can detect an
   /// incompatible payload instead of misreading it.
-  static const int currentSchemaVersion = 1;
+  static const int currentSchemaVersion = 2;
 
   final int schemaVersion;
   final DateTime generatedAt; // local
   final bool hasLocation;
   final String? locationLabel;
+  final String? timezoneId;
   final List<WidgetDay> days; // today + horizon (empty when !hasLocation)
 
   Map<String, dynamic> toJson() => {
         'schemaVersion': schemaVersion,
-        'generatedAt': generatedAt.toIso8601String(),
+        'generatedAt': generatedAt.toUtc().toIso8601String(),
         'hasLocation': hasLocation,
         'locationLabel': locationLabel,
+        'timezoneId': timezoneId,
         'days': days.map((d) => d.toJson()).toList(),
       };
 

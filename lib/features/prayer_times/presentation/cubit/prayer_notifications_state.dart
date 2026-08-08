@@ -7,6 +7,7 @@ class PrayerNotificationsState {
     this.hasLocation = true,
     this.delivery = const NotificationDeliveryStatus(),
     this.scheduledCount = 0,
+    this.zoneMismatch = false,
   });
 
   final bool enabled;
@@ -14,6 +15,7 @@ class PrayerNotificationsState {
   final bool hasLocation;
   final NotificationDeliveryStatus delivery;
   final int scheduledCount;
+  final bool zoneMismatch;
 
   bool get batteryOptimized => delivery.batteryOptimized;
   bool get exactAlarmsAllowed => delivery.exactAlarmsAllowed;

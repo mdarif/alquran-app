@@ -108,7 +108,11 @@ class _FakePrayerNotificationSettingsRepository
   @override
   bool enabled;
   @override
+  bool get allowZoneMismatchAlerts => false;
+  @override
   Future<void> setEnabled(bool value) async => enabled = value;
+  @override
+  Future<void> setAllowZoneMismatchAlerts(bool value) async {}
 }
 
 class _FakePrayerTimesRepository implements PrayerTimesRepository {
@@ -129,6 +133,12 @@ class _FakePrayerTimesRepository implements PrayerTimesRepository {
     saved = _loc;
     return const LocationResult(LocationStatus.ok, _loc);
   }
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async => saved = location;
+
+  @override
+  Future<void> clearLocation() async => saved = null;
 
   @override
   DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) {

@@ -174,7 +174,9 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
               ),
               if (!widget.compact) ...[
                 const SizedBox(height: 12),
-                PrayerTimeline(times: times, now: _now),
+                const _SectionHint(label: 'Today'),
+                const SizedBox(height: 8),
+                PrayerTimeline(times: times, now: _now, next: widget.next),
                 const SizedBox(height: 12),
                 ExtraTimings(times: times, nextFajr: widget.nextFajr),
               ],
@@ -247,6 +249,24 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
     if (suppressNextBadge) return null;
     if (prayer == widget.times.nextAfter(_now)?.$1) return 'Next';
     return null;
+  }
+}
+
+class _SectionHint extends StatelessWidget {
+  const _SectionHint({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w400,
+          ),
+    );
   }
 }
 

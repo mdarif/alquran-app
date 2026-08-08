@@ -15,6 +15,13 @@ abstract interface class PrayerTimesRepository {
   /// the caller reacts to [LocationStatus]. Never throws.
   Future<LocationResult> acquireLocation();
 
+  /// Persist a manually chosen location. City timezones travel with the saved
+  /// coordinates; device GPS locations deliberately use a null timezone id.
+  Future<void> saveLocation(GeoLocation location);
+
+  /// Remove the saved location and all of its associated display metadata.
+  Future<void> clearLocation();
+
   /// Prayer times for [location] on [date] (local DateTimes), or **null** when
   /// no defensible schedule exists for that day — above the polar circles the
   /// sun may not rise or set at all. Callers must degrade gracefully (hide the

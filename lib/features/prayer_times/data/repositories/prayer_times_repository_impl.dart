@@ -1,5 +1,6 @@
 import 'package:adhan/adhan.dart' as adhan;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../domain/entities/daily_prayer_times.dart';
 import '../../domain/entities/geo_location.dart';
@@ -10,19 +11,21 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
   PrayerTimesRepositoryImpl(
     this._prefs,
     this._locationProvider, {
-    DateTime Function(DateTime utc)? toLocal,
-  }) : _toLocal = toLocal ?? _deviceLocal;
+    tz.Location Function(GeoLocation location)? zoneFor,
+  }) : _zoneFor = zoneFor ?? _defaultZoneFor;
 
   final SharedPreferences _prefs;
   final LocationProvider _locationProvider;
 
-  /// UTC instant → the wall clock to display. Injectable so tests are
-  /// independent of the machine's timezone; production uses the device's.
-  final DateTime Function(DateTime utc) _toLocal;
+  /// Resolves a location to its display zone. Injectable so tests stay
+  /// independent of the machine's configured timezone.
+  final tz.Location Function(GeoLocation location) _zoneFor;
 
   static const String _kLat = 'prayer_lat';
   static const String _kLon = 'prayer_lon';
   static const String _kLabel = 'prayer_label';
+  static const String _kTimezone = 'prayer_tz';
+  static const String _kSource = 'prayer_source';
 
   // The ONLY two calculation knobs, fixed and never surfaced in the UI:
   //  • method = University of Islamic Sciences, Karachi (18°/18°) — the
@@ -44,6 +47,8 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
       latitude: lat,
       longitude: lon,
       label: _prefs.getString(_kLabel),
+      timezoneId: _prefs.getString(_kTimezone),
+      source: _sourceFromPrefs(_prefs.getString(_kSource)),
     );
   }
 
@@ -52,13 +57,41 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
     final result = await _locationProvider.current();
     final loc = result.location;
     if (result.status == LocationStatus.ok && loc != null) {
-      await _prefs.setDouble(_kLat, loc.latitude);
-      await _prefs.setDouble(_kLon, loc.longitude);
-      if (loc.label != null) {
-        await _prefs.setString(_kLabel, loc.label!);
-      }
+      await saveLocation(
+        GeoLocation(
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          label: loc.label,
+        ),
+      );
     }
     return result;
+  }
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {
+    await _prefs.setDouble(_kLat, location.latitude);
+    await _prefs.setDouble(_kLon, location.longitude);
+    if (location.label == null) {
+      await _prefs.remove(_kLabel);
+    } else {
+      await _prefs.setString(_kLabel, location.label!);
+    }
+    if (location.timezoneId == null) {
+      await _prefs.remove(_kTimezone);
+    } else {
+      await _prefs.setString(_kTimezone, location.timezoneId!);
+    }
+    await _prefs.setString(_kSource, location.source.name);
+  }
+
+  @override
+  Future<void> clearLocation() async {
+    await _prefs.remove(_kLat);
+    await _prefs.remove(_kLon);
+    await _prefs.remove(_kLabel);
+    await _prefs.remove(_kTimezone);
+    await _prefs.remove(_kSource);
   }
 
   @override
@@ -92,25 +125,41 @@ class PrayerTimesRepositoryImpl implements PrayerTimesRepository {
       // support is a future release).
       return null;
     }
+    final zone = _zoneFor(location);
     return DailyPrayerTimes(
-      fajr: _toLocal(times.fajr),
-      sunrise: _toLocal(times.sunrise),
-      dhuhr: _toLocal(times.dhuhr),
-      asr: _toLocal(times.asr),
-      maghrib: _toLocal(times.maghrib),
-      isha: _toLocal(times.isha),
+      fajr: _inZone(times.fajr, zone),
+      sunrise: _inZone(times.sunrise, zone),
+      dhuhr: _inZone(times.dhuhr, zone),
+      asr: _inZone(times.asr, zone),
+      maghrib: _inZone(times.maghrib, zone),
+      isha: _inZone(times.isha, zone),
       location: location,
       date: date,
     );
   }
 
-  /// The device's local wall clock for [utc], as a plain (non-UTC) DateTime so
-  /// its *instant* matches what it displays — `isAfter(DateTime.now())` then
-  /// ranks the day correctly (a UTC-flagged time shifted by an offset once kept
-  /// a long-passed Asr as "next" late at night). `toLocal()` applies the offset
-  /// in force at that instant, which is what makes DST days come out right.
-  static DateTime _deviceLocal(DateTime utc) {
-    final t = utc.toLocal();
-    return DateTime(t.year, t.month, t.day, t.hour, t.minute);
+  static tz.Location _defaultZoneFor(GeoLocation location) {
+    final id = location.timezoneId;
+    if (id == null) return tz.local;
+    try {
+      return tz.getLocation(id);
+    } catch (_) {
+      return tz.local;
+    }
+  }
+
+  static LocationSource _sourceFromPrefs(String? value) {
+    return LocationSource.values
+            .where((source) => source.name == value)
+            .firstOrNull ??
+        LocationSource.device;
+  }
+
+  /// Retains the precise instant while truncating seconds in the selected
+  /// location's wall clock. This also applies the offset in force at each time,
+  /// including a DST transition day.
+  static DateTime _inZone(DateTime utc, tz.Location zone) {
+    final t = tz.TZDateTime.from(utc, zone);
+    return tz.TZDateTime(zone, t.year, t.month, t.day, t.hour, t.minute);
   }
 }

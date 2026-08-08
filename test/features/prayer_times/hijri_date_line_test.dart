@@ -17,6 +17,12 @@ class _NoLocRepo implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.denied);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
   @override
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date) =>
       throw UnimplementedError();

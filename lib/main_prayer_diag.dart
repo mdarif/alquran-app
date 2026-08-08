@@ -38,6 +38,12 @@ class _DiagRepo implements PrayerTimesRepository {
       : LocationResult(LocationStatus.ok, loc);
 
   @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
+
+  @override
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
     final d = DateTime(date.year, date.month, date.day);
     DateTime t(int h, int m) => d.add(Duration(hours: h, minutes: m));

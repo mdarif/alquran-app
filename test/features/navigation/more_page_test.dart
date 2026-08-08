@@ -9,6 +9,7 @@ import 'package:al_quran/features/app_update/domain/entities/app_update_prompt.d
 import 'package:al_quran/features/app_update/domain/repositories/app_update_repository.dart';
 import 'package:al_quran/features/app_update/presentation/cubit/app_update_cubit.dart';
 import 'package:al_quran/features/navigation/presentation/pages/more_page.dart';
+import 'package:al_quran/features/navigation/presentation/pages/reminders_settings_page.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
@@ -114,7 +115,11 @@ class _FakePrayerNotificationSettingsRepository
   @override
   bool enabled = false;
   @override
+  bool get allowZoneMismatchAlerts => false;
+  @override
   Future<void> setEnabled(bool value) async => enabled = value;
+  @override
+  Future<void> setAllowZoneMismatchAlerts(bool value) async {}
 }
 
 class _FakePrayerTimesRepository implements PrayerTimesRepository {
@@ -123,6 +128,12 @@ class _FakePrayerTimesRepository implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.unavailable, null);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
   @override
   DailyPrayerTimes? timesFor(GeoLocation location, DateTime date) => null;
 }
@@ -167,13 +178,15 @@ void main() {
   });
   tearDown(GetIt.I.reset);
 
-  testWidgets('lists Reading Theme, Settings, and About in that order',
+  testWidgets('lists Reading Theme, Reminders, Settings, and About in order',
       (tester) async {
     await _pumpMore(tester);
 
     expect(find.byKey(WidgetKeys.morePage), findsOneWidget);
     expect(find.byKey(WidgetKeys.moreReadingThemeRow), findsOneWidget);
     expect(find.text('Reading Theme'), findsOneWidget);
+    expect(find.byKey(WidgetKeys.moreRemindersRow), findsOneWidget);
+    expect(find.text('Reminders'), findsOneWidget);
     expect(find.byKey(WidgetKeys.moreSettingsRow), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
     expect(find.byKey(WidgetKeys.moreAboutRow), findsOneWidget);
@@ -181,10 +194,14 @@ void main() {
 
     final themeTop =
         tester.getTopLeft(find.byKey(WidgetKeys.moreReadingThemeRow)).dy;
+    final remindersTop =
+        tester.getTopLeft(find.byKey(WidgetKeys.moreRemindersRow)).dy;
     final settingsTop =
         tester.getTopLeft(find.byKey(WidgetKeys.moreSettingsRow)).dy;
     final aboutTop = tester.getTopLeft(find.byKey(WidgetKeys.moreAboutRow)).dy;
     expect(themeTop, lessThan(settingsTop));
+    expect(themeTop, lessThan(remindersTop));
+    expect(remindersTop, lessThan(settingsTop));
     expect(settingsTop, lessThan(aboutTop));
   });
 
@@ -200,6 +217,14 @@ void main() {
     await tester.tap(find.byKey(WidgetKeys.moreReadingThemeRow));
     await tester.pumpAndSettle();
     expect(find.byType(ReadingLightSheet), findsOneWidget);
+  });
+
+  testWidgets('tapping Reminders opens the Reminders page', (tester) async {
+    await _pumpMore(tester);
+    await tester.tap(find.byKey(WidgetKeys.moreRemindersRow));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RemindersSettingsPage), findsOneWidget);
   });
 
   testWidgets('tapping Settings opens Settings', (tester) async {

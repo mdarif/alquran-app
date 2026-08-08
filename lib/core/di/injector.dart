@@ -10,12 +10,15 @@ import '../../features/app_update/data/repositories/app_update_repository_impl.d
 import '../../features/app_update/domain/repositories/app_update_repository.dart';
 import '../../features/app_update/presentation/cubit/app_update_cubit.dart';
 import '../../features/prayer_times/data/location/geolocator_location_provider.dart';
+import '../../features/prayer_times/data/repositories/city_repository_impl.dart';
 import '../../features/prayer_times/data/repositories/prayer_notification_settings_repository_impl.dart';
 import '../../features/prayer_times/data/repositories/prayer_times_repository_impl.dart';
 import '../../features/prayer_times/domain/repositories/prayer_notification_settings_repository.dart';
+import '../../features/prayer_times/domain/repositories/city_repository.dart';
 import '../../features/prayer_times/domain/repositories/prayer_times_repository.dart';
 import '../../features/prayer_times/presentation/cubit/prayer_notifications_cubit.dart';
 import '../../features/prayer_times/presentation/cubit/prayer_times_cubit.dart';
+import '../../features/prayer_times/presentation/cubit/city_search_cubit.dart';
 import '../../features/reader/data/repositories/ayah_repository_impl.dart';
 import '../../features/reader/data/repositories/ayah_bookmark_repository_impl.dart';
 import '../../features/reader/data/repositories/last_read_repository_impl.dart';
@@ -119,12 +122,16 @@ Future<void> configureDependencies() async {
     ..registerLazySingleton<AppUpdateCubit>(
       () => AppUpdateCubit(getIt<AppUpdateRepository>()),
     )
+    // The GeoNames asset is decoded only on the manual-location path.
+    ..registerLazySingleton<CityRepository>(CityRepositoryImpl.new)
     // Prayer times: location (geolocator) + on-device adhan calc. Registered
     // before ThemeCubit since its resolver reads this repo.
     ..registerLazySingleton<PrayerTimesRepository>(
       () => PrayerTimesRepositoryImpl(
         getIt<SharedPreferences>(),
-        const GeolocatorLocationProvider(),
+        GeolocatorLocationProvider(
+          cityRepository: getIt<CityRepository>(),
+        ),
       ),
     )
     // Home-screen widget bridge: the pure WidgetBridge serialises the schedule;
@@ -226,6 +233,9 @@ Future<void> configureDependencies() async {
     )
     ..registerFactory<IndexListCubit>(
       () => IndexListCubit(getIt<IndexRepository>()),
+    )
+    ..registerFactory<CitySearchCubit>(
+      () => CitySearchCubit(getIt<CityRepository>()),
     );
 
   // Translations screen: an app-lifetime singleton (like RemindersCubit /

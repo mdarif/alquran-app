@@ -24,6 +24,12 @@ class _FakeRepo implements PrayerTimesRepository {
       const LocationResult(LocationStatus.ok, _loc);
 
   @override
+  Future<void> saveLocation(GeoLocation location) async => saved = location;
+
+  @override
+  Future<void> clearLocation() async => saved = null;
+
+  @override
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
     final d = DateTime(date.year, date.month, date.day);
     return DailyPrayerTimes(

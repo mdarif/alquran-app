@@ -36,6 +36,12 @@ class _FakeRepo implements PrayerTimesRepository {
   @override
   Future<LocationResult> acquireLocation() async =>
       const LocationResult(LocationStatus.ok, _loc);
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async {}
+
+  @override
+  Future<void> clearLocation() async {}
 }
 
 /// Records what the publisher hands to the platform seam.

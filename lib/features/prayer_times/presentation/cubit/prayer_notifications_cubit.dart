@@ -1,8 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../../reminders/domain/scheduling/notification_delivery_status.dart';
 import '../../../reminders/domain/scheduling/notification_scheduler.dart';
 import '../../domain/entities/prayer.dart';
+import '../../domain/entities/geo_location.dart';
 import '../../domain/repositories/prayer_notification_settings_repository.dart';
 import '../../domain/repositories/prayer_times_repository.dart';
 import '../../domain/scheduling/prayer_notification_payload.dart';
@@ -61,6 +63,11 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
     await _settings.setEnabled(false);
     await _cancelPrayerNotifications();
     emit(const PrayerNotificationsState(enabled: false));
+  }
+
+  Future<void> turnOnAnyway() async {
+    await _settings.setAllowZoneMismatchAlerts(true);
+    await _reschedule();
   }
 
   /// Re-run the battery-optimization prompt (from the reliability hint).
@@ -141,6 +148,11 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
     await _cancelPrayerNotifications();
 
     final now = _clock();
+    if (_zoneDiffers(location, now) && !_settings.allowZoneMismatchAlerts) {
+      await _cancelPrayerNotifications();
+      emit(const PrayerNotificationsState(enabled: true, zoneMismatch: true));
+      return;
+    }
     var scheduled = 0;
     for (var dayOffset = 0; dayOffset < _windowDays; dayOffset++) {
       final day = _prayerTimes.timesFor(
@@ -171,6 +183,17 @@ class PrayerNotificationsCubit extends Cubit<PrayerNotificationsState> {
         scheduledCount: scheduled,
       ),
     );
+  }
+
+  bool _zoneDiffers(GeoLocation location, DateTime now) {
+    final id = location.timezoneId;
+    if (id == null) return false;
+    try {
+      return tz.TZDateTime.from(now, tz.getLocation(id)).timeZoneOffset !=
+          tz.TZDateTime.from(now, tz.local).timeZoneOffset;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> _cancelPrayerNotifications() async {

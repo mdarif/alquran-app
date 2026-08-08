@@ -37,6 +37,7 @@ class WidgetBridge {
         generatedAt: now,
         hasLocation: false,
         locationLabel: null,
+        timezoneId: null,
         days: const [],
       );
     }
@@ -56,6 +57,7 @@ class WidgetBridge {
         generatedAt: now,
         hasLocation: false,
         locationLabel: location.label,
+        timezoneId: location.timezoneId,
         days: const [],
       );
     }
@@ -64,6 +66,7 @@ class WidgetBridge {
       generatedAt: now,
       hasLocation: true,
       locationLabel: location.label,
+      timezoneId: location.timezoneId,
       days: days,
     );
   }
