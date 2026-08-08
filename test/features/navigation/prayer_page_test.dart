@@ -1,6 +1,6 @@
 import 'package:al_quran/core/testing/widget_keys.dart';
+import 'package:al_quran/core/theme/app_icons.dart';
 import 'package:al_quran/features/navigation/presentation/pages/prayer_page.dart';
-import 'package:al_quran/features/navigation/presentation/pages/reminders_settings_page.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/daily_prayer_times.dart';
 import 'package:al_quran/features/prayer_times/domain/entities/geo_location.dart';
 import 'package:al_quran/features/prayer_times/domain/location/location_provider.dart';
@@ -24,6 +24,12 @@ class _FakeRepo implements PrayerTimesRepository {
     saved = _loc;
     return const LocationResult(LocationStatus.ok, _loc);
   }
+
+  @override
+  Future<void> saveLocation(GeoLocation location) async => saved = location;
+
+  @override
+  Future<void> clearLocation() async => saved = null;
 
   @override
   DailyPrayerTimes timesFor(GeoLocation location, DateTime date) {
@@ -63,27 +69,26 @@ Future<void> _pump(WidgetTester tester, PrayerTimesCubit? cubit) {
 }
 
 void main() {
-  testWidgets('renders today\'s schedule and a Reminders entry point',
+  testWidgets('renders today\'s schedule without secondary settings',
       (tester) async {
     await _pump(tester, _cubit(saved: _loc, hour: 17));
     await tester.pumpAndSettle();
 
     expect(find.byKey(WidgetKeys.prayerPage), findsOneWidget);
-    for (final name in ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
+    for (final name in ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']) {
       expect(find.text(name), findsOneWidget);
     }
-    expect(find.byKey(WidgetKeys.remindersButton), findsOneWidget);
-    expect(find.text('Reminders'), findsOneWidget);
+    expect(find.text('Sunrise'), findsNothing);
+    expect(find.text('Reminders'), findsNothing);
   });
 
-  testWidgets('tapping Reminders opens the Reminders page', (tester) async {
+  testWidgets('keeps location picker legible without a city label',
+      (tester) async {
     await _pump(tester, _cubit(saved: _loc, hour: 17));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(WidgetKeys.remindersButton));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(RemindersSettingsPage), findsOneWidget);
+    expect(find.byIcon(AppIcons.editLocation), findsOneWidget);
+    expect(find.text('Location'), findsOneWidget);
   });
 
   testWidgets('no location → an enable-location affordance, no schedule',

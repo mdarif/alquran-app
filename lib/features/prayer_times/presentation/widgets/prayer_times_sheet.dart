@@ -10,6 +10,7 @@ import '../../../reminders/presentation/sunnah_occasion.dart';
 import '../../domain/entities/daily_prayer_times.dart';
 import '../../domain/entities/forbidden_window.dart';
 import '../../domain/entities/prayer.dart';
+import 'prayer_timeline.dart';
 
 String formatPrayerTime(DateTime t) {
   final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
@@ -29,6 +30,10 @@ class PrayerTimesSheet extends StatelessWidget {
     this.gregorianDate,
     this.initialNow,
     this.liveCountdown = true,
+    this.compact = true,
+    this.showDetailedRows = true,
+    this.showHeading = true,
+    this.nextFajr,
     super.key,
   });
 
@@ -38,6 +43,10 @@ class PrayerTimesSheet extends StatelessWidget {
   final DateTime? notificationFireAt;
   final DateTime? initialNow;
   final bool liveCountdown;
+  final bool compact;
+  final bool showDetailedRows;
+  final bool showHeading;
+  final DateTime? nextFajr;
 
   /// Gregorian date to convert to the Hijri (already Maghrib-rolled by the
   /// caller); null hides the date block. The [gregorianDate] (civil, for the line
@@ -56,6 +65,10 @@ class PrayerTimesSheet extends StatelessWidget {
       gregorianDate: gregorianDate,
       initialNow: initialNow,
       liveCountdown: liveCountdown,
+      compact: compact,
+      showDetailedRows: showDetailedRows,
+      showHeading: showHeading,
+      nextFajr: nextFajr,
     );
   }
 }
@@ -70,6 +83,10 @@ class _PrayerTimesSheetBody extends StatefulWidget {
     this.gregorianDate,
     this.initialNow,
     this.liveCountdown = true,
+    this.compact = true,
+    this.showDetailedRows = true,
+    this.showHeading = true,
+    this.nextFajr,
   });
 
   final DailyPrayerTimes times;
@@ -80,6 +97,10 @@ class _PrayerTimesSheetBody extends StatefulWidget {
   final DateTime? gregorianDate;
   final DateTime? initialNow;
   final bool liveCountdown;
+  final bool compact;
+  final bool showDetailedRows;
+  final bool showHeading;
+  final DateTime? nextFajr;
 
   @override
   State<_PrayerTimesSheetBody> createState() => _PrayerTimesSheetBodyState();
@@ -109,7 +130,6 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cs = theme.colorScheme;
     final times = widget.times;
     final rowNext = times.nextAfter(_now)?.$1;
     final hasActiveSalah = times.currentSalahAt(_now) != null;
@@ -132,28 +152,13 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Text(
-                    "Today's Prayer Times",
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  if (times.location.label != null) ...[
-                    const Spacer(),
-                    Flexible(
-                      child: Text(
-                        times.location.label!,
-                        textAlign: TextAlign.end,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              if (widget.showHeading)
+                Text(
+                  "Today's Prayer Times",
+                  style: theme.textTheme.titleMedium,
+                ),
               if (widget.hijriBaseDate != null) ...[
-                const SizedBox(height: 10),
+                if (widget.showHeading) const SizedBox(height: 10),
                 _HijriDateLabel(
                   baseDate: widget.hijriBaseDate!,
                   gregorianDate: widget.gregorianDate ?? widget.hijriBaseDate!,
@@ -167,50 +172,59 @@ class _PrayerTimesSheetBodyState extends State<_PrayerTimesSheetBody> {
                 notificationPrayer: notificationPrayer,
                 notificationFireAt: widget.notificationFireAt,
               ),
-              const SizedBox(height: 8),
-              // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq — not a
-              // salah, so never highlighted), then the remaining four prayers.
-              _PrayerRow(
-                label: Prayer.fajr.label,
-                time: times.fajr,
-                isNext: rowNext == Prayer.fajr,
-                badge: _badgeFor(
-                  Prayer.fajr,
-                  notificationPrayer,
-                  notificationCurrent,
-                  suppressNextBadge,
-                ),
-              ),
-              _PrayerRow(
-                label: 'Sunrise',
-                time: times.sunrise,
-                isNext: rowNext == Prayer.sunrise,
-                muted: true,
-                badge: _badgeFor(
-                  Prayer.sunrise,
-                  notificationPrayer,
-                  notificationCurrent,
-                  suppressNextBadge,
-                ),
-                forbidden: forbidden[ForbiddenReason.afterSunrise],
-              ),
-              for (final (prayer, time) in times.schedule.skip(1))
+              if (!widget.compact) ...[
+                const SizedBox(height: 12),
+                PrayerTimeline(times: times, now: _now),
+                const SizedBox(height: 12),
+                ExtraTimings(times: times, nextFajr: widget.nextFajr),
+              ],
+              if (widget.showDetailedRows) ...[
+                const SizedBox(height: 8),
+                // Fajr, then Sunrise as a muted marker (end of Fajr / Ishraq —
+                // not a salah, so never highlighted), then the remaining four
+                // prayers.
                 _PrayerRow(
-                  label: prayer.label,
-                  time: time,
-                  isNext: prayer == rowNext,
+                  label: Prayer.fajr.label,
+                  time: times.fajr,
+                  isNext: rowNext == Prayer.fajr,
                   badge: _badgeFor(
-                    prayer,
+                    Prayer.fajr,
                     notificationPrayer,
                     notificationCurrent,
                     suppressNextBadge,
                   ),
-                  forbidden: switch (prayer) {
-                    Prayer.dhuhr => forbidden[ForbiddenReason.zenith],
-                    Prayer.maghrib => forbidden[ForbiddenReason.beforeSunset],
-                    _ => null,
-                  },
                 ),
+                _PrayerRow(
+                  label: 'Sunrise',
+                  time: times.sunrise,
+                  isNext: rowNext == Prayer.sunrise,
+                  muted: true,
+                  badge: _badgeFor(
+                    Prayer.sunrise,
+                    notificationPrayer,
+                    notificationCurrent,
+                    suppressNextBadge,
+                  ),
+                  forbidden: forbidden[ForbiddenReason.afterSunrise],
+                ),
+                for (final (prayer, time) in times.schedule.skip(1))
+                  _PrayerRow(
+                    label: prayer.label,
+                    time: time,
+                    isNext: prayer == rowNext,
+                    badge: _badgeFor(
+                      prayer,
+                      notificationPrayer,
+                      notificationCurrent,
+                      suppressNextBadge,
+                    ),
+                    forbidden: switch (prayer) {
+                      Prayer.dhuhr => forbidden[ForbiddenReason.zenith],
+                      Prayer.maghrib => forbidden[ForbiddenReason.beforeSunset],
+                      _ => null,
+                    },
+                  ),
+              ],
             ],
           ),
         ),
@@ -292,7 +306,7 @@ class _PrayerFocusCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: cs.primaryContainer.withValues(alpha: 0.48),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -403,7 +417,7 @@ class _NextPrayerFocusCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: cs.primaryContainer.withValues(alpha: 0.48),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -432,7 +446,7 @@ class _NextPrayerFocusCard extends StatelessWidget {
                   formatPrayerTime(at),
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -477,7 +491,7 @@ class _ForbiddenFocusCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: gold.withValues(alpha: 0.13),
         border: Border.all(color: gold.withValues(alpha: 0.28)),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -570,7 +584,7 @@ class _FocusEndpoint extends StatelessWidget {
           textAlign: align,
           style: theme.textTheme.labelLarge?.copyWith(
             color: cs.onPrimaryContainer,
-            fontWeight: emphasized ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: emphasized ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
         Text(
@@ -784,7 +798,7 @@ class _HijriDateLabel extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: dateStyle?.copyWith(
               color: isSunnah ? gold : cs.onSurface,
-              fontWeight: isSunnah ? FontWeight.w700 : FontWeight.w600,
+              fontWeight: isSunnah ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
         ),
@@ -798,7 +812,7 @@ class _HijriDateLabel extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: dateStyle?.copyWith(
                 color: cs.onSurfaceVariant.withValues(alpha: 0.88),
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
