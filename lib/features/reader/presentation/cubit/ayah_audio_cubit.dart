@@ -133,9 +133,7 @@ class AyahAudioCubit extends Cubit<AyahAudioState> {
     if (_translationAudioEnabled &&
         _translationPlayer != null &&
         _inFatihaPocScope(completedAyahId)) {
-      await _translationPlayer.playAsset(
-        sahihInternationalAssetPath(surah: 1, ayah: completedAyahId!),
-      );
+      await _translationPlayer.play(surah: 1, ayah: completedAyahId!);
     }
 
     int? next;

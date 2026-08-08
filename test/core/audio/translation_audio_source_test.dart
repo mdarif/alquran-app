@@ -10,14 +10,15 @@ void main() {
     });
   });
 
-  group('sahihInternationalAssetPath', () {
-    // POC scope is Al-Fatihah only (bundled local assets, no CDN yet — see
-    // docs/translation-audio-chaining-plan.md Phase 2). The helper itself is
-    // general so it doesn't need to change when the POC grows past Fatiha.
-    test('builds the bundled asset path from surah/ayah', () {
+  group('translationAudioUrl', () {
+    // R2 publish (2026-08-08): al-quran-audio bucket, translation-audio/
+    // prefix — sibling to recitation/, not nested under it. See
+    // ../alquran-data/docs/translation-audio-r2-publish-plan.md.
+    test('builds the R2 URL from surah/ayah', () {
       expect(
-        sahihInternationalAssetPath(surah: 1, ayah: 1),
-        'assets/audio/poc/en-sahih-international/001001.mp3',
+        translationAudioUrl(surah: 1, ayah: 1),
+        'https://audio.alquranreader.com/translation-audio/'
+        'en-sahih-international/001001.mp3',
       );
     });
 
@@ -35,8 +36,27 @@ void main() {
         isNot(contains(translationAudioKey(surah: 2, ayah: 1))),
       );
       expect(
-        sahihInternationalAssetPath(surah: 2, ayah: 1),
-        'assets/audio/poc/en-sahih-international/002001.mp3',
+        translationAudioUrl(surah: 2, ayah: 1),
+        'https://audio.alquranreader.com/translation-audio/'
+        'en-sahih-international/002001.mp3',
+      );
+    });
+  });
+
+  group('translationAudioCacheRelativePath', () {
+    test('builds a cache path namespaced by the edition slug', () {
+      expect(
+        translationAudioCacheRelativePath(surah: 1, ayah: 1),
+        'translation-audio/en-sahih-international/001001.mp3',
+      );
+    });
+
+    // Distinct namespace from the Arabic recitation cache
+    // (recitation/alafasy_64/...) so the two can never collide on disk.
+    test('cache path never collides with the recitation cache namespace', () {
+      expect(
+        translationAudioCacheRelativePath(surah: 1, ayah: 1),
+        isNot(startsWith('recitation/')),
       );
     });
   });

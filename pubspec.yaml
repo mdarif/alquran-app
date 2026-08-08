@@ -148,11 +148,6 @@ flutter:
     # Version marker (db_meta.built_at) used to re-seed the bundled DB on update.
     # Regenerate after replacing quran.db: `make seed-version`.
     - assets/db/quran.db.version
-    # Al-Fatihah translation-audio POC (docs/translation-audio-chaining-plan.md
-    # Phase 2) — 7 bundled clips, local-assets-only per the dual-audio-urdu-poc
-    # precedent (no CDN dependency during POC). Licensing not yet confirmed for
-    # public release — see the plan's open questions.
-    - assets/audio/poc/en-sahih-international/
     # Compact GeoNames city index for the manual prayer-location picker.
     - assets/geo/cities.bin.gz
 

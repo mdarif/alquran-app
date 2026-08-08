@@ -17,8 +17,8 @@ class _FakeTranslationPlayer implements TranslationAudioPlayer {
   Completer<void>? _pending;
 
   @override
-  Future<void> playAsset(String assetPath) {
-    calls.add('playAsset($assetPath)');
+  Future<void> play({required int surah, required int ayah}) {
+    calls.add('play(surah: $surah, ayah: $ayah)');
     _pending = Completer<void>();
     return _pending!.future;
   }
@@ -384,7 +384,7 @@ void main() {
       await pumpEventQueue();
 
       expect(translation.calls, [
-        'playAsset(assets/audio/poc/en-sahih-international/001001.mp3)',
+        'play(surah: 1, ayah: 1)',
       ]);
       expect(player.calls, ['play(1)']); // next verse withheld mid-chain
 
@@ -436,7 +436,7 @@ void main() {
       await pumpEventQueue();
 
       expect(translation.calls, [
-        'playAsset(assets/audio/poc/en-sahih-international/001001.mp3)',
+        'play(surah: 1, ayah: 1)',
       ]);
       translation.completeCurrent();
       await pumpEventQueue();

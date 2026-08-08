@@ -101,8 +101,8 @@ class _RecordingTranslationPlayer implements TranslationAudioPlayer {
   Completer<void>? _pending;
 
   @override
-  Future<void> playAsset(String assetPath) {
-    calls.add(assetPath);
+  Future<void> play({required int surah, required int ayah}) {
+    calls.add('play(surah: $surah, ayah: $ayah)');
     _pending = Completer<void>();
     return _pending!.future;
   }
