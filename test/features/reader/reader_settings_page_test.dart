@@ -93,8 +93,7 @@ void main() {
           isReading: false,
           resources: const [_sahih],
           translationAudioDuringContinuousPlayback: true,
-          onToggleTranslationAudioDuringContinuousPlayback: (v) =>
-              reported = v,
+          onToggleTranslationAudioDuringContinuousPlayback: (v) => reported = v,
         ),
       );
       final toggle = tester.widget<SwitchListTile>(

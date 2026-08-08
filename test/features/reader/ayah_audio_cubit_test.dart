@@ -585,7 +585,8 @@ void main() {
     // player swallows failures internally (JustAudioTranslationPlayer.play);
     // this fake models the same contract by simply completing its future
     // without the cubit needing to know play() "failed" vs. "finished".
-    test('a translation-audio segment that fails to play does not stall the chain',
+    test(
+        'a translation-audio segment that fails to play does not stall the chain',
         () async {
       final translation = _FakeTranslationPlayer();
       final c = AyahAudioCubit(player, null, translation);

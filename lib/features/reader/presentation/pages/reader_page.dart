@@ -840,8 +840,7 @@ class _ReaderViewState extends State<_ReaderView> with WidgetsBindingObserver {
           onToggleTranslationPeek: _toggleShowTranslationPeek,
           showArabicMatn: _showArabicMatn,
           onToggleShowArabic: _toggleShowArabicMatn,
-          translationAudioDuringContinuousPlayback:
-              _translationAudioContinuous,
+          translationAudioDuringContinuousPlayback: _translationAudioContinuous,
           onToggleTranslationAudioDuringContinuousPlayback:
               _toggleTranslationAudioContinuous,
           onReset: _resetReadingPreferences,
