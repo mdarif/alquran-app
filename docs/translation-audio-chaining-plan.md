@@ -2,7 +2,10 @@
 
 Status: **Phase 2 (Al-Fatihah POC) built and verified on-device 2026-08-08**
 (iOS simulator — Arabic + Sahih International chained correctly through all 7
-verses). `FeatureFlags.translationAudioFatihaPoc = true`. Builds on the
+verses). `FeatureFlags.translationAudioFatihaPoc = true`. **Phase 1 (R2
+publish of the 7 Al-Fatihah files) planned and in progress as of 2026-08-08**
+— see "Rollout phases" below; Phase 1.5 (app-side switch off the bundled
+asset) is blocked on Phase 1 landing. Builds on the
 existing [dual-audio-urdu-poc-plan.md](dual-audio-urdu-poc-plan.md) POC
 (Arabic + one Urdu translation, Al-Fatihah only) but generalizes it to **any
 number of audio-backed translations**, sourced from QuranEnc.com and
@@ -290,28 +293,73 @@ chains correctly through all 7 Al-Fatihah verses, flag is on.
 
 1. **Phase 0 (done)**: source discovery + pilot fetch for Sahih International
    audio in `alquran-data` (this doc's companion work). No app changes yet.
-2. **Phase 1 — data pipeline**: build the `alquran-data` side properly —
-   `translation_audio_resources` equivalent in the pipeline's schema, a
-   `build_editions`-style packaging step for audio (content-addressed,
-   `catalogue.json`-style manifest, R2 publish under a new prefix in the
-   existing `al-quran-audio` bucket — **not** the `recitation/` prefix the
-   owner pointed at, since this is conceptually a sibling, e.g.
-   `translation-audio/<slug>/`). Publish Sahih International only.
-   **Exit gate:** audio licensing/attribution terms are confirmed for the
-   specific Sahih International/Ibrahim Walk files before any public R2/app
-   usage. Do not treat this as a soft follow-up.
-3. **Phase 2 — app POC**: extend the existing Urdu POC's queue-builder
-   concept (`DualAudioSegment`/`ConcatenatingAudioSource` pattern already
-   proven there) to the priority-ordered, N-translation `buildAyahQueue`
-   design above. Ship behind a feature flag, Detailed mode, one surah first
-   (reuse Al-Fatihah as the smoke test, matching the POC precedent). Keep the
-   POC deliberately narrow: Sahih International only, stream+cache per ayah,
-   no full-pack download UI, no Rowwad, and no extra language-selection UX.
-4. **Phase 3 — full rollout**: full-Quran Sahih International audio, per-row
+2. **Phase 1 — data pipeline, narrowed to Al-Fatihah's 7 files (in progress,
+   2026-08-08)**: publish just the 7 already-fetched Al-Fatihah Sahih
+   International files (`sources/audio/sahih-international/001001.mp3`..
+   `001007.mp3` in `alquran-data`, byte-identical to today's bundled app
+   assets) to R2 — bucket `al-quran-audio` (same bucket `recitation/` already
+   lives in), under a **sibling** prefix `translation-audio/en-sahih-international/`,
+   keyed `SSSAAA.mp3` (translation-audio's own numbering, NOT the global
+   1..6236 id `recitation/` uses). No `catalogue.json` / content-addressed
+   filenames — audio follows the simpler `recitation/` precedent (plain
+   files, the app builds URLs directly), not the text-editions packaging
+   pipeline. Full step-by-step commands + verification, written to run
+   standalone (no context from this doc needed):
+   `../alquran-data/docs/translation-audio-r2-publish-plan.md`.
+   **Full-Quran Sahih International (6236 files) is explicitly NOT part of
+   this step** — that fetch is still in progress in `alquran-data`
+   (2,820/6236 as of 2026-08-08) and gets its own publish pass later (folded
+   into Phase 3 below), once this narrow pilot proves the R2 URL shape and
+   the app-side player work. Licensing exit gate already cleared (owner,
+   2026-08-08 — see "Open questions" below), not a blocker for this step.
+3. **Phase 1.5 — app-side switch off the bundled asset (blocked on Phase 1's
+   R2 publish being verified live)**: stop bundling
+   `assets/audio/poc/en-sahih-international/*.mp3` in the app and stream +
+   cache from R2 instead — the SAME pattern `core/audio/recitation_source.dart`
+   / `JustAudioRecitationPlayer` already use for Arabic (`LockCachingAudioSource`,
+   first play streams-and-caches to a deterministic on-disk path, replays are
+   offline). Concretely, in this repo:
+   - `core/audio/translation_audio_source.dart`: add
+     `translationAudioUrl({surah, ayah})` (mirrors `alafasyUrl`, points at
+     `https://audio.alquranreader.com/translation-audio/en-sahih-international/<SSSAAA>.mp3`)
+     and `translationAudioCacheRelativePath({surah, ayah})` (mirrors
+     `recitationCacheRelativePath`, e.g.
+     `translation-audio/en-sahih-international/<SSSAAA>.mp3` under the app's
+     cache dir — deliberately namespaced so it can never collide with a
+     reciter's cache entries). Delete `sahihInternationalAssetPath` once
+     nothing references it — no local-asset fallback is planned.
+   - `core/audio/translation_audio_player.dart`: replace
+     `JustAudioTranslationPlayer`'s `setAsset`-based one-shot player with a
+     `LockCachingAudioSource`-backed one (same shape as
+     `JustAudioRecitationPlayer.play`), so `TranslationAudioPlayer`'s
+     interface method takes a resolved URI + cache path (or a `surah`/`ayah`
+     pair it resolves internally) instead of a bundled asset path.
+   - `AyahAudioCubit._advanceAfterCompletion`: swap the
+     `_translationPlayer.playAsset(sahihInternationalAssetPath(...))` call for
+     the new URL-based one.
+   - `pubspec.yaml`: remove the
+     `assets/audio/poc/en-sahih-international/` asset entry; delete the 7
+     bundled files (they only ever existed to avoid a CDN dependency during
+     the POC — see `docs/dual-audio-urdu-poc-plan.md` Track 2 — that reason
+     goes away once R2 is live).
+   - Tests: `test/core/audio/translation_audio_source_test.dart` gets a
+     numbering canary for the new URL helper (mirrors
+     `test/core/audio/recitation_source_test.dart`); the
+     `_FakeTranslationPlayer` in `test/features/reader/ayah_audio_cubit_test.dart`
+     updates its `playAsset` fake to the new interface shape.
+   - Manual verification: on-device, confirm all 7 Fatiha verses still chain
+     correctly with the SAME toggle UX as before — this step must be
+     behaviorally invisible to the reader, only the audio source changes.
+4. **Phase 2 (done)**: the app POC shipped against bundled assets — see
+   "Phase 2 status" above. Phase 1.5 swaps its audio source only; the
+   queue-builder/chaining design it proved (and the per-verse toggle,
+   chained repeat-one, etc. built on top of it since) is unaffected.
+5. **Phase 3 — full rollout**: full-Quran Sahih International audio
+   (fetch-then-publish, same shape as Phase 1 but for all 6236 files), per-row
    audio toggle in the Translations sheet, continuous-playback setting,
    download/cache management UI, error-handling per
    `docs/error-handling-runbook.md`.
-5. **Phase 4 — Rowwad and beyond**: once `english_rwwad` is compressed
+6. **Phase 4 — Rowwad and beyond**: once `english_rwwad` is compressed
    (owner's stated follow-up) and/or other QuranEnc translation-audio
    editions are chosen, add them as additional `translation_audio_resources`
    rows — no new app code, same as adding a text translation today.
@@ -323,22 +371,22 @@ chains correctly through all 7 Al-Fatihah verses, flag is on.
   ~795 KB/ayah)? Needs a pipeline step (likely re-encode via ffmpeg at a lower
   bitrate) before Phase 4 for that edition — worth scoping as its own small
   task once Sahih International ships and the pattern is proven.
-- **R2 prefix naming**: proposed `translation-audio/<slug>/` inside the
-  existing `al-quran-audio` bucket, sibling to `recitation/` — confirm before
-  Phase 1 publishing, since prefixes are effectively permanent once clients
-  reference them.
+- ~~**R2 prefix naming**~~ — **RESOLVED 2026-08-08:** `translation-audio/<slug>/`
+  inside the existing `al-quran-audio` bucket, sibling to `recitation/`.
+  Locked in for the Phase 1 Al-Fatihah publish
+  (`../alquran-data/docs/translation-audio-r2-publish-plan.md`).
 - **Per-ayah availability manifest format**: reuse QuranEnc's `files.json`
   shape directly, or normalize it into this repo's existing
   `catalogue.json` shape for consistency with text editions? Leaning
   normalize, to keep one manifest format across the whole app, but not
-  decided.
+  decided. Doesn't block the Al-Fatihah pilot (7/7 files, no missing-asset
+  case to handle yet) — matters once Phase 3 covers the full 6236.
 - **Now-playing highlight**: v1 nice-to-have or explicit backlog item for
   `docs/quality-backlog.md`?
-- **Repeat/loop mode interaction**: if a user loops a single ayah (existing
-  recitation feature), does the loop replay the full chain (Arabic +
-  translations) or just Arabic? Leaning "full chain," since the loop target
-  is "this ayah," not "this ayah's Arabic," but not yet confirmed with the
-  owner.
+- ~~**Repeat/loop mode interaction**~~ — **RESOLVED 2026-08-08:** implemented
+  as "full chain" (`AyahAudioCubit._syncLoopMode`/`_chainedRepeatOneActive`) —
+  repeat-one on a chained verse replays Arabic + translation together, not
+  just Arabic. See "Phase 2 status" above.
 - ~~**License confirmation for audio specifically**~~ — **RESOLVED 2026-08-08
   (owner):** owner has personally checked the legal position and confirmed
   everyayah.com's Sahih International/Ibrahim Walk recording is free to
